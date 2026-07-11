@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sim-kgb",
+  // Wrapper (worker-entry.js) membungkus output OpenNext (.open-next/worker.js)
+  // dan menambahkan handler `scheduled` untuk Cron Trigger.
+  "main": "worker-entry.js",
+  "compatibility_date": "2024-12-30",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    { "binding": "WORKER_SELF_REFERENCE", "service": "sim-kgb" }
+  ],
+  // R2: penyimpanan berkas SK KGB (menggantikan Vercel Blob).
+  // Buat bucket lebih dulu:  wrangler r2 bucket create sim-kgb-sk
+  "r2_buckets": [
+    { "binding": "SK_BUCKET", "bucket_name": "sim-kgb-sk" }
+  ],
+  // Cron harian (00:00 UTC) → generate notifikasi. Ditangani handler scheduled
+  // di wrapper worker (lihat worker-entry.js) yang memanggil /api/cron/notifikasi.
+  "triggers": {
+    "crons": ["0 0 * * *"]
+  },
+  "observability": { "enabled": true }
+}

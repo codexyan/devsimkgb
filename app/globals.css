@@ -1,0 +1,220 @@
+@import "tailwindcss";
+
+/* ── Clearbit Design System ─────────────────────────────────────── */
+@theme {
+  --color-midnight-ink:   #091135;
+  --color-electric-blue:  #0f77ff;
+  --color-cobalt-surface: #127ee3;
+  --color-slate:          #36394a;
+  --color-frost-border:   #e1e9f0;
+  --color-mist:           #b1bbcd;
+  --color-graphite:       #000000;
+  --color-paper:          #ffffff;
+  --color-lavender-wash:  #f5f3ff;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #091135;
+  --midnight-ink:   #091135;
+  --electric-blue:  #0f77ff;
+  --cobalt-surface: #127ee3;
+  --slate:          #36394a;
+  --frost-border:   #e1e9f0;
+  --mist:           #b1bbcd;
+  --paper:          #ffffff;
+  --lavender-wash:  #f5f3ff;
+  --focus-ring: 0px 0px 0px 1px rgb(15,119,255), 0px 1px 2px 0px rgba(12,43,100,0.32), 0px 6px 16px 0px rgba(12,43,100,0.32);
+}
+
+/* ── Token dashboard (light default) ─────────────────────────────
+   Dipakai seluruh halaman /dashboard lewat var(--*). Nilai light =
+   persis palet lama, sehingga tampilan terang tidak berubah.       */
+:root {
+  --card: #ffffff;
+  --sub:  #f6f9fc;
+  --dt1: #0f172a;  --dtn: #1a3a5c;
+  --dt2: #44607c;  --dt3: #5f7690;  --dt4: #8a9eb5;  --dt5: #a0b4c8;  --dt6: #c8d8e8;
+  --ln0: #d0dce8;  --ln1: #e0eaf2;  --ln2: #f0f4f8;
+  --tint-navy: #eef4fa;
+  --tint-blue-bg: #eff6ff;  --tint-blue-bg2: #dbeafe;  --tint-blue-ln: #bfdbfe;  --st-blue: #1e40af;
+  --tint-red-bg: #fef2f2;   --tint-red-bg2: #fee2e2;   --tint-red-ln: #fecaca;   --st-red: #dc2626;
+  --tint-amber-bg: #fff8ec; --tint-amber-bg2: #fef3c7; --tint-amber-ln: #fde68a; --st-amber: #b87c0a; --st-amber2: #92600a;
+  --tint-green-bg: #eafaf3; --tint-green-bg2: #d1fae5; --tint-green-ln: #9fe1cb; --st-green: #0f6e56;
+  --tint-violet-bg: #f3f0ff; --tint-violet-ln: #c4b5fd; --st-violet: #6d28d9;
+  --accent: #1254a7;  --accent-bg: rgba(17, 84, 167, 0.07);
+  --navy-solid: #1a3a5c;  --red-solid: #dc2626;  --green-solid: #0f6e56;
+  --amber-solid: #b87c0a; --violet-solid: #6d28d9; --blue-solid: #1e40af; --accent-solid: #1254a7;
+}
+
+/* ── Mode gelap dashboard ────────────────────────────────────────
+   Aktif saat DashboardShell menyetel data-dash-theme="dark" pada
+   <html>. Semua token (termasuk milik cb-*) dialihkan ke navy pekat. */
+html[data-dash-theme="dark"] {
+  --background: #0a111e;
+  --foreground: #e8eef7;
+  --paper: #131c2b;
+  --lavender-wash: #0a111e;
+  --frost-border: #263349;
+  --mist: #64758d;
+  --midnight-ink: #e8eef7;
+  --slate: #c3cede;
+  --electric-blue: #3d8bff;
+  --cobalt-surface: #1f6fd0;
+
+  --card: #131c2b;
+  --sub:  rgba(255, 255, 255, 0.045);
+  --dt1: #e8eef7;  --dtn: #d9e5f5;
+  --dt2: #c0cfe2;  --dt3: #9db0c9;  --dt4: #8296b0;  --dt5: #66788f;  --dt6: #4c5c70;
+  --ln0: rgba(255,255,255,0.16);  --ln1: rgba(255,255,255,0.10);  --ln2: rgba(255,255,255,0.07);
+  --tint-navy: rgba(110, 168, 255, 0.13);
+  --tint-blue-bg: rgba(96,165,250,0.13);  --tint-blue-bg2: rgba(96,165,250,0.22);  --tint-blue-ln: rgba(96,165,250,0.38);  --st-blue: #93b3f5;
+  --tint-red-bg: rgba(239,68,68,0.12);    --tint-red-bg2: rgba(239,68,68,0.20);    --tint-red-ln: rgba(239,68,68,0.36);    --st-red: #f87171;
+  --tint-amber-bg: rgba(245,158,11,0.12); --tint-amber-bg2: rgba(245,158,11,0.20); --tint-amber-ln: rgba(245,158,11,0.36); --st-amber: #fbbf24; --st-amber2: #f5cd67;
+  --tint-green-bg: rgba(52,211,153,0.12); --tint-green-bg2: rgba(52,211,153,0.22); --tint-green-ln: rgba(52,211,153,0.40); --st-green: #34d399;
+  --tint-violet-bg: rgba(167,139,250,0.15); --tint-violet-ln: rgba(167,139,250,0.42); --st-violet: #b79df8;
+  --accent: #6ea8ff;  --accent-bg: rgba(110, 168, 255, 0.14);
+  --navy-solid: #1f4d7e;  --red-solid: #cf3d3d;  --green-solid: #0d8465;
+  --amber-solid: #b8770a; --violet-solid: #7c4fe0; --blue-solid: #2e63c9; --accent-solid: #2e6fc2;
+  color-scheme: dark;
+}
+
+/* Utilitas Tailwind hardcoded yang perlu ikut gelap */
+html[data-dash-theme="dark"] .bg-white   { background-color: var(--card); }
+html[data-dash-theme="dark"] .bg-gray-50 { background-color: var(--sub); }
+
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+
+body {
+  transition: background 0.35s ease, color 0.35s ease;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.008em;
+}
+
+*:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--frost-border); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--mist); }
+
+/* ── Keyframes ──────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.anim-fade-up    { animation: fadeUp    0.4s cubic-bezier(.22,1,.36,1) both; }
+.anim-fade-in    { animation: fadeIn    0.25s ease both; }
+.anim-slide-right{ animation: slideRight 0.3s cubic-bezier(.22,1,.36,1) both; }
+
+/* ── Reveal scroll (keep for existing pages) ─────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.55s cubic-bezier(.22,1,.36,1), transform 0.55s cubic-bezier(.22,1,.36,1);
+}
+.reveal.visible { opacity: 1; transform: none; }
+
+/* ── Clearbit components ─────────────────────────── */
+.cb-card {
+  background: var(--paper);
+  border: 1px solid var(--frost-border);
+  border-radius: 12px;
+}
+
+.cb-input {
+  width: 100%;
+  border: 1px solid var(--frost-border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--midnight-ink);
+  background: var(--paper);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+}
+.cb-input::placeholder { color: var(--mist); }
+.cb-input:focus { border-color: var(--electric-blue); box-shadow: var(--focus-ring); }
+
+.cb-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--cobalt-surface); color: #fff;
+  border: none; border-radius: 8px; padding: 10px 20px;
+  font-size: 14px; font-weight: 500; font-family: inherit;
+  cursor: pointer; transition: background 0.15s;
+}
+.cb-btn:hover:not(:disabled) { background: #0d6fd4; }
+.cb-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.cb-btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: transparent; color: var(--midnight-ink);
+  border: 1px solid var(--frost-border); border-radius: 8px; padding: 9px 20px;
+  font-size: 14px; font-weight: 500; font-family: inherit;
+  cursor: pointer; transition: background 0.15s;
+}
+.cb-btn-ghost:hover { background: var(--lavender-wash); }
+
+/* ── Admin modules: modal, header chip, stat tiles (dipakai lintas halaman) ── */
+@keyframes admFade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes admRise { from { opacity: 0; transform: translateY(16px) scale(.975) } to { opacity: 1; transform: none } }
+
+.adm-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(6, 14, 28, 0.55);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  animation: admFade .2s ease both;
+}
+.adm-modal {
+  position: relative; width: 100%;
+  background: var(--card); border: 1px solid var(--ln1);
+  border-radius: 18px; box-shadow: 0 28px 70px rgba(6,14,28,0.28);
+  animation: admRise .32s cubic-bezier(.22,1,.36,1) both;
+  overflow: hidden;
+}
+.adm-modal::before {
+  content: ""; position: absolute; top: 0; left: 8%; right: 8%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201,162,39,0.55), transparent);
+}
+
+/* Chip ikon judul seksi/halaman */
+.adm-chip {
+  width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 16px rgba(9,20,40,0.16), inset 0 1px 0 rgba(255,255,255,0.22);
+}
+
+/* Kartu statistik ringkas */
+.adm-stat {
+  background: var(--card); border: 0.5px solid var(--ln1); border-radius: 14px;
+  padding: 12px 14px; position: relative; overflow: hidden;
+  transition: box-shadow .18s, transform .18s, border-color .18s;
+}
+.adm-stat.clickable { cursor: pointer; }
+.adm-stat.clickable:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(9,20,40,0.10); }
+.adm-stat.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.adm-stat-strip { position: absolute; top: 0; left: 0; right: 0; height: 2.5px; opacity: .85; }
+
+/* Input teks umum admin (mengikuti token tema) */
+.adm-input {
+  width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 13px;
+  color: var(--dt1); background: var(--card); border: 1px solid var(--ln0);
+  border-radius: 10px; outline: none; font-family: inherit; transition: border-color .15s, box-shadow .15s;
+}
+.adm-input::placeholder { color: var(--dt5); }
+.adm-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+

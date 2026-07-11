@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+// DEV LOKAL: provider di-set "sqlite" agar bisa login tanpa database Neon.
+// UNTUK PRODUKSI (Neon/Postgres): kembalikan provider ke "postgresql", set
+// DATABASE_URL/DIRECT_URL ke connection string Neon, lalu `prisma generate`.
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  nip       String   @unique
+  password  String
+  nama      String
+  jabatan   String?
+  email     String?
+  role      String   @default("SDM")
+  createdAt DateTime @default(now())
+
+  auditLogs        AuditLog[]
+  suratDibuat      SuratKGB[]             @relation("GeneratedBy")
+  kgbDibuat        RiwayatKGB[]           @relation("CreatedBy")
+  serahTerima      SerahTerima[]          @relation("SerahTerimaBy")
+  hukdisDibuat     RiwayatHukdis[]        @relation("HukdisCreatedBy")
+  profileRequests  ProfileChangeRequest[] @relation("RequestOwner")
+  rekonDibuat      RekonBulanan[]         @relation("RekonBy")
+  reviewedRequests ProfileChangeRequest[] @relation("RequestReviewer")
+}
+
+model ProfileChangeRequest {
+  id          String    @id @default(cuid())
+  userId      String
+  nama        String?
+  jabatan     String?
+  email       String?
+  status      String    @default("pending") // pending | approved | rejected
+  alasanTolak String?
+  createdAt   DateTime  @default(now())
+  reviewedAt  DateTime?
+  reviewedBy  String?
+
+  user     User  @relation("RequestOwner", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("RequestReviewer", fields: [reviewedBy], references: [id])
+
+  @@index([userId, status])
+  @@index([status])
+}
+
+model Pegawai {
+  id                    String    @id @default(cuid())
+  nip                   String    @unique
+  nama                  String
+  tempatLahir           String?
+  tanggalLahir          DateTime?
+  jenisKelamin          String?
+  pendidikanTerakhir    String?
+  jabatan               String
+  pangkat               String
+  golonganRuang         String
+  unitKerja             String   @default("Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan")
+  eselon                String?
+  jenisJabatan          String?
+  tmtGolongan           DateTime
+  mkgTahun              Int       @default(0)
+  mkgBulan              Int       @default(0)
+  gajiPokok             Int
+  tmtKgbTerakhir        DateTime
+  tmtKgbBerikutnya      DateTime
+  statusHukdis          Boolean   @default(false)
+  tanggalHukdisBerakhir DateTime?
+  jenisHukdis           String?
+  keteranganHukdis      String?
+  aktif                 Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  riwayatKGB    RiwayatKGB[]
+  riwayatHukdis RiwayatHukdis[]
+
+  @@index([aktif, tmtKgbBerikutnya])
+  @@index([statusHukdis])
+}
+
+model RiwayatKGB {
+  id               String   @id @default(cuid())
+  pegawaiId        String
+  nomorSK          String
+  tanggalSK        DateTime
+  tmtSK            DateTime
+  golonganLama     String
+  gajiPokokLama    Int
+  mkgTahunLama     Int
+  mkgBulanLama     Int
+  golonganBaru     String
+  gajiPokokBaru    Int
+  mkgTahunBaru     Int
+  mkgBulanBaru     Int
+  tmtKgbBaru       DateTime
+  tmtKgbBerikutnya DateTime
+  status                  String    @default("belum_diproses")
+  flagRapelan             Boolean   @default(false)
+  isArsip                 Boolean   @default(false)
+  konfirmasiKeuanganAt    DateTime?
+  konfirmasiKeuanganBy    String?
+  rapelanDitetapkan       Boolean?
+  inputGajiWebAt          DateTime?
+  inputGajiWebBy          String?
+  createdBy               String
+  createdAt               DateTime  @default(now())
+
+  pegawai     Pegawai       @relation(fields: [pegawaiId], references: [id], onDelete: Cascade)
+  creator     User          @relation("CreatedBy", fields: [createdBy], references: [id])
+  surat       SuratKGB?
+  serahTerima SerahTerima[]
+
+  @@index([status])
+  @@index([pegawaiId, status])
+  @@index([tmtKgbBaru])
+}
+
+model SuratKGB {
+  id               String   @id @default(cuid())
+  kgbId            String   @unique
+  nomorSurat       String
+  tanggalSurat     DateTime
+  namaKepalaKanwil String
+  nipKepalaKanwil  String
+  pathFile         String?
+  generatedAt      DateTime @default(now())
+  generatedBy      String
+
+  kgb       RiwayatKGB @relation(fields: [kgbId], references: [id], onDelete: Cascade)
+  generator User       @relation("GeneratedBy", fields: [generatedBy], references: [id])
+}
+
+model SerahTerima {
+  id                 String   @id @default(cuid())
+  kgbId              String
+  namaAdmin          String
+  keterangan         String?
+  tanggalSerahTerima DateTime @default(now())
+  createdBy          String
+
+  kgb     RiwayatKGB @relation(fields: [kgbId], references: [id], onDelete: Cascade)
+  creator User       @relation("SerahTerimaBy", fields: [createdBy], references: [id])
+}
+
+model KonfigurasiKanwil {
+  id         String   @id @default(cuid())
+  namaKepala String
+  nipKepala  String
+  nomorPP    String   @default("Nomor 5 Tahun 2024")
+  tahunPP    String   @default("2024")
+  // Kontak & operasional (dapat dikonfigurasi Super Admin di halaman Pengaturan)
+  waAdmin          String @default("")   // nomor WA admin utk tombol lupa password (format 62xxx)
+  notifKgbH1       Int    @default(14)    // peringatan awal KGB, x hari sebelum deadline SDM
+  notifKgbH2       Int    @default(7)     // peringatan mendesak KGB, x hari sebelum deadline SDM
+  sesiTimeoutMenit Int    @default(60)    // auto-logout setelah idle sekian menit
+  updatedAt  DateTime @updatedAt
+  updatedBy  String?
+}
+
+model Notifikasi {
+  id          String   @id @default(cuid())
+  judul       String
+  pesan       String
+  tipe        String // "hukdis_berakhir" | "kgb_jatuh_tempo" | "rapelan"
+  referenceId String? // id pegawai atau id KGB yang terkait
+  dibaca      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  prioritas   String   @default("normal") // "critical" | "warning" | "info" | "normal"
+  linkHref    String? // URL tujuan saat notifikasi diklik
+  kategori    String? // "kgb" | "hukdis" | "sistem"
+}
+
+model RiwayatHukdis {
+  id           String   @id @default(cuid())
+  pegawaiId    String
+  jenisHukdis  String   // "teguran_lisan" | "teguran_tertulis" | "pernyataan_tidak_puas" | "penundaan_kgb" | "penurunan_pangkat" | "pembebasan_jabatan" | "pemberhentian_dengan_hormat" | "pemberhentian_tidak_hormat"
+  nomorSK      String
+  tanggalSK    DateTime
+  tmtMulai     DateTime
+  tmtBerakhir  DateTime
+  berdampakKGB Boolean  @default(false)
+  durasiTunda  Int?     // bulan penundaan KGB (ditetapkan PIC Hukdis saat input)
+  // Dasar hukum SNAPSHOT: regulasi yang berlaku saat SK Hukdis terbit. Dikunci
+  // per catatan (asas tempus regit actum) — peraturan baru tidak mengubahnya.
+  dasarHukum   String?
+  keterangan   String?
+  createdAt    DateTime @default(now())
+  createdBy    String
+
+  pegawai Pegawai @relation(fields: [pegawaiId], references: [id], onDelete: Cascade)
+  creator User    @relation("HukdisCreatedBy", fields: [createdBy], references: [id])
+}
+
+model HukdisJenis {
+  id            String   @id @default(cuid())
+  kode          String   @unique
+  label         String
+  kategori      String   // "ringan" | "sedang" | "berat"
+  dasarHukum    String?  // teks denormalisasi dari regulasi (untuk tampil & default input)
+  // Relasi ke master Regulasi: peraturan yang mendasari jenis hukdis ini.
+  regulasiId    String?
+  regulasi      Regulasi? @relation(fields: [regulasiId], references: [id])
+  durasiHukdis  Int      @default(0)  // masa berlaku hukdis (bulan); 0 = input manual
+  berdampakKGB  Boolean  @default(false)
+  durasiTunda   Int?                  // bulan penundaan KGB, isi jika berdampakKGB
+  aktif         Boolean  @default(true)
+  urutan        Int      @default(0)
+  updatedAt     DateTime @updatedAt
+  updatedBy     String?
+
+  @@index([regulasiId])
+}
+
+model HukdisKonfigurasi {
+  id               String   @id @default(cuid())
+  notifHariH1      Int      @default(30)
+  notifHariH2      Int      @default(14)
+  updatedAt        DateTime @updatedAt
+  updatedBy        String?
+}
+
+// Master data Regulasi/Peraturan: siklus hidup dinamis (berlaku, dicabut
+// sebagian, dicabut) + rantai pergantian + pasal yang masih berlaku. Dipilih
+// saat input hukdis lalu di-snapshot ke RiwayatHukdis.dasarHukum (teks).
+model Regulasi {
+  id               String     @id @default(cuid())
+  nomor            String     // mis. "PP Nomor 94" atau "Perpres Nomor 12"
+  tahun            String     // mis. "2021"
+  tentang          String     // judul singkat, mis. "Disiplin Pegawai Negeri Sipil"
+  status           String     @default("berlaku") // "berlaku" | "dicabut_sebagian" | "dicabut"
+  pasalBerlaku     String?    // untuk dicabut_sebagian: pasal yang masih berlaku
+  digantikanOlehId String?
+  digantikanOleh   Regulasi?  @relation("Penggantian", fields: [digantikanOlehId], references: [id])
+  menggantikan     Regulasi[] @relation("Penggantian")
+  // Jenis hukdis yang mendasarkan diri pada regulasi ini
+  jenisHukdis      HukdisJenis[]
+  catatan          String?
+  urutan           Int        @default(0)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  updatedBy        String?
+
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  waktu      DateTime @default(now())
+  aksi       String
+  detail     String
+  targetNama String?
+  ipAddress  String?
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([waktu])
+  @@index([aksi])
+  @@index([userId])
+}
+
+model RekonBulanan {
+  id           String   @id @default(cuid())
+  bulanTmt     String   // format "YYYY-MM" — bulan TMT KGB yang direkon
+  tanggalInput DateTime
+  inputBy      String
+  jumlahData   Int
+  catatan      String?
+  createdAt    DateTime @default(now())
+
+  creator User @relation("RekonBy", fields: [inputBy], references: [id])
+
+  @@unique([bulanTmt])
+  @@index([bulanTmt])
+}
