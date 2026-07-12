@@ -1,50 +1,52 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets, makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { kalkulasiKGB } from "@/lib/tabelGaji";
 import { isSuperAdmin } from "@/lib/auth";
 
+export const runtime = "nodejs";
+
 /**
  * POST /api/pegawai/backfill-kgb
- * Satu kali pakai: buat RiwayatKGB untuk semua pegawai aktif yang belum punya riwayat.
- * Hanya bisa dijalankan oleh ADMIN.
+ * Buat RiwayatKGB untuk semua pegawai aktif yang belum punya riwayat.
  */
 export async function POST() {
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userLogin = await prisma.user.findUnique({
-    where: { nip: session.user.nip! },
-  });
+  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
   if (!userLogin || !isSuperAdmin(userLogin.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  // Ambil semua pegawai aktif yang belum punya riwayat KGB sama sekali
-  const pegawaiTanpaKGB = await prisma.pegawai.findMany({
-    where: {
-      aktif: true,
-      riwayatKGB: { none: {} },
-    },
-  });
+  const [allPegawai, allKgb] = await Promise.all([
+    sheets.pegawai.findMany(),
+    sheets.riwayatKGB.findMany(),
+  ]);
+  const pegawaiWithKgb = new Set(allKgb.map((k) => k.pegawaiId));
+  const pegawaiTanpaKGB = allPegawai.filter((p) => p.aktif && !pegawaiWithKgb.has(p.id));
 
   let berhasil = 0;
   let gagal = 0;
   const errors: string[] = [];
-
   const today = new Date();
 
   for (const pegawai of pegawaiTanpaKGB) {
     try {
-      const hasil = kalkulasiKGB(pegawai);
+      const hasil = kalkulasiKGB({
+        golonganRuang: pegawai.golonganRuang,
+        mkgTahun: pegawai.mkgTahun,
+        mkgBulan: pegawai.mkgBulan,
+        tmtKgbBerikutnya: pegawai.tmtKgbBerikutnya as Date,
+        tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
+      });
       const deadlineSDM = new Date(hasil.tmtKgbBaru.getFullYear(), hasil.tmtKgbBaru.getMonth() - 1, 0);
       const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const flagRapelan = todayDate > deadlineSDM;
 
-      await prisma.riwayatKGB.create({
-        data: {
+      await sheets.riwayatKGB.create(
+        makeRiwayatKGB({
           pegawaiId: pegawai.id,
-          nomorSK: "",
           tanggalSK: new Date(hasil.tmtKgbBaru),
           tmtSK: new Date(hasil.tmtKgbBaru),
           golonganLama: pegawai.golonganRuang,
@@ -60,8 +62,8 @@ export async function POST() {
           status: "belum_diproses",
           flagRapelan,
           createdBy: userLogin.id,
-        },
-      });
+        }),
+      );
       berhasil++;
     } catch {
       gagal++;
@@ -69,10 +71,5 @@ export async function POST() {
     }
   }
 
-  return NextResponse.json({
-    total: pegawaiTanpaKGB.length,
-    berhasil,
-    gagal,
-    errors,
-  });
+  return NextResponse.json({ total: pegawaiTanpaKGB.length, berhasil, gagal, errors });
 }

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { canManageHukdis } from "@/lib/auth";
+
+export const runtime = "nodejs";
 
 export async function DELETE(
   _req: Request,
@@ -14,10 +16,10 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const jenis = await prisma.hukdisJenis.findUnique({ where: { id } });
+  const jenis = (await sheets.hukdisJenis.findUnique({ id })) as any;
   if (!jenis) return NextResponse.json({ error: "Jenis tidak ditemukan" }, { status: 404 });
 
-  const used = await prisma.riwayatHukdis.count({ where: { jenisHukdis: jenis.kode } });
+  const used = await sheets.riwayatHukdis.count({ jenisHukdis: jenis.kode });
   if (used > 0) {
     return NextResponse.json(
       { error: `Tidak dapat dihapus: sudah tercatat pada ${used} riwayat hukdis` },
@@ -25,6 +27,6 @@ export async function DELETE(
     );
   }
 
-  await prisma.hukdisJenis.delete({ where: { id } });
+  await sheets.hukdisJenis.delete({ id });
   return NextResponse.json({ ok: true });
 }

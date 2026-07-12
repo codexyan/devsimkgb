@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { canManageHukdis } from "@/lib/auth";
 
-// GET /api/hukdis — daftar SELURUH catatan hukuman disiplin lintas pegawai
-// (modul Hukdis mandiri). Hanya Super Admin & SDM Hukdis.
+export const runtime = "nodejs";
+
+// GET /api/hukdis — daftar SELURUH catatan hukuman disiplin lintas pegawai.
 export async function GET() {
   const session = await auth();
   if (!session)
@@ -13,43 +14,40 @@ export async function GET() {
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
   try {
-    const [rows, jenisList] = await Promise.all([
-      prisma.riwayatHukdis.findMany({
-        orderBy: { tmtMulai: "desc" },
-        include: {
-          pegawai: { select: { id: true, nama: true, nip: true, jabatan: true, golonganRuang: true, aktif: true } },
-        },
-      }),
-      prisma.hukdisJenis.findMany({ select: { kode: true, label: true, kategori: true, dasarHukum: true } }),
+    const [rows, jenisList, pegawaiList] = await Promise.all([
+      sheets.riwayatHukdis.findMany({ orderBy: { field: "tmtMulai", dir: "desc" } }) as Promise<any[]>,
+      sheets.hukdisJenis.findMany() as Promise<any[]>,
+      sheets.pegawai.findMany(),
     ]);
 
     const jenisMap = new Map(jenisList.map((j) => [j.kode, j]));
+    const pegawaiMap = new Map(pegawaiList.map((p) => [p.id, p]));
     const now = Date.now();
 
     const data = rows.map((r) => {
       const j = jenisMap.get(r.jenisHukdis);
+      const p = pegawaiMap.get(r.pegawaiId);
       return {
         id: r.id,
-        pegawai: r.pegawai,
+        pegawai: p
+          ? { id: p.id, nama: p.nama, nip: p.nip, jabatan: p.jabatan, golonganRuang: p.golonganRuang, aktif: p.aktif }
+          : null,
         jenisHukdis: r.jenisHukdis,
         jenisLabel: j?.label ?? r.jenisHukdis,
         kategori: j?.kategori ?? "-",
         nomorSK: r.nomorSK,
-        tanggalSK: r.tanggalSK.toISOString(),
-        tmtMulai: r.tmtMulai.toISOString(),
-        tmtBerakhir: r.tmtBerakhir.toISOString(),
+        tanggalSK: r.tanggalSK ? new Date(r.tanggalSK).toISOString() : null,
+        tmtMulai: r.tmtMulai ? new Date(r.tmtMulai).toISOString() : null,
+        tmtBerakhir: r.tmtBerakhir ? new Date(r.tmtBerakhir).toISOString() : null,
         berdampakKGB: r.berdampakKGB,
         durasiTunda: r.durasiTunda,
-        // Dasar hukum snapshot per catatan; fallback ke config jenis saat ini
-        // hanya untuk catatan lama yang belum punya snapshot.
         dasarHukum: r.dasarHukum ?? j?.dasarHukum ?? null,
         keterangan: r.keterangan,
-        createdAt: r.createdAt.toISOString(),
-        aktif: r.tmtBerakhir.getTime() >= now,
+        createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
+        aktif: r.tmtBerakhir ? new Date(r.tmtBerakhir).getTime() >= now : false,
       };
     });
 
-    // Ringkasan untuk kartu statistik
     const aktif = data.filter((d) => d.aktif);
     const summary = {
       total: data.length,

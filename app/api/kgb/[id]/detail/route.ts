@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
+
+export const runtime = "nodejs";
 
 export async function GET(
   _req: Request,
@@ -12,19 +14,14 @@ export async function GET(
 
   const { id } = await params;
 
-  const kgb = await prisma.riwayatKGB.findUnique({
-    where: { id },
-    include: {
-      pegawai: true,
-      surat: true,
-    },
-  });
-
+  const kgb = await sheets.riwayatKGB.findUnique({ id });
   if (!kgb)
-    return NextResponse.json(
-      { error: "Data tidak ditemukan" },
-      { status: 404 },
-    );
+    return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
-  return NextResponse.json(kgb);
+  const [pegawai, suratList] = await Promise.all([
+    sheets.pegawai.findUnique({ id: kgb.pegawaiId }),
+    sheets.suratKGB.findMany({ where: { kgbId: id } }) as Promise<any[]>,
+  ]);
+
+  return NextResponse.json({ ...kgb, pegawai, surat: suratList[0] ?? null });
 }

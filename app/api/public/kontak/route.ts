@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 
-// Endpoint PUBLIK (tanpa auth): hanya nomor WA admin untuk tombol "Lupa
-// Password" di halaman login. Tidak membocorkan data sensitif lain.
+export const runtime = "nodejs";
+
+// Endpoint PUBLIK (tanpa auth): hanya nomor WA admin untuk tombol "Lupa Password".
 export async function GET() {
   try {
-    const cfg = await prisma.konfigurasiKanwil.findUnique({
-      where: { id: "default" },
-      select: { waAdmin: true },
-    });
+    const cfg = (await sheets.konfigurasiKanwil.findUnique({ id: "default" })) as any;
     return NextResponse.json({ waAdmin: cfg?.waAdmin ?? "" });
   } catch {
     return NextResponse.json({ waAdmin: "" });

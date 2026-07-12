@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
+import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { getGajiPokok } from "@/lib/tabelGaji";
 import { canManageHukdis } from "@/lib/auth";
+
+export const runtime = "nodejs";
 
 export async function DELETE(
   _req: Request,
@@ -18,33 +21,29 @@ export async function DELETE(
 
   const { hukdisId } = await params;
 
-  const userLogin = await prisma.user.findUnique({
-    where: { nip: session.user.nip! },
-  });
+  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
-  const hukdis = await prisma.riwayatHukdis.findUnique({
-    where: { id: hukdisId },
-    include: { pegawai: true },
-  });
+  const hukdis = (await sheets.riwayatHukdis.findUnique({ id: hukdisId })) as any;
   if (!hukdis)
     return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
-  const pegawai = hukdis.pegawai;
+  const pegawai = await sheets.pegawai.findUnique({ id: hukdis.pegawaiId });
+  if (!pegawai)
+    return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
-  // Hitung TMT yang dipulihkan jika penundaan KGB
+  const tmtBerikutnya = pegawai.tmtKgbBerikutnya ? new Date(pegawai.tmtKgbBerikutnya) : new Date();
+  // Hitung TMT yang dipulihkan jika penundaan KGB.
   const restoredTmt = hukdis.berdampakKGB && hukdis.durasiTunda
-    ? new Date(pegawai.tmtKgbBerikutnya.getFullYear(), pegawai.tmtKgbBerikutnya.getMonth() - hukdis.durasiTunda, pegawai.tmtKgbBerikutnya.getDate())
+    ? new Date(tmtBerikutnya.getFullYear(), tmtBerikutnya.getMonth() - hukdis.durasiTunda, tmtBerikutnya.getDate())
     : null;
 
   const updates: Record<string, unknown> = {};
   if (restoredTmt) updates.tmtKgbBerikutnya = restoredTmt;
 
-  // Cek apakah masih ada hukdis aktif lain untuk pegawai ini
-  const sisaHukdis = await prisma.riwayatHukdis.count({
-    where: { pegawaiId: pegawai.id, id: { not: hukdisId } },
-  });
+  // Cek apakah masih ada hukdis aktif lain untuk pegawai ini.
+  const sisaHukdis = await sheets.riwayatHukdis.count({ pegawaiId: pegawai.id, id: { not: hukdisId } });
   if (sisaHukdis === 0) {
     updates.statusHukdis = false;
     updates.tanggalHukdisBerakhir = null;
@@ -52,12 +51,11 @@ export async function DELETE(
     updates.keteranganHukdis = null;
   }
 
-  await prisma.$transaction([
-    prisma.riwayatHukdis.delete({ where: { id: hukdisId } }),
-    prisma.pegawai.update({ where: { id: pegawai.id }, data: updates }),
-  ]);
+  // Pengganti $transaction: hapus + update sekuensial (best-effort).
+  await sheets.riwayatHukdis.delete({ id: hukdisId });
+  await sheets.pegawai.update({ id: pegawai.id }, updates);
 
-  // Sinkronisasi riwayatKGB placeholder ke TMT yang dipulihkan
+  // Sinkronisasi riwayatKGB placeholder ke TMT yang dipulihkan.
   if (restoredTmt) {
     const newTmtBerikutnya = new Date(restoredTmt.getFullYear() + 2, restoredTmt.getMonth(), restoredTmt.getDate());
     const mkgTahunBaru = pegawai.mkgTahun + 2;
@@ -67,27 +65,33 @@ export async function DELETE(
     const deadlineRestored = new Date(restoredTmt.getFullYear(), restoredTmt.getMonth() - 1, 0);
     const flagRapelan = todayDate > deadlineRestored;
 
-    await prisma.riwayatKGB.deleteMany({ where: { pegawaiId: pegawai.id, status: "belum_diproses" } });
-    await prisma.riwayatKGB.create({
-      data: {
-        pegawaiId: pegawai.id,
-        nomorSK: "",
-        tanggalSK: restoredTmt,
-        tmtSK: restoredTmt,
-        golonganLama: pegawai.golonganRuang,
-        gajiPokokLama: pegawai.gajiPokok,
-        mkgTahunLama: pegawai.mkgTahun,
-        mkgBulanLama: pegawai.mkgBulan,
-        golonganBaru: pegawai.golonganRuang,
-        gajiPokokBaru,
-        mkgTahunBaru,
-        mkgBulanBaru: pegawai.mkgBulan,
-        tmtKgbBaru: restoredTmt,
-        tmtKgbBerikutnya: newTmtBerikutnya,
-        status: "belum_diproses",
-        flagRapelan,
-        createdBy: userLogin.id,
-      },
+    await sheets.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
+    await sheets.riwayatKGB.create({
+      id: newId(),
+      pegawaiId: pegawai.id,
+      nomorSK: "",
+      tanggalSK: restoredTmt,
+      tmtSK: restoredTmt,
+      golonganLama: pegawai.golonganRuang,
+      gajiPokokLama: pegawai.gajiPokok,
+      mkgTahunLama: pegawai.mkgTahun,
+      mkgBulanLama: pegawai.mkgBulan,
+      golonganBaru: pegawai.golonganRuang,
+      gajiPokokBaru,
+      mkgTahunBaru,
+      mkgBulanBaru: pegawai.mkgBulan,
+      tmtKgbBaru: restoredTmt,
+      tmtKgbBerikutnya: newTmtBerikutnya,
+      status: "belum_diproses",
+      flagRapelan,
+      isArsip: false,
+      konfirmasiKeuanganAt: null,
+      konfirmasiKeuanganBy: null,
+      rapelanDitetapkan: null,
+      inputGajiWebAt: null,
+      inputGajiWebBy: null,
+      createdBy: userLogin.id,
+      createdAt: new Date(),
     });
   }
 

@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
+import { newId } from "@/lib/sheets/id";
 
 interface AuditParams {
   userId: string;
@@ -9,18 +10,19 @@ interface AuditParams {
 }
 
 /**
- * Tulis audit log, fire-and-forget, tidak menghentikan response jika gagal.
+ * Tulis audit log ke Google Sheets (tab AuditLog), fire-and-forget:
+ * tidak menghentikan response jika gagal.
  */
 export function logAudit(params: AuditParams) {
-  prisma.auditLog
+  sheets.auditLog
     .create({
-      data: {
-        aksi: params.aksi,
-        detail: params.detail,
-        targetNama: params.targetNama ?? null,
-        ipAddress: params.ipAddress ?? null,
-        userId: params.userId,
-      },
+      id: newId(),
+      waktu: new Date(),
+      aksi: params.aksi,
+      detail: params.detail,
+      targetNama: params.targetNama ?? null,
+      ipAddress: params.ipAddress ?? null,
+      userId: params.userId,
     })
     .catch((err) => console.error("[auditLog] gagal menulis:", err));
 }

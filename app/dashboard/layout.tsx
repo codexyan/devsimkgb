@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import DashboardShell from "./components/DashboardShell";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -16,9 +16,9 @@ export default async function DashboardLayout({
   if (!session) redirect("/login");
 
   // Durasi auto-logout dari Pengaturan (fallback 60 mnt bila belum diatur)
-  const cfg = await prisma.konfigurasiKanwil
-    .findUnique({ where: { id: "default" }, select: { sesiTimeoutMenit: true } })
-    .catch(() => null);
+  const cfg = (await sheets.konfigurasiKanwil
+    .findUnique({ id: "default" })
+    .catch(() => null)) as { sesiTimeoutMenit?: number } | null;
 
   return (
     <DashboardShell

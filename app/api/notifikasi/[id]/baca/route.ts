@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 
-// Tandai satu notifikasi sebagai dibaca. Dipanggil oleh Topbar dan Sidebar
-// sebagai PATCH /api/notifikasi/<id>/baca (id di path, tanpa body).
+export const runtime = "nodejs";
+
+// Tandai satu notifikasi sebagai dibaca.
 export async function PATCH(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -14,17 +15,9 @@ export async function PATCH(
 
   const { id } = await params;
 
-  try {
-    await prisma.notifikasi.update({
-      where: { id },
-      data: { dibaca: true },
-    });
-  } catch {
-    return NextResponse.json(
-      { error: "Notifikasi tidak ditemukan" },
-      { status: 404 },
-    );
-  }
+  const updated = await sheets.notifikasi.update({ id }, { dibaca: true });
+  if (!updated)
+    return NextResponse.json({ error: "Notifikasi tidak ditemukan" }, { status: 404 });
 
   return NextResponse.json({ success: true });
 }

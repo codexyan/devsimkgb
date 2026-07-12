@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { authConfig } from "./auth.config";
 
 // Instance NextAuth LENGKAP (server/API): authConfig edge-safe + provider
@@ -19,8 +19,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.nip || !credentials?.password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { nip: credentials.nip as string },
+        const user = await sheets.user.findUnique({
+          nip: credentials.nip as string,
         });
 
         if (!user) return null;

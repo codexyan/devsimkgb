@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets, makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { getGajiPokok } from "@/lib/tabelGaji";
+
+export const runtime = "nodejs";
 
 /**
  * POST /api/kgb/[id]/create-next
  * Buat placeholder KGB berikutnya dari KGB yang sudah selesai.
- * Digunakan untuk repair data yang placeholder-nya tidak terbuat.
  */
 export async function POST(
   _req: Request,
@@ -18,23 +19,21 @@ export async function POST(
 
   const { id } = await params;
 
-  const kgb = await prisma.riwayatKGB.findUnique({
-    where: { id },
-    include: { pegawai: true },
-  });
-
+  const kgb = await sheets.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
 
   if (kgb.status !== "selesai")
     return NextResponse.json({ error: "Hanya KGB berstatus Selesai yang bisa dibuat placeholder-nya" }, { status: 400 });
 
-  const pegawai = kgb.pegawai;
-  const tmtNext = new Date(kgb.tmtKgbBerikutnya);
+  const pegawai = await sheets.pegawai.findUnique({ id: kgb.pegawaiId });
+  if (!pegawai)
+    return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
+
+  const tmtNext = new Date(kgb.tmtKgbBerikutnya as Date);
   const tmtNextBerikutnya = new Date(tmtNext);
   tmtNextBerikutnya.setFullYear(tmtNextBerikutnya.getFullYear() + 2);
 
-  // Sumber kebenaran: Lama = Baru dari KGB selesai, Baru = Lama + 2 tahun
   const nextMkgTahunLama = kgb.mkgTahunBaru;
   const nextMkgBulanLama = kgb.mkgBulanBaru;
   const nextGolonganLama = kgb.golonganBaru;
@@ -49,46 +48,40 @@ export async function POST(
   const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const flagRapelan = todayDate > deadlineSDM;
 
-  const userLogin = await prisma.user.findUnique({ where: { nip: session.user.nip! } });
+  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
 
-  // Hapus semua belum_diproses lama (duplikat), buat 1 bersih
-  await prisma.riwayatKGB.deleteMany({
-    where: { pegawaiId: pegawai.id, status: "belum_diproses" },
-  });
+  await sheets.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
 
-  // Update pegawai dengan nilai selesai KGB
-  await prisma.pegawai.update({
-    where: { id: pegawai.id },
-    data: {
+  await sheets.pegawai.update(
+    { id: pegawai.id },
+    {
       golonganRuang: kgb.golonganBaru,
       gajiPokok: kgb.gajiPokokBaru,
       mkgTahun: kgb.mkgTahunBaru,
       mkgBulan: kgb.mkgBulanBaru,
       tmtKgbBerikutnya: tmtNext,
     },
-  });
+  );
 
-  const next = await prisma.riwayatKGB.create({
-    data: {
-      pegawaiId: pegawai.id,
-      nomorSK: "",
-      tanggalSK: tmtNext,
-      tmtSK: tmtNext,
-      golonganLama: nextGolonganLama,
-      gajiPokokLama: nextGajiPokokLama,
-      mkgTahunLama: nextMkgTahunLama,
-      mkgBulanLama: nextMkgBulanLama,
-      golonganBaru: nextGolonganLama,
-      gajiPokokBaru: nextGajiPokokBaru,
-      mkgTahunBaru: nextMkgTahunBaru,
-      mkgBulanBaru: nextMkgBulanBaru,
-      tmtKgbBaru: tmtNext,
-      tmtKgbBerikutnya: tmtNextBerikutnya,
-      status: "belum_diproses",
-      flagRapelan,
-      createdBy: userLogin?.id ?? "",
-    },
+  const next = makeRiwayatKGB({
+    pegawaiId: pegawai.id,
+    tanggalSK: tmtNext,
+    tmtSK: tmtNext,
+    golonganLama: nextGolonganLama,
+    gajiPokokLama: nextGajiPokokLama,
+    mkgTahunLama: nextMkgTahunLama,
+    mkgBulanLama: nextMkgBulanLama,
+    golonganBaru: nextGolonganLama,
+    gajiPokokBaru: nextGajiPokokBaru,
+    mkgTahunBaru: nextMkgTahunBaru,
+    mkgBulanBaru: nextMkgBulanBaru,
+    tmtKgbBaru: tmtNext,
+    tmtKgbBerikutnya: tmtNextBerikutnya,
+    status: "belum_diproses",
+    flagRapelan,
+    createdBy: userLogin?.id ?? "",
   });
+  await sheets.riwayatKGB.create(next);
 
   return NextResponse.json({ success: true, next });
 }

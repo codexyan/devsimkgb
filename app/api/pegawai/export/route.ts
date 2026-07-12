@@ -1,35 +1,20 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
+
+export const runtime = "nodejs";
 
 export async function GET() {
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const pegawai = await prisma.pegawai.findMany({
-    orderBy: { nama: "asc" },
-  });
+  const pegawai = await sheets.pegawai.findMany({ orderBy: { field: "nama", dir: "asc" } });
 
   const HEADERS = [
-    "nip",
-    "nama",
-    "jabatan",
-    "pangkat",
-    "golonganRuang",
-    "tmtGolongan",
-    "mkgTahun",
-    "mkgBulan",
-    "gajiPokok",
-    "tmtKgbTerakhir",
-    "tmtKgbBerikutnya",
-    "tempatLahir",
-    "tanggalLahir",
-    "jenisKelamin",
-    "pendidikanTerakhir",
-    "eselon",
-    "statusHukdis",
-    "keteranganHukdis",
+    "nip", "nama", "jabatan", "pangkat", "golonganRuang", "tmtGolongan", "mkgTahun", "mkgBulan",
+    "gajiPokok", "tmtKgbTerakhir", "tmtKgbBerikutnya", "tempatLahir", "tanggalLahir",
+    "jenisKelamin", "pendidikanTerakhir", "eselon", "statusHukdis", "keteranganHukdis",
   ];
 
   function toDate(val: Date | null): string {
@@ -66,7 +51,7 @@ export async function GET() {
       esc(p.eselon),
       esc(p.statusHukdis),
       esc(p.keteranganHukdis),
-    ].join(",")
+    ].join(","),
   );
 
   const csv = [HEADERS.join(","), ...rows].join("\n");

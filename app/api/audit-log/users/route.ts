@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
+
+export const runtime = "nodejs";
 
 export async function GET() {
   const session = await auth();
@@ -9,22 +11,21 @@ export async function GET() {
   }
 
   try {
-    const users = await prisma.auditLog.findMany({
-      select: {
-        user: { select: { nama: true } },
-      },
-      distinct: ["userId"],
-      where: {
-        userId: { not: null },
-      },
-    });
+    const [logs, users] = await Promise.all([
+      sheets.auditLog.findMany(),
+      sheets.user.findMany(),
+    ]);
+    const namaById = new Map(users.map((u) => [u.id, u.nama]));
 
-    const namaList = users
-      .map((u) => u.user?.nama)
-      .filter(Boolean)
-      .sort() as string[];
+    // distinct nama user yang pernah muncul di audit log.
+    const namaSet = new Set<string>();
+    for (const l of logs) {
+      if (!l.userId) continue;
+      const n = namaById.get(l.userId);
+      if (n) namaSet.add(n);
+    }
 
-    return NextResponse.json(namaList);
+    return NextResponse.json([...namaSet].sort());
   } catch (error) {
     console.error("Error fetching audit log users:", error);
     return NextResponse.json([], { status: 500 });

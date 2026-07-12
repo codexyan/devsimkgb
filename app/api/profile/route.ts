@@ -1,39 +1,31 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import bcrypt from "bcryptjs";
 import { logAudit } from "@/lib/auditLog";
+
+export const runtime = "nodejs";
 
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Try with jabatan+email (after migration). Fallback to core fields if columns don't exist yet.
-  try {
-    const user = await prisma.user.findUnique({
-      where: { nip: session.user.nip! },
-      select: { id: true, nip: true, nama: true, jabatan: true, email: true, role: true, createdAt: true },
-    });
-    if (!user) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
-    return NextResponse.json(user);
-  } catch {
-    const user = await prisma.user.findUnique({
-      where: { nip: session.user.nip! },
-      select: { id: true, nip: true, nama: true, role: true, createdAt: true },
-    });
-    if (!user) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
-    return NextResponse.json({ ...user, jabatan: null, email: null });
-  }
+  const user = await sheets.user.findUnique({ nip: session.user.nip! });
+  if (!user) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
+  return NextResponse.json({
+    id: user.id, nip: user.nip, nama: user.nama, jabatan: user.jabatan,
+    email: user.email, role: user.role, createdAt: user.createdAt,
+  });
 }
 
 export async function PATCH(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json() as any;
+  const body = (await req.json()) as any;
   const { nama, jabatan, email, passwordLama, passwordBaru, konfirmasiPassword } = body;
 
-  const user = await prisma.user.findUnique({ where: { nip: session.user.nip! } });
+  const user = await sheets.user.findUnique({ nip: session.user.nip! });
   if (!user) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
 
   const updateData: Record<string, string> = {};
@@ -65,16 +57,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Tidak ada perubahan" }, { status: 400 });
   }
 
-  // Try update with all fields; if jabatan/email columns missing, update only core fields
-  try {
-    await prisma.user.update({ where: { id: user.id }, data: updateData });
-  } catch {
-    const { jabatan: _j, email: _e, ...coreData } = updateData;
-    if (Object.keys(coreData).length === 0) {
-      return NextResponse.json({ error: "Kolom jabatan/email belum tersedia. Jalankan migrasi database terlebih dahulu." }, { status: 500 });
-    }
-    await prisma.user.update({ where: { id: user.id }, data: coreData });
-  }
+  await sheets.user.update({ id: user.id }, updateData);
 
   logAudit({
     userId: user.id,

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
+
+export const runtime = "nodejs";
 
 // PATCH, approve atau reject permintaan
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -10,58 +12,57 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
   }
 
-  const admin = await prisma.user.findUnique({ where: { nip: session.user.nip! }, select: { id: true, nama: true } });
+  const admin = await sheets.user.findUnique({ nip: session.user.nip! });
   if (!admin) return NextResponse.json({ error: "Admin tidak ditemukan" }, { status: 404 });
 
   const { id } = await params;
-  const { action, alasanTolak } = await req.json() as any;
+  const { action, alasanTolak } = (await req.json()) as any;
 
-  const request = await prisma.profileChangeRequest.findUnique({
-    where: { id },
-    include: { user: { select: { id: true, nama: true, nip: true } } },
-  });
-
+  const request = (await sheets.profileChangeRequest.findUnique({ id })) as any;
   if (!request) return NextResponse.json({ error: "Permintaan tidak ditemukan" }, { status: 404 });
-  if (request.status !== "pending") return NextResponse.json({ error: "Permintaan sudah diproses" }, { status: 400 });
+  if (request.status !== "pending")
+    return NextResponse.json({ error: "Permintaan sudah diproses" }, { status: 400 });
+
+  const reqUser = await sheets.user.findUnique({ id: request.userId });
+  const reqUserNama = reqUser?.nama ?? "-";
 
   if (action === "approve") {
-    // Terapkan perubahan ke profil user
-    const updateData: Record<string, string | null> = {};
+    // Terapkan perubahan ke profil user (field jabatan/email selalu diterapkan,
+    // sesuai perilaku semula; nama hanya bila terisi).
+    const updateData: Record<string, string | null> = {
+      jabatan: request.jabatan ?? null,
+      email: request.email ?? null,
+    };
     if (request.nama) updateData.nama = request.nama;
-    if (request.jabatan !== undefined) updateData.jabatan = request.jabatan;
-    if (request.email !== undefined) updateData.email = request.email;
 
-    await prisma.$transaction([
-      prisma.user.update({ where: { id: request.userId }, data: updateData }),
-      prisma.profileChangeRequest.update({
-        where: { id },
-        data: { status: "approved", reviewedAt: new Date(), reviewedBy: admin.id },
-      }),
-    ]);
+    // Pengganti $transaction: dua update sekuensial (best-effort, tanpa rollback).
+    await sheets.user.update({ id: request.userId }, updateData);
+    await sheets.profileChangeRequest.update(
+      { id },
+      { status: "approved", reviewedAt: new Date(), reviewedBy: admin.id },
+    );
 
     logAudit({
       userId: admin.id,
       aksi: "approve_perubahan_profil",
-      detail: `${admin.nama} menyetujui permintaan perubahan profil ${request.user.nama}`,
+      detail: `${admin.nama} menyetujui permintaan perubahan profil ${reqUserNama}`,
     });
-
   } else if (action === "reject") {
-    await prisma.profileChangeRequest.update({
-      where: { id },
-      data: {
+    await sheets.profileChangeRequest.update(
+      { id },
+      {
         status: "rejected",
         alasanTolak: alasanTolak?.trim() || null,
         reviewedAt: new Date(),
         reviewedBy: admin.id,
       },
-    });
+    );
 
     logAudit({
       userId: admin.id,
       aksi: "reject_perubahan_profil",
-      detail: `${admin.nama} menolak permintaan perubahan profil ${request.user.nama}`,
+      detail: `${admin.nama} menolak permintaan perubahan profil ${reqUserNama}`,
     });
-
   } else {
     return NextResponse.json({ error: "Action tidak valid" }, { status: 400 });
   }

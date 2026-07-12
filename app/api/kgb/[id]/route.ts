@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
+import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { canProcessKGB } from "@/lib/auth";
+
+export const runtime = "nodejs";
 
 export async function PATCH(
   req: Request,
@@ -16,28 +19,22 @@ export async function PATCH(
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
   const { id } = await params;
-  const body = await req.json() as any;
+  const body = (await req.json()) as any;
 
-  try {
   // Toggle flagRapelan manual
   if (body.flagRapelan !== undefined) {
-    const kgb = await prisma.riwayatKGB.update({
-      where: { id },
-      data: { flagRapelan: body.flagRapelan },
-    });
+    const kgb = await sheets.riwayatKGB.update({ id }, { flagRapelan: body.flagRapelan });
+    if (!kgb) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
     return NextResponse.json(kgb);
   }
 
   // Update data SK (dari halaman generate)
   if (body.nomorSK !== undefined) {
-    const kgb = await prisma.riwayatKGB.update({
-      where: { id },
-      data: {
-        nomorSK: body.nomorSK,
-        tanggalSK: body.tanggalSK ? new Date(body.tanggalSK) : undefined,
-        tmtSK: body.tmtSK ? new Date(body.tmtSK) : undefined,
-      },
-    });
+    const patch: Record<string, unknown> = { nomorSK: body.nomorSK };
+    if (body.tanggalSK) patch.tanggalSK = new Date(body.tanggalSK);
+    if (body.tmtSK) patch.tmtSK = new Date(body.tmtSK);
+    const kgb = await sheets.riwayatKGB.update({ id }, patch);
+    if (!kgb) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
     return NextResponse.json(kgb);
   }
 
@@ -47,30 +44,24 @@ export async function PATCH(
     return NextResponse.json({ error: "Status tidak valid" }, { status: 400 });
   }
 
-  const kgb = await prisma.riwayatKGB.update({
-    where: { id },
-    data: { status: body.status },
-    include: {
-      pegawai: { select: { nama: true, nip: true } },
-    },
-  });
+  const kgb = await sheets.riwayatKGB.update({ id }, { status: body.status });
+  if (!kgb) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
 
-  const userLogin = await prisma.user.findUnique({
-    where: { nip: session.user.nip! },
-  });
+  const [pegawai, userLogin] = await Promise.all([
+    sheets.pegawai.findUnique({ id: kgb.pegawaiId }),
+    sheets.user.findUnique({ nip: session.user.nip! }),
+  ]);
 
   // Jika ditolak, catat alasan di SerahTerima
-  if (body.status === "ditolak" && body.alasanTolak) {
-    if (userLogin) {
-      await prisma.serahTerima.create({
-        data: {
-          kgbId: id,
-          namaAdmin: session.user.nama || userLogin.nama,
-          keterangan: `DITOLAK: ${body.alasanTolak}`,
-          createdBy: userLogin.id,
-        },
-      });
-    }
+  if (body.status === "ditolak" && body.alasanTolak && userLogin) {
+    await sheets.serahTerima.create({
+      id: newId(),
+      kgbId: id,
+      namaAdmin: session.user.nama || userLogin.nama,
+      keterangan: `DITOLAK: ${body.alasanTolak}`,
+      tanggalSerahTerima: new Date(),
+      createdBy: userLogin.id,
+    });
   }
 
   if (userLogin) {
@@ -84,17 +75,12 @@ export async function PATCH(
     logAudit({
       userId: userLogin.id,
       aksi,
-      detail: `Status KGB ${kgb.pegawai.nama} (${kgb.pegawai.nip}) diubah menjadi "${statusLabel[body.status] ?? body.status}"${body.alasanTolak ? `, Alasan: ${body.alasanTolak}` : ""}`,
-      targetNama: kgb.pegawai.nama,
+      detail: `Status KGB ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}) diubah menjadi "${statusLabel[body.status] ?? body.status}"${body.alasanTolak ? `, Alasan: ${body.alasanTolak}` : ""}`,
+      targetNama: pegawai?.nama ?? "-",
     });
   }
 
-  return NextResponse.json(kgb);
-  } catch (e: unknown) {
-    const code = (e as { code?: string })?.code;
-    if (code === "P2025") return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
-    throw e;
-  }
+  return NextResponse.json({ ...kgb, pegawai: pegawai ? { nama: pegawai.nama, nip: pegawai.nip } : null });
 }
 
 export async function DELETE(
@@ -109,14 +95,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
   const { id } = await params;
-
-  try {
-    await prisma.riwayatKGB.delete({ where: { id } });
-  } catch (e: unknown) {
-    const code = (e as { code?: string })?.code;
-    if (code === "P2025") return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
-    throw e;
-  }
+  const ok = await sheets.riwayatKGB.delete({ id });
+  if (!ok) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
 
   return NextResponse.json({ message: "Data KGB berhasil dihapus" });
 }

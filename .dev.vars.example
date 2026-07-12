@@ -15,3 +15,8 @@ DIRECT_URL="postgresql://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=re
 
 # Rahasia untuk melindungi endpoint cron /api/cron/notifikasi
 CRON_SECRET="ganti-dengan-rahasia-acak-panjang"
+
+# ===== Google Sheets (mode Sheets-as-backend) =====
+GOOGLE_SERVICE_ACCOUNT_EMAIL="nama-sa@project-id.iam.gserviceaccount.com"
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n"
+GOOGLE_SHEET_ID="1AbC...."

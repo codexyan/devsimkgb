@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import bcrypt from "bcryptjs";
+
+export const runtime = "nodejs";
 
 // PATCH, reset password user
 export async function PATCH(
@@ -14,22 +16,19 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const { password } = await req.json() as any;
+  const { password } = (await req.json()) as any;
 
   if (!password || password.length < 6) {
-    return NextResponse.json(
-      { error: "Password minimal 6 karakter" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Password minimal 6 karakter" }, { status: 400 });
   }
 
-  const user = await prisma.user.findUnique({ where: { id } });
+  const user = await sheets.user.findUnique({ id });
   if (!user) {
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);
-  await prisma.user.update({ where: { id }, data: { password: hashedPassword } });
+  await sheets.user.update({ id }, { password: hashedPassword });
 
   return NextResponse.json({ ok: true });
 }
@@ -47,83 +46,63 @@ export async function DELETE(
   const { id } = await params;
 
   // Cegah hapus diri sendiri
-  const me = await prisma.user.findUnique({ where: { nip: session.user.nip! } });
+  const me = await sheets.user.findUnique({ nip: session.user.nip! });
   if (me?.id === id) {
-    return NextResponse.json(
-      { error: "Tidak bisa menghapus akun yang sedang login" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Tidak bisa menghapus akun yang sedang login" }, { status: 400 });
   }
 
-  const user = await prisma.user.findUnique({ where: { id } });
+  const user = await sheets.user.findUnique({ id });
   if (!user) {
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
   }
 
-  // Ambil reassignTo dari body (opsional)
   let reassignTo: string | null = null;
   try {
-    const body = await req.json() as any;
+    const body = (await req.json()) as any;
     reassignTo = body?.reassignTo ?? null;
   } catch {
-    // body kosong = tidak ada reassign, lanjut
+    // body kosong = tidak ada reassign
   }
 
-  // Cek jumlah record yang mengacu ke user ini
   const [kgbCount, suratCount, serahTerimaCount, hukdisCount] = await Promise.all([
-    prisma.riwayatKGB.count({ where: { createdBy: id } }),
-    prisma.suratKGB.count({ where: { generatedBy: id } }),
-    prisma.serahTerima.count({ where: { createdBy: id } }),
-    prisma.riwayatHukdis.count({ where: { createdBy: id } }),
+    sheets.riwayatKGB.count({ createdBy: id }),
+    sheets.suratKGB.count({ generatedBy: id }),
+    sheets.serahTerima.count({ createdBy: id }),
+    sheets.riwayatHukdis.count({ createdBy: id }),
   ]);
 
   const total = kgbCount + suratCount + serahTerimaCount + hukdisCount;
 
   if (total > 0 && !reassignTo) {
-    // Kembalikan jumlah record supaya UI bisa tampilkan dialog reassign
     return NextResponse.json(
-      {
-        needsReassign: true,
-        counts: { kgbCount, suratCount, serahTerimaCount, hukdisCount, total },
-      },
+      { needsReassign: true, counts: { kgbCount, suratCount, serahTerimaCount, hukdisCount, total } },
       { status: 409 },
     );
   }
 
   if (total > 0 && reassignTo) {
-    // Validasi user tujuan ada dan bukan user yang sama
     if (reassignTo === id) {
-      return NextResponse.json(
-        { error: "User tujuan tidak boleh sama dengan user yang dihapus" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "User tujuan tidak boleh sama dengan user yang dihapus" }, { status: 400 });
     }
-    const targetUser = await prisma.user.findUnique({ where: { id: reassignTo } });
+    const targetUser = await sheets.user.findUnique({ id: reassignTo });
     if (!targetUser) {
-      return NextResponse.json(
-        { error: "User tujuan tidak ditemukan" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "User tujuan tidak ditemukan" }, { status: 404 });
     }
 
-    // Reassign semua record lalu hapus user dalam satu transaction
-    await prisma.$transaction([
-      prisma.riwayatKGB.updateMany({ where: { createdBy: id }, data: { createdBy: reassignTo } }),
-      prisma.suratKGB.updateMany({ where: { generatedBy: id }, data: { generatedBy: reassignTo } }),
-      prisma.serahTerima.updateMany({ where: { createdBy: id }, data: { createdBy: reassignTo } }),
-      prisma.riwayatHukdis.updateMany({ where: { createdBy: id }, data: { createdBy: reassignTo } }),
-      prisma.auditLog.updateMany({ where: { userId: id }, data: { userId: null } }),
-      prisma.user.delete({ where: { id } }),
-    ]);
+    // Reassign semua record lalu hapus user (sekuensial, pengganti $transaction).
+    await sheets.riwayatKGB.updateMany({ createdBy: id }, { createdBy: reassignTo });
+    await sheets.suratKGB.updateMany({ generatedBy: id }, { generatedBy: reassignTo } as any);
+    await sheets.serahTerima.updateMany({ createdBy: id }, { createdBy: reassignTo } as any);
+    await sheets.riwayatHukdis.updateMany({ createdBy: id }, { createdBy: reassignTo } as any);
+    await sheets.auditLog.updateMany({ userId: id }, { userId: null });
+    await sheets.user.delete({ id });
 
     return NextResponse.json({ ok: true, reassigned: total });
   }
 
-  // Tidak ada record terkait, langsung hapus
-  await prisma.$transaction([
-    prisma.auditLog.updateMany({ where: { userId: id }, data: { userId: null } }),
-    prisma.user.delete({ where: { id } }),
-  ]);
+  // Tidak ada record terkait, langsung hapus.
+  await sheets.auditLog.updateMany({ userId: id }, { userId: null });
+  await sheets.user.delete({ id });
 
   return NextResponse.json({ ok: true });
 }

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { canManageHukdis, canEditPegawai } from "@/lib/auth";
+
+export const runtime = "nodejs";
 
 export async function GET(
   _req: Request,
@@ -14,15 +16,9 @@ export async function GET(
 
   const { id } = await params;
 
-  const pegawai = await prisma.pegawai.findUnique({
-    where: { id },
-  });
-
+  const pegawai = await sheets.pegawai.findUnique({ id });
   if (!pegawai)
-    return NextResponse.json(
-      { error: "Pegawai tidak ditemukan" },
-      { status: 404 },
-    );
+    return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
   const role = session.user.role!;
   const data = canManageHukdis(role)
@@ -44,20 +40,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
   const { id } = await params;
-  const body = await req.json() as any;
+  const body = (await req.json()) as any;
 
   if (!body.tmtGolongan || !body.tmtKgbBerikutnya) {
-    return NextResponse.json(
-      { error: "TMT Golongan dan TMT KGB Berikutnya wajib diisi" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "TMT Golongan dan TMT KGB Berikutnya wajib diisi" }, { status: 400 });
   }
 
-  let pegawai;
-  try {
-    pegawai = await prisma.pegawai.update({
-    where: { id },
-    data: {
+  const pegawai = await sheets.pegawai.update(
+    { id },
+    {
       nama: body.nama,
       tempatLahir: body.tempatLahir || null,
       tanggalLahir: body.tanggalLahir ? new Date(body.tanggalLahir) : null,
@@ -79,20 +70,16 @@ export async function PATCH(
         : (() => { const d = new Date(body.tmtKgbBerikutnya); d.setFullYear(d.getFullYear() - 2); return d; })(),
       statusHukdis: body.statusHukdis || false,
       keteranganHukdis: body.keteranganHukdis || null,
-      tanggalHukdisBerakhir: body.tanggalHukdisBerakhir
-        ? new Date(body.tanggalHukdisBerakhir)
-        : null,
+      tanggalHukdisBerakhir: body.tanggalHukdisBerakhir ? new Date(body.tanggalHukdisBerakhir) : null,
       jenisHukdis: body.jenisHukdis || null,
       aktif: body.aktif !== undefined ? body.aktif : true,
+      updatedAt: new Date(),
     },
-  });
-  } catch (e: unknown) {
-    const code = (e as { code?: string })?.code;
-    if (code === "P2025") return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
-    throw e;
-  }
+  );
+  if (!pegawai)
+    return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
-  const userLogin = await prisma.user.findUnique({ where: { nip: session.user.nip! } });
+  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
   if (userLogin) {
     logAudit({
       userId: userLogin.id,
@@ -120,21 +107,19 @@ export async function DELETE(
   const { searchParams } = new URL(req.url);
   const hapusPermanent = searchParams.get("permanent") === "true";
 
-  const userLogin = await prisma.user.findUnique({ where: { nip: session.user.nip! } });
+  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const pegawai = await sheets.pegawai.findUnique({ id });
 
   if (hapusPermanent) {
-    const pegawai = await prisma.pegawai.findUnique({ where: { id }, select: { nama: true, nip: true } });
-
-    const kgbList = await prisma.riwayatKGB.findMany({
-      where: { pegawaiId: id },
-      select: { id: true },
-    });
+    const kgbList = await sheets.riwayatKGB.findMany({ where: { pegawaiId: id } });
     const kgbIds = kgbList.map((k) => k.id);
 
-    await prisma.suratKGB.deleteMany({ where: { kgbId: { in: kgbIds } } });
-    await prisma.serahTerima.deleteMany({ where: { kgbId: { in: kgbIds } } });
-    await prisma.riwayatKGB.deleteMany({ where: { pegawaiId: id } });
-    await prisma.pegawai.delete({ where: { id } });
+    if (kgbIds.length > 0) {
+      await sheets.suratKGB.deleteMany({ kgbId: { in: kgbIds } });
+      await sheets.serahTerima.deleteMany({ kgbId: { in: kgbIds } });
+    }
+    await sheets.riwayatKGB.deleteMany({ pegawaiId: id });
+    await sheets.pegawai.delete({ id });
 
     if (userLogin && pegawai) {
       logAudit({
@@ -148,12 +133,7 @@ export async function DELETE(
     return NextResponse.json({ message: "Pegawai berhasil dihapus permanen" });
   }
 
-  const pegawai = await prisma.pegawai.findUnique({ where: { id }, select: { nama: true, nip: true } });
-
-  await prisma.pegawai.update({
-    where: { id },
-    data: { aktif: false },
-  });
+  await sheets.pegawai.update({ id }, { aktif: false });
 
   if (userLogin && pegawai) {
     logAudit({

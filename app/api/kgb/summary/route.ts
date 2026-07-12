@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
+
+export const runtime = "nodejs";
 
 export async function GET() {
   const session = await auth();
@@ -8,35 +10,26 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const today = new Date();
-  // Deadline SDM = akhir bulan ke-2 sebelum TMT → rapelan jika bulan-sebelum-TMT sudah mulai
   const rapelanCutoff = new Date(today.getFullYear(), today.getMonth() + 2, 1);
 
-  const [belumDiproses, sedangDiproses, menungguKeuangan, selesai, ditolak, virtualCount, rapelan] =
-    await Promise.all([
-      prisma.riwayatKGB.count({ where: { status: "belum_diproses" } }),
-      prisma.riwayatKGB.count({ where: { status: "sedang_diproses", isArsip: false } }),
-      prisma.riwayatKGB.count({ where: { status: "menunggu_keuangan", isArsip: false } }),
-      prisma.riwayatKGB.count({ where: { status: "selesai", isArsip: false } }),
-      prisma.riwayatKGB.count({ where: { status: "ditolak", isArsip: false } }),
-      // Virtual: pegawai aktif tanpa riwayatKGB aktif (belum_diproses/sedang_diproses/menunggu_keuangan)
-      prisma.pegawai.count({
-        where: {
-          aktif: true,
-          NOT: {
-            riwayatKGB: {
-              some: { status: { in: ["belum_diproses", "sedang_diproses", "menunggu_keuangan"] } },
-            },
-          },
-        },
-      }),
-      prisma.pegawai.count({
-        where: {
-          aktif: true,
-          tmtKgbBerikutnya: { lt: rapelanCutoff },
-          NOT: { riwayatKGB: { some: { status: "selesai" } } },
-        },
-      }),
-    ]);
+  const [allKgb, pegawaiList] = await Promise.all([
+    sheets.riwayatKGB.findMany(),
+    sheets.pegawai.findMany(),
+  ]);
+  const pegAktif = pegawaiList.filter((p) => p.aktif);
+  const aktifStatus = ["belum_diproses", "sedang_diproses", "menunggu_keuangan"];
+  const activePegIds = new Set(allKgb.filter((k) => aktifStatus.includes(k.status)).map((k) => k.pegawaiId));
+  const selesaiPegIds = new Set(allKgb.filter((k) => k.status === "selesai").map((k) => k.pegawaiId));
+
+  const belumDiproses = allKgb.filter((k) => k.status === "belum_diproses").length;
+  const sedangDiproses = allKgb.filter((k) => k.status === "sedang_diproses" && !k.isArsip).length;
+  const menungguKeuangan = allKgb.filter((k) => k.status === "menunggu_keuangan" && !k.isArsip).length;
+  const selesai = allKgb.filter((k) => k.status === "selesai" && !k.isArsip).length;
+  const ditolak = allKgb.filter((k) => k.status === "ditolak" && !k.isArsip).length;
+  const virtualCount = pegAktif.filter((p) => !activePegIds.has(p.id)).length;
+  const rapelan = pegAktif.filter(
+    (p) => p.tmtKgbBerikutnya && p.tmtKgbBerikutnya < rapelanCutoff && !selesaiPegIds.has(p.id),
+  ).length;
 
   const totalBelumDiproses = belumDiproses + virtualCount;
   const total = totalBelumDiproses + sedangDiproses + menungguKeuangan + selesai + ditolak;

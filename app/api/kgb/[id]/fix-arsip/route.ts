@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { sheets } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 
+export const runtime = "nodejs";
+
 /**
  * PATCH /api/kgb/[id]/fix-arsip
- * Reset flagRapelan = false pada KGB selesai yang diinput sebagai arsip historis.
- * Sekaligus reset placeholder belum_diproses yang ter-generate dari KGB tersebut.
+ * Reset flagRapelan = false pada KGB selesai (arsip historis) + placeholder-nya.
  */
 export async function PATCH(
   _req: Request,
@@ -18,44 +19,30 @@ export async function PATCH(
 
   const { id } = await params;
 
-  const kgb = await prisma.riwayatKGB.findUnique({
-    where: { id },
-    include: { pegawai: true },
-  });
-
+  const kgb = await sheets.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
 
   if (kgb.status !== "selesai")
-    return NextResponse.json(
-      { error: "Hanya KGB berstatus Selesai yang bisa dikoreksi sebagai arsip" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Hanya KGB berstatus Selesai yang bisa dikoreksi sebagai arsip" }, { status: 400 });
 
-  // Reset flagRapelan pada KGB selesai ini
-  await prisma.riwayatKGB.update({
-    where: { id },
-    data: { flagRapelan: false },
-  });
+  const pegawai = await sheets.pegawai.findUnique({ id: kgb.pegawaiId });
 
-  // Reset flagRapelan pada placeholder belum_diproses yang merupakan kelanjutan dari KGB ini
-  // Placeholder tersebut memiliki tmtKgbBaru = tmtKgbBerikutnya dari KGB ini
-  await prisma.riwayatKGB.updateMany({
-    where: {
-      pegawaiId: kgb.pegawaiId,
-      status: "belum_diproses",
-      tmtKgbBaru: kgb.tmtKgbBerikutnya,
-    },
-    data: { flagRapelan: false },
-  });
+  await sheets.riwayatKGB.update({ id }, { flagRapelan: false });
 
-  const userLogin = await prisma.user.findUnique({ where: { nip: session.user.nip! } });
+  // Reset placeholder belum_diproses yang merupakan kelanjutan (tmtKgbBaru = tmtKgbBerikutnya KGB ini).
+  await sheets.riwayatKGB.updateMany(
+    { pegawaiId: kgb.pegawaiId, status: "belum_diproses", tmtKgbBaru: kgb.tmtKgbBerikutnya },
+    { flagRapelan: false },
+  );
+
+  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
   if (userLogin) {
     logAudit({
       userId: userLogin.id,
       aksi: "fix_arsip",
-      detail: `Koreksi arsip KGB ${kgb.pegawai.nama} (${kgb.pegawai.nip}), flagRapelan direset ke false`,
-      targetNama: kgb.pegawai.nama,
+      detail: `Koreksi arsip KGB ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}), flagRapelan direset ke false`,
+      targetNama: pegawai?.nama ?? "-",
     });
   }
 
