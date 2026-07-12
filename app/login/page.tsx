@@ -5,7 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { TransitionLink } from "@/lib/ui";
-import { NAMA_KANWIL } from "@/lib/ui";
+import { NAMA_KANWIL_SINGKAT } from "@/lib/ui";
 import { themeCss, useThemeMode, ThemeToggle } from "@/lib/landingTheme";
 
 /* ── Flat icons ─────────────────────────────────────────────────────────── */
@@ -121,14 +121,11 @@ export default function LoginPage() {
       <header className="kgb-rise" style={{
         position: "absolute", top: 0, left: 0, right: 0, zIndex: 20,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "22px clamp(20px,4.5vw,56px)", pointerEvents: "none",
+        padding: "18px clamp(16px,4.5vw,56px)", pointerEvents: "none",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "11px", pointerEvents: "auto" }}>
           <Image src="/icons.svg" alt="Crest IMIPAS" width={34} height={27} priority style={{ display: "block", flexShrink: 0 }} />
-          <div>
-            <div style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em", color: "var(--text)" }}>SIM-KGB</div>
-            <div style={{ fontSize: "9.5px", color: "var(--dim)", letterSpacing: "0.02em" }}>Kanwil Ditjenpas Kalimantan Selatan</div>
-          </div>
+          <div style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em", color: "var(--text)" }}>SIM-KGB</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", pointerEvents: "auto" }}>
           <ThemeToggle mode={mode} onToggle={toggleMode} />
@@ -144,7 +141,7 @@ export default function LoginPage() {
         flex: 1, position: "relative", zIndex: 1,
         display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center",
-        padding: "118px clamp(20px,5vw,72px) 56px",
+        padding: "104px clamp(18px,5vw,72px) 48px",
       }}>
         <div style={{ width: "100%", maxWidth: "424px" }}>
 
@@ -157,17 +154,17 @@ export default function LoginPage() {
               Area Pengelola
             </div>
             <h1 style={{
-              fontFamily: "var(--font-display), 'Playfair Display', Georgia, serif",
-              fontSize: "clamp(1.9rem,4.5vw,2.4rem)", fontWeight: 600,
-              letterSpacing: "-0.01em", lineHeight: 1.15,
+              fontFamily: "var(--font-display), 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif",
+              fontSize: "clamp(1.7rem,4.5vw,2.3rem)", fontWeight: 800,
+              letterSpacing: "-0.03em", lineHeight: 1.15,
               color: "var(--text)", margin: 0,
             }}>
-              Selamat datang <em className="kgb-shimmer" style={{ fontStyle: "italic" }}>kembali.</em>
+              Selamat datang <em className="kgb-shimmer" style={{ fontStyle: "normal" }}>kembali.</em>
             </h1>
           </div>
 
           {/* Kartu form */}
-          <div className="kgb-rise kgb-d3 lg-card" style={{ padding: "32px 30px", overflow: "hidden" }}>
+          <div className="kgb-rise kgb-d3 lg-card" style={{ padding: "clamp(22px,5.5vw,32px) clamp(20px,5vw,30px)", overflow: "hidden" }}>
             {/* Hairline emas tepi atas */}
             <span aria-hidden style={{
               position: "absolute", top: 0, left: "8%", right: "8%", height: "1px",
@@ -186,6 +183,8 @@ export default function LoginPage() {
                   <input
                     id="login-nip"
                     type="text"
+                    inputMode="numeric"
+                    maxLength={18}
                     value={nip}
                     onChange={(e) => setNip(e.target.value)}
                     placeholder="Masukkan 18 digit NIP..."
@@ -228,8 +227,9 @@ export default function LoginPage() {
                     onClick={() => setShowPwd((v) => !v)}
                     aria-label={showPwd ? "Sembunyikan password" : "Tampilkan password"}
                     style={{
-                      position: "absolute", right: "13px", top: "50%", transform: "translateY(-50%)",
-                      background: "none", border: "none", cursor: "pointer", color: "var(--dim)", padding: 0, display: "flex",
+                      position: "absolute", right: "4px", top: "50%", transform: "translateY(-50%)",
+                      background: "none", border: "none", cursor: "pointer", color: "var(--dim)",
+                      padding: "10px", display: "flex", borderRadius: "8px",
                     }}
                   >
                     {showPwd ? Ic.eyeOff : Ic.eye}
@@ -284,7 +284,7 @@ export default function LoginPage() {
               Akses terbatas
             </p>
             <p style={{ fontSize: "11px", color: "var(--dim)", opacity: .7, margin: 0 }}>
-              {NAMA_KANWIL}
+              {NAMA_KANWIL_SINGKAT}
             </p>
           </div>
         </div>
@@ -327,8 +327,8 @@ export default function LoginPage() {
             </div>
 
             <h3 style={{
-              fontFamily: "var(--font-display), 'Playfair Display', Georgia, serif",
-              fontSize: "19px", fontWeight: 600, color: "var(--text)", margin: "0 0 6px",
+              fontFamily: "var(--font-display), 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif",
+              fontSize: "19px", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text)", margin: "0 0 6px",
             }}>
               Lupa Password?
             </h3>
@@ -342,6 +342,8 @@ export default function LoginPage() {
             <input
               id="forgot-nip"
               type="text"
+              inputMode="numeric"
+              maxLength={18}
               value={nipLupa}
               onChange={(e) => setNipLupa(e.target.value)}
               placeholder="Masukkan NIP..."

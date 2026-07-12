@@ -17,6 +17,10 @@ export const C = {
 export const NAMA_KANWIL =
   "Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan";
 
+/* Versi ringkas untuk ruang sempit di UI (badge, header, footer, mobile).
+   Nama lengkap tetap dipakai pada dokumen/naskah resmi. */
+export const NAMA_KANWIL_SINGKAT = "Kanwil Ditjenpas Kalimantan Selatan";
+
 export const fmt = (s: string, opts?: Intl.DateTimeFormatOptions) =>
   new Date(s).toLocaleDateString("id-ID", opts ?? { day: "numeric", month: "long", year: "numeric" });
 

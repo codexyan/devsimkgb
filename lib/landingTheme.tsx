@@ -135,7 +135,16 @@ export const themeCss = `
     color-scheme: dark;
   }
 
+  .kgb-scene {
+    /* Kurva gerak bersama: cepat di awal, mendarat lembut */
+    --ease-out:    cubic-bezier(.22,1,.36,1);
+    --ease-spring: cubic-bezier(.34,1.45,.42,1);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+
   .kgb-scene input::placeholder { color: var(--dim); opacity: .75; }
+  .kgb-scene button, .kgb-scene a, .kgb-scene input { touch-action: manipulation; }
 
   /* ── Lapisan latar ── */
   .kgb-dots {
@@ -171,31 +180,28 @@ export const themeCss = `
 
   /* ── Tombol ikon kaca (toggle tema, dsb.) ── */
   .kgb-icon-btn {
-    width: 34px; height: 34px; border-radius: 50%;
+    width: 36px; height: 36px; border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
     background: var(--surface); color: var(--soft);
     border: 1px solid var(--hair); cursor: pointer;
     backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    transition: color .2s, border-color .2s, transform .2s, box-shadow .2s;
+    transition: color .2s, border-color .2s, transform .25s var(--ease-spring), box-shadow .2s;
     flex-shrink: 0;
   }
-  .kgb-icon-btn:hover { color: var(--gold-hi); border-color: var(--gold-soft); transform: translateY(-1px); }
+  .kgb-icon-btn:active { transform: scale(.94); }
 
   /* ── Pill kaca (tautan Masuk / kembali) ── */
   .kgb-pill {
     display: inline-flex; align-items: center; gap: 7px;
-    height: 34px; padding: 0 15px; border-radius: 9999px;
+    height: 36px; padding: 0 16px; border-radius: 9999px;
     background: var(--surface); color: var(--soft);
     border: 1px solid var(--hair); text-decoration: none;
     font-size: 12px; font-weight: 600; letter-spacing: .01em;
     backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    transition: color .2s, border-color .2s, transform .2s, box-shadow .2s;
+    transition: color .2s, border-color .2s, transform .25s var(--ease-spring), box-shadow .2s;
     white-space: nowrap;
   }
-  .kgb-pill:hover {
-    color: var(--text); border-color: var(--gold-soft);
-    transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.10);
-  }
+  .kgb-pill:active { transform: scale(.96); }
 
   /* ── Tombol emas utama ── */
   .kgb-gold-btn {
@@ -205,15 +211,32 @@ export const themeCss = `
     color: var(--btn-ink); font-family: inherit; font-weight: 700;
     letter-spacing: .01em;
     box-shadow: 0 8px 26px rgba(201,162,39,0.30), inset 0 1px 0 rgba(255,255,255,0.28);
-    transition: transform .2s, box-shadow .2s, filter .2s;
+    transition: transform .25s var(--ease-spring), box-shadow .2s, filter .2s;
   }
-  .kgb-gold-btn:hover:not(:disabled) {
-    transform: translateY(-1.5px);
-    box-shadow: 0 12px 32px rgba(201,162,39,0.40), inset 0 1px 0 rgba(255,255,255,0.28);
-    filter: brightness(1.04);
-  }
-  .kgb-gold-btn:active:not(:disabled) { transform: translateY(0); }
+  .kgb-gold-btn:active:not(:disabled) { transform: scale(.97); }
   .kgb-gold-btn:disabled { cursor: not-allowed; opacity: .55; box-shadow: none; }
+
+  /* Hover hanya untuk perangkat ber-kursor — di layar sentuh state hover
+     menempel setelah tap dan terasa janggal. */
+  @media (hover: hover) and (pointer: fine) {
+    .kgb-icon-btn:hover { color: var(--gold-hi); border-color: var(--gold-soft); transform: translateY(-1px); }
+    .kgb-pill:hover {
+      color: var(--text); border-color: var(--gold-soft);
+      transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+    }
+    .kgb-gold-btn:hover:not(:disabled) {
+      transform: translateY(-1.5px);
+      box-shadow: 0 12px 32px rgba(201,162,39,0.40), inset 0 1px 0 rgba(255,255,255,0.28);
+      filter: brightness(1.04);
+    }
+    .kgb-gold-btn:active:not(:disabled) { transform: translateY(0); }
+  }
+
+  /* ── Focus ring keyboard ── */
+  .kgb-icon-btn:focus-visible, .kgb-pill:focus-visible,
+  .kgb-gold-btn:focus-visible, .kgb-fld:focus-visible {
+    outline: 2px solid var(--gold-hi); outline-offset: 2px;
+  }
 
   /* ── Field input ── */
   .kgb-fld-wrap { position: relative; }
@@ -230,14 +253,17 @@ export const themeCss = `
   }
   .kgb-fld-wrap:focus-within .kgb-fld-ic { color: var(--gold-hi); }
 
-  /* ── Motion ── */
+  /* ── Motion ──
+     Hanya opacity + transform (komposit GPU) — tanpa animasi filter/blur
+     yang memicu repaint mahal dan patah-patah di perangkat mobile. */
   @keyframes kgbRise {
-    from { opacity: 0; transform: translateY(22px); filter: blur(6px); }
-    to   { opacity: 1; transform: none; filter: blur(0); }
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: none; }
   }
   @keyframes kgbShimmer { to { background-position: -220% 0; } }
   @keyframes kgbBlink   { 0%,100% { opacity: 1 } 50% { opacity: 0 } }
   @keyframes kgbSpin    { to { transform: rotate(360deg) } }
+  @keyframes spin       { to { transform: rotate(360deg) } }
   @keyframes kgbPulse   { 0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.45) } 70% { box-shadow: 0 0 0 6px rgba(34,197,94,0) } }
   @keyframes kgbFloatA  { from { transform: translate(0,0) scale(1) } to { transform: translate(70px,50px) scale(1.12) } }
   @keyframes kgbFloatB  { from { transform: translate(0,0) scale(1.08) } to { transform: translate(-80px,-55px) scale(1) } }
@@ -250,10 +276,21 @@ export const themeCss = `
     to   { opacity: 1; transform: none; }
   }
 
-  .kgb-rise { animation: kgbRise .7s cubic-bezier(.22,1,.36,1) both; }
-  .kgb-d1 { animation-delay: .08s } .kgb-d2 { animation-delay: .16s }
-  .kgb-d3 { animation-delay: .24s } .kgb-d4 { animation-delay: .34s }
-  .kgb-d5 { animation-delay: .44s } .kgb-d6 { animation-delay: .56s }
+  .kgb-rise { animation: kgbRise .65s var(--ease-out) both; }
+  .kgb-d1 { animation-delay: .06s } .kgb-d2 { animation-delay: .13s }
+  .kgb-d3 { animation-delay: .20s } .kgb-d4 { animation-delay: .28s }
+  .kgb-d5 { animation-delay: .37s } .kgb-d6 { animation-delay: .48s }
+
+  /* ── Penyesuaian mobile ── */
+  @media (max-width: 640px) {
+    /* Orb lebih kecil + blur lebih ringan: hemat GPU layar sentuh */
+    .kgb-orb { filter: blur(48px); }
+    .kgb-orb-a { width: 340px; height: 340px; top: -150px; left: -110px; }
+    .kgb-orb-b { width: 380px; height: 380px; bottom: -180px; right: -130px; }
+    .kgb-dots { background-size: 22px 22px; }
+    /* 16px mencegah auto-zoom iOS saat fokus ke input */
+    .kgb-fld { font-size: 16px; }
+  }
 
   @media (prefers-reduced-motion: reduce) {
     .kgb-scene, .kgb-scene *, .kgb-scene *::before, .kgb-scene *::after {

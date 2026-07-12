@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { PageTransitionProvider } from "@/lib/ui";
 
@@ -10,12 +10,11 @@ const inter = Inter({
   display: "swap",
 });
 
-// Serif display untuk headline halaman publik (landing & login)
-const playfair = Playfair_Display({
+// Sans geometris tegas untuk headline halaman publik (landing & login)
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-display",
   weight: ["500", "600", "700", "800"],
-  style: ["normal", "italic"],
   display: "swap",
 });
 
@@ -37,7 +36,7 @@ export default function RootLayout({
     // suppressHydrationWarning: script bootstrap tema menyetel data-dash-theme
     // pada <html> sebelum React hydrate (pola next-themes); perbedaan atribut
     // di elemen ini disengaja dan aman diabaikan.
-    <html lang="id" suppressHydrationWarning className={`${inter.variable} ${playfair.variable} h-full antialiased`}>
+    <html lang="id" suppressHydrationWarning className={`${inter.variable} ${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         {/* Terapkan tema tersimpan SEBELUM hydration (anti-flash, dashboard
             langsung gelap). Di root layout agar hanya dirender saat full load

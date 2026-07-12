@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { TransitionLink } from "@/lib/ui";
-import { fmt, Ic, NAMA_KANWIL } from "@/lib/ui";
+import { fmt, Ic, NAMA_KANWIL_SINGKAT } from "@/lib/ui";
 import { themeCss, useThemeMode, ThemeToggle } from "@/lib/landingTheme";
 
 /* ── Typewriter: frasa penutup headline ─────────────────────────────────── */
@@ -35,7 +35,7 @@ function TypewriterCycle() {
 
   return (
     <span style={{ whiteSpace: "nowrap" }}>
-      <em className="kgb-shimmer" style={{ fontStyle: "italic" }}>{displayed}</em>
+      <em className="kgb-shimmer" style={{ fontStyle: "normal" }}>{displayed}</em>
       <span aria-hidden style={{
         display: "inline-block", width: "3px", height: "0.78em",
         background: "var(--gold-hi)", marginLeft: "4px", verticalAlign: "baseline",
@@ -95,6 +95,8 @@ export default function KgbLandingPage() {
       <style>{`
         ${themeCss}
         .cek-shell {
+          display: flex; align-items: center; gap: 6px;
+          border-radius: 18px; padding: 6px 6px 6px 16px;
           background: var(--surface);
           border: 1.5px solid var(--hair);
           backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
@@ -105,7 +107,20 @@ export default function KgbLandingPage() {
           border-color: var(--gold-hi);
           box-shadow: 0 0 0 4px var(--gold-wash), 0 10px 34px rgba(0,0,0,0.08);
         }
-        .cek-input { outline: none; }
+        .cek-row { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; }
+        .cek-input {
+          flex: 1; min-width: 0; background: transparent; border: none; outline: none;
+          font-family: inherit; font-size: 15px; color: var(--text);
+          padding: 12px 0; letter-spacing: 0.01em;
+        }
+        .cek-btn { padding: 12px 22px; font-size: 13.5px; flex-shrink: 0; }
+        /* Mobile: input & tombol bertumpuk agar tidak saling menabrak */
+        @media (max-width: 560px) {
+          .cek-shell { flex-direction: column; align-items: stretch; padding: 8px; gap: 8px; border-radius: 20px; }
+          .cek-row { padding: 2px 10px 0; }
+          .cek-input { font-size: 16px; padding: 10px 0; } /* 16px: cegah zoom iOS */
+          .cek-btn { width: 100%; padding: 13px 20px; font-size: 14px; }
+        }
         .row-sep { border-bottom: 1px solid var(--hair-soft); }
         .row-sep:last-child { border-bottom: none; }
       `}</style>
@@ -119,14 +134,11 @@ export default function KgbLandingPage() {
       <header className="kgb-rise" style={{
         position: "absolute", top: 0, left: 0, right: 0, zIndex: 20,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "22px clamp(20px,4.5vw,56px)", pointerEvents: "none",
+        padding: "18px clamp(16px,4.5vw,56px)", pointerEvents: "none",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "11px", pointerEvents: "auto" }}>
           <Image src="/icons.svg" alt="Crest IMIPAS" width={34} height={27} priority style={{ display: "block", flexShrink: 0 }} />
-          <div>
-            <div style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em", color: "var(--text)" }}>SIM-KGB</div>
-            <div style={{ fontSize: "9.5px", color: "var(--dim)", letterSpacing: "0.02em" }}>Kanwil Ditjenpas Kalimantan Selatan</div>
-          </div>
+          <div style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em", color: "var(--text)" }}>SIM-KGB</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", pointerEvents: "auto" }}>
           <ThemeToggle mode={mode} onToggle={toggleMode} />
@@ -142,7 +154,7 @@ export default function KgbLandingPage() {
         flex: 1, position: "relative", zIndex: 1,
         display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center",
-        padding: "118px clamp(20px,5vw,72px) 64px",
+        padding: "108px clamp(18px,5vw,72px) 56px",
       }}>
         <div style={{ width: "100%", maxWidth: "640px", textAlign: "center" }}>
 
@@ -159,7 +171,7 @@ export default function KgbLandingPage() {
               flexShrink: 0, display: "inline-block", animation: "kgbPulse 2.4s ease-out infinite",
             }} />
             <span style={{ fontSize: "11.5px", color: "var(--soft)", fontWeight: 500, letterSpacing: "0.015em" }}>
-              Layanan resmi · {NAMA_KANWIL}
+              Layanan resmi · {NAMA_KANWIL_SINGKAT}
             </span>
           </div>
 
@@ -173,18 +185,18 @@ export default function KgbLandingPage() {
 
           {/* Headline */}
           <h1 className="kgb-rise kgb-d2" style={{
-            fontFamily: "var(--font-display), 'Playfair Display', Georgia, serif",
-            fontSize: "clamp(2.5rem,6.2vw,4.3rem)",
-            fontWeight: 600, letterSpacing: "-0.015em", lineHeight: 1.08,
+            fontFamily: "var(--font-display), 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif",
+            fontSize: "clamp(2rem,6vw,3.9rem)",
+            fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.08,
             color: "var(--text)", margin: "0 0 4px",
           }}>
             Kenaikan Gaji Berkala,
           </h1>
           <div className="kgb-rise kgb-d3" style={{
-            fontFamily: "var(--font-display), 'Playfair Display', Georgia, serif",
-            fontSize: "clamp(2.5rem,6.2vw,4.3rem)",
-            fontWeight: 600, letterSpacing: "-0.015em", lineHeight: 1.14,
-            color: "var(--text)", marginBottom: "26px",
+            fontFamily: "var(--font-display), 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif",
+            fontSize: "clamp(2rem,6vw,3.9rem)",
+            fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.14,
+            color: "var(--text)", marginBottom: "24px",
           }}>
             kini <TypewriterCycle />
           </div>
@@ -200,32 +212,30 @@ export default function KgbLandingPage() {
 
           {/* Search bar */}
           <div className="kgb-rise kgb-d5 cek-shell" style={{
-            borderRadius: "16px",
-            display: "flex", alignItems: "center",
-            padding: "6px 6px 6px 18px",
             marginBottom: result || error ? "22px" : "0",
           }}>
-            <span style={{ color: "var(--dim)", display: "flex", flexShrink: 0, marginRight: "11px" }}>
-              {Ic.search}
-            </span>
-            <input
-              type="text"
-              placeholder="Masukkan NIP pegawai..."
-              value={nip}
-              onChange={(e) => setNip(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCek()}
-              className="cek-input"
-              style={{
-                flex: 1, background: "transparent", border: "none",
-                fontSize: "14px", color: "var(--text)", fontFamily: "inherit",
-                padding: "12px 0", minWidth: 0, letterSpacing: "0.01em",
-              }}
-            />
+            <div className="cek-row">
+              <span style={{ color: "var(--dim)", display: "flex", flexShrink: 0 }}>
+                {Ic.search}
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                enterKeyHint="search"
+                maxLength={18}
+                placeholder="Masukkan NIP pegawai..."
+                aria-label="NIP pegawai"
+                value={nip}
+                onChange={(e) => setNip(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCek()}
+                className="cek-input"
+              />
+            </div>
             <button
               onClick={handleCek}
               disabled={loading || !nip.trim()}
-              className="kgb-gold-btn"
-              style={{ padding: "11px 22px", fontSize: "13px", flexShrink: 0 }}
+              className="kgb-gold-btn cek-btn"
             >
               {loading ? Ic.spin : Ic.arrow}
               {loading ? "Mencari" : "Cek Status"}
@@ -331,10 +341,10 @@ export default function KgbLandingPage() {
                 ].map((row) => (
                   <div key={row.label} className="row-sep" style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
-                    gap: "16px", padding: "13px 20px",
+                    flexWrap: "wrap", gap: "6px 16px", padding: "13px clamp(16px,4vw,20px)",
                   }}>
                     <span style={{ fontSize: "12px", color: "var(--dim)", flexShrink: 0 }}>{row.label}</span>
-                    <div style={{ textAlign: "right" }}>{row.node}</div>
+                    <div style={{ textAlign: "right", minWidth: 0 }}>{row.node}</div>
                   </div>
                 ))}
 
@@ -366,7 +376,7 @@ export default function KgbLandingPage() {
         gap: "10px", flexWrap: "wrap", textAlign: "center",
       }}>
         <span style={{ fontSize: "11px", color: "var(--dim)" }}>
-          {`© ${new Date().getFullYear()} ${NAMA_KANWIL}`}
+          {`© ${new Date().getFullYear()} ${NAMA_KANWIL_SINGKAT}`}
         </span>
         <span aria-hidden style={{ width: "3px", height: "3px", borderRadius: "50%", background: "var(--dim)", opacity: .5 }} />
         <span style={{ fontSize: "11px", color: "var(--dim)" }}>
