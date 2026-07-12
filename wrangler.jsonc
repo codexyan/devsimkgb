@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "sim-kgb",
+  "name": "devsimkgb",
   // Wrapper (worker-entry.js) membungkus output OpenNext (.open-next/worker.js)
   // dan menambahkan handler `scheduled` untuk Cron Trigger.
   "main": "worker-entry.js",
@@ -11,7 +11,7 @@
     "binding": "ASSETS"
   },
   "services": [
-    { "binding": "WORKER_SELF_REFERENCE", "service": "sim-kgb" }
+    { "binding": "WORKER_SELF_REFERENCE", "service": "devsimkgb" }
   ],
   // R2: penyimpanan berkas SK KGB (menggantikan Vercel Blob).
   // Buat bucket lebih dulu:  wrangler r2 bucket create sim-kgb-sk
