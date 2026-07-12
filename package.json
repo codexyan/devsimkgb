@@ -39,7 +39,13 @@
     "wrangler": "^4.110.0"
   },
   "optionalDependencies": {
+    "@ast-grep/napi-linux-x64-gnu": "0.40.5",
+    "@esbuild/linux-x64": "0.25.4",
+    "@img/sharp-linux-x64": "0.34.5",
+    "@napi-rs/canvas-linux-x64-gnu": "0.1.100",
+    "@next/swc-linux-x64-gnu": "16.2.10",
     "@tailwindcss/oxide-linux-x64-gnu": "4.3.2",
+    "@unrs/resolver-binding-linux-x64-gnu": "1.12.2",
     "lightningcss-linux-x64-gnu": "1.32.0"
   }
 }
