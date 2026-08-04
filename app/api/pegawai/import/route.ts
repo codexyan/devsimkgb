@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets, makeRiwayatKGB, type PegawaiRow } from "@/lib/sheets/tables";
+import { sheets, makeRiwayatKGB, type PegawaiRow, type RiwayatKGBRow } from "@/lib/sheets/tables";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -21,14 +21,20 @@ export async function POST(req: Request) {
 
   const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
 
+  // Kuota Sheets API terbatas (±60 tulis/menit) — import dikerjakan BATCH:
+  // satu kali baca daftar NIP terdaftar, satu append Pegawai, satu append
+  // RiwayatKGB. Per-baris create dulu membuat import besar kena 429.
+  const terdaftar = new Set((await sheets.pegawai.findMany()).map((p) => p.nip));
+
   const results = { berhasil: 0, gagal: 0, errors: [] as string[] };
+  const pegawaiBatch: PegawaiRow[] = [];
+  const riwayatBatch: RiwayatKGBRow[] = [];
 
   for (const row of rows) {
     try {
       row.nip = row.nip?.replace(/^="(.*)"$/, "$1").trim() ?? row.nip;
 
-      const existing = await sheets.pegawai.findUnique({ nip: row.nip });
-      if (existing) {
+      if (terdaftar.has(row.nip)) {
         results.gagal++;
         results.errors.push(`NIP ${row.nip} (${row.nama}) sudah terdaftar, dilewati`);
         continue;
@@ -80,7 +86,8 @@ export async function POST(req: Request) {
         createdAt: now,
         updatedAt: now,
       };
-      await sheets.pegawai.create(pegawai);
+      terdaftar.add(pegawai.nip); // tolak duplikat di dalam file yang sama
+      pegawaiBatch.push(pegawai);
 
       // Auto-create RiwayatKGB.
       if (userLogin) {
@@ -97,7 +104,7 @@ export async function POST(req: Request) {
         const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         const flagRapelan = todayDate > deadlineSDM;
 
-        await sheets.riwayatKGB.create(
+        riwayatBatch.push(
           makeRiwayatKGB({
             pegawaiId: pegawai.id,
             tanggalSK: new Date(hasil.tmtKgbBaru),
@@ -120,10 +127,29 @@ export async function POST(req: Request) {
       }
 
       results.berhasil++;
-    } catch {
+    } catch (e) {
       results.gagal++;
-      results.errors.push(`NIP ${row.nip} (${row.nama}): Gagal disimpan`);
+      const pesan = e instanceof Error ? e.message : "data tidak valid";
+      results.errors.push(`NIP ${row.nip} (${row.nama}): Gagal diproses — ${pesan}`);
     }
+  }
+
+  // Tulis sekaligus: 2 request append, berapa pun jumlah barisnya.
+  try {
+    await sheets.pegawai.createMany(pegawaiBatch);
+    try {
+      await sheets.riwayatKGB.createMany(riwayatBatch);
+    } catch (e) {
+      const pesan = e instanceof Error ? e.message : "unknown";
+      results.errors.push(
+        `Pegawai tersimpan, tetapi pembuatan RiwayatKGB otomatis gagal: ${pesan}. Buat KGB pertama secara manual dari halaman pegawai.`,
+      );
+    }
+  } catch (e) {
+    results.gagal += results.berhasil;
+    results.berhasil = 0;
+    const pesan = e instanceof Error ? e.message : "unknown";
+    results.errors.push(`Gagal menulis ke Google Sheets: ${pesan}. Tidak ada baris baru yang tersimpan — coba lagi.`);
   }
 
   if (userLogin && results.berhasil > 0) {

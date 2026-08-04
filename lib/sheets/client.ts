@@ -14,21 +14,30 @@ function sheetId(): string {
   return id;
 }
 
+// Kuota Sheets API ±60 baca & 60 tulis per menit per user; burst panggilan
+// (mis. import massal) memicu 429. Coba ulang dengan backoff sebelum menyerah.
+const MAX_RETRY = 4;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function api(path: string, init?: RequestInit): Promise<Response> {
-  const token = await getAccessToken();
-  const res = await fetch(`${API_BASE}/${sheetId()}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!res.ok) {
+  for (let attempt = 0; ; attempt++) {
+    const token = await getAccessToken();
+    const res = await fetch(`${API_BASE}/${sheetId()}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+    if (res.ok) return res;
     const text = await res.text();
+    if ((res.status === 429 || res.status >= 500) && attempt < MAX_RETRY) {
+      await sleep(Math.min(30_000, 2_000 * 2 ** attempt));
+      continue;
+    }
     throw new Error(`Google Sheets API error (${res.status}) di ${path}: ${text}`);
   }
-  return res;
 }
 
 /** Baca seluruh nilai pada sebuah range (mis. "Pegawai!A1:Z"). */
