@@ -592,7 +592,7 @@ export default function RiwayatKGBPage() {
         >
           <div
             className="w-full max-w-lg rounded-2xl flex flex-col"
-            style={{ background: "var(--card)", maxHeight: "85vh", border: "0.5px solid var(--ln1)" }}
+            style={{ background: "var(--card)", maxHeight: "85dvh", border: "0.5px solid var(--ln1)" }}
           >
             {/* Header */}
             <div
@@ -753,7 +753,7 @@ export default function RiwayatKGBPage() {
         >
           <div
             className="w-full max-w-md rounded-2xl p-6 flex flex-col gap-4"
-            style={{ background: "var(--card)", maxHeight: "90vh", overflowY: "auto" }}
+            style={{ background: "var(--card)", maxHeight: "90dvh", overflowY: "auto" }}
           >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold" style={{ color: "var(--dtn)" }}>Tambah Hukuman Disiplin</h3>

@@ -245,7 +245,7 @@ export default function LogAktivitasPage() {
             <p className="text-xs" style={{ color: "var(--dt5)" }}>Tidak ada log yang sesuai filter</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto tbl-scroll">
             <table className="w-full">
               <thead>
                 <tr style={{ background: "var(--sub)", borderBottom: "0.5px solid var(--ln1)" }}>

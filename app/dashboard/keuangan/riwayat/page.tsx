@@ -470,7 +470,7 @@ export default function RiwayatKeuanganPage() {
               </div>
 
               {/* ── Desktop: table ── */}
-              <div className="hidden md:block overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto tbl-scroll">
                 <table className="w-full" style={{ borderCollapse: "collapse", fontSize: "12px" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid var(--ln2)", background: "var(--sub)" }}>
@@ -554,7 +554,7 @@ export default function RiwayatKeuanganPage() {
               </div>
 
               {/* ── Desktop: table ── */}
-              <div className="hidden md:block overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto tbl-scroll">
                 <table className="w-full" style={{ borderCollapse: "collapse", fontSize: "12px" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid var(--ln2)", background: "var(--sub)" }}>

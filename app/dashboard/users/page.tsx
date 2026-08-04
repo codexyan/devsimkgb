@@ -278,7 +278,7 @@ export default function UsersPage() {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto tbl-scroll">
                 <table className="w-full">
                   <thead>
                     <tr style={{ background: "var(--sub)", borderBottom: "0.5px solid var(--ln1)" }}>

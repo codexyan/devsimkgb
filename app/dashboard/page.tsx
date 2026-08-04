@@ -1713,7 +1713,7 @@ function DashboardMain() {
           <div className="dash-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40"
             onClick={() => setShowRapelanPopup(false)}>
             <div className="dash-modal bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl mx-0 sm:mx-4 flex flex-col"
-              style={{ maxHeight: "90vh" }}
+              style={{ maxHeight: "90dvh" }}
               onClick={(e) => e.stopPropagation()}>
 
               {/* Header */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { TransitionLink } from "@/lib/ui";
 import { fmt, Ic, NAMA_KANWIL_SINGKAT } from "@/lib/ui";
@@ -69,6 +69,13 @@ export default function KgbLandingPage() {
   const [loading, setLoading] = useState(false);
   const [result,  setResult]  = useState<CekResult | null>(null);
   const [error,   setError]   = useState("");
+
+  // Hasil/error muncul di bawah lipatan pada layar pendek (hero di tengah
+  // vertikal) — gulirkan agar langsung terlihat tanpa harus scroll manual.
+  const hasilRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (result || error) hasilRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [result, error]);
 
   async function handleCek() {
     const q = nip.trim();
@@ -244,7 +251,7 @@ export default function KgbLandingPage() {
 
           {/* Error */}
           {error && (
-            <div style={{
+            <div ref={hasilRef} style={{
               display: "flex", alignItems: "center", gap: "10px",
               background: "var(--st-bad-bg)", border: "1px solid var(--st-bad)",
               borderRadius: "12px", padding: "12px 16px",
@@ -264,7 +271,7 @@ export default function KgbLandingPage() {
             const initials = result.nama.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 
             return (
-              <div style={{
+              <div ref={hasilRef} style={{
                 position: "relative",
                 background: "var(--surface)",
                 backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",

@@ -430,7 +430,7 @@ export default function LaporanPage() {
                 <p className="text-xs" style={{ color: "var(--dt5)" }}>Tidak ada data KGB pada periode ini</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto tbl-scroll">
                 <table className="w-full" style={{ fontSize: "12px", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: "var(--sub)", borderBottom: "0.5px solid var(--ln1)" }}>

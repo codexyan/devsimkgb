@@ -254,7 +254,7 @@ export default function HukdisPage() {
             {data.length === 0 && <button onClick={openInput} className="text-xs font-semibold px-4 py-2 rounded-xl text-white" style={{ background: "var(--red-solid)" }}>+ Input Hukdis Pertama</button>}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto tbl-scroll">
             <table className="w-full">
               <thead>
                 <tr style={{ background: "var(--sub)", borderBottom: "0.5px solid var(--ln1)" }}>
@@ -317,7 +317,7 @@ export default function HukdisPage() {
       {/* Modal Input Hukdis */}
       {showInput && (
         <div className="adm-overlay" onClick={() => !submitting && setShowInput(false)}>
-          <div className="adm-modal" style={{ maxWidth: "30rem", maxHeight: "92vh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
+          <div className="adm-modal" style={{ maxWidth: "30rem", maxHeight: "92dvh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 px-5 py-4 shrink-0" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
               <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg,#e35d5d,var(--red-solid))" }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>

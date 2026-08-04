@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Sidebar from "./Sidebar";
 import { RoleContext, UserContext } from "./RoleContext";
@@ -27,6 +28,15 @@ export default function DashboardShell({ nama, nip, role, sesiTimeoutMenit = 60,
   const lastActivityRef = useRef<number>(0);
   const warningShownAt  = useRef<number | null>(null);
   const [themeMode] = useThemeMode();
+  const pathname = usePathname();
+  const mainRef  = useRef<HTMLElement>(null);
+
+  // <main> adalah satu-satunya area gulir dan elemennya persisten lintas
+  // navigasi client-side — tanpa reset, halaman baru terbuka di posisi
+  // scroll halaman sebelumnya.
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
+  }, [pathname]);
 
   // Terapkan mode tema ke <html> agar token dashboard di globals.css aktif;
   // dibersihkan saat keluar dashboard supaya halaman publik tidak terpengaruh.
@@ -73,7 +83,7 @@ export default function DashboardShell({ nama, nip, role, sesiTimeoutMenit = 60,
   }, [IDLE_LIMIT, WARN_AT]);
 
   return (
-    <div style={{ height: "100vh", display: "flex", overflow: "hidden", background: "var(--lavender-wash)" }}>
+    <div style={{ height: "100dvh", display: "flex", overflow: "hidden", background: "var(--lavender-wash)" }}>
 
       {/* Idle warning */}
       {showIdleWarning && (
@@ -116,8 +126,15 @@ export default function DashboardShell({ nama, nip, role, sesiTimeoutMenit = 60,
       {/* Sidebar (self-contained: handles open/collapsed + notifications) */}
       <Sidebar role={role} nama={nama} nip={nip} />
 
-      {/* Main content */}
-      <main style={{ flex: 1, overflowY: "auto", padding: "20px", minWidth: 0 }}>
+      {/* Main content — satu-satunya area gulir vertikal halaman */}
+      <main
+        ref={mainRef}
+        style={{
+          flex: 1, overflowY: "auto", padding: "20px", minWidth: 0,
+          overscrollBehavior: "contain",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
         <RoleContext.Provider value={role}>
           <UserContext.Provider value={{ nama, nip, role }}>
             {children}

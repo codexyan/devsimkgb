@@ -839,7 +839,7 @@ export default function KGBPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto tbl-scroll">
             <table className="w-full">
               <thead>
                 <tr
@@ -1160,7 +1160,7 @@ export default function KGBPage() {
           >
             <div
               className="bg-white rounded-2xl w-full overflow-hidden flex flex-col"
-              style={{ maxWidth: "680px", maxHeight: "92vh", zIndex: 51, animation: "kgbModalIn 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}
+              style={{ maxWidth: "680px", maxHeight: "92dvh", zIndex: 51, animation: "kgbModalIn 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}
               onClick={(e) => e.stopPropagation()}
             >
               <div
@@ -1669,7 +1669,7 @@ export default function KGBPage() {
           >
             <div
               className="bg-white rounded-2xl w-full overflow-hidden flex flex-col"
-              style={{ maxWidth: "480px", maxHeight: "92vh", zIndex: 51, animation: "kgbModalIn 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}
+              style={{ maxWidth: "480px", maxHeight: "92dvh", zIndex: 51, animation: "kgbModalIn 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}
               onClick={(e) => e.stopPropagation()}
             >
               <div

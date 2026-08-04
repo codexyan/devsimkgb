@@ -813,7 +813,7 @@ export default function KeuanganDashboardPage() {
             </div>
 
             {/* ── Desktop: tabel ── */}
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto tbl-scroll">
               <table className="w-full" style={{ borderCollapse:"collapse", fontSize:"12px" }}>
                 <thead>
                   <tr style={{ borderBottom:"1px solid var(--ln2)", background:"var(--sub)" }}>
@@ -1051,7 +1051,7 @@ export default function KeuanganDashboardPage() {
         const totalNaik = items.reduce((s, k) => s + Math.max(0, k.gajiPokokBaru - k.gajiPokokLama), 0);
         return (
           <div className="adm-overlay" onClick={() => !bulkLoading && setShowBulk(false)}>
-            <div className="adm-modal" style={{ maxWidth:"26rem", maxHeight:"88vh", display:"flex", flexDirection:"column" }} onClick={(e) => e.stopPropagation()}>
+            <div className="adm-modal" style={{ maxWidth:"26rem", maxHeight:"88dvh", display:"flex", flexDirection:"column" }} onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-3 px-5 py-4 shrink-0" style={{ borderBottom:"0.5px solid var(--ln2)", background:"var(--sub)" }}>
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background:"linear-gradient(135deg,#17a37e,var(--green-solid))" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -1099,7 +1099,7 @@ export default function KeuanganDashboardPage() {
           <div style={{ position:"fixed", inset:0, background:"rgba(6,14,28,0.55)", backdropFilter:"blur(6px)", WebkitBackdropFilter:"blur(6px)", zIndex:60, animation:"admFade .2s ease both" }}
             onClick={() => setPopup(null)} />
           <div style={{ position:"fixed", inset:0, zIndex:61, display:"flex", alignItems:"center", justifyContent:"center", padding:"1.5rem", pointerEvents:"none" }}>
-            <div style={{ background:"var(--card)", borderRadius:"16px", width:"100%", maxWidth:"700px", maxHeight:"80vh", display:"flex", flexDirection:"column", boxShadow:"0 24px 64px rgba(0,0,0,0.18)", pointerEvents:"all" }}>
+            <div style={{ background:"var(--card)", borderRadius:"16px", width:"100%", maxWidth:"700px", maxHeight:"80dvh", display:"flex", flexDirection:"column", boxShadow:"0 24px 64px rgba(0,0,0,0.18)", pointerEvents:"all" }}>
               <div className="px-5 py-3.5 flex items-center justify-between shrink-0"
                 style={{ borderBottom:"1px solid var(--ln2)" }}>
                 <div>

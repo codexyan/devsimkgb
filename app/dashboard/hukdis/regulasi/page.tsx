@@ -193,7 +193,7 @@ export default function RegulasiPage() {
       {/* Modal Form */}
       {showForm && (
         <div className="adm-overlay" onClick={() => !saving && setShowForm(false)}>
-          <div className="adm-modal" style={{ maxWidth: "28rem", maxHeight: "92vh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
+          <div className="adm-modal" style={{ maxWidth: "28rem", maxHeight: "92dvh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 px-5 py-4 shrink-0" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
               <div className="flex-1"><h2 className="text-sm font-semibold" style={{ color: "var(--dtn)" }}>{editing ? "Ubah Regulasi" : "Tambah Regulasi"}</h2></div>
               <button onClick={() => setShowForm(false)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "var(--ln2)", color: "var(--dt3)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>

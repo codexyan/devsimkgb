@@ -396,7 +396,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
           zIndex: 30,
         }}
         className={[
-          "fixed top-0 left-0 h-screen",
+          "fixed top-0 left-0 h-dvh",
           "lg:relative lg:top-auto lg:left-auto lg:h-full lg:translate-x-0",
           isCollapsed ? "lg:w-15" : "lg:w-56",
           isOpen ? "translate-x-0 w-56" : "-translate-x-full w-56",
@@ -451,7 +451,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
         </div>
 
         {/* ── Nav ── */}
-        <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 0" }}>
+        <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 0", overscrollBehavior: "contain" }}>
 
           {/* Main items (mendukung grup collapsible) */}
           <div>

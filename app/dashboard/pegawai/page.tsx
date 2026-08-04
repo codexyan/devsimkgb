@@ -750,7 +750,7 @@ export default function PegawaiPage() {
         <>
         {/* ── Desktop table ── */}
         <div className="hidden md:block bg-white rounded-2xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto tbl-scroll">
             <table className="w-full">
               <thead>
                 <tr
@@ -1051,7 +1051,7 @@ export default function PegawaiPage() {
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
             <div
               className="bg-white rounded-t-2xl sm:rounded-2xl w-full overflow-hidden flex flex-col"
-              style={{ maxWidth: "580px", maxHeight: "95vh", zIndex: 51 }}
+              style={{ maxWidth: "580px", maxHeight: "95dvh", zIndex: 51 }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
