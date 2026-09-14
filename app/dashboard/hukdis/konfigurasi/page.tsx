@@ -693,7 +693,7 @@ export default function HukdisKonfigurasiPage() {
               background: "var(--tint-blue-bg)", border: "1px solid var(--tint-blue-ln)",
               borderRadius: "9999px", padding: "2px 10px",
             }}>
-              PP No. 53 Tahun 2010
+              PP Nomor 94 Tahun 2021
             </span>
           </div>
           <p style={{ fontSize: "12px", color: "var(--dt3)", margin: "3px 0 0" }}>

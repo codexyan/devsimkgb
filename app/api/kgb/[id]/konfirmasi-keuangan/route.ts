@@ -4,6 +4,7 @@ import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { getGajiPokok } from "@/lib/tabelGaji";
+import { penetapDariSurat } from "@/lib/penetapSk";
 
 export const runtime = "nodejs";
 
@@ -83,11 +84,15 @@ export async function POST(
 
     await sheets.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
 
+    // SK dasar siklus berikutnya adalah surat KGB ini, jadi penetapnya = penandatangan surat ini.
+    const suratSelesai = (await sheets.suratKGB.findUnique({ kgbId: kgbSelesai.id })) as Parameters<typeof penetapDariSurat>[0];
+
     await sheets.riwayatKGB.create(
       makeRiwayatKGB({
         pegawaiId: pegawai.id,
         tanggalSK: tmtNext,
         tmtSK: tmtNext,
+        penetapSkDasar: penetapDariSurat(suratSelesai),
         golonganLama: nextGolonganLama,
         gajiPokokLama: nextGajiPokokLama,
         mkgTahunLama: nextMkgTahunLama,

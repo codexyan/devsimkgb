@@ -1,11 +1,13 @@
 // Definisi tab Google Sheets = padanan tabel database. Setiap tab punya baris
 // header persis nama kolom di bawah (urutan dicocokkan by-name saat baca; saat
 // TULIS bersifat posisional, jadi header WAJIB urut sesuai definisi kolom).
+// Kolom baru selalu ditambahkan di UJUNG daftar agar data lama tidak bergeser.
 //
 // Skrip scripts/setup-sheets.ts membuat tab yang belum ada beserta header-nya.
 
 import { Table, type ColumnDef, type TableDef } from "./table";
 import { newId } from "./id";
+import type { PenandatanganRow } from "../penandatangan";
 
 // ---- helper ringkas untuk mendefinisikan kolom ----
 const s = (name: string): ColumnDef => ({ name, type: "string" });
@@ -39,6 +41,8 @@ export interface RiwayatKGBRow {
   flagRapelan: boolean; isArsip: boolean; konfirmasiKeuanganAt: Date | null;
   konfirmasiKeuanganBy: string | null; rapelanDitetapkan: boolean | null;
   inputGajiWebAt: Date | null; inputGajiWebBy: string | null; createdBy: string; createdAt: Date | null;
+  /** Pejabat yang menetapkan SK dasar; dicetak pada baris "Oleh" di surat KGB. */
+  penetapSkDasar: string | null;
 }
 
 export interface AuditLogRow {
@@ -50,6 +54,8 @@ export interface NotifikasiRow {
   id: string; judul: string; pesan: string; tipe: string; referenceId: string | null;
   dibaca: boolean; createdAt: Date | null; prioritas: string; linkHref: string | null; kategori: string | null;
 }
+
+export type { PenandatanganRow };
 
 // ============================ Definisi kolom per tab ============================
 
@@ -80,11 +86,17 @@ const defs = {
       i("mkgTahunBaru"), i("mkgBulanBaru"), d("tmtKgbBaru"), d("tmtKgbBerikutnya"), s("status"),
       b("flagRapelan"), b("isArsip"), d("konfirmasiKeuanganAt"), s("konfirmasiKeuanganBy"),
       b("rapelanDitetapkan"), d("inputGajiWebAt"), s("inputGajiWebBy"), s("createdBy"), d("createdAt"),
+      s("penetapSkDasar"),
     ],
   },
   SuratKGB: {
     tab: "SuratKGB",
-    columns: [s("id"), s("kgbId"), s("nomorSurat"), d("tanggalSurat"), s("namaKepalaKanwil"), s("nipKepalaKanwil"), s("pathFile"), d("generatedAt"), s("generatedBy")],
+    // namaKepalaKanwil/nipKepalaKanwil menyimpan salinan penandatangan (siapa pun jenisnya).
+    columns: [
+      s("id"), s("kgbId"), s("nomorSurat"), d("tanggalSurat"), s("namaKepalaKanwil"), s("nipKepalaKanwil"),
+      s("pathFile"), d("generatedAt"), s("generatedBy"),
+      s("penandatanganId"), s("jenisPenandatangan"), s("jabatanPenandatangan"),
+    ],
   },
   SerahTerima: {
     tab: "SerahTerima",
@@ -92,7 +104,13 @@ const defs = {
   },
   KonfigurasiKanwil: {
     tab: "KonfigurasiKanwil",
+    // namaKepala/nipKepala tidak dipakai lagi (pindah ke tab Penandatangan), tetapi kolomnya
+    // tetap ada karena penulisan posisional.
     columns: [s("id"), s("namaKepala"), s("nipKepala"), s("nomorPP"), s("tahunPP"), s("waAdmin"), i("notifKgbH1"), i("notifKgbH2"), i("sesiTimeoutMenit"), d("updatedAt"), s("updatedBy")],
+  },
+  Penandatangan: {
+    tab: "Penandatangan",
+    columns: [s("id"), s("jenis"), s("nama"), s("nip"), s("jabatan"), s("dasarPenunjukan"), d("berlakuMulai"), d("berlakuSampai"), d("updatedAt"), s("updatedBy")],
   },
   Notifikasi: {
     tab: "Notifikasi",
@@ -134,6 +152,7 @@ export const sheets = {
   suratKGB: new Table(defs.SuratKGB),
   serahTerima: new Table(defs.SerahTerima),
   konfigurasiKanwil: new Table(defs.KonfigurasiKanwil),
+  penandatangan: new Table<PenandatanganRow>(defs.Penandatangan),
   notifikasi: new Table<NotifikasiRow>(defs.Notifikasi),
   riwayatHukdis: new Table(defs.RiwayatHukdis),
   hukdisJenis: new Table(defs.HukdisJenis),
@@ -171,6 +190,7 @@ export function makeRiwayatKGB(p: Partial<RiwayatKGBRow>): RiwayatKGBRow {
     inputGajiWebBy: p.inputGajiWebBy ?? null,
     createdBy: p.createdBy ?? "",
     createdAt: p.createdAt ?? new Date(),
+    penetapSkDasar: p.penetapSkDasar ?? null,
   };
 }
 

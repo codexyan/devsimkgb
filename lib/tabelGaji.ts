@@ -83,29 +83,31 @@ export const TABEL_GAJI: Record<string, Record<string, number>> = {
     "25_0": 2812800,
     "27_0": 2901400,
   },
+  // II/a naik pada MKG 0, 1, lalu setiap tahun ganjil (Peraturan BKN 1/2024, Daftar B-1).
   "II/a": {
     "0_0": 2184000,
-    "2_0": 2218400,
-    "4_0": 2360300,
-    "6_0": 2434600,
-    "8_0": 2511300,
-    "10_0": 2590400,
-    "12_0": 2672000,
-    "14_0": 2756200,
-    "16_0": 2843000,
-    "18_0": 2932500,
-    "20_0": 3024800,
-    "22_0": 3120100,
-    "24_0": 3218400,
-    "26_0": 3319800,
-    "28_0": 3424300,
-    "30_0": 3532200,
-    "32_0": 3643400,
+    "1_0": 2218400,
+    "3_0": 2288200,
+    "5_0": 2360300,
+    "7_0": 2434600,
+    "9_0": 2511300,
+    "11_0": 2590400,
+    "13_0": 2672000,
+    "15_0": 2756200,
+    "17_0": 2843000,
+    "19_0": 2932500,
+    "21_0": 3024900,
+    "23_0": 3120100,
+    "25_0": 3218400,
+    "27_0": 3319800,
+    "29_0": 3424300,
+    "31_0": 3532200,
+    "33_0": 3643400,
   },
   "II/b": {
-    "3_0": 2288200,
-    "5_0": 2385000,
-    "7_0": 2460100,
+    "3_0": 2385000,
+    "5_0": 2460100,
+    "7_0": 2537600,
     "9_0": 2617500,
     "11_0": 2700000,
     "13_0": 2785000,
@@ -153,7 +155,7 @@ export const TABEL_GAJI: Record<string, Record<string, number>> = {
     "25_0": 3644300,
     "27_0": 3759100,
     "29_0": 3877500,
-    "31_0": 3999500,
+    "31_0": 3999600,
     "33_0": 4125600,
   },
   "III/a": {
@@ -196,7 +198,7 @@ export const TABEL_GAJI: Record<string, Record<string, number>> = {
   },
   "III/c": {
     "0_0": 3026400,
-    "2_0": 3121100,
+    "2_0": 3121700,
     "4_0": 3220000,
     "6_0": 3321400,
     "8_0": 3426000,
@@ -293,7 +295,7 @@ export const TABEL_GAJI: Record<string, Record<string, number>> = {
     "0_0": 3723000,
     "2_0": 3840200,
     "4_0": 3961200,
-    "6_0": 4086000,
+    "6_0": 4085900,
     "8_0": 4214600,
     "10_0": 4347300,
     "12_0": 4484300,
@@ -355,6 +357,11 @@ export function getGajiPokok(
   }
 
   return gajiTerpilih;
+}
+
+/** true bila golongan ada di tabel gaji PNS (I/a–IV/e). */
+export function isGolonganDikenal(golongan: string): boolean {
+  return Object.prototype.hasOwnProperty.call(TABEL_GAJI, golongan);
 }
 
 // Fungsi otomatis isi pangkat dari golongan
@@ -439,6 +446,9 @@ export function kalkulasiKGB(pegawai: {
   tmtKgbBerikutnya: Date | string;
   tmtKgbTerakhir?: Date | string | null;
 }): HasilKalkulasiKGB {
+  if (!isGolonganDikenal(pegawai.golonganRuang)) {
+    throw new Error(`Golongan "${pegawai.golonganRuang}" tidak dikenal di tabel gaji PP 5/2024`);
+  }
   const tmtKgbBaru = new Date(pegawai.tmtKgbBerikutnya);
 
   // MKG baru: hitung dari selisih tahun aktual antara TMT terakhir dan TMT baru.

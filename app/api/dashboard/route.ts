@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { sheets, type RiwayatKGBRow } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
+import { penetapDariSurat } from "@/lib/penetapSk";
 
 export const runtime = "nodejs";
 
-type Surat = { id: string; nomorSurat: string; tanggalSurat: Date | null };
+type Surat = {
+  id: string; nomorSurat: string; tanggalSurat: Date | null;
+  jenisPenandatangan: string | null; jabatanPenandatangan: string | null;
+};
 
 export async function GET() {
   const session = await auth();
@@ -45,7 +49,10 @@ export async function GET() {
     const kgbsFor = (pid: string) => kgbByPegawai.get(pid) ?? [];
     const suratByKgbId = new Map<string, Surat>();
     for (const sRow of allSurat as any[]) {
-      suratByKgbId.set(sRow.kgbId, { id: sRow.id, nomorSurat: sRow.nomorSurat, tanggalSurat: sRow.tanggalSurat });
+      suratByKgbId.set(sRow.kgbId, {
+        id: sRow.id, nomorSurat: sRow.nomorSurat, tanggalSurat: sRow.tanggalSurat,
+        jenisPenandatangan: sRow.jenisPenandatangan ?? null, jabatanPenandatangan: sRow.jabatanPenandatangan ?? null,
+      });
     }
     const namaById = new Map(users.map((u) => [u.id, u.nama]));
 
@@ -234,6 +241,7 @@ export async function GET() {
         statusKGB,
         kgbId: kgbTerakhir?.id || null,
         nomorSK: kgbTerakhir?.nomorSK ?? null,
+        penetapSkDasar: kgbTerakhir?.penetapSkDasar ?? null,
         sudahGenerateSurat: !!kgbTerakhir?.surat,
         suratNomorSurat: kgbTerakhir?.surat?.nomorSurat ?? null,
         tanggalSK: kgbTerakhir?.tanggalSK?.toISOString() ?? null,
@@ -248,6 +256,8 @@ export async function GET() {
         prevNomorSK: (() => { const n = prevSelesai?.surat?.nomorSurat; return n && n !== "-" ? n : null; })(),
         prevTanggalSK: (() => { const s = prevSelesai?.surat; return s?.nomorSurat && s.nomorSurat !== "-" ? s.tanggalSurat?.toISOString() ?? null : null; })(),
         prevTmtSK: prevSelesai?.tmtKgbBaru?.toISOString() ?? null,
+        // SK dasar KGB berikutnya = surat KGB yang terakhir selesai, jadi penetapnya penandatangan surat itu.
+        prevPenetapSkDasar: penetapDariSurat(prevSelesai?.surat),
       };
     });
 

@@ -22,12 +22,6 @@ export async function PATCH(req: Request) {
 
   const body = (await req.json()) as any;
 
-  const namaKepala = typeof body.namaKepala === "string" ? body.namaKepala.trim() : "";
-  const nipKepala = typeof body.nipKepala === "string" ? body.nipKepala.trim() : "";
-  if (!namaKepala || !nipKepala) {
-    return NextResponse.json({ error: "Nama dan NIP Kepala Kanwil wajib diisi" }, { status: 400 });
-  }
-
   const clampInt = (v: unknown, def: number, min: number, max: number) => {
     const n = Math.round(Number(v));
     return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
@@ -38,9 +32,8 @@ export async function PATCH(req: Request) {
   if (notifKgbH2 > notifKgbH1) [notifKgbH1, notifKgbH2] = [notifKgbH2, notifKgbH1];
   const sesiTimeoutMenit = clampInt(body.sesiTimeoutMenit, 60, 5, 480);
 
+  // Penandatangan surat KGB dikelola di /api/penandatangan, bukan di sini.
   const data = {
-    namaKepala,
-    nipKepala,
     nomorPP: body.nomorPP || "Nomor 5 Tahun 2024",
     tahunPP: body.tahunPP || "2024",
     waAdmin,
@@ -57,7 +50,7 @@ export async function PATCH(req: Request) {
   if (existing) {
     config = await sheets.konfigurasiKanwil.update({ id: "default" }, data as any);
   } else {
-    config = { id: "default", ...data };
+    config = { id: "default", namaKepala: "", nipKepala: "", ...data };
     await sheets.konfigurasiKanwil.create(config as any);
   }
 
@@ -66,7 +59,7 @@ export async function PATCH(req: Request) {
     logAudit({
       userId: userLogin.id,
       aksi: "edit_konfigurasi",
-      detail: `Update konfigurasi kanwil, Kepala: ${body.namaKepala} (${body.nipKepala})`,
+      detail: `Update konfigurasi kanwil: dasar hukum ${data.nomorPP}, notifikasi H-${notifKgbH1}/H-${notifKgbH2}, sesi ${sesiTimeoutMenit} menit`,
     });
   }
 

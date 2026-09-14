@@ -81,6 +81,10 @@ export async function POST(req: Request) {
   if (existing)
     return NextResponse.json({ error: "NIP sudah terdaftar" }, { status: 400 });
 
+  const { isGolonganDikenal } = await import("@/lib/tabelGaji");
+  if (!isGolonganDikenal(body.golonganRuang))
+    return NextResponse.json({ error: `Golongan "${body.golonganRuang ?? ""}" tidak dikenal di tabel gaji PP 5/2024` }, { status: 400 });
+
   const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
@@ -140,6 +144,7 @@ export async function POST(req: Request) {
     id: newId(),
     pegawaiId: pegawai.id,
     nomorSK: "",
+    penetapSkDasar: null,
     tanggalSK: new Date(hasil.tmtKgbBaru),
     tmtSK: new Date(hasil.tmtKgbBaru),
     golonganLama: pegawai.golonganRuang,

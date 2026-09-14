@@ -46,6 +46,11 @@ export async function PATCH(
     return NextResponse.json({ error: "TMT Golongan dan TMT KGB Berikutnya wajib diisi" }, { status: 400 });
   }
 
+  const { isGolonganDikenal } = await import("@/lib/tabelGaji");
+  if (!isGolonganDikenal(body.golonganRuang)) {
+    return NextResponse.json({ error: `Golongan "${body.golonganRuang ?? ""}" tidak dikenal di tabel gaji PP 5/2024` }, { status: 400 });
+  }
+
   const pegawai = await sheets.pegawai.update(
     { id },
     {

@@ -107,8 +107,11 @@ export async function POST(
   if (berdampakKGB) {
     const newTmt = tmtKgbBerikutnnyaBaru;
     const newTmtBerikutnya = new Date(newTmt.getFullYear() + 2, newTmt.getMonth(), newTmt.getDate());
-    const mkgTahunBaru = pegawai.mkgTahun + 2 + (durasiTunda! / 12);
-    const gajiPokokBaru = getGajiPokok(pegawai.golonganRuang, mkgTahunBaru, pegawai.mkgBulan);
+    // Masa penundaan ikut dihitung sebagai masa kerja; simpan sebagai tahun dan bulan utuh.
+    const totalBulan = pegawai.mkgTahun * 12 + pegawai.mkgBulan + 24 + durasiTunda!;
+    const mkgTahunBaru = Math.floor(totalBulan / 12);
+    const mkgBulanBaru = totalBulan % 12;
+    const gajiPokokBaru = getGajiPokok(pegawai.golonganRuang, mkgTahunBaru, mkgBulanBaru);
     const today = new Date();
     const deadlineNew = new Date(newTmt.getFullYear(), newTmt.getMonth() - 1, 0);
     const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -127,7 +130,7 @@ export async function POST(
         golonganBaru: pegawai.golonganRuang,
         gajiPokokBaru,
         mkgTahunBaru,
-        mkgBulanBaru: pegawai.mkgBulan,
+        mkgBulanBaru,
         tmtKgbBaru: newTmt,
         tmtKgbBerikutnya: newTmtBerikutnya,
         status: "belum_diproses",

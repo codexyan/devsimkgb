@@ -92,6 +92,7 @@ export async function DELETE(
       inputGajiWebBy: null,
       createdBy: userLogin.id,
       createdAt: new Date(),
+      penetapSkDasar: null,
     });
   }
 

@@ -42,6 +42,7 @@ interface RiwayatKGB {
   isArsip: boolean;
   createdAt: string;
   surat: { nomorSurat: string; pathFile?: string | null } | null;
+  alasanBatal?: string | null;
 }
 
 interface RiwayatHukdis {
@@ -679,6 +680,12 @@ export default function RiwayatKGBPage() {
                           </p>
                         </div>
                       </div>
+
+                      {r.status === "ditolak" && r.alasanBatal && (
+                        <p className="px-4 pb-3 text-xs" style={{ color: "var(--st-red)" }}>
+                          Alasan pembatalan: {r.alasanBatal}
+                        </p>
+                      )}
 
                       {/* Action buttons */}
                       {(canGenerate || canUpload || r.surat?.pathFile) && (

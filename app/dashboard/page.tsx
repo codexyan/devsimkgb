@@ -6,6 +6,7 @@ import { useRole, useDashUser } from "@/app/dashboard/components/RoleContext";
 import { ROLES } from "@/lib/auth";
 import DashboardHukdis from "@/app/dashboard/components/DashboardHukdis";
 import DashboardKeuangan from "@/app/dashboard/components/DashboardKeuangan";
+import { SARAN_PENETAP_SK } from "@/lib/penetapSk";
 /* -----------------------------------------
    Interfaces
    ----------------------------------------- */
@@ -29,6 +30,7 @@ interface PegawaiJatuhTempo {
   statusKGB: string | null;
   kgbId: string | null;
   nomorSK: string | null;
+  penetapSkDasar: string | null;
   sudahGenerateSurat: boolean;
   suratNomorSurat: string | null;
   tanggalSK: string | null;
@@ -43,6 +45,7 @@ interface PegawaiJatuhTempo {
   prevNomorSK: string | null;
   prevTanggalSK: string | null;
   prevTmtSK: string | null;
+  prevPenetapSkDasar: string | null;
 }
 
 interface TrenBulanan {
@@ -529,15 +532,15 @@ function DashboardMain() {
   const [actionModal, setActionModal] = useState<PipelineModal | null>(null);
   const [alasanTolak, setAlasanTolak] = useState("");
   const [processingKgbId, setProcessingKgbId] = useState<string | null>(null);
-  const [inputForm, setInputForm] = useState({ nomorSK: "", tanggalSK: "", tmtSK: "" });
+  const [inputForm, setInputForm] = useState({ nomorSK: "", tanggalSK: "", tmtSK: "", penetapSkDasar: "" });
   const [inputError, setInputError] = useState<string | null>(null);
   // Arsip KGB form (inline popup dari pipeline)
-  const [arsipForm, setArsipForm] = useState({ nomorSK: "", tanggalSK: "", tmtSK: "" });
+  const [arsipForm, setArsipForm] = useState({ nomorSK: "", tanggalSK: "", tmtSK: "", penetapSkDasar: "" });
   const [arsipFile, setArsipFile] = useState<File | null>(null);
   const [arsipFileUrl, setArsipFileUrl] = useState<string | null>(null);
   const [arsipError, setArsipError] = useState<string | null>(null);
   // Combined Generate + Edit form
-  const [genForm, setGenForm] = useState({ nomorSK: "", tanggalSK: "", tmtSK: "", nomorSurat: "", tanggalSurat: new Date().toISOString().slice(0, 10) });
+  const [genForm, setGenForm] = useState({ nomorSK: "", tanggalSK: "", tmtSK: "", penetapSkDasar: "", nomorSurat: "", tanggalSurat: new Date().toISOString().slice(0, 10) });
   const [genError, setGenError] = useState<string | null>(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -781,7 +784,7 @@ function DashboardMain() {
         await fetch(`/api/kgb/${data.id}/upload-sk`, { method: "POST", body: fd });
       }
       setActionModal(null);
-      setArsipForm({ nomorSK: "", tanggalSK: "", tmtSK: "" });
+      setArsipForm({ nomorSK: "", tanggalSK: "", tmtSK: "", penetapSkDasar: "" });
       setArsipFile(null);
       fetchDashboard();
     } finally {
@@ -797,12 +800,12 @@ function DashboardMain() {
       const res = await fetch("/api/kgb", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pegawaiId: actionModal.pegawaiId, nomorSK: inputForm.nomorSK, tanggalSK: inputForm.tanggalSK, tmtSK: inputForm.tmtSK }),
+        body: JSON.stringify({ pegawaiId: actionModal.pegawaiId, nomorSK: inputForm.nomorSK, tanggalSK: inputForm.tanggalSK, tmtSK: inputForm.tmtSK, penetapSkDasar: inputForm.penetapSkDasar }),
       });
       const json = await res.json() as any;
       if (!res.ok) { setInputError(json.error || "Gagal menyimpan KGB"); return; }
       setActionModal(null);
-      setInputForm({ nomorSK: "", tanggalSK: "", tmtSK: "" });
+      setInputForm({ nomorSK: "", tanggalSK: "", tmtSK: "", penetapSkDasar: "" });
       setInputError(null);
       fetchDashboard();
     } finally {
@@ -822,7 +825,7 @@ function DashboardMain() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nomorSurat: genForm.nomorSurat, tanggalSurat: genForm.tanggalSurat }),
       });
-      if (!res.ok) { setGenError("Gagal membuat preview"); return; }
+      if (!res.ok) { const j = await res.json().catch(() => ({})) as { error?: string }; setGenError(j.error || "Gagal membuat preview"); return; }
       const blob = await res.blob();
       setPdfPreviewUrl(URL.createObjectURL(blob));
     } finally {
@@ -842,7 +845,7 @@ function DashboardMain() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nomorSurat: genForm.nomorSurat, tanggalSurat: genForm.tanggalSurat }),
       });
-      if (!res.ok) { setGenError("Gagal membuat preview Srikandi"); return; }
+      if (!res.ok) { const j = await res.json().catch(() => ({})) as { error?: string }; setGenError(j.error || "Gagal membuat preview Srikandi"); return; }
       const blob = await res.blob();
       setSrikandiPreviewUrl(URL.createObjectURL(blob));
       setPreviewTab("srikandi");
@@ -854,6 +857,7 @@ function DashboardMain() {
   async function handleSaveAndGenerate() {
     if (!actionModal || actionModal.type !== "generate" || !actionModal.kgbId) return;
     if (!genForm.tanggalSK || !genForm.tmtSK) { setGenError("Tanggal SK dan TMT SK terakhir wajib diisi"); return; }
+    if (!genForm.penetapSkDasar.trim()) { setGenError("Isi pejabat yang menetapkan SK terakhir"); return; }
     if (!genForm.nomorSurat.trim() || !genForm.tanggalSurat) { setGenError("Nomor dan tanggal SK baru wajib diisi"); return; }
     setProcessingKgbId(actionModal.kgbId);
     setGenError(null);
@@ -861,17 +865,18 @@ function DashboardMain() {
       const patchRes = await fetch(`/api/kgb/${actionModal.kgbId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nomorSK: genForm.nomorSK, tanggalSK: genForm.tanggalSK, tmtSK: genForm.tmtSK }),
+        body: JSON.stringify({ nomorSK: genForm.nomorSK, tanggalSK: genForm.tanggalSK, tmtSK: genForm.tmtSK, penetapSkDasar: genForm.penetapSkDasar }),
       });
       if (!patchRes.ok) { const j = await patchRes.json() as any; setGenError(j.error || "Gagal menyimpan data SK terakhir"); return; }
       const pdfBody = JSON.stringify({ nomorSurat: genForm.nomorSurat, tanggalSurat: genForm.tanggalSurat });
       const tahun = genForm.tanggalSurat ? new Date(genForm.tanggalSurat).getFullYear() : new Date().getFullYear();
       const namaFile = actionModal.nama;
+      // Hanya permintaan reguler yang menyimpan surat; versi Srikandi cukup pratinjau agar tidak tercatat dua kali.
       const [res, resSrikandi] = await Promise.all([
         fetch(`/api/kgb/${actionModal.kgbId}/pdf`, { method: "POST", headers: { "Content-Type": "application/json" }, body: pdfBody }),
-        fetch(`/api/kgb/${actionModal.kgbId}/pdf?srikandi=true`, { method: "POST", headers: { "Content-Type": "application/json" }, body: pdfBody }),
+        fetch(`/api/kgb/${actionModal.kgbId}/pdf?preview=true&srikandi=true`, { method: "POST", headers: { "Content-Type": "application/json" }, body: pdfBody }),
       ]);
-      if (!res.ok) { setGenError("Gagal generate PDF"); return; }
+      if (!res.ok) { const j = await res.json().catch(() => ({})) as { error?: string }; setGenError(j.error || "Gagal generate PDF"); return; }
       const triggerDownload = (blob: Blob, filename: string) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -884,7 +889,7 @@ function DashboardMain() {
       if (pdfPreviewUrl) { URL.revokeObjectURL(pdfPreviewUrl); setPdfPreviewUrl(null); }
       if (srikandiPreviewUrl) { URL.revokeObjectURL(srikandiPreviewUrl); setSrikandiPreviewUrl(null); }
       setPreviewTab("regular");
-      setGenForm({ nomorSK: "", tanggalSK: "", tmtSK: "", nomorSurat: "", tanggalSurat: new Date().toISOString().slice(0, 10) });
+      setGenForm({ nomorSK: "", tanggalSK: "", tmtSK: "", penetapSkDasar: "", nomorSurat: "", tanggalSurat: new Date().toISOString().slice(0, 10) });
       fetchDashboard();
     } finally {
       setProcessingKgbId(null);
@@ -1576,7 +1581,7 @@ function DashboardMain() {
                                   {/* Jalur Arsip: SK sudah ada di sistem lama, tinggal digitalisasi */}
                                   <button
                                     onClick={() => {
-                                      setArsipForm({ nomorSK: "", tanggalSK: "", tmtSK: "" });
+                                      setArsipForm({ nomorSK: "", tanggalSK: "", tmtSK: "", penetapSkDasar: "" });
                                       setArsipFile(null); setArsipError(null);
                                       setActionModal({ type: "arsip", pegawaiId: p.id, nama: p.nama, nip: p.nip, golonganRuang: p.golonganRuang, tmtKgb: p.tmtKgbBerikutnya });
                                     }}
@@ -1597,7 +1602,7 @@ function DashboardMain() {
                                     onClick={() => {
                                       const tmt = p.tmtKgbBerikutnya;
                                       const tmtStr = tmt ? new Date(tmt).toISOString().slice(0, 10) : "";
-                                      setInputForm({ nomorSK: p.prevNomorSK ?? "", tanggalSK: p.prevTanggalSK ? p.prevTanggalSK.slice(0, 10) : new Date().toISOString().slice(0, 10), tmtSK: p.prevTmtSK ? p.prevTmtSK.slice(0, 10) : tmtStr });
+                                      setInputForm({ nomorSK: p.prevNomorSK ?? "", tanggalSK: p.prevTanggalSK ? p.prevTanggalSK.slice(0, 10) : new Date().toISOString().slice(0, 10), tmtSK: p.prevTmtSK ? p.prevTmtSK.slice(0, 10) : tmtStr, penetapSkDasar: p.prevPenetapSkDasar ?? "" });
                                       setInputError(null);
                                       setActionModal({ type: "input", pegawaiId: p.id, nama: p.nama, nip: p.nip, tmtKgb: tmt, isReInput: false, golonganRuang: p.golonganRuang, gajiPokok: p.gajiPokok, mkgTahun: p.mkgTahun, mkgBulan: p.mkgBulan });
                                     }}
@@ -1620,7 +1625,7 @@ function DashboardMain() {
                                     onClick={() => {
                                       const tmt = p.tmtKgbBerikutnya;
                                       const tmtStr = tmt ? new Date(tmt).toISOString().slice(0, 10) : "";
-                                      setInputForm({ nomorSK: p.prevNomorSK ?? "", tanggalSK: p.prevTanggalSK ? p.prevTanggalSK.slice(0, 10) : new Date().toISOString().slice(0, 10), tmtSK: p.prevTmtSK ? p.prevTmtSK.slice(0, 10) : tmtStr });
+                                      setInputForm({ nomorSK: p.prevNomorSK ?? "", tanggalSK: p.prevTanggalSK ? p.prevTanggalSK.slice(0, 10) : new Date().toISOString().slice(0, 10), tmtSK: p.prevTmtSK ? p.prevTmtSK.slice(0, 10) : tmtStr, penetapSkDasar: p.prevPenetapSkDasar ?? "" });
                                       setInputError(null);
                                       setActionModal({ type: "input", pegawaiId: p.id, nama: p.nama, nip: p.nip, tmtKgb: tmt, isReInput: false, golonganRuang: p.golonganRuang, gajiPokok: p.gajiPokok, mkgTahun: p.mkgTahun, mkgBulan: p.mkgBulan });
                                     }}
@@ -1643,7 +1648,7 @@ function DashboardMain() {
                                 <>
                               <button
                                 onClick={() => {
-                                  setGenForm({ nomorSK: p.nomorSK ?? "", tanggalSK: p.tanggalSK ? p.tanggalSK.slice(0, 10) : "", tmtSK: p.tmtSK ? p.tmtSK.slice(0, 10) : new Date(p.tmtKgbBerikutnya).toISOString().slice(0, 10), nomorSurat: p.suratNomorSurat ?? "", tanggalSurat: new Date().toISOString().slice(0, 10) });
+                                  setGenForm({ nomorSK: p.nomorSK ?? "", tanggalSK: p.tanggalSK ? p.tanggalSK.slice(0, 10) : "", tmtSK: p.tmtSK ? p.tmtSK.slice(0, 10) : new Date(p.tmtKgbBerikutnya).toISOString().slice(0, 10), penetapSkDasar: p.penetapSkDasar ?? "", nomorSurat: p.suratNomorSurat ?? "", tanggalSurat: new Date().toISOString().slice(0, 10) });
                                   setGenError(null);
                                   setPdfPreviewUrl(null);
                                   setActionModal({ type: "generate", kgbId: p.kgbId!, nama: p.nama, nip: p.nip, tmtKgb: p.tmtKgbBerikutnya, golonganRuang: p.golonganRuang, gajiPokokLama: p.gajiPokokLama, gajiPokokBaru: p.gajiPokokBaru, mkgTahunBaru: p.mkgTahunBaru, mkgBulanBaru: p.mkgBulanBaru });
@@ -2052,6 +2057,17 @@ function DashboardMain() {
                         className="w-full text-xs rounded-xl px-3 py-2.5 outline-none"
                         style={{ border: "1.5px solid var(--ln1)", color: "var(--dtn)" }} />
                     </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-0.5" style={{ color: "var(--dt3)" }}>Ditetapkan oleh</label>
+                      <p className="text-xs mb-1" style={{ color: "var(--dt5)" }}>Pejabat yang menetapkan SK tersebut, wajib sebelum surat dibuat</p>
+                      <input list="saran-penetap-sk" value={inputForm.penetapSkDasar} onChange={e => setInputForm(f => ({ ...f, penetapSkDasar: e.target.value }))}
+                        placeholder="Pilih atau ketik jabatan penetap"
+                        className="w-full text-xs rounded-xl px-3 py-2.5 outline-none"
+                        style={{ border: "1.5px solid var(--ln1)", color: "var(--dtn)" }} />
+                      <datalist id="saran-penetap-sk">
+                        {SARAN_PENETAP_SK.map((s) => <option key={s} value={s} />)}
+                      </datalist>
+                    </div>
                   </div>
                 </div>
                 {inputError && <p className="text-xs mb-3 px-3 py-2 rounded-xl" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>{inputError}</p>}
@@ -2332,6 +2348,16 @@ function DashboardMain() {
                           <input type="date" value={genForm.tmtSK} onChange={e => setGenForm(f => ({ ...f, tmtSK: e.target.value }))}
                             className="w-full text-xs rounded-xl px-3 py-2 outline-none"
                             style={{ border: "1.5px solid var(--ln1)", color: "var(--dtn)" }} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium mb-0.5" style={{ color: "var(--dt3)" }}>Ditetapkan oleh <span style={{ color: "var(--st-red)" }}>*</span></label>
+                          <input list="saran-penetap-sk" value={genForm.penetapSkDasar} onChange={e => setGenForm(f => ({ ...f, penetapSkDasar: e.target.value }))}
+                            placeholder="Pilih atau ketik jabatan penetap"
+                            className="w-full text-xs rounded-xl px-3 py-2 outline-none"
+                            style={{ border: "1.5px solid var(--ln1)", color: "var(--dtn)" }} />
+                          <datalist id="saran-penetap-sk">
+                            {SARAN_PENETAP_SK.map((s) => <option key={s} value={s} />)}
+                          </datalist>
                         </div>
                       </div>
                     </div>

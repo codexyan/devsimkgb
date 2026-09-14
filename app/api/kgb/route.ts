@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { sheets, makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
-import { kalkulasiKGB, getGajiPokok } from "@/lib/tabelGaji";
+import { kalkulasiKGB, getGajiPokok, isGolonganDikenal } from "@/lib/tabelGaji";
 import { canProcessKGB } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -151,6 +151,7 @@ export async function GET(req: Request) {
         nomorSK: "",
         tanggalSK: "",
         tmtSK: "",
+        penetapSkDasar: null,
         status: "belum_diproses",
         flagRapelan,
         unlockDate: unlockDate.toISOString(),
@@ -187,20 +188,37 @@ export async function POST(req: Request) {
   if (!pegawai)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
-  // Cek pegawai Hukdis (penundaan_kgb memblokir proses).
-  if (pegawai.statusHukdis) {
-    const now = new Date();
-    const masihAktif = !pegawai.tanggalHukdisBerakhir || pegawai.tanggalHukdisBerakhir > now;
-    const berdampakKeKGB = !pegawai.jenisHukdis || pegawai.jenisHukdis === "penundaan_kgb";
-    if (masihAktif && berdampakKeKGB) {
-      const sisa = pegawai.tanggalHukdisBerakhir
-        ? `Berakhir: ${new Date(pegawai.tanggalHukdisBerakhir).toLocaleDateString("id-ID")}`
-        : "Tanggal berakhir belum ditetapkan";
-      return NextResponse.json(
-        { error: `Pegawai sedang dalam Penundaan KGB aktif, KGB tidak dapat diproses. ${sisa}` },
-        { status: 400 },
-      );
-    }
+  if (!isGolonganDikenal(pegawai.golonganRuang)) {
+    return NextResponse.json(
+      { error: `Golongan "${pegawai.golonganRuang}" tidak dikenal di tabel gaji PP 5/2024. Perbaiki data pegawai terlebih dahulu.` },
+      { status: 400 },
+    );
+  }
+
+  // Hukdis yang ditandai berdampak KGB menahan proses selama masih berlaku.
+  const now = new Date();
+  const riwayatHukdis = (await sheets.riwayatHukdis.findMany({ where: { pegawaiId: pegawai.id } })) as {
+    berdampakKGB: boolean | null;
+    tmtBerakhir: Date | null;
+  }[];
+  const hukdisMenahan = riwayatHukdis.find(
+    (h) => h.berdampakKGB === true && (!h.tmtBerakhir || new Date(h.tmtBerakhir) > now),
+  );
+  // Data lama tanpa riwayat hukdis memakai penanda di data pegawai seperti sebelumnya.
+  const penandaLamaMenahan =
+    riwayatHukdis.length === 0 &&
+    pegawai.statusHukdis &&
+    (!pegawai.tanggalHukdisBerakhir || pegawai.tanggalHukdisBerakhir > now) &&
+    (!pegawai.jenisHukdis || pegawai.jenisHukdis === "penundaan_kgb");
+  if (hukdisMenahan || penandaLamaMenahan) {
+    const berakhir = hukdisMenahan ? hukdisMenahan.tmtBerakhir : pegawai.tanggalHukdisBerakhir;
+    const sisa = berakhir
+      ? `Berakhir: ${new Date(berakhir).toLocaleDateString("id-ID")}`
+      : "Tanggal berakhir belum ditetapkan";
+    return NextResponse.json(
+      { error: `Pegawai sedang menjalani hukuman disiplin yang menunda KGB, sehingga KGB belum dapat diproses. ${sisa}` },
+      { status: 400 },
+    );
   }
 
   const hasil = kalkulasiKGB({
@@ -217,6 +235,7 @@ export async function POST(req: Request) {
   const deadlineSDM = new Date(tmtKgb.getFullYear(), tmtKgb.getMonth() - 1, 0);
   const isArsip = body.isArsip === true;
   const flagRapelan = isArsip ? false : todayDatePost > deadlineSDM;
+  const penetapSkDasar = typeof body.penetapSkDasar === "string" ? body.penetapSkDasar.trim() || null : null;
 
   // -- MODE ARSIP --
   if (isArsip) {
@@ -225,6 +244,7 @@ export async function POST(req: Request) {
       nomorSK: body.nomorSK,
       tanggalSK: new Date(body.tanggalSK),
       tmtSK: new Date(body.tmtSK),
+      penetapSkDasar,
       golonganLama: pegawai.golonganRuang,
       gajiPokokLama: pegawai.gajiPokok,
       mkgTahunLama: pegawai.mkgTahun,
@@ -315,6 +335,8 @@ export async function POST(req: Request) {
     nomorSK: body.nomorSK,
     tanggalSK: new Date(body.tanggalSK),
     tmtSK: new Date(body.tmtSK),
+    // Placeholder bisa sudah membawa penetap dari surat KGB sebelumnya.
+    penetapSkDasar: penetapSkDasar ?? existing?.penetapSkDasar ?? null,
     golonganLama: pegawai.golonganRuang,
     gajiPokokLama: pegawai.gajiPokok,
     mkgTahunLama: pegawai.mkgTahun,

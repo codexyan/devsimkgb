@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRef } from "react";
 import Link from "next/link";
+import { SARAN_PENETAP_SK } from "@/lib/penetapSk";
 
 interface KGB {
   id: string | null;
@@ -23,8 +24,10 @@ interface KGB {
   nomorSK: string;
   tanggalSK: string;
   tmtSK: string;
+  penetapSkDasar?: string | null;
   status: string;
   flagRapelan: boolean;
+  isArsip?: boolean;
   unlockDate?: string;
   isLocked?: boolean;
   createdAt: string;
@@ -87,7 +90,7 @@ export default function KGBPage() {
   const [pegawaiList, setPegawaiList] = useState<Pegawai[]>([]);
   const [pegawaiSearch, setPegawaiSearch] = useState("");
   const [selectedPegawai, setSelectedPegawai] = useState<Pegawai | null>(null);
-  const [form, setForm] = useState({ nomorSK: "", tanggalSK: "", tmtSK: "" });
+  const [form, setForm] = useState({ nomorSK: "", tanggalSK: "", tmtSK: "", penetapSkDasar: "" });
   const [preview, setPreview] = useState<{
     mkgTahunBaru: number;
     mkgBulanBaru: number;
@@ -473,7 +476,7 @@ export default function KGBPage() {
     setPegawaiSearch("");
     setPegawaiList([]);
     setPreview(null);
-    setForm({ nomorSK: "", tanggalSK: "", tmtSK: "" });
+    setForm({ nomorSK: "", tanggalSK: "", tmtSK: "", penetapSkDasar: "" });
     setIsArsip(false);
     setArsipStep("form");
     setArsipFile(null);
@@ -994,6 +997,16 @@ export default function KGBPage() {
                               Antrean Otomatis
                             </span>
                           )}
+                          {!k.isVirtual && !k.isArsip && !k.penetapSkDasar &&
+                            (k.status === "sedang_diproses" || (k.status === "belum_diproses" && k.nomorSK !== "")) && (
+                            <span
+                              className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                              style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber2)", fontSize: "10px" }}
+                              title="Pejabat penetap SK terakhir belum diisi, sehingga surat belum dapat dibuat"
+                            >
+                              Penetap SK perlu dilengkapi
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -1454,6 +1467,23 @@ export default function KGBPage() {
                         <p className="text-xs mt-1" style={{ color: "var(--dt5)" }}>Tanggal gaji baru mulai berlaku</p>
                       </div>
                     </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: "var(--dt2)" }}>
+                        Ditetapkan oleh
+                      </label>
+                      <input
+                        className={inputClass}
+                        style={inputStyle}
+                        list="saran-penetap-sk"
+                        placeholder="Pejabat yang menetapkan SK terakhir"
+                        value={form.penetapSkDasar}
+                        onChange={(e) => setForm((p) => ({ ...p, penetapSkDasar: e.target.value }))}
+                      />
+                      <datalist id="saran-penetap-sk">
+                        {SARAN_PENETAP_SK.map((s) => <option key={s} value={s} />)}
+                      </datalist>
+                      <p className="text-xs mt-1" style={{ color: "var(--dt5)" }}>Tercetak pada baris &quot;Oleh&quot; di surat; wajib diisi sebelum surat dibuat</p>
+                    </div>
                   </div>
                 )}
 
@@ -1749,6 +1779,7 @@ export default function KGBPage() {
                     { label: "Jabatan", val: showDetail.pegawai.jabatan },
                     { label: "Unit Kerja", val: showDetail.pegawai.unitKerja },
                     { label: "Nomor SK", val: showDetail.nomorSK || "-" },
+                    { label: "Ditetapkan oleh", val: showDetail.penetapSkDasar || "Perlu dilengkapi" },
                     {
                       label: "Tanggal SK",
                       val: showDetail.tanggalSK

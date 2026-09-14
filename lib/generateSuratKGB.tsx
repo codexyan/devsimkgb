@@ -10,6 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import path from "path";
 import fs from "fs";
+import type { JenisPenandatangan } from "./penandatangan";
 
 Font.register({
   family: "Times",
@@ -135,6 +136,8 @@ interface SuratKGBProps {
     nomorSK: string;
     tanggalSK: Date | string;
     tmtSK: Date | string;
+    /** Pejabat penetap SK dasar, dicetak pada baris "Oleh". */
+    penetapSkDasar: string;
     mkgTahunLama: number;
     mkgBulanLama: number;
     gajiPokokBaru: number;
@@ -145,12 +148,15 @@ interface SuratKGBProps {
     tmtKgbBerikutnya: Date | string;
     flagRapelan: boolean;
   };
-  kanwil: {
-    namaKepala: string;
-    nipKepala: string;
-    nomorPP: string;
-    tahunPP: string;
+  /** Hasil tentukanPenandatangan(); jabatan sudah berawalan Plh./Plt. bila perlu. */
+  penandatangan: {
+    jenis: JenisPenandatangan;
+    jabatan: string;
+    nama: string;
+    nip: string;
   };
+  /** Nomor peraturan gaji yang dirujuk, mis. "Nomor 5 Tahun 2024". */
+  dasarHukum: string;
   /** Render versi Srikandi: placeholder ${ttd_pengirim} + label Srikandi di area TTD */
   srikandi?: boolean;
 }
@@ -160,7 +166,8 @@ export function SuratKGBDocument({
   tanggalSurat,
   pegawai,
   kgb,
-  kanwil,
+  penandatangan,
+  dasarHukum,
   srikandi = false,
 }: SuratKGBProps) {
   const logoSrc = `data:image/png;base64,${fs
@@ -169,6 +176,8 @@ export function SuratKGBDocument({
   const labelSrikandiSrc = srikandi
     ? `data:image/png;base64,${fs.readFileSync(path.join(process.cwd(), "public/label-srikandi.png")).toString("base64")}`
     : null;
+  // KGB milik pimpinan Kanwil ditandatangani Dirjen, sehingga suratnya berkop Direktorat Jenderal.
+  const kopDitjen = penandatangan.jenis === "dirjen";
 
   return (
     <Document>
@@ -181,15 +190,21 @@ export function SuratKGBDocument({
             <Text style={S.kopL1}>
               KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA
             </Text>
-            <Text style={S.kopL2}>DIREKTORAT JENDERAL PEMASYARAKATAN</Text>
-            <Text style={S.kopL3}>KANTOR WILAYAH KALIMANTAN SELATAN</Text>
-            <Text style={S.kopL4}>
-              Jalan Jendral A. Yani Km. 5,5 No. 24, Banjarmasin, Kalimantan
-              Selatan
-            </Text>
-            <Text style={S.kopL4}>
-              Telepon 085252502005, Pos-el : kanwilditjenpaskalsel@gmail.com
-            </Text>
+            {kopDitjen ? (
+              <Text style={S.kopL3}>DIREKTORAT JENDERAL PEMASYARAKATAN</Text>
+            ) : (
+              <>
+                <Text style={S.kopL2}>DIREKTORAT JENDERAL PEMASYARAKATAN</Text>
+                <Text style={S.kopL3}>KANTOR WILAYAH KALIMANTAN SELATAN</Text>
+                <Text style={S.kopL4}>
+                  Jalan Jendral A. Yani Km. 5,5 No. 24, Banjarmasin, Kalimantan
+                  Selatan
+                </Text>
+                <Text style={S.kopL4}>
+                  Telepon 085252502005, Pos-el : kanwilditjenpaskalsel@gmail.com
+                </Text>
+              </>
+            )}
           </View>
         </View>
 
@@ -275,10 +290,7 @@ export function SuratKGBDocument({
           <Text style={S.subLabel}>a.</Text>
           <Text style={S.subKey}>Oleh</Text>
           <Text style={S.subColon}>:</Text>
-          <Text style={S.subValue}>
-            Kepala Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan
-            Selatan
-          </Text>
+          <Text style={S.subValue}>{kgb.penetapSkDasar}</Text>
         </View>
         <View style={S.sub}>
           <Text style={S.subLabel}>b.</Text>
@@ -348,14 +360,12 @@ export function SuratKGBDocument({
         {/* DASAR HUKUM */}
         <Text style={S.dasarHukum}>
           {"      "}Diharap agar sesuai dengan Peraturan Pemerintah{" "}
-          <Text style={{ fontWeight: "bold" }}>
-            No. 5 Tahun {kanwil.tahunPP},
-          </Text>{" "}
+          <Text style={{ fontWeight: "bold" }}>{dasarHukum},</Text>{" "}
           kepada Pegawai tersebut dapat dibayarkan penghasilannya berdasarkan
           gaji pokok tersebut.
         </Text>
 
-        {/* TTD */}
+        {/* TTD: delegasi, jadi ditandatangani atas nama jabatan sendiri (tanpa a.n. Menteri) */}
         {srikandi ? (
           /* Srikandi: 2-kolom, kiri ${ttd_pengirim}, kanan blok pejabat */
           <View
@@ -373,7 +383,7 @@ export function SuratKGBDocument({
             {/* Kanan: jabatan + label Srikandi + nama + NIP */}
             <View style={{ alignItems: "flex-end" }}>
               <Text style={{ fontSize: 11, marginBottom: 6 }}>
-                Kepala Kantor Wilayah
+                {penandatangan.jabatan}
               </Text>
               {labelSrikandiSrc && (
                 // eslint-disable-next-line jsx-a11y/alt-text -- Image @react-pdf/renderer (PDF), bukan elemen DOM; prop alt tidak ada di tipenya
@@ -387,19 +397,19 @@ export function SuratKGBDocument({
                   src={labelSrikandiSrc}
                 />
               )}
-              <Text style={S.ttdNama}>{kanwil.namaKepala}</Text>
-              <Text style={S.ttdNip}>NIP. {kanwil.nipKepala}</Text>
+              <Text style={S.ttdNama}>{penandatangan.nama}</Text>
+              <Text style={S.ttdNip}>NIP. {penandatangan.nip}</Text>
             </View>
           </View>
         ) : (
           /* Reguler: satu blok rata kanan dengan ruang tanda tangan */
           <View style={S.ttdBlock}>
             <Text style={{ fontSize: 11, marginBottom: 4 }}>
-              Kepala Kantor Wilayah
+              {penandatangan.jabatan}
             </Text>
             <Text style={{ fontSize: 11, marginBottom: 36 }}> </Text>
-            <Text style={S.ttdNama}>{kanwil.namaKepala}</Text>
-            <Text style={S.ttdNip}>NIP. {kanwil.nipKepala}</Text>
+            <Text style={S.ttdNama}>{penandatangan.nama}</Text>
+            <Text style={S.ttdNip}>NIP. {penandatangan.nip}</Text>
           </View>
         )}
 

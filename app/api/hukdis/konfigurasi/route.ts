@@ -141,12 +141,20 @@ export async function PATCH(req: Request) {
     }
   }
 
+  // Halaman selalu mengirim dasarHukum saat menyimpan; tautan regulasi hanya dilepas
+  // bila teks dasar hukumnya benar-benar diubah.
+  const jenisById = new Map(
+    (body.jenisUpdates?.length
+      ? ((await sheets.hukdisJenis.findMany()) as { id: string; dasarHukum: string | null }[])
+      : []
+    ).map((j) => [j.id, j] as const),
+  );
   for (const u of body.jenisUpdates ?? []) {
     let dasarPatch: { dasarHukum?: string | null; regulasiId?: string | null } = {};
     if (u.regulasiId !== undefined) {
       const r = await resolveDasar(u.regulasiId, u.dasarHukum);
       dasarPatch = { dasarHukum: r.dasarHukum, regulasiId: r.regulasiId };
-    } else if (u.dasarHukum !== undefined) {
+    } else if (u.dasarHukum !== undefined && u.dasarHukum !== jenisById.get(u.id)?.dasarHukum) {
       dasarPatch = { dasarHukum: u.dasarHukum, regulasiId: null };
     }
     await sheets.hukdisJenis.update(

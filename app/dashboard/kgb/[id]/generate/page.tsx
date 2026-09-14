@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { SARAN_PENETAP_SK } from "@/lib/penetapSk";
 
 interface KGBDetail {
   id: string;
   nomorSK: string;
   tanggalSK: string;
   tmtSK: string;
+  penetapSkDasar: string | null;
   pegawai: {
     nama: string;
     nip: string;
@@ -43,6 +45,7 @@ export default function GeneratePDFPage() {
   const [nomorSK, setNomorSK] = useState("");
   const [tanggalSK, setTanggalSK] = useState("");
   const [tmtSK, setTmtSK] = useState("");
+  const [penetapSkDasar, setPenetapSkDasar] = useState("");
   const [mode, setMode] = useState<"reguler" | "srikandi">("reguler");
   const [generating, setGenerating] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -68,6 +71,7 @@ export default function GeneratePDFPage() {
           setTanggalSK(new Date(data.tanggalSK).toISOString().split("T")[0]);
         if (data.tmtSK)
           setTmtSK(new Date(data.tmtSK).toISOString().split("T")[0]);
+        if (data.penetapSkDasar) setPenetapSkDasar(data.penetapSkDasar);
         if (data.surat) {
           setNomorSurat(data.surat.nomorSurat);
           setTanggalSurat(
@@ -88,6 +92,7 @@ export default function GeneratePDFPage() {
   function validate() {
     if (!nomorSurat) { setError("Nomor surat wajib diisi"); return false; }
     if (!nomorSK || !tanggalSK || !tmtSK) { setError("Nomor SK, Tanggal SK, dan TMT SK wajib diisi"); return false; }
+    if (!penetapSkDasar.trim()) { setError("Isi pejabat yang menetapkan SK terakhir"); return false; }
     setError("");
     return true;
   }
@@ -96,7 +101,7 @@ export default function GeneratePDFPage() {
     await fetch(`/api/kgb/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nomorSK, tanggalSK, tmtSK }),
+      body: JSON.stringify({ nomorSK, tanggalSK, tmtSK, penetapSkDasar }),
     });
   }
 
@@ -442,6 +447,25 @@ export default function GeneratePDFPage() {
                       onChange={(e) => setTmtSK(e.target.value)}
                     />
                   </div>
+                </div>
+                <div>
+                  <label
+                    className="block text-xs font-medium mb-1.5"
+                    style={{ color: "var(--dt2)" }}
+                  >
+                    Ditetapkan oleh
+                  </label>
+                  <input
+                    className={inputClass}
+                    style={inputStyle}
+                    list="saran-penetap-sk"
+                    placeholder="Pejabat yang menetapkan SK terakhir"
+                    value={penetapSkDasar}
+                    onChange={(e) => setPenetapSkDasar(e.target.value)}
+                  />
+                  <datalist id="saran-penetap-sk">
+                    {SARAN_PENETAP_SK.map((s) => <option key={s} value={s} />)}
+                  </datalist>
                 </div>
               </div>
             </div>

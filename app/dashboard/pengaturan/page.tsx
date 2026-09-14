@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { ROLES } from "@/lib/auth";
+import PenandatanganManager from "./PenandatanganManager";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Pengaturan (super admin). Terbagi menjadi beberapa seksi:
-   1. Pejabat penandatangan SK  — dipilih dari data pegawai (bukan diketik)
+   1. Penandatangan surat KGB   — definitif, Plh, Plt, Dirjen, dengan masa berlaku
    2. Dasar hukum KGB
    3. Notifikasi KGB            — ambang H-… peringatan
    4. Keamanan sesi             — durasi auto-logout
@@ -14,18 +15,15 @@ import { ROLES } from "@/lib/auth";
    ───────────────────────────────────────────────────────────────────────── */
 
 interface Konfigurasi {
-  namaKepala: string; nipKepala: string;
   nomorPP: string; tahunPP: string;
   waAdmin: string; notifKgbH1: number; notifKgbH2: number; sesiTimeoutMenit: number;
   updatedAt?: string; updatedBy?: string | null;
 }
-interface PegawaiOpt { id: string; nip: string; nama: string; jabatan: string; golonganRuang: string; }
 
 const EMPTY: Konfigurasi = {
-  namaKepala: "", nipKepala: "", nomorPP: "Nomor 5 Tahun 2024", tahunPP: "2024",
+  nomorPP: "Nomor 5 Tahun 2024", tahunPP: "2024",
   waAdmin: "", notifKgbH1: 14, notifKgbH2: 7, sesiTimeoutMenit: 60,
 };
-const initials = (n: string) => n.split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase();
 
 /* Kartu seksi dengan chip ikon — siap masonry (break-inside-avoid) + anchor id */
 function Section({ id, icon, grad, title, desc, children, badge }: {
@@ -80,54 +78,36 @@ export default function PengaturanPage() {
   const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState("");
   const [saved, setSaved]     = useState(false);
-
-  const [pegawai, setPegawai] = useState<PegawaiOpt[]>([]);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerSearch, setPickerSearch] = useState("");
+  const [adaPenandatangan, setAdaPenandatangan] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/konfigurasi").then((r) => r.json() as any).catch(() => null),
-      fetch("/api/pegawai?search=&status=").then((r) => r.json() as any).catch(() => []),
-    ]).then(([cfg, peg]) => {
-      if (cfg && cfg.namaKepala !== undefined) {
-        const c: Konfigurasi = {
-          namaKepala: cfg.namaKepala ?? "", nipKepala: cfg.nipKepala ?? "",
-          nomorPP: cfg.nomorPP ?? EMPTY.nomorPP, tahunPP: cfg.tahunPP ?? EMPTY.tahunPP,
-          waAdmin: cfg.waAdmin ?? "", notifKgbH1: cfg.notifKgbH1 ?? 14,
-          notifKgbH2: cfg.notifKgbH2 ?? 7, sesiTimeoutMenit: cfg.sesiTimeoutMenit ?? 60,
-          updatedAt: cfg.updatedAt, updatedBy: cfg.updatedBy,
-        };
-        setForm(c); setInitial(c);
-      } else setInitial(null);
-      if (Array.isArray(peg)) setPegawai(peg);
-    }).finally(() => setLoading(false));
+    fetch("/api/konfigurasi")
+      .then((r) => r.json() as any)
+      .catch(() => null)
+      .then((cfg) => {
+        if (cfg && cfg.id) {
+          const c: Konfigurasi = {
+            nomorPP: cfg.nomorPP ?? EMPTY.nomorPP, tahunPP: cfg.tahunPP ?? EMPTY.tahunPP,
+            waAdmin: cfg.waAdmin ?? "", notifKgbH1: cfg.notifKgbH1 ?? 14,
+            notifKgbH2: cfg.notifKgbH2 ?? 7, sesiTimeoutMenit: cfg.sesiTimeoutMenit ?? 60,
+            updatedAt: cfg.updatedAt, updatedBy: cfg.updatedBy,
+          };
+          setForm(c); setInitial(c);
+        } else setInitial(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const matched = useMemo(() => pegawai.find((p) => p.nip === form.nipKepala) ?? null, [pegawai, form.nipKepala]);
-  const filteredPegawai = useMemo(() => {
-    const q = pickerSearch.trim().toLowerCase();
-    const list = q ? pegawai.filter((p) => p.nama.toLowerCase().includes(q) || p.nip.includes(q) || (p.jabatan ?? "").toLowerCase().includes(q)) : pegawai;
-    return list.slice(0, 60);
-  }, [pegawai, pickerSearch]);
-
   const isDirty = !initial || (Object.keys(EMPTY) as (keyof Konfigurasi)[]).some((k) => form[k] !== initial[k]);
-
-  function pickPegawai(p: PegawaiOpt) {
-    setForm((f) => ({ ...f, namaKepala: p.nama, nipKepala: p.nip }));
-    setPickerOpen(false); setPickerSearch(""); setSaved(false);
-  }
   const num = (v: string, fb: number) => { const n = parseInt(v.replace(/\D/g, "")); return Number.isFinite(n) ? n : fb; };
 
   async function handleSave() {
     setError(""); setSaved(false);
-    if (!form.namaKepala.trim() || !form.nipKepala.trim()) { setError("Pejabat penandatangan wajib dipilih dari data pegawai"); return; }
     setSaving(true);
     try {
       const res = await fetch("/api/konfigurasi", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          namaKepala: form.namaKepala.trim(), nipKepala: form.nipKepala.trim(),
           nomorPP: form.nomorPP.trim(), tahunPP: form.tahunPP.trim(),
           waAdmin: form.waAdmin.trim(), notifKgbH1: form.notifKgbH1,
           notifKgbH2: form.notifKgbH2, sesiTimeoutMenit: form.sesiTimeoutMenit,
@@ -136,7 +116,7 @@ export default function PengaturanPage() {
       const d = await res.json() as any;
       if (!res.ok) { setError(d.error || "Gagal menyimpan pengaturan"); return; }
       const c: Konfigurasi = {
-        namaKepala: d.namaKepala, nipKepala: d.nipKepala, nomorPP: d.nomorPP, tahunPP: d.tahunPP,
+        nomorPP: d.nomorPP, tahunPP: d.tahunPP,
         waAdmin: d.waAdmin ?? "", notifKgbH1: d.notifKgbH1, notifKgbH2: d.notifKgbH2,
         sesiTimeoutMenit: d.sesiTimeoutMenit, updatedAt: d.updatedAt, updatedBy: d.updatedBy,
       };
@@ -156,11 +136,9 @@ export default function PengaturanPage() {
   }
   if (loading) return <div className="flex items-center justify-center py-24"><p className="text-xs" style={{ color: "var(--dt4)" }}>Memuat pengaturan…</p></div>;
 
-  const hasSignatory = !!form.namaKepala && !!form.nipKepala;
-
   // Status ringkas per seksi untuk rail navigasi + overview
   const nav = [
-    { id: "pejabat",    label: "Pejabat Penandatangan", ok: hasSignatory,   grad: "linear-gradient(135deg,#2d5d94,var(--navy-solid))" },
+    { id: "pejabat",    label: "Penandatangan Surat",    ok: adaPenandatangan, grad: "linear-gradient(135deg,#2d5d94,var(--navy-solid))" },
     { id: "dokumen",    label: "Dasar Hukum KGB",        ok: !!form.nomorPP.trim(), grad: "linear-gradient(135deg,#17a37e,var(--green-solid))" },
     { id: "notifikasi", label: "Notifikasi KGB",         ok: true,           grad: "linear-gradient(135deg,#d99414,var(--amber-solid))" },
     { id: "keamanan",   label: "Keamanan Sesi",          ok: true,           grad: "linear-gradient(135deg,#e35d5d,var(--red-solid))" },
@@ -185,7 +163,7 @@ export default function PengaturanPage() {
       {!initial && (
         <div className="rounded-xl px-3 py-2 flex items-center gap-2.5 mb-4" style={{ background: "var(--tint-amber-bg)", border: "1px solid var(--tint-amber-ln)" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--st-amber)" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <p className="text-xs" style={{ color: "var(--st-amber2)" }}>Konfigurasi belum tersimpan. Generate SK akan <strong>gagal</strong> sampai pejabat penandatangan dipilih dan disimpan.</p>
+          <p className="text-xs" style={{ color: "var(--st-amber2)" }}>Dasar hukum, notifikasi, dan kontak belum pernah disimpan, sehingga nilai bawaan yang dipakai.</p>
         </div>
       )}
 
@@ -227,53 +205,10 @@ export default function PengaturanPage() {
         <div className="flex-1 min-w-0">
         <div className="columns-1 xl:columns-2" style={{ columnGap: "16px" }}>
 
-        {/* 1. Pejabat penandatangan */}
-        <Section id="pejabat" badge={<StatusBadge ok={hasSignatory} />} grad="linear-gradient(135deg,#2d5d94,var(--navy-solid))" title="Pejabat Penandatangan SK" desc="Dipilih dari data pegawai · ganti saat Kakanwil berganti"
+        {/* 1. Penandatangan surat KGB */}
+        <Section id="pejabat" badge={<StatusBadge ok={adaPenandatangan} okLabel="Berlaku" noLabel="Belum ada" />} grad="linear-gradient(135deg,#2d5d94,var(--navy-solid))" title="Penandatangan Surat KGB" desc="Dipilih otomatis menurut tanggal surat · Plh, Plt, dan Dirjen punya masa berlaku"
           icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>}>
-          {hasSignatory && !pickerOpen ? (
-            <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: "var(--sub)", border: "1px solid var(--ln1)" }}>
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold shrink-0" style={{ background: "linear-gradient(135deg,#e0bd54,#c9a227)", color: "#211903" }}>{initials(form.namaKepala)}</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold truncate" style={{ color: "var(--dtn)" }}>{form.namaKepala}</p>
-                <p className="text-xs truncate" style={{ color: "var(--dt4)" }}>NIP {form.nipKepala}</p>
-                {matched ? <p className="text-xs truncate" style={{ color: "var(--dt5)", fontSize: "10.5px" }}>{matched.jabatan} · Gol. {matched.golonganRuang}</p>
-                         : <p className="text-xs" style={{ color: "var(--st-amber)", fontSize: "10px" }}>Tidak cocok dengan data pegawai aktif</p>}
-              </div>
-              <button onClick={() => { setPickerOpen(true); setPickerSearch(""); }} className="text-xs font-semibold px-3 py-1.5 rounded-lg shrink-0" style={{ background: "var(--tint-navy)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}>Ubah</button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--dt5)" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
-                <input autoFocus value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Cari nama, NIP, atau jabatan…" className="adm-input" style={{ paddingLeft: "34px" }} />
-              </div>
-              <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--ln1)", maxHeight: "240px", overflowY: "auto" }}>
-                {pegawai.length === 0 ? <p className="text-xs text-center py-8" style={{ color: "var(--dt5)" }}>Belum ada data pegawai.</p>
-                 : filteredPegawai.length === 0 ? <p className="text-xs text-center py-8" style={{ color: "var(--dt5)" }}>Tidak ada yang cocok</p>
-                 : filteredPegawai.map((p, i) => {
-                    const active = p.nip === form.nipKepala;
-                    return (
-                      <button key={p.id} onClick={() => pickPegawai(p)} className="w-full flex items-center gap-3 px-3 py-2.5 text-left" style={{ background: active ? "var(--accent-bg)" : "transparent", borderBottom: i < filteredPegawai.length - 1 ? "0.5px solid var(--ln2)" : "none", cursor: "pointer" }}>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>{initials(p.nama)}</div>
-                        <div className="flex-1 min-w-0"><p className="text-xs font-semibold truncate" style={{ color: "var(--dtn)" }}>{p.nama}</p><p className="text-xs truncate" style={{ color: "var(--dt4)" }}>{p.nip} · {p.jabatan} · Gol. {p.golonganRuang}</p></div>
-                        {active && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" className="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>}
-                      </button>
-                    );
-                  })}
-              </div>
-              {hasSignatory && <button onClick={() => { setPickerOpen(false); setPickerSearch(""); }} className="text-xs px-3 py-1.5 rounded-lg" style={{ color: "var(--dt4)", border: "0.5px solid var(--ln1)" }}>Batal ubah</button>}
-            </div>
-          )}
-          <div>
-            <p className="text-xs font-semibold mb-1.5" style={{ color: "var(--dt2)" }}>Pratinjau pada dokumen</p>
-            <div className="rounded-xl px-4 py-3" style={{ background: "var(--sub)", border: "1px dashed var(--ln0)" }}>
-              <div style={{ fontFamily: "'Times New Roman', Times, serif", fontSize: "12.5px", color: "var(--dt1)", textAlign: "left", width: "fit-content", marginLeft: "auto" }}>
-                <p style={{ margin: 0 }}>Kepala Kantor Wilayah</p><div style={{ height: "42px" }} />
-                <p style={{ margin: 0, fontWeight: 700, textDecoration: "underline" }}>{form.namaKepala || "................................"}</p>
-                <p style={{ margin: 0 }}>NIP. {form.nipKepala || "..............................."}</p>
-              </div>
-            </div>
-          </div>
+          <PenandatanganManager onStatus={setAdaPenandatangan} />
         </Section>
 
         {/* 2. Dasar hukum */}

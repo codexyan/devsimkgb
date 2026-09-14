@@ -3,8 +3,7 @@ import { sheets, makeRiwayatKGB, type PegawaiRow, type RiwayatKGBRow } from "@/l
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
-import { lookupGajiPokok } from "@/lib/gajiPokokTable";
-import { kalkulasiKGB } from "@/lib/tabelGaji";
+import { getGajiPokok, isGolonganDikenal, kalkulasiKGB } from "@/lib/tabelGaji";
 
 export const runtime = "nodejs";
 
@@ -40,17 +39,23 @@ export async function POST(req: Request) {
         continue;
       }
 
+      if (!isGolonganDikenal(row.golonganRuang)) {
+        results.gagal++;
+        results.errors.push(
+          `NIP ${row.nip} (${row.nama}): golongan "${row.golonganRuang}" tidak dikenal di tabel gaji PP 5/2024`,
+        );
+        continue;
+      }
+
       const mkgTahun = parseInt(row.mkgTahun) || 0;
       const mkgBulan = parseInt(row.mkgBulan) || 0;
       const gajiPokokRaw = row.gajiPokok ? parseInt(row.gajiPokok) : null;
       const gajiPokok =
-        gajiPokokRaw && !isNaN(gajiPokokRaw) ? gajiPokokRaw : lookupGajiPokok(row.golonganRuang, mkgTahun);
+        gajiPokokRaw && !isNaN(gajiPokokRaw) ? gajiPokokRaw : getGajiPokok(row.golonganRuang, mkgTahun, mkgBulan);
 
       if (!gajiPokok) {
         results.gagal++;
-        results.errors.push(
-          `NIP ${row.nip} (${row.nama}): golonganRuang "${row.golonganRuang}" tidak dikenali, gajiPokok tidak dapat ditentukan`,
-        );
+        results.errors.push(`NIP ${row.nip} (${row.nama}): gaji pokok tidak dapat ditentukan dari MKG ${mkgTahun} tahun ${mkgBulan} bulan`);
         continue;
       }
 

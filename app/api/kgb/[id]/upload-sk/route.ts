@@ -3,6 +3,7 @@ import { sheets } from "@/lib/sheets/tables";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
+import { canProcessKGB } from "@/lib/auth";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export const runtime = "nodejs";
@@ -15,6 +16,10 @@ export async function POST(
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // SK final hanya diunggah pengelola KGB, bukan sembarang pengguna yang login.
+  if (!canProcessKGB(session.user.role!))
+    return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+
   const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
@@ -24,6 +29,9 @@ export async function POST(
   const kgb = await sheets.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
+  if (kgb.status === "ditolak")
+    return NextResponse.json({ error: "KGB ini sudah dibatalkan. Input ulang KGB sebelum mengunggah SK." }, { status: 409 });
+
   const [pegawai, existingSurat] = await Promise.all([
     sheets.pegawai.findUnique({ id: kgb.pegawaiId }),
     sheets.suratKGB.findUnique({ kgbId: id }) as Promise<any>,
