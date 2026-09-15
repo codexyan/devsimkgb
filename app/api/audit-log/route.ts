@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 
@@ -23,8 +23,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const [logs, users] = await Promise.all([
-      sheets.auditLog.findMany({ orderBy: { field: "waktu", dir: "desc" } }),
-      sheets.user.findMany(),
+      db.auditLog.findMany({ orderBy: { field: "waktu", dir: "desc" } }),
+      db.user.findMany(),
     ]);
     const namaById = new Map(users.map((u) => [u.id, u.nama]));
 
@@ -81,7 +81,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
 
   const body = (await req.json().catch(() => ({}))) as any;
   const ids: string[] = Array.isArray(body.ids) ? body.ids : [];
@@ -90,7 +90,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Tidak ada ID yang dipilih" }, { status: 400 });
   }
 
-  const count = await sheets.auditLog.deleteMany({ id: { in: ids } });
+  const count = await db.auditLog.deleteMany({ id: { in: ids } });
 
   if (userLogin) {
     logAudit({

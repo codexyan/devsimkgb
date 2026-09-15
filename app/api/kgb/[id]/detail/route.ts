@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -14,13 +14,13 @@ export async function GET(
 
   const { id } = await params;
 
-  const kgb = await sheets.riwayatKGB.findUnique({ id });
+  const kgb = await db.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
   const [pegawai, suratList] = await Promise.all([
-    sheets.pegawai.findUnique({ id: kgb.pegawaiId }),
-    sheets.suratKGB.findMany({ where: { kgbId: id } }) as Promise<any[]>,
+    db.pegawai.findUnique({ id: kgb.pegawaiId }),
+    db.suratKGB.findMany({ where: { kgbId: id } }) as Promise<any[]>,
   ]);
 
   return NextResponse.json({ ...kgb, pegawai, surat: suratList[0] ?? null });

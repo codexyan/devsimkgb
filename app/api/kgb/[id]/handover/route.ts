@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sheets, makeRiwayatKGB } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
+import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -22,7 +23,7 @@ export async function POST(
   const { id } = await params;
   const { keterangan } = (await req.json()) as any;
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
@@ -35,15 +36,15 @@ export async function POST(
     tanggalSerahTerima: new Date(),
     createdBy: userLogin.id,
   };
-  await sheets.serahTerima.create(serahTerima);
+  await db.serahTerima.create(serahTerima);
 
   // Update status KGB jadi selesai
-  const kgbSelesai = await sheets.riwayatKGB.update({ id }, { status: "selesai" });
+  const kgbSelesai = await db.riwayatKGB.update({ id }, { status: "selesai" });
   if (!kgbSelesai)
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
 
   // Auto-generate KGB berikutnya
-  const pegawai = await sheets.pegawai.findUnique({ id: kgbSelesai.pegawaiId });
+  const pegawai = await db.pegawai.findUnique({ id: kgbSelesai.pegawaiId });
   if (pegawai) {
     const tmtNext = new Date(kgbSelesai.tmtKgbBerikutnya as Date);
     const tmtNextBerikutnya = new Date(tmtNext);
@@ -63,7 +64,7 @@ export async function POST(
     const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const flagRapelan = todayDate > deadlineSDM;
 
-    await sheets.pegawai.update(
+    await db.pegawai.update(
       { id: pegawai.id },
       {
         golonganRuang: kgbSelesai.golonganBaru,
@@ -74,9 +75,9 @@ export async function POST(
       },
     );
 
-    await sheets.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
+    await db.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
 
-    await sheets.riwayatKGB.create(
+    await db.riwayatKGB.create(
       makeRiwayatKGB({
         pegawaiId: pegawai.id,
         tanggalSK: tmtNext,
@@ -118,7 +119,7 @@ export async function GET(
 
   const { id } = await params;
 
-  const logs = await sheets.serahTerima.findMany({
+  const logs = await db.serahTerima.findMany({
     where: { kgbId: id },
     orderBy: { field: "tanggalSerahTerima", dir: "desc" },
   });

@@ -59,7 +59,7 @@ export type { PenandatanganRow };
 
 // ============================ Definisi kolom per tab ============================
 
-const defs = {
+export const defs = {
   User: {
     tab: "User",
     columns: [s("id"), s("nip"), s("password"), s("nama"), s("jabatan"), s("email"), s("role"), d("createdAt")],

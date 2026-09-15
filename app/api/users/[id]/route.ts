@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import bcrypt from "bcryptjs";
 
@@ -22,13 +22,13 @@ export async function PATCH(
     return NextResponse.json({ error: "Password minimal 6 karakter" }, { status: 400 });
   }
 
-  const user = await sheets.user.findUnique({ id });
+  const user = await db.user.findUnique({ id });
   if (!user) {
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);
-  await sheets.user.update({ id }, { password: hashedPassword });
+  await db.user.update({ id }, { password: hashedPassword });
 
   return NextResponse.json({ ok: true });
 }
@@ -46,12 +46,12 @@ export async function DELETE(
   const { id } = await params;
 
   // Cegah hapus diri sendiri
-  const me = await sheets.user.findUnique({ nip: session.user.nip! });
+  const me = await db.user.findUnique({ nip: session.user.nip! });
   if (me?.id === id) {
     return NextResponse.json({ error: "Tidak bisa menghapus akun yang sedang login" }, { status: 400 });
   }
 
-  const user = await sheets.user.findUnique({ id });
+  const user = await db.user.findUnique({ id });
   if (!user) {
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
   }
@@ -65,10 +65,10 @@ export async function DELETE(
   }
 
   const [kgbCount, suratCount, serahTerimaCount, hukdisCount] = await Promise.all([
-    sheets.riwayatKGB.count({ createdBy: id }),
-    sheets.suratKGB.count({ generatedBy: id }),
-    sheets.serahTerima.count({ createdBy: id }),
-    sheets.riwayatHukdis.count({ createdBy: id }),
+    db.riwayatKGB.count({ createdBy: id }),
+    db.suratKGB.count({ generatedBy: id }),
+    db.serahTerima.count({ createdBy: id }),
+    db.riwayatHukdis.count({ createdBy: id }),
   ]);
 
   const total = kgbCount + suratCount + serahTerimaCount + hukdisCount;
@@ -84,25 +84,25 @@ export async function DELETE(
     if (reassignTo === id) {
       return NextResponse.json({ error: "User tujuan tidak boleh sama dengan user yang dihapus" }, { status: 400 });
     }
-    const targetUser = await sheets.user.findUnique({ id: reassignTo });
+    const targetUser = await db.user.findUnique({ id: reassignTo });
     if (!targetUser) {
       return NextResponse.json({ error: "User tujuan tidak ditemukan" }, { status: 404 });
     }
 
     // Reassign semua record lalu hapus user (sekuensial, pengganti $transaction).
-    await sheets.riwayatKGB.updateMany({ createdBy: id }, { createdBy: reassignTo });
-    await sheets.suratKGB.updateMany({ generatedBy: id }, { generatedBy: reassignTo } as any);
-    await sheets.serahTerima.updateMany({ createdBy: id }, { createdBy: reassignTo } as any);
-    await sheets.riwayatHukdis.updateMany({ createdBy: id }, { createdBy: reassignTo } as any);
-    await sheets.auditLog.updateMany({ userId: id }, { userId: null });
-    await sheets.user.delete({ id });
+    await db.riwayatKGB.updateMany({ createdBy: id }, { createdBy: reassignTo });
+    await db.suratKGB.updateMany({ generatedBy: id }, { generatedBy: reassignTo } as any);
+    await db.serahTerima.updateMany({ createdBy: id }, { createdBy: reassignTo } as any);
+    await db.riwayatHukdis.updateMany({ createdBy: id }, { createdBy: reassignTo } as any);
+    await db.auditLog.updateMany({ userId: id }, { userId: null });
+    await db.user.delete({ id });
 
     return NextResponse.json({ ok: true, reassigned: total });
   }
 
   // Tidak ada record terkait, langsung hapus.
-  await sheets.auditLog.updateMany({ userId: id }, { userId: null });
-  await sheets.user.delete({ id });
+  await db.auditLog.updateMany({ userId: id }, { userId: null });
+  await db.user.delete({ id });
 
   return NextResponse.json({ ok: true });
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -9,7 +9,7 @@ export async function GET() {
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const pegawai = await sheets.pegawai.findMany({ orderBy: { field: "nama", dir: "asc" } });
+  const pegawai = await db.pegawai.findMany({ orderBy: { field: "nama", dir: "asc" } });
 
   const HEADERS = [
     "nip", "nama", "jabatan", "pangkat", "golonganRuang", "tmtGolongan", "mkgTahun", "mkgBulan",

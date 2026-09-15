@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { canManageHukdis } from "@/lib/auth";
 
@@ -15,9 +15,9 @@ export async function GET() {
 
   try {
     const [rows, jenisList, pegawaiList] = await Promise.all([
-      sheets.riwayatHukdis.findMany({ orderBy: { field: "tmtMulai", dir: "desc" } }) as Promise<any[]>,
-      sheets.hukdisJenis.findMany() as Promise<any[]>,
-      sheets.pegawai.findMany(),
+      db.riwayatHukdis.findMany({ orderBy: { field: "tmtMulai", dir: "desc" } }) as Promise<any[]>,
+      db.hukdisJenis.findMany() as Promise<any[]>,
+      db.pegawai.findMany(),
     ]);
 
     const jenisMap = new Map(jenisList.map((j) => [j.kode, j]));

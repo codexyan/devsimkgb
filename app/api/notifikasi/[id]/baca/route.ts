@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -15,7 +15,7 @@ export async function PATCH(
 
   const { id } = await params;
 
-  const updated = await sheets.notifikasi.update({ id }, { dibaca: true });
+  const updated = await db.notifikasi.update({ id }, { dibaca: true });
   if (!updated)
     return NextResponse.json({ error: "Notifikasi tidak ditemukan" }, { status: 404 });
 

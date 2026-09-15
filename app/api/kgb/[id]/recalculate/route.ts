@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { getGajiPokok } from "@/lib/tabelGaji";
 
@@ -19,7 +19,7 @@ export async function PATCH(
 
   const { id } = await params;
 
-  const kgb = await sheets.riwayatKGB.findUnique({ id });
+  const kgb = await db.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
@@ -36,7 +36,7 @@ export async function PATCH(
   const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const flagRapelan = todayDate > deadlineSDM;
 
-  const updated = await sheets.riwayatKGB.update(
+  const updated = await db.riwayatKGB.update(
     { id },
     { golonganBaru: kgb.golonganLama, gajiPokokBaru, mkgTahunBaru, mkgBulanBaru, flagRapelan },
   );

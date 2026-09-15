@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import bcrypt from "bcryptjs";
@@ -13,7 +13,7 @@ export async function GET() {
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
   }
 
-  const all = await sheets.user.findMany({ orderBy: { field: "createdAt", dir: "desc" } });
+  const all = await db.user.findMany({ orderBy: { field: "createdAt", dir: "desc" } });
   const users = all.map((u) => ({ id: u.id, nip: u.nip, nama: u.nama, role: u.role, createdAt: u.createdAt }));
   return NextResponse.json(users);
 }
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Semua field wajib diisi" }, { status: 400 });
   }
 
-  const existing = await sheets.user.findUnique({ nip });
+  const existing = await db.user.findUnique({ nip });
   if (existing) {
     return NextResponse.json({ error: "NIP sudah terdaftar" }, { status: 400 });
   }
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     role,
     createdAt: new Date(),
   };
-  await sheets.user.create(user);
+  await db.user.create(user);
 
   return NextResponse.json(
     { id: user.id, nip: user.nip, nama: user.nama, role: user.role, createdAt: user.createdAt },

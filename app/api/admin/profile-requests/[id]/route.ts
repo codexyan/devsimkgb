@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 
@@ -12,18 +12,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
   }
 
-  const admin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const admin = await db.user.findUnique({ nip: session.user.nip! });
   if (!admin) return NextResponse.json({ error: "Admin tidak ditemukan" }, { status: 404 });
 
   const { id } = await params;
   const { action, alasanTolak } = (await req.json()) as any;
 
-  const request = (await sheets.profileChangeRequest.findUnique({ id })) as any;
+  const request = (await db.profileChangeRequest.findUnique({ id })) as any;
   if (!request) return NextResponse.json({ error: "Permintaan tidak ditemukan" }, { status: 404 });
   if (request.status !== "pending")
     return NextResponse.json({ error: "Permintaan sudah diproses" }, { status: 400 });
 
-  const reqUser = await sheets.user.findUnique({ id: request.userId });
+  const reqUser = await db.user.findUnique({ id: request.userId });
   const reqUserNama = reqUser?.nama ?? "-";
 
   if (action === "approve") {
@@ -36,8 +36,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (request.nama) updateData.nama = request.nama;
 
     // Pengganti $transaction: dua update sekuensial (best-effort, tanpa rollback).
-    await sheets.user.update({ id: request.userId }, updateData);
-    await sheets.profileChangeRequest.update(
+    await db.user.update({ id: request.userId }, updateData);
+    await db.profileChangeRequest.update(
       { id },
       { status: "approved", reviewedAt: new Date(), reviewedBy: admin.id },
     );
@@ -48,7 +48,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       detail: `${admin.nama} menyetujui permintaan perubahan profil ${reqUserNama}`,
     });
   } else if (action === "reject") {
-    await sheets.profileChangeRequest.update(
+    await db.profileChangeRequest.update(
       { id },
       {
         status: "rejected",

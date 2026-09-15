@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -26,28 +26,28 @@ export async function PATCH(
 
   // Toggle flagRapelan manual
   if (body.flagRapelan !== undefined) {
-    const kgb = await sheets.riwayatKGB.update({ id }, { flagRapelan: body.flagRapelan });
+    const kgb = await db.riwayatKGB.update({ id }, { flagRapelan: body.flagRapelan });
     if (!kgb) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
     return NextResponse.json(kgb);
   }
 
   // Update data SK terakhir (dasar surat)
   if (body.nomorSK !== undefined) {
-    const lama = await sheets.riwayatKGB.findUnique({ id });
+    const lama = await db.riwayatKGB.findUnique({ id });
     if (!lama) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
 
     const patch: Record<string, unknown> = { nomorSK: body.nomorSK };
     if (body.tanggalSK) patch.tanggalSK = new Date(body.tanggalSK);
     if (body.tmtSK) patch.tmtSK = new Date(body.tmtSK);
     if (typeof body.penetapSkDasar === "string") patch.penetapSkDasar = body.penetapSkDasar.trim() || null;
-    const kgb = await sheets.riwayatKGB.update({ id }, patch);
+    const kgb = await db.riwayatKGB.update({ id }, patch);
 
     // Penetap SK dasar tercetak di surat, jadi perubahan sesudah surat dibuat dicatat.
     const penetapBerubah = "penetapSkDasar" in patch && patch.penetapSkDasar !== (lama.penetapSkDasar ?? null);
-    if (penetapBerubah && (await sheets.suratKGB.findUnique({ kgbId: id }))) {
+    if (penetapBerubah && (await db.suratKGB.findUnique({ kgbId: id }))) {
       const [pegawai, userLogin] = await Promise.all([
-        sheets.pegawai.findUnique({ id: lama.pegawaiId }),
-        sheets.user.findUnique({ nip: session.user.nip! }),
+        db.pegawai.findUnique({ id: lama.pegawaiId }),
+        db.user.findUnique({ nip: session.user.nip! }),
       ]);
       if (userLogin) {
         logAudit({
@@ -71,7 +71,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Alasan pembatalan wajib diisi" }, { status: 400 });
   }
 
-  const lama = await sheets.riwayatKGB.findUnique({ id });
+  const lama = await db.riwayatKGB.findUnique({ id });
   if (!lama) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
   if (lama.isArsip || !["belum_diproses", "sedang_diproses"].includes(lama.status)) {
     return NextResponse.json(
@@ -81,11 +81,11 @@ export async function PATCH(
   }
 
   const [pegawai, userLogin] = await Promise.all([
-    sheets.pegawai.findUnique({ id: lama.pegawaiId }),
-    sheets.user.findUnique({ nip: session.user.nip! }),
+    db.pegawai.findUnique({ id: lama.pegawaiId }),
+    db.user.findUnique({ nip: session.user.nip! }),
   ]);
 
-  const kgb = await sheets.riwayatKGB.update({ id }, { status: "ditolak" });
+  const kgb = await db.riwayatKGB.update({ id }, { status: "ditolak" });
 
   // Input KGB menggeser TMT pegawai ke periode berikutnya; kembalikan agar KGB dapat diinput ulang.
   if (
@@ -94,12 +94,12 @@ export async function PATCH(
     !samaHari(lama.tmtKgbBaru, lama.tmtKgbBerikutnya)
   ) {
     const selesaiTerakhir = (
-      await sheets.riwayatKGB.findMany({
+      await db.riwayatKGB.findMany({
         where: { pegawaiId: lama.pegawaiId, status: "selesai" },
         orderBy: { field: "tmtKgbBaru", dir: "desc" },
       })
     )[0];
-    await sheets.pegawai.update(
+    await db.pegawai.update(
       { id: pegawai.id },
       {
         tmtKgbBerikutnya: lama.tmtKgbBaru,
@@ -109,7 +109,7 @@ export async function PATCH(
   }
 
   if (userLogin) {
-    await sheets.serahTerima.create({
+    await db.serahTerima.create({
       id: newId(),
       kgbId: id,
       namaAdmin: session.user.nama || userLogin.nama,
@@ -140,7 +140,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
   const { id } = await params;
-  const ok = await sheets.riwayatKGB.delete({ id });
+  const ok = await db.riwayatKGB.delete({ id });
   if (!ok) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
 
   return NextResponse.json({ message: "Data KGB berhasil dihapus" });

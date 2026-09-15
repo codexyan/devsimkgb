@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 
@@ -19,24 +19,24 @@ export async function PATCH(
 
   const { id } = await params;
 
-  const kgb = await sheets.riwayatKGB.findUnique({ id });
+  const kgb = await db.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
 
   if (kgb.status !== "selesai")
     return NextResponse.json({ error: "Hanya KGB berstatus Selesai yang bisa dikoreksi sebagai arsip" }, { status: 400 });
 
-  const pegawai = await sheets.pegawai.findUnique({ id: kgb.pegawaiId });
+  const pegawai = await db.pegawai.findUnique({ id: kgb.pegawaiId });
 
-  await sheets.riwayatKGB.update({ id }, { flagRapelan: false });
+  await db.riwayatKGB.update({ id }, { flagRapelan: false });
 
   // Reset placeholder belum_diproses yang merupakan kelanjutan (tmtKgbBaru = tmtKgbBerikutnya KGB ini).
-  await sheets.riwayatKGB.updateMany(
+  await db.riwayatKGB.updateMany(
     { pegawaiId: kgb.pegawaiId, status: "belum_diproses", tmtKgbBaru: kgb.tmtKgbBerikutnya },
     { flagRapelan: false },
   );
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (userLogin) {
     logAudit({
       userId: userLogin.id,

@@ -1,4 +1,4 @@
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 
 interface AuditParams {
@@ -14,7 +14,7 @@ interface AuditParams {
  * tidak menghentikan response jika gagal.
  */
 export function logAudit(params: AuditParams) {
-  sheets.auditLog
+  db.auditLog
     .create({
       id: newId(),
       waktu: new Date(),

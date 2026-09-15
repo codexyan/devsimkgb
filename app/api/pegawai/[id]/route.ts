@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { canManageHukdis, canEditPegawai } from "@/lib/auth";
@@ -16,7 +16,7 @@ export async function GET(
 
   const { id } = await params;
 
-  const pegawai = await sheets.pegawai.findUnique({ id });
+  const pegawai = await db.pegawai.findUnique({ id });
   if (!pegawai)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
@@ -51,7 +51,7 @@ export async function PATCH(
     return NextResponse.json({ error: `Golongan "${body.golonganRuang ?? ""}" tidak dikenal di tabel gaji PP 5/2024` }, { status: 400 });
   }
 
-  const pegawai = await sheets.pegawai.update(
+  const pegawai = await db.pegawai.update(
     { id },
     {
       nama: body.nama,
@@ -84,7 +84,7 @@ export async function PATCH(
   if (!pegawai)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (userLogin) {
     logAudit({
       userId: userLogin.id,
@@ -112,19 +112,19 @@ export async function DELETE(
   const { searchParams } = new URL(req.url);
   const hapusPermanent = searchParams.get("permanent") === "true";
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
-  const pegawai = await sheets.pegawai.findUnique({ id });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
+  const pegawai = await db.pegawai.findUnique({ id });
 
   if (hapusPermanent) {
-    const kgbList = await sheets.riwayatKGB.findMany({ where: { pegawaiId: id } });
+    const kgbList = await db.riwayatKGB.findMany({ where: { pegawaiId: id } });
     const kgbIds = kgbList.map((k) => k.id);
 
     if (kgbIds.length > 0) {
-      await sheets.suratKGB.deleteMany({ kgbId: { in: kgbIds } });
-      await sheets.serahTerima.deleteMany({ kgbId: { in: kgbIds } });
+      await db.suratKGB.deleteMany({ kgbId: { in: kgbIds } });
+      await db.serahTerima.deleteMany({ kgbId: { in: kgbIds } });
     }
-    await sheets.riwayatKGB.deleteMany({ pegawaiId: id });
-    await sheets.pegawai.delete({ id });
+    await db.riwayatKGB.deleteMany({ pegawaiId: id });
+    await db.pegawai.delete({ id });
 
     if (userLogin && pegawai) {
       logAudit({
@@ -138,7 +138,7 @@ export async function DELETE(
     return NextResponse.json({ message: "Pegawai berhasil dihapus permanen" });
   }
 
-  await sheets.pegawai.update({ id }, { aktif: false });
+  await db.pegawai.update({ id }, { aktif: false });
 
   if (userLogin && pegawai) {
     logAudit({

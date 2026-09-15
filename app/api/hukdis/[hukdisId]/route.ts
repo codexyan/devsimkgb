@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -21,15 +21,15 @@ export async function DELETE(
 
   const { hukdisId } = await params;
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
-  const hukdis = (await sheets.riwayatHukdis.findUnique({ id: hukdisId })) as any;
+  const hukdis = (await db.riwayatHukdis.findUnique({ id: hukdisId })) as any;
   if (!hukdis)
     return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
 
-  const pegawai = await sheets.pegawai.findUnique({ id: hukdis.pegawaiId });
+  const pegawai = await db.pegawai.findUnique({ id: hukdis.pegawaiId });
   if (!pegawai)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
@@ -43,7 +43,7 @@ export async function DELETE(
   if (restoredTmt) updates.tmtKgbBerikutnya = restoredTmt;
 
   // Cek apakah masih ada hukdis aktif lain untuk pegawai ini.
-  const sisaHukdis = await sheets.riwayatHukdis.count({ pegawaiId: pegawai.id, id: { not: hukdisId } });
+  const sisaHukdis = await db.riwayatHukdis.count({ pegawaiId: pegawai.id, id: { not: hukdisId } });
   if (sisaHukdis === 0) {
     updates.statusHukdis = false;
     updates.tanggalHukdisBerakhir = null;
@@ -52,8 +52,8 @@ export async function DELETE(
   }
 
   // Pengganti $transaction: hapus + update sekuensial (best-effort).
-  await sheets.riwayatHukdis.delete({ id: hukdisId });
-  await sheets.pegawai.update({ id: pegawai.id }, updates);
+  await db.riwayatHukdis.delete({ id: hukdisId });
+  await db.pegawai.update({ id: pegawai.id }, updates);
 
   // Sinkronisasi riwayatKGB placeholder ke TMT yang dipulihkan.
   if (restoredTmt) {
@@ -65,8 +65,8 @@ export async function DELETE(
     const deadlineRestored = new Date(restoredTmt.getFullYear(), restoredTmt.getMonth() - 1, 0);
     const flagRapelan = todayDate > deadlineRestored;
 
-    await sheets.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
-    await sheets.riwayatKGB.create({
+    await db.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
+    await db.riwayatKGB.create({
       id: newId(),
       pegawaiId: pegawai.id,
       nomorSK: "",

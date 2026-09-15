@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sheets, makeRiwayatKGB } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
+import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { getGajiPokok } from "@/lib/tabelGaji";
 
@@ -19,14 +20,14 @@ export async function POST(
 
   const { id } = await params;
 
-  const kgb = await sheets.riwayatKGB.findUnique({ id });
+  const kgb = await db.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
 
   if (kgb.status !== "selesai")
     return NextResponse.json({ error: "Hanya KGB berstatus Selesai yang bisa dibuat placeholder-nya" }, { status: 400 });
 
-  const pegawai = await sheets.pegawai.findUnique({ id: kgb.pegawaiId });
+  const pegawai = await db.pegawai.findUnique({ id: kgb.pegawaiId });
   if (!pegawai)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
@@ -48,11 +49,11 @@ export async function POST(
   const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const flagRapelan = todayDate > deadlineSDM;
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
 
-  await sheets.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
+  await db.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
 
-  await sheets.pegawai.update(
+  await db.pegawai.update(
     { id: pegawai.id },
     {
       golonganRuang: kgb.golonganBaru,
@@ -81,7 +82,7 @@ export async function POST(
     flagRapelan,
     createdBy: userLogin?.id ?? "",
   });
-  await sheets.riwayatKGB.create(next);
+  await db.riwayatKGB.create(next);
 
   return NextResponse.json({ success: true, next });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sheets, makeRiwayatKGB, type PegawaiRow, type RiwayatKGBRow } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
+import { makeRiwayatKGB, type PegawaiRow, type RiwayatKGBRow } from "@/lib/sheets/tables";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -18,12 +19,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Tidak ada data untuk diimport" }, { status: 400 });
   }
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
 
   // Kuota Sheets API terbatas (±60 tulis/menit) — import dikerjakan BATCH:
   // satu kali baca daftar NIP terdaftar, satu append Pegawai, satu append
   // RiwayatKGB. Per-baris create dulu membuat import besar kena 429.
-  const terdaftar = new Set((await sheets.pegawai.findMany()).map((p) => p.nip));
+  const terdaftar = new Set((await db.pegawai.findMany()).map((p) => p.nip));
 
   const results = { berhasil: 0, gagal: 0, errors: [] as string[] };
   const pegawaiBatch: PegawaiRow[] = [];
@@ -141,9 +142,9 @@ export async function POST(req: Request) {
 
   // Tulis sekaligus: 2 request append, berapa pun jumlah barisnya.
   try {
-    await sheets.pegawai.createMany(pegawaiBatch);
+    await db.pegawai.createMany(pegawaiBatch);
     try {
-      await sheets.riwayatKGB.createMany(riwayatBatch);
+      await db.riwayatKGB.createMany(riwayatBatch);
     } catch (e) {
       const pesan = e instanceof Error ? e.message : "unknown";
       results.errors.push(

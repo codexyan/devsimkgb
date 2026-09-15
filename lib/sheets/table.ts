@@ -143,7 +143,7 @@ function matchesValue(rv: unknown, v: unknown): boolean {
  *   { OR: [ {..}, {..} ] }                → salah satu benar
  *   { AND: [ {..}, {..} ] }               → semua benar
  */
-function matches(record: Row, where: Where | undefined): boolean {
+export function matches(record: Row, where: Where | undefined): boolean {
   if (!where) return true;
   return Object.entries(where).every(([k, v]) => {
     if (k === "OR") {

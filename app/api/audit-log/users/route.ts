@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -12,8 +12,8 @@ export async function GET() {
 
   try {
     const [logs, users] = await Promise.all([
-      sheets.auditLog.findMany(),
-      sheets.user.findMany(),
+      db.auditLog.findMany(),
+      db.user.findMany(),
     ]);
     const namaById = new Map(users.map((u) => [u.id, u.nama]));
 

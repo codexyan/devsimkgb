@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 
@@ -10,7 +10,7 @@ export async function GET() {
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const config = await sheets.konfigurasiKanwil.findUnique({ id: "default" });
+  const config = await db.konfigurasiKanwil.findUnique({ id: "default" });
   return NextResponse.json(config);
 }
 
@@ -45,16 +45,16 @@ export async function PATCH(req: Request) {
   };
 
   // Upsert id "default": buat jika belum ada.
-  const existing = await sheets.konfigurasiKanwil.findUnique({ id: "default" });
+  const existing = await db.konfigurasiKanwil.findUnique({ id: "default" });
   let config;
   if (existing) {
-    config = await sheets.konfigurasiKanwil.update({ id: "default" }, data as any);
+    config = await db.konfigurasiKanwil.update({ id: "default" }, data as any);
   } else {
     config = { id: "default", namaKepala: "", nipKepala: "", ...data };
-    await sheets.konfigurasiKanwil.create(config as any);
+    await db.konfigurasiKanwil.create(config as any);
   }
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (userLogin) {
     logAudit({
       userId: userLogin.id,

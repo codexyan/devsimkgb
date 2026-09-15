@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sheets, makeRiwayatKGB } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
+import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { kalkulasiKGB } from "@/lib/tabelGaji";
 import { isSuperAdmin } from "@/lib/auth";
@@ -15,13 +16,13 @@ export async function POST() {
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin || !isSuperAdmin(userLogin.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const [allPegawai, allKgb] = await Promise.all([
-    sheets.pegawai.findMany(),
-    sheets.riwayatKGB.findMany(),
+    db.pegawai.findMany(),
+    db.riwayatKGB.findMany(),
   ]);
   const pegawaiWithKgb = new Set(allKgb.map((k) => k.pegawaiId));
   const pegawaiTanpaKGB = allPegawai.filter((p) => p.aktif && !pegawaiWithKgb.has(p.id));
@@ -44,7 +45,7 @@ export async function POST() {
       const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const flagRapelan = todayDate > deadlineSDM;
 
-      await sheets.riwayatKGB.create(
+      await db.riwayatKGB.create(
         makeRiwayatKGB({
           pegawaiId: pegawai.id,
           tanggalSK: new Date(hasil.tmtKgbBaru),

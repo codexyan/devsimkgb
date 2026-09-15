@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sheets, makeRiwayatKGB } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
+import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -20,7 +21,7 @@ export async function GET(
     return NextResponse.json({ error: "Akses ditolak: hanya SDM Hukdis dan Super Admin" }, { status: 403 });
 
   const { id } = await params;
-  const list = await sheets.riwayatHukdis.findMany({
+  const list = await db.riwayatHukdis.findMany({
     where: { pegawaiId: id },
     orderBy: { field: "tmtMulai", dir: "desc" },
   });
@@ -42,15 +43,15 @@ export async function POST(
   const { id: pegawaiId } = await params;
   const body = (await req.json()) as any;
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
-  const pegawai = await sheets.pegawai.findUnique({ id: pegawaiId });
+  const pegawai = await db.pegawai.findUnique({ id: pegawaiId });
   if (!pegawai)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
-  const jenisConfig = (await sheets.hukdisJenis.findUnique({ kode: body.jenisHukdis })) as any;
+  const jenisConfig = (await db.hukdisJenis.findUnique({ kode: body.jenisHukdis })) as any;
 
   const berdampakKGB: boolean =
     typeof body.berdampakKGB === "boolean"
@@ -90,9 +91,9 @@ export async function POST(
     createdAt: new Date(),
     createdBy: userLogin.id,
   };
-  await sheets.riwayatHukdis.create(hukdis);
+  await db.riwayatHukdis.create(hukdis);
 
-  await sheets.pegawai.update(
+  await db.pegawai.update(
     { id: pegawaiId },
     {
       statusHukdis: true,
@@ -117,8 +118,8 @@ export async function POST(
     const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const flagRapelan = todayDate > deadlineNew;
 
-    await sheets.riwayatKGB.deleteMany({ pegawaiId, status: "belum_diproses" });
-    await sheets.riwayatKGB.create(
+    await db.riwayatKGB.deleteMany({ pegawaiId, status: "belum_diproses" });
+    await db.riwayatKGB.create(
       makeRiwayatKGB({
         pegawaiId,
         tanggalSK: newTmt,

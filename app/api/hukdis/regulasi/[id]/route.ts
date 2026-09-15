@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { canManageHukdis } from "@/lib/auth";
@@ -26,7 +26,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const digantikanOlehId =
     status !== "berlaku" && body.digantikanOlehId && body.digantikanOlehId !== id ? body.digantikanOlehId : null;
 
-  const reg = await sheets.regulasi.update(
+  const reg = await db.regulasi.update(
     { id },
     {
       nomor, tahun, tentang, status,
@@ -38,7 +38,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     } as any,
   );
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (userLogin) logAudit({ userId: userLogin.id, aksi: "edit_konfigurasi", detail: `Ubah regulasi: ${nomor} Tahun ${tahun} (status: ${status})` });
 
   return NextResponse.json(reg);
@@ -52,10 +52,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   const { id } = await params;
   // Lepas referensi 'digantikanOleh' dari regulasi lain agar tidak menggantung.
-  await sheets.regulasi.updateMany({ digantikanOlehId: id }, { digantikanOlehId: null } as any);
-  await sheets.regulasi.delete({ id });
+  await db.regulasi.updateMany({ digantikanOlehId: id }, { digantikanOlehId: null } as any);
+  await db.regulasi.delete({ id });
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (userLogin) logAudit({ userId: userLogin.id, aksi: "edit_konfigurasi", detail: "Hapus regulasi" });
 
   return NextResponse.json({ ok: true });

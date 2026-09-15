@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -15,8 +15,8 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const [rekonList, users] = await Promise.all([
-    sheets.rekonBulanan.findMany({ orderBy: { field: "tanggalInput", dir: "desc" } }) as Promise<any[]>,
-    sheets.user.findMany(),
+    db.rekonBulanan.findMany({ orderBy: { field: "tanggalInput", dir: "desc" } }) as Promise<any[]>,
+    db.user.findMany(),
   ]);
   const userById = new Map(users.map((u) => [u.id, u]));
 
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   if (session.user.role !== "keuangan" && session.user.role !== "superAdminCore")
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
   }
 
   // Cek: sudah pernah direkon?
-  const existing = (await sheets.rekonBulanan.findUnique({ bulanTmt })) as any;
+  const existing = (await db.rekonBulanan.findUnique({ bulanTmt })) as any;
   if (existing)
     return NextResponse.json(
       { error: `Input untuk KGB TMT ${bulanTmt} sudah pernah dilakukan pada ${new Date(existing.tanggalInput).toLocaleDateString("id-ID")}.` },
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
   const dateFrom = new Date(y, m - 1, 1);
   const dateTo = new Date(y, m, 1);
 
-  const allKgb = await sheets.riwayatKGB.findMany({ where: { status: "menunggu_keuangan" } });
+  const allKgb = await db.riwayatKGB.findMany({ where: { status: "menunggu_keuangan" } });
   const kgbList = allKgb.filter((k) => k.tmtKgbBaru && k.tmtKgbBaru >= dateFrom && k.tmtKgbBaru < dateTo);
 
   if (kgbList.length === 0)
@@ -87,14 +87,14 @@ export async function POST(req: Request) {
   const now = new Date();
 
   // Tandai setiap KGB: inputGajiWebAt + inputGajiWebBy.
-  await sheets.riwayatKGB.updateMany(
+  await db.riwayatKGB.updateMany(
     { id: { in: kgbList.map((k) => k.id) } },
     { inputGajiWebAt: now, inputGajiWebBy: userLogin.id },
   );
 
   // Catat rekon.
   const rekonId = newId();
-  await sheets.rekonBulanan.create({
+  await db.rekonBulanan.create({
     id: rekonId,
     bulanTmt,
     tanggalInput: now,

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -17,7 +17,7 @@ export async function GET() {
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
   try {
-    const all = (await sheets.regulasi.findMany()) as any[];
+    const all = (await db.regulasi.findMany()) as any[];
     // orderBy [status asc, tahun desc, urutan asc]
     all.sort(
       (a, b) =>
@@ -64,9 +64,9 @@ export async function POST(req: Request) {
     updatedAt: now,
     updatedBy: session.user.nip,
   };
-  await sheets.regulasi.create(reg);
+  await db.regulasi.create(reg);
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (userLogin) logAudit({ userId: userLogin.id, aksi: "edit_konfigurasi", detail: `Tambah regulasi: ${nomor} Tahun ${tahun}` });
 
   return NextResponse.json(reg, { status: 201 });

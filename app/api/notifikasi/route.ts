@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { generateNotifikasi } from "@/lib/generateNotifikasi";
 
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   if (dibacaFilter !== null && dibacaFilter !== "") where.dibaca = dibacaFilter === "true";
   if (prioritasFilter) where.prioritas = prioritasFilter;
 
-  const all = await sheets.notifikasi.findMany({ where, orderBy: { field: "createdAt", dir: "desc" } });
+  const all = await db.notifikasi.findMany({ where, orderBy: { field: "createdAt", dir: "desc" } });
   return NextResponse.json(all.slice(0, limit));
 }
 
@@ -35,9 +35,9 @@ export async function PATCH(req: Request) {
   const { id, dibacaSemua } = (await req.json()) as any;
 
   if (dibacaSemua) {
-    await sheets.notifikasi.updateMany({ dibaca: false }, { dibaca: true });
+    await db.notifikasi.updateMany({ dibaca: false }, { dibaca: true });
   } else if (id) {
-    await sheets.notifikasi.update({ id }, { dibaca: true });
+    await db.notifikasi.update({ id }, { dibaca: true });
   }
 
   return NextResponse.json({ success: true });
@@ -57,11 +57,11 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
     if (all === "true") {
-      const count = await sheets.notifikasi.deleteMany({});
+      const count = await db.notifikasi.deleteMany({});
       return NextResponse.json({ success: true, deleted: count });
     }
 
-    await sheets.notifikasi.delete({ id: id! });
+    await db.notifikasi.delete({ id: id! });
     return NextResponse.json({ success: true });
   }
 
@@ -69,7 +69,7 @@ export async function DELETE(req: NextRequest) {
   const tigaPuluhHariLalu = new Date();
   tigaPuluhHariLalu.setDate(tigaPuluhHariLalu.getDate() - 30);
 
-  const count = await sheets.notifikasi.deleteMany({ dibaca: true, createdAt: { lte: tigaPuluhHariLalu } });
+  const count = await db.notifikasi.deleteMany({ dibaca: true, createdAt: { lte: tigaPuluhHariLalu } });
 
   return NextResponse.json({ success: true, deleted: count });
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -13,8 +13,8 @@ export async function GET() {
   const rapelanCutoff = new Date(today.getFullYear(), today.getMonth() + 2, 1);
 
   const [allKgb, pegawaiList] = await Promise.all([
-    sheets.riwayatKGB.findMany(),
-    sheets.pegawai.findMany(),
+    db.riwayatKGB.findMany(),
+    db.pegawai.findMany(),
   ]);
   const pegAktif = pegawaiList.filter((p) => p.aktif);
   const aktifStatus = ["belum_diproses", "sedang_diproses", "menunggu_keuangan"];

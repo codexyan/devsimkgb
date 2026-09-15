@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sheets, makeRiwayatKGB } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
+import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { kalkulasiKGB, getGajiPokok, isGolonganDikenal } from "@/lib/tabelGaji";
@@ -30,9 +31,9 @@ export async function GET(req: Request) {
     : null;
 
   const [allKgb, pegawaiList, suratList] = await Promise.all([
-    sheets.riwayatKGB.findMany(),
-    sheets.pegawai.findMany(),
-    sheets.suratKGB.findMany() as Promise<any[]>,
+    db.riwayatKGB.findMany(),
+    db.pegawai.findMany(),
+    db.suratKGB.findMany() as Promise<any[]>,
   ]);
   const pegById = new Map(pegawaiList.map((p) => [p.id, p]));
   const suratByKgb = new Map(suratList.map((sRow) => [sRow.kgbId, sRow]));
@@ -173,7 +174,7 @@ export async function POST(req: Request) {
   if (!canProcessKGB(session.user.role!))
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
@@ -184,7 +185,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Request body tidak valid" }, { status: 400 });
   }
 
-  const pegawai = await sheets.pegawai.findUnique({ id: body.pegawaiId });
+  const pegawai = await db.pegawai.findUnique({ id: body.pegawaiId });
   if (!pegawai)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
@@ -197,7 +198,7 @@ export async function POST(req: Request) {
 
   // Hukdis yang ditandai berdampak KGB menahan proses selama masih berlaku.
   const now = new Date();
-  const riwayatHukdis = (await sheets.riwayatHukdis.findMany({ where: { pegawaiId: pegawai.id } })) as {
+  const riwayatHukdis = (await db.riwayatHukdis.findMany({ where: { pegawaiId: pegawai.id } })) as {
     berdampakKGB: boolean | null;
     tmtBerakhir: Date | null;
   }[];
@@ -260,9 +261,9 @@ export async function POST(req: Request) {
       isArsip: true,
       createdBy: userLogin.id,
     });
-    await sheets.riwayatKGB.create(kgbArsip);
+    await db.riwayatKGB.create(kgbArsip);
 
-    await sheets.pegawai.update(
+    await db.pegawai.update(
       { id: body.pegawaiId },
       {
         golonganRuang: pegawai.golonganRuang,
@@ -274,7 +275,7 @@ export async function POST(req: Request) {
       },
     );
 
-    await sheets.riwayatKGB.deleteMany({ pegawaiId: body.pegawaiId, status: "belum_diproses" });
+    await db.riwayatKGB.deleteMany({ pegawaiId: body.pegawaiId, status: "belum_diproses" });
 
     const tmtNext = new Date(hasil.tmtKgbBerikutnya);
     const tmtNextBerikutnya = new Date(tmtNext);
@@ -285,7 +286,7 @@ export async function POST(req: Request) {
     const deadlineNext = new Date(tmtNext.getFullYear(), tmtNext.getMonth() - 1, 0);
     const nextFlagRapelan = todayDatePost > deadlineNext;
 
-    await sheets.riwayatKGB.create(
+    await db.riwayatKGB.create(
       makeRiwayatKGB({
         pegawaiId: body.pegawaiId,
         tanggalSK: tmtNext,
@@ -325,7 +326,7 @@ export async function POST(req: Request) {
   }
 
   // Placeholder belum_diproses terbaru bila ada → update.
-  const belumList = await sheets.riwayatKGB.findMany({
+  const belumList = await db.riwayatKGB.findMany({
     where: { pegawaiId: body.pegawaiId, status: "belum_diproses" },
     orderBy: { field: "createdAt", dir: "desc" },
   });
@@ -353,10 +354,10 @@ export async function POST(req: Request) {
   };
 
   const kgb = existing
-    ? (await sheets.riwayatKGB.update({ id: existing.id }, kgbData))!
-    : await sheets.riwayatKGB.create(makeRiwayatKGB({ pegawaiId: body.pegawaiId, ...kgbData }));
+    ? (await db.riwayatKGB.update({ id: existing.id }, kgbData))!
+    : await db.riwayatKGB.create(makeRiwayatKGB({ pegawaiId: body.pegawaiId, ...kgbData }));
 
-  await sheets.pegawai.update(
+  await db.pegawai.update(
     { id: body.pegawaiId },
     { tmtKgbTerakhir: hasil.tmtKgbBaru, tmtKgbBerikutnya: hasil.tmtKgbBerikutnya },
   );

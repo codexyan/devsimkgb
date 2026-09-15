@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import bcrypt from "bcryptjs";
 import { logAudit } from "@/lib/auditLog";
@@ -10,7 +10,7 @@ export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const user = await sheets.user.findUnique({ nip: session.user.nip! });
+  const user = await db.user.findUnique({ nip: session.user.nip! });
   if (!user) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
   return NextResponse.json({
     id: user.id, nip: user.nip, nama: user.nama, jabatan: user.jabatan,
@@ -25,7 +25,7 @@ export async function PATCH(req: Request) {
   const body = (await req.json()) as any;
   const { nama, jabatan, email, passwordLama, passwordBaru, konfirmasiPassword } = body;
 
-  const user = await sheets.user.findUnique({ nip: session.user.nip! });
+  const user = await db.user.findUnique({ nip: session.user.nip! });
   if (!user) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
 
   const updateData: Record<string, string> = {};
@@ -57,7 +57,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Tidak ada perubahan" }, { status: 400 });
   }
 
-  await sheets.user.update({ id: user.id }, updateData);
+  await db.user.update({ id: user.id }, updateData);
 
   logAudit({
     userId: user.id,

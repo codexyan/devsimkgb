@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sheets, type PegawaiRow } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
+import { type PegawaiRow } from "@/lib/sheets/tables";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -14,7 +15,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Auto clear hukdis yang sudah berakhir.
-    await sheets.pegawai.updateMany(
+    await db.pegawai.updateMany(
       { statusHukdis: true, tanggalHukdisBerakhir: { lt: new Date() } },
       { statusHukdis: false, tanggalHukdisBerakhir: null, jenisHukdis: null },
     );
@@ -36,13 +37,13 @@ export async function GET(req: Request) {
       ];
     }
 
-    const pegawai = await sheets.pegawai.findMany({
+    const pegawai = await db.pegawai.findMany({
       where,
       orderBy: { field: "nama", dir: "asc" },
     });
 
     // Status KGB terkini (record aktif terbaru per pegawai) — pengganti `include`.
-    const allKgb = await sheets.riwayatKGB.findMany({ where: { isArsip: false } });
+    const allKgb = await db.riwayatKGB.findMany({ where: { isArsip: false } });
     const latestByPegawai = new Map<string, { id: string; status: string; t: number }>();
     for (const k of allKgb) {
       const t = k.createdAt?.getTime() ?? 0;
@@ -77,7 +78,7 @@ export async function POST(req: Request) {
 
   const body = (await req.json()) as any;
 
-  const existing = await sheets.pegawai.findUnique({ nip: body.nip });
+  const existing = await db.pegawai.findUnique({ nip: body.nip });
   if (existing)
     return NextResponse.json({ error: "NIP sudah terdaftar" }, { status: 400 });
 
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
   if (!isGolonganDikenal(body.golonganRuang))
     return NextResponse.json({ error: `Golongan "${body.golonganRuang ?? ""}" tidak dikenal di tabel gaji PP 5/2024` }, { status: 400 });
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
@@ -124,7 +125,7 @@ export async function POST(req: Request) {
     updatedAt: now,
   };
 
-  await sheets.pegawai.create(pegawai);
+  await db.pegawai.create(pegawai);
 
   // Auto-create KGB pertama.
   const { kalkulasiKGB } = await import("@/lib/tabelGaji");
@@ -140,7 +141,7 @@ export async function POST(req: Request) {
   const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const flagRapelan = todayDate > deadlineSDM;
 
-  await sheets.riwayatKGB.create({
+  await db.riwayatKGB.create({
     id: newId(),
     pegawaiId: pegawai.id,
     nomorSK: "",

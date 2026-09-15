@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sheets, makeRiwayatKGB } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
+import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -19,7 +20,7 @@ export async function POST(
   if (session.user.role !== "keuangan" && session.user.role !== "superAdminCore")
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
@@ -33,14 +34,14 @@ export async function POST(
     // body kosong → tidak rapelan
   }
 
-  const kgb = await sheets.riwayatKGB.findUnique({ id });
+  const kgb = await db.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
 
   if (kgb.status !== "menunggu_keuangan")
     return NextResponse.json({ error: "KGB tidak dalam status menunggu_keuangan" }, { status: 400 });
 
-  const kgbSelesai = (await sheets.riwayatKGB.update(
+  const kgbSelesai = (await db.riwayatKGB.update(
     { id },
     {
       status: "selesai",
@@ -51,7 +52,7 @@ export async function POST(
   ))!;
 
   // Auto-generate KGB berikutnya
-  const pegawai = await sheets.pegawai.findUnique({ id: kgbSelesai.pegawaiId });
+  const pegawai = await db.pegawai.findUnique({ id: kgbSelesai.pegawaiId });
   if (pegawai) {
     const tmtNext = new Date(kgbSelesai.tmtKgbBerikutnya as Date);
     const tmtNextBerikutnya = new Date(tmtNext);
@@ -71,7 +72,7 @@ export async function POST(
     const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const flagRapelan = todayDate > deadlineSDM;
 
-    await sheets.pegawai.update(
+    await db.pegawai.update(
       { id: pegawai.id },
       {
         golonganRuang: kgbSelesai.golonganBaru,
@@ -82,12 +83,12 @@ export async function POST(
       },
     );
 
-    await sheets.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
+    await db.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
 
     // SK dasar siklus berikutnya adalah surat KGB ini, jadi penetapnya = penandatangan surat ini.
-    const suratSelesai = (await sheets.suratKGB.findUnique({ kgbId: kgbSelesai.id })) as Parameters<typeof penetapDariSurat>[0];
+    const suratSelesai = (await db.suratKGB.findUnique({ kgbId: kgbSelesai.id })) as Parameters<typeof penetapDariSurat>[0];
 
-    await sheets.riwayatKGB.create(
+    await db.riwayatKGB.create(
       makeRiwayatKGB({
         pegawaiId: pegawai.id,
         tanggalSK: tmtNext,
@@ -125,7 +126,7 @@ export async function POST(
   const monthLo = new Date(tmtYear, tmtMonth, 1);
   const monthHi = new Date(tmtYear, tmtMonth + 1, 1);
 
-  const allKgb = await sheets.riwayatKGB.findMany();
+  const allKgb = await db.riwayatKGB.findMany();
   const sisa = allKgb.filter(
     (k) => k.status === "menunggu_keuangan" && k.tmtKgbBaru && k.tmtKgbBaru >= monthLo && k.tmtKgbBaru < monthHi,
   ).length;
@@ -138,13 +139,13 @@ export async function POST(
       now.getFullYear() === h1Year && now.getMonth() === h1Month && now.getDate() >= 1 && now.getDate() <= 15;
 
     if (inWindow) {
-      const already = await sheets.rekonBulanan.findUnique({ bulanTmt });
+      const already = await db.rekonBulanan.findUnique({ bulanTmt });
       if (!already) {
         const jumlah = allKgb.filter(
           (k) => k.konfirmasiKeuanganAt && k.tmtKgbBaru && k.tmtKgbBaru >= monthLo && k.tmtKgbBaru < monthHi,
         ).length;
 
-        await sheets.rekonBulanan.create({
+        await db.rekonBulanan.create({
           id: newId(),
           bulanTmt,
           tanggalInput: now,

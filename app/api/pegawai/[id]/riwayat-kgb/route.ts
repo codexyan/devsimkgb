@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -16,7 +16,7 @@ export async function GET(
 
   const { id } = await params;
 
-  const p = await sheets.pegawai.findUnique({ id });
+  const p = await db.pegawai.findUnique({ id });
   if (!p)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
@@ -27,9 +27,9 @@ export async function GET(
   };
 
   const [riwayatRaw, suratList, serahTerimaList] = await Promise.all([
-    sheets.riwayatKGB.findMany({ where: { pegawaiId: id }, orderBy: { field: "tmtKgbBaru", dir: "desc" } }),
-    sheets.suratKGB.findMany() as Promise<any[]>,
-    sheets.serahTerima.findMany() as Promise<{ kgbId: string; keterangan: string | null }[]>,
+    db.riwayatKGB.findMany({ where: { pegawaiId: id }, orderBy: { field: "tmtKgbBaru", dir: "desc" } }),
+    db.suratKGB.findMany() as Promise<any[]>,
+    db.serahTerima.findMany() as Promise<{ kgbId: string; keterangan: string | null }[]>,
   ]);
   const suratByKgb = new Map(suratList.map((sRow) => [sRow.kgbId, sRow]));
   // Alasan pembatalan dicatat di SerahTerima dengan awalan "DITOLAK: ".

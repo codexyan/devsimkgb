@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -46,7 +46,7 @@ export async function POST(
   if (!canProcessKGB(role) && !isPreview)
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
@@ -58,7 +58,7 @@ export async function POST(
   // Preview tanpa nomor & tanggal = unduh ulang surat tersimpan, apa adanya.
   const unduhUlang = isPreview && !(bodyData.nomorSurat && bodyData.tanggalSurat);
 
-  const kgb = await sheets.riwayatKGB.findUnique({ id });
+  const kgb = await db.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
   if (!isPreview && STATUS_TERKUNCI[kgb.status])
@@ -71,13 +71,13 @@ export async function POST(
   }
 
   const [pegawai, suratList, daftarPenandatangan, kanwil] = await Promise.all([
-    sheets.pegawai.findUnique({ id: kgb.pegawaiId }),
-    sheets.suratKGB.findMany({
+    db.pegawai.findUnique({ id: kgb.pegawaiId }),
+    db.suratKGB.findMany({
       where: { kgbId: id },
       orderBy: { field: "tanggalSurat", dir: "desc" },
     }) as Promise<any[]>,
-    sheets.penandatangan.findMany(),
-    sheets.konfigurasiKanwil.findUnique({ id: "default" }) as Promise<any>,
+    db.penandatangan.findMany(),
+    db.konfigurasiKanwil.findUnique({ id: "default" }) as Promise<any>,
   ]);
   if (!pegawai)
     return NextResponse.json({ error: "Data pegawai tidak ditemukan" }, { status: 404 });
@@ -171,12 +171,12 @@ export async function POST(
       jabatanPenandatangan: penandatangan.jabatan,
     };
     if (existingSurat) {
-      await sheets.suratKGB.update(
+      await db.suratKGB.update(
         { kgbId: id },
         { nomorSurat, tanggalSurat: new Date(tanggalSurat), generatedBy: userLogin.id, ...salinanPenandatangan } as any,
       );
     } else {
-      await sheets.suratKGB.create({
+      await db.suratKGB.create({
         id: newId(),
         kgbId: id,
         nomorSurat,
@@ -188,7 +188,7 @@ export async function POST(
       } as any);
     }
 
-    await sheets.riwayatKGB.update({ id }, { status: "sedang_diproses" });
+    await db.riwayatKGB.update({ id }, { status: "sedang_diproses" });
 
     logAudit({
       userId: userLogin.id,

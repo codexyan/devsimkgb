@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import DashboardShell from "./components/DashboardShell";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -16,7 +16,7 @@ export default async function DashboardLayout({
   if (!session) redirect("/login");
 
   // Durasi auto-logout dari Pengaturan (fallback 60 mnt bila belum diatur)
-  const cfg = (await sheets.konfigurasiKanwil
+  const cfg = (await db.konfigurasiKanwil
     .findUnique({ id: "default" })
     .catch(() => null)) as { sesiTimeoutMenit?: number } | null;
 

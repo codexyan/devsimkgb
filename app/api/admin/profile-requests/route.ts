@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -12,11 +12,11 @@ export async function GET() {
   }
 
   try {
-    const requests = await sheets.profileChangeRequest.findMany({
+    const requests = await db.profileChangeRequest.findMany({
       where: { status: "pending" },
       orderBy: { field: "createdAt", dir: "asc" },
     });
-    const users = await sheets.user.findMany();
+    const users = await db.user.findMany();
     const userById = new Map(users.map((u) => [u.id, u]));
 
     // Emulasi `include: user` — gabungkan data user terkait.

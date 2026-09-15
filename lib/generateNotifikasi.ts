@@ -1,4 +1,5 @@
-import { sheets, type NotifikasiRow } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
+import { type NotifikasiRow } from "@/lib/sheets/tables";
 import { newId } from "@/lib/sheets/id";
 
 export interface NotifikasiResult {
@@ -31,7 +32,7 @@ export async function generateNotifikasi(): Promise<NotifikasiResult> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const cfg = (await sheets.konfigurasiKanwil.findUnique({ id: "default" })) as any;
+  const cfg = (await db.konfigurasiKanwil.findUnique({ id: "default" })) as any;
   const H1 = cfg?.notifKgbH1 ?? 14;
   const H2 = cfg?.notifKgbH2 ?? 7;
 
@@ -40,9 +41,9 @@ export async function generateNotifikasi(): Promise<NotifikasiResult> {
   const sebulanLagi = new Date(today); sebulanLagi.setMonth(today.getMonth() + 1);
 
   const [allNotif, allPegawai, allKgb] = await Promise.all([
-    sheets.notifikasi.findMany(),
-    sheets.pegawai.findMany(),
-    sheets.riwayatKGB.findMany(),
+    db.notifikasi.findMany(),
+    db.pegawai.findMany(),
+    db.riwayatKGB.findMany(),
   ]);
 
   const details: string[] = [];
@@ -75,7 +76,7 @@ export async function generateNotifikasi(): Promise<NotifikasiResult> {
       );
 
     if (rows.length > 0) {
-      await sheets.notifikasi.createMany(rows);
+      await db.notifikasi.createMany(rows);
       created += rows.length;
       details.push(`Hukdis berakhir: ${rows.length} notifikasi`);
     }
@@ -147,7 +148,7 @@ export async function generateNotifikasi(): Promise<NotifikasiResult> {
     }
 
     if (rows.length > 0) {
-      await sheets.notifikasi.createMany(rows);
+      await db.notifikasi.createMany(rows);
       created += rows.length;
       const rapelanCount = rows.filter((r) => r.tipe === "rapelan").length;
       const jatuhTempoCount = rows.filter((r) => r.tipe === "kgb_jatuh_tempo").length;

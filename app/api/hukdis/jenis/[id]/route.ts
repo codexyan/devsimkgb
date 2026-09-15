@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { canManageHukdis } from "@/lib/auth";
 
@@ -16,10 +16,10 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const jenis = (await sheets.hukdisJenis.findUnique({ id })) as any;
+  const jenis = (await db.hukdisJenis.findUnique({ id })) as any;
   if (!jenis) return NextResponse.json({ error: "Jenis tidak ditemukan" }, { status: 404 });
 
-  const used = await sheets.riwayatHukdis.count({ jenisHukdis: jenis.kode });
+  const used = await db.riwayatHukdis.count({ jenisHukdis: jenis.kode });
   if (used > 0) {
     return NextResponse.json(
       { error: `Tidak dapat dihapus: sudah tercatat pada ${used} riwayat hukdis` },
@@ -27,6 +27,6 @@ export async function DELETE(
     );
   }
 
-  await sheets.hukdisJenis.delete({ id });
+  await db.hukdisJenis.delete({ id });
   return NextResponse.json({ ok: true });
 }

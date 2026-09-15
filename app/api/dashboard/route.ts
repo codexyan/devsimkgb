@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sheets, type RiwayatKGBRow } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
+import { type RiwayatKGBRow } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { penetapDariSurat } from "@/lib/penetapSk";
 
@@ -31,12 +32,12 @@ export async function GET() {
 
     // Sekali tarik seluruh tab yang dibutuhkan (pengganti banyak query paralel).
     const [allPegawai, allKgb, allSurat, allAudit, allNotif, users] = await Promise.all([
-      sheets.pegawai.findMany(),
-      sheets.riwayatKGB.findMany(),
-      sheets.suratKGB.findMany(),
-      sheets.auditLog.findMany({ orderBy: { field: "waktu", dir: "desc" } }),
-      sheets.notifikasi.findMany(),
-      sheets.user.findMany(),
+      db.pegawai.findMany(),
+      db.riwayatKGB.findMany(),
+      db.suratKGB.findMany(),
+      db.auditLog.findMany({ orderBy: { field: "waktu", dir: "desc" } }),
+      db.notifikasi.findMany(),
+      db.user.findMany(),
     ]);
 
     const pegawaiAktif = allPegawai.filter((p) => p.aktif);

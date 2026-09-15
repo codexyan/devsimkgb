@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -11,10 +11,10 @@ export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const user = await sheets.user.findUnique({ nip: session.user.nip! });
+  const user = await db.user.findUnique({ nip: session.user.nip! });
   if (!user) return NextResponse.json(null);
 
-  const list = (await sheets.profileChangeRequest.findMany({
+  const list = (await db.profileChangeRequest.findMany({
     where: { userId: user.id },
     orderBy: { field: "createdAt", dir: "desc" },
   })) as any[];
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const user = await sheets.user.findUnique({ nip: session.user.nip! });
+  const user = await db.user.findUnique({ nip: session.user.nip! });
   if (!user) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
 
   const { nama, jabatan, email } = (await req.json()) as any;
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Format email tidak valid" }, { status: 400 });
   }
 
-  const existing = await sheets.profileChangeRequest.findUnique({ userId: user.id, status: "pending" });
+  const existing = await db.profileChangeRequest.findUnique({ userId: user.id, status: "pending" });
   if (existing) {
     return NextResponse.json({ error: "Masih ada permintaan yang menunggu persetujuan admin" }, { status: 400 });
   }
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     reviewedAt: null,
     reviewedBy: null,
   };
-  await sheets.profileChangeRequest.create(request);
+  await db.profileChangeRequest.create(request);
 
   logAudit({
     userId: user.id,

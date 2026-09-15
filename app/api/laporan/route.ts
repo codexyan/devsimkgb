@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -22,9 +22,9 @@ export async function GET(req: Request) {
     : new Date(tahun, 11, 31, 23, 59, 59);
 
   const [allKgb, pegawaiList, suratList] = await Promise.all([
-    sheets.riwayatKGB.findMany({ orderBy: { field: "tmtKgbBaru", dir: "asc" } }),
-    sheets.pegawai.findMany(),
-    sheets.suratKGB.findMany() as Promise<any[]>,
+    db.riwayatKGB.findMany({ orderBy: { field: "tmtKgbBaru", dir: "asc" } }),
+    db.pegawai.findMany(),
+    db.suratKGB.findMany() as Promise<any[]>,
   ]);
   const pegawaiById = new Map(pegawaiList.map((p) => [p.id, p]));
   const suratByKgbId = new Map(suratList.map((sRow) => [sRow.kgbId, sRow]));

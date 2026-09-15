@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { authConfig } from "./auth.config";
 
 // Instance NextAuth LENGKAP (server/API): authConfig edge-safe + provider
@@ -19,7 +19,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.nip || !credentials?.password) return null;
 
-        const user = await sheets.user.findUnique({
+        const user = await db.user.findUnique({
           nip: credentials.nip as string,
         });
 

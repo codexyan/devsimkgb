@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 
@@ -16,14 +16,14 @@ export async function POST(req: Request) {
   if (!kgbId)
     return NextResponse.json({ error: "kgbId wajib" }, { status: 400 });
 
-  const kgb = await sheets.riwayatKGB.findUnique({ id: kgbId });
+  const kgb = await db.riwayatKGB.findUnique({ id: kgbId });
   if (!kgb)
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
-  const pegawai = await sheets.pegawai.findUnique({ id: kgb.pegawaiId });
+  const pegawai = await db.pegawai.findUnique({ id: kgb.pegawaiId });
 
   const tmt = new Date(kgb.tmtKgbBaru as Date).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 
-  await sheets.notifikasi.create({
+  await db.notifikasi.create({
     id: newId(),
     judul: "Follow Up dari Keuangan",
     pesan: `Keuangan meminta agar KGB atas nama ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}) TMT ${tmt} segera diproses dan dikirimkan SK-nya.`,

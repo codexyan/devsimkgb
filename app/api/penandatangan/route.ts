@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -19,7 +19,7 @@ export async function GET() {
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const daftar = await sheets.penandatangan.findMany({ orderBy: { field: "berlakuMulai", dir: "desc" } });
+  const daftar = await db.penandatangan.findMany({ orderBy: { field: "berlakuMulai", dir: "desc" } });
   return NextResponse.json(daftar);
 }
 
@@ -38,13 +38,13 @@ export async function POST(req: Request) {
   const hasil = validasiPenandatangan(body);
   if (!hasil.ok) return NextResponse.json({ error: hasil.error }, { status: 400 });
 
-  const bentrok = cariBentrok(await sheets.penandatangan.findMany(), hasil.data);
+  const bentrok = cariBentrok(await db.penandatangan.findMany(), hasil.data);
   if (bentrok) return NextResponse.json({ error: pesanBentrok(bentrok) }, { status: 409 });
 
   const baris = { id: newId(), ...hasil.data, updatedAt: new Date(), updatedBy: session.user.nip ?? null };
-  await sheets.penandatangan.create(baris);
+  await db.penandatangan.create(baris);
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (userLogin) {
     logAudit({
       userId: userLogin.id,

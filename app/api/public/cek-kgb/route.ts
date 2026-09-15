@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -12,14 +12,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "NIP wajib diisi" }, { status: 400 });
     }
 
-    const pegawai = await sheets.pegawai.findUnique({ nip });
+    const pegawai = await db.pegawai.findUnique({ nip });
     if (!pegawai || !pegawai.aktif) {
       return NextResponse.json({ error: "Pegawai tidak ditemukan dalam sistem" }, { status: 404 });
     }
 
     const [riwayatRaw, suratList] = await Promise.all([
-      sheets.riwayatKGB.findMany({ where: { pegawaiId: pegawai.id }, orderBy: { field: "tmtKgbBaru", dir: "desc" } }),
-      sheets.suratKGB.findMany() as Promise<any[]>,
+      db.riwayatKGB.findMany({ where: { pegawaiId: pegawai.id }, orderBy: { field: "tmtKgbBaru", dir: "desc" } }),
+      db.suratKGB.findMany() as Promise<any[]>,
     ]);
     const suratByKgb = new Map(suratList.map((sRow) => [sRow.kgbId, sRow]));
 

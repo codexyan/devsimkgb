@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { canManageHukdis } from "@/lib/auth";
@@ -14,9 +14,9 @@ export async function GET() {
 
   try {
     const [jenisList, konfigList, regulasiList] = await Promise.all([
-      sheets.hukdisJenis.findMany({ orderBy: { field: "urutan", dir: "asc" } }) as Promise<any[]>,
-      sheets.hukdisKonfigurasi.findMany() as Promise<any[]>,
-      sheets.regulasi.findMany() as Promise<any[]>,
+      db.hukdisJenis.findMany({ orderBy: { field: "urutan", dir: "asc" } }) as Promise<any[]>,
+      db.hukdisKonfigurasi.findMany() as Promise<any[]>,
+      db.regulasi.findMany() as Promise<any[]>,
     ]);
     const konfig = konfigList[0];
     const regById = new Map(regulasiList.map((r) => [r.id, r]));
@@ -63,12 +63,12 @@ export async function POST(req: Request) {
   // Pastikan kode unik.
   let kode = kodeBase;
   let suffix = 2;
-  while (await sheets.hukdisJenis.findUnique({ kode })) {
+  while (await db.hukdisJenis.findUnique({ kode })) {
     kode = `${kodeBase}_${suffix++}`;
   }
 
   // Urutan = max + 1.
-  const all = (await sheets.hukdisJenis.findMany()) as any[];
+  const all = (await db.hukdisJenis.findMany()) as any[];
   const urutan = Math.max(0, ...all.map((j) => Number(j.urutan) || 0)) + 1;
 
   const jenis = {
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
     updatedAt: new Date(),
     updatedBy: session.user.nip,
   };
-  await sheets.hukdisJenis.create(jenis);
+  await db.hukdisJenis.create(jenis);
 
   return NextResponse.json(jenis, { status: 201 });
 }
@@ -95,7 +95,7 @@ export async function POST(req: Request) {
 async function resolveDasar(regulasiId?: string | null, manual?: string | null) {
   const id = regulasiId?.trim() || null;
   if (id) {
-    const reg = (await sheets.regulasi.findUnique({ id })) as any;
+    const reg = (await db.regulasi.findUnique({ id })) as any;
     if (reg) return { regulasiId: id, dasarHukum: `${reg.nomor} Tahun ${reg.tahun}` };
   }
   const text = manual?.trim() || null;
@@ -119,9 +119,9 @@ export async function PATCH(req: Request) {
   };
 
   if (body.notifHariH1 !== undefined || body.notifHariH2 !== undefined) {
-    const existing = ((await sheets.hukdisKonfigurasi.findMany()) as any[])[0];
+    const existing = ((await db.hukdisKonfigurasi.findMany()) as any[])[0];
     if (existing) {
-      await sheets.hukdisKonfigurasi.update(
+      await db.hukdisKonfigurasi.update(
         { id: existing.id },
         {
           ...(body.notifHariH1 !== undefined ? { notifHariH1: body.notifHariH1 } : {}),
@@ -131,7 +131,7 @@ export async function PATCH(req: Request) {
         } as any,
       );
     } else {
-      await sheets.hukdisKonfigurasi.create({
+      await db.hukdisKonfigurasi.create({
         id: newId(),
         notifHariH1: body.notifHariH1 ?? 30,
         notifHariH2: body.notifHariH2 ?? 14,
@@ -145,7 +145,7 @@ export async function PATCH(req: Request) {
   // bila teks dasar hukumnya benar-benar diubah.
   const jenisById = new Map(
     (body.jenisUpdates?.length
-      ? ((await sheets.hukdisJenis.findMany()) as { id: string; dasarHukum: string | null }[])
+      ? ((await db.hukdisJenis.findMany()) as { id: string; dasarHukum: string | null }[])
       : []
     ).map((j) => [j.id, j] as const),
   );
@@ -157,7 +157,7 @@ export async function PATCH(req: Request) {
     } else if (u.dasarHukum !== undefined && u.dasarHukum !== jenisById.get(u.id)?.dasarHukum) {
       dasarPatch = { dasarHukum: u.dasarHukum, regulasiId: null };
     }
-    await sheets.hukdisJenis.update(
+    await db.hukdisJenis.update(
       { id: u.id },
       {
         ...(u.label !== undefined ? { label: u.label } : {}),

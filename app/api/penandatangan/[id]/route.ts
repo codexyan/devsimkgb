@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { ROLES } from "@/lib/auth";
@@ -22,7 +22,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
   const { id } = await params;
-  const lama = await sheets.penandatangan.findUnique({ id });
+  const lama = await db.penandatangan.findUnique({ id });
   if (!lama) return NextResponse.json({ error: "Penandatangan tidak ditemukan" }, { status: 404 });
 
   let body: Record<string, unknown>;
@@ -44,15 +44,15 @@ export async function PATCH(
   });
   if (!hasil.ok) return NextResponse.json({ error: hasil.error }, { status: 400 });
 
-  const bentrok = cariBentrok(await sheets.penandatangan.findMany(), hasil.data, id);
+  const bentrok = cariBentrok(await db.penandatangan.findMany(), hasil.data, id);
   if (bentrok) return NextResponse.json({ error: pesanBentrok(bentrok) }, { status: 409 });
 
-  const baru = await sheets.penandatangan.update(
+  const baru = await db.penandatangan.update(
     { id },
     { ...hasil.data, updatedAt: new Date(), updatedBy: session.user.nip ?? null },
   );
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (userLogin && baru) {
     logAudit({
       userId: userLogin.id,
@@ -74,10 +74,10 @@ export async function DELETE(
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
   const { id } = await params;
-  const lama = await sheets.penandatangan.findUnique({ id });
+  const lama = await db.penandatangan.findUnique({ id });
   if (!lama) return NextResponse.json({ error: "Penandatangan tidak ditemukan" }, { status: 404 });
 
-  const dipakai = await sheets.suratKGB.count({ penandatanganId: id });
+  const dipakai = await db.suratKGB.count({ penandatanganId: id });
   if (dipakai > 0) {
     return NextResponse.json(
       { error: `Sudah tercetak pada ${dipakai} surat KGB. Isi tanggal akhir berlaku alih-alih menghapus.` },
@@ -85,9 +85,9 @@ export async function DELETE(
     );
   }
 
-  await sheets.penandatangan.delete({ id });
+  await db.penandatangan.delete({ id });
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (userLogin) {
     logAudit({
       userId: userLogin.id,

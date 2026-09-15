@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sheets } from "@/lib/sheets/tables";
+import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -20,21 +20,21 @@ export async function POST(
   if (!canProcessKGB(session.user.role!))
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
-  const userLogin = await sheets.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
   const { id } = await params;
 
-  const kgb = await sheets.riwayatKGB.findUnique({ id });
+  const kgb = await db.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
   if (kgb.status === "ditolak")
     return NextResponse.json({ error: "KGB ini sudah dibatalkan. Input ulang KGB sebelum mengunggah SK." }, { status: 409 });
 
   const [pegawai, existingSurat] = await Promise.all([
-    sheets.pegawai.findUnique({ id: kgb.pegawaiId }),
-    sheets.suratKGB.findUnique({ kgbId: id }) as Promise<any>,
+    db.pegawai.findUnique({ id: kgb.pegawaiId }),
+    db.suratKGB.findUnique({ kgbId: id }) as Promise<any>,
   ]);
 
   const formData = await req.formData();
@@ -63,7 +63,7 @@ export async function POST(
 
   const nomorSuratFinal = nomorSuratParam ?? existingSurat?.nomorSurat ?? "-";
   if (existingSurat) {
-    await sheets.suratKGB.update(
+    await db.suratKGB.update(
       { kgbId: id },
       {
         pathFile,
@@ -72,7 +72,7 @@ export async function POST(
       } as any,
     );
   } else {
-    await sheets.suratKGB.create({
+    await db.suratKGB.create({
       id: newId(),
       kgbId: id,
       nomorSurat: nomorSuratFinal,
@@ -87,7 +87,7 @@ export async function POST(
 
   const sudahSelesai = kgb.status === "selesai";
   if (!sudahSelesai) {
-    await sheets.riwayatKGB.update({ id }, { status: "menunggu_keuangan" });
+    await db.riwayatKGB.update({ id }, { status: "menunggu_keuangan" });
   }
 
   logAudit({
