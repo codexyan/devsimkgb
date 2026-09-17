@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { type PegawaiRow } from "@/lib/sheets/tables";
+import { makeRiwayatKGB, type PegawaiRow } from "@/lib/sheets/tables";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { canManageHukdis, canEditPegawai } from "@/lib/auth";
+import { NON_KEUANGAN } from "@/lib/authGuard";
+import { bacaIsianPegawai, bacaTanggal, teksAtauNull } from "@/lib/dataPegawai";
+import { penandaHukdisBerlaku } from "@/lib/hukdisKedaluwarsa";
+import { rencanaSiklusBerikutnya, type RencanaSiklusKgb } from "@/lib/jadwalKgb";
+import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
+import { hariIniWita } from "@/lib/waktu";
 
 export const runtime = "nodejs";
 
@@ -13,12 +19,9 @@ export async function GET(req: Request) {
     const session = await auth();
     if (!session)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    // Auto clear hukdis yang sudah berakhir.
-    await db.pegawai.updateMany(
-      { statusHukdis: true, tanggalHukdisBerakhir: { lt: new Date() } },
-      { statusHukdis: false, tanggalHukdisBerakhir: null, jenisHukdis: null },
-    );
+    // Data pribadi dan hukdis pegawai tidak dipakai halaman keuangan.
+    if (!NON_KEUANGAN.includes(session.user.role ?? ""))
+      return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search") || "";
@@ -44,16 +47,19 @@ export async function GET(req: Request) {
 
     // Status KGB terkini (record aktif terbaru per pegawai) — pengganti `include`.
     const allKgb = await db.riwayatKGB.findMany({ where: { isArsip: false } });
-    const latestByPegawai = new Map<string, { id: string; status: string; t: number }>();
+    const latestByPegawai = new Map<string, { status: string; t: number }>();
     for (const k of allKgb) {
       const t = k.createdAt?.getTime() ?? 0;
       const prev = latestByPegawai.get(k.pegawaiId);
-      if (!prev || t > prev.t) latestByPegawai.set(k.pegawaiId, { id: k.id, status: k.status, t });
+      if (!prev || t > prev.t) latestByPegawai.set(k.pegawaiId, { status: k.status, t });
     }
 
+    // Hukdis yang sudah lewat tanggal berakhirnya dibaca tidak aktif; penanda di data pegawai
+    // diselaraskan oleh cron harian, bukan oleh GET.
+    const hariIni = hariIniWita();
     const withKgb = pegawai.map((p) => {
       const kgb = latestByPegawai.get(p.id);
-      return { ...p, statusKGB: kgb?.status ?? null, kgbId: kgb?.id ?? null };
+      return { ...penandaHukdisBerlaku(p, hariIni), statusKGB: kgb?.status ?? null };
     });
 
     const role = session.user.role!;
@@ -76,104 +82,64 @@ export async function POST(req: Request) {
   if (!canEditPegawai(session.user.role!))
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
-  const body = (await req.json()) as any;
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Request body tidak valid" }, { status: 400 });
+  }
 
-  const existing = await db.pegawai.findUnique({ nip: body.nip });
+  const hasil = bacaIsianPegawai(body, { denganNip: true });
+  if (hasil.galat !== undefined)
+    return NextResponse.json({ error: hasil.galat }, { status: 400 });
+  const isian = hasil.data;
+
+  // Penanda hukdis hanya diisi pengelola hukdis; peran lain mencatat hukdis lewat Riwayat Hukdis.
+  const bolehHukdis = canManageHukdis(session.user.role!);
+  const tanggalHukdisBerakhir = bacaTanggal(body.tanggalHukdisBerakhir);
+  if (bolehHukdis && tanggalHukdisBerakhir.status === "tidak_valid")
+    return NextResponse.json({ error: "Tanggal berakhir hukuman disiplin tidak valid." }, { status: 400 });
+
+  const existing = await db.pegawai.findUnique({ nip: isian.nip });
   if (existing)
-    return NextResponse.json({ error: "NIP sudah terdaftar" }, { status: 400 });
-
-  const { isGolonganDikenal } = await import("@/lib/tabelGaji");
-  if (!isGolonganDikenal(body.golonganRuang))
-    return NextResponse.json({ error: `Golongan "${body.golonganRuang ?? ""}" tidak dikenal di tabel gaji PP 5/2024` }, { status: 400 });
+    return NextResponse.json({ error: "NIP sudah terdaftar" }, { status: 409 });
 
   const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
   const now = new Date();
-  const tmtKgbBerikutnya = new Date(body.tmtKgbBerikutnya);
-  const tmtKgbTerakhir = body.tmtKgbTerakhir
-    ? new Date(body.tmtKgbTerakhir)
-    : (() => { const dd = new Date(body.tmtKgbBerikutnya); dd.setFullYear(dd.getFullYear() - 2); return dd; })();
-
   const pegawai: PegawaiRow = {
     id: newId(),
-    nip: body.nip,
-    nama: body.nama,
-    tempatLahir: body.tempatLahir || null,
-    tanggalLahir: body.tanggalLahir ? new Date(body.tanggalLahir) : null,
-    jenisKelamin: body.jenisKelamin || null,
-    pendidikanTerakhir: body.pendidikanTerakhir || null,
-    jabatan: body.jabatan,
-    pangkat: body.pangkat,
-    golonganRuang: body.golonganRuang,
-    unitKerja: body.unitKerja,
-    eselon: body.eselon || null,
-    jenisJabatan: body.jenisJabatan || null,
-    tmtGolongan: new Date(body.tmtGolongan),
-    mkgTahun: parseInt(body.mkgTahun) || 0,
-    mkgBulan: parseInt(body.mkgBulan) || 0,
-    gajiPokok: parseInt(body.gajiPokok),
-    tmtKgbTerakhir,
-    tmtKgbBerikutnya,
-    statusHukdis: body.statusHukdis || false,
-    tanggalHukdisBerakhir: body.tanggalHukdisBerakhir ? new Date(body.tanggalHukdisBerakhir) : null,
-    jenisHukdis: body.jenisHukdis || null,
-    keteranganHukdis: body.keteranganHukdis || null,
+    ...isian,
+    // Tanpa TMT terakhir, masa kerja sekarang dianggap dicapai satu langkah tabel gaji sebelum TMT berikutnya.
+    tmtKgbTerakhir:
+      isian.tmtKgbTerakhir ??
+      tambahBulan(isian.tmtKgbBerikutnya, -bulanKeKgbBerikutnya(isian.golonganRuang, isian.mkgTahun, isian.mkgBulan)),
+    statusHukdis: bolehHukdis && (body.statusHukdis === true || body.statusHukdis === "true"),
+    tanggalHukdisBerakhir: bolehHukdis && tanggalHukdisBerakhir.status === "valid" ? tanggalHukdisBerakhir.tanggal : null,
+    jenisHukdis: bolehHukdis ? teksAtauNull(body.jenisHukdis) : null,
+    keteranganHukdis: bolehHukdis ? teksAtauNull(body.keteranganHukdis) : null,
     aktif: true,
     createdAt: now,
     updatedAt: now,
   };
 
+  // Jadwal KGB pertama dihitung sebelum menulis agar data pegawai tidak tersimpan tanpa jadwal.
+  let rencana: RencanaSiklusKgb;
+  try {
+    rencana = rencanaSiklusBerikutnya(pegawai);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Jadwal KGB tidak dapat dihitung" }, { status: 400 });
+  }
+
   await db.pegawai.create(pegawai);
-
-  // Auto-create KGB pertama.
-  const { kalkulasiKGB } = await import("@/lib/tabelGaji");
-  const hasil = kalkulasiKGB({
-    golonganRuang: pegawai.golonganRuang,
-    mkgTahun: pegawai.mkgTahun,
-    mkgBulan: pegawai.mkgBulan,
-    tmtKgbBerikutnya: pegawai.tmtKgbBerikutnya!,
-    tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
-  });
-  const today = new Date();
-  const deadlineSDM = new Date(hasil.tmtKgbBaru.getFullYear(), hasil.tmtKgbBaru.getMonth() - 1, 0);
-  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const flagRapelan = todayDate > deadlineSDM;
-
-  await db.riwayatKGB.create({
-    id: newId(),
-    pegawaiId: pegawai.id,
-    nomorSK: "",
-    penetapSkDasar: null,
-    tanggalSK: new Date(hasil.tmtKgbBaru),
-    tmtSK: new Date(hasil.tmtKgbBaru),
-    golonganLama: pegawai.golonganRuang,
-    gajiPokokLama: pegawai.gajiPokok,
-    mkgTahunLama: pegawai.mkgTahun,
-    mkgBulanLama: pegawai.mkgBulan,
-    golonganBaru: pegawai.golonganRuang,
-    gajiPokokBaru: hasil.gajiPokokBaru,
-    mkgTahunBaru: hasil.mkgTahunBaru,
-    mkgBulanBaru: hasil.mkgBulanBaru,
-    tmtKgbBaru: hasil.tmtKgbBaru,
-    tmtKgbBerikutnya: hasil.tmtKgbBerikutnya,
-    status: "belum_diproses",
-    flagRapelan,
-    isArsip: false,
-    konfirmasiKeuanganAt: null,
-    konfirmasiKeuanganBy: null,
-    rapelanDitetapkan: null,
-    inputGajiWebAt: null,
-    inputGajiWebBy: null,
-    createdBy: userLogin.id,
-    createdAt: new Date(),
-  });
+  await db.riwayatKGB.create(makeRiwayatKGB({ pegawaiId: pegawai.id, createdBy: userLogin.id, ...rencana }));
 
   logAudit({
     userId: userLogin.id,
     aksi: "tambah_pegawai",
-    detail: `Tambah pegawai baru: ${pegawai.nama} (${pegawai.nip}), ${pegawai.jabatan}, ${pegawai.golonganRuang}`,
+    detail: `Tambah pegawai baru: ${pegawai.nama} (${pegawai.nip}), ${pegawai.jabatan}, ${pegawai.golonganRuang}, ${pegawai.unitKerja}`,
     targetNama: pegawai.nama,
   });
 

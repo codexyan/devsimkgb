@@ -1,82 +1,92 @@
 # SIM-KGB
 
-Sistem Informasi Manajemen **Kenaikan Gaji Berkala (KGB)** — Kementerian Imigrasi dan Pemasyarakatan RI.
+Sistem Informasi Manajemen **Kenaikan Gaji Berkala (KGB)** Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan, Kementerian Imigrasi dan Pemasyarakatan RI.
 
-Aplikasi web tunggal (single-app) untuk mengelola data pegawai, riwayat KGB, hukuman disiplin (hukdis), pembuatan surat KGB (PDF), rekonsiliasi keuangan, notifikasi, dan pelaporan.
-
-> Repo ini dipisah dari monorepo `sdmpas` menjadi repo mandiri. Paket bersama (`@sdmpas/ui`, `@sdmpas/auth`) telah di-inline ke `lib/ui` dan `lib/auth`; tidak ada lagi dependency workspace.
+Aplikasi web tunggal untuk mengelola data pegawai Kanwil dan UPT, proses KGB (Input KGB, Buat SK, Unggah SK TTE, konfirmasi keuangan), hukuman disiplin (hukdis), pembuatan SK KGB dalam PDF, rekap per bulan TMT, notifikasi, dan laporan. Semua tanggal dihitung menurut WITA (Asia/Makassar).
 
 ## Teknologi
 
 - **Next.js 16** (App Router, Turbopack) · **React 19** · **TypeScript 5**
-- **Tailwind CSS v4**
-- **Prisma 7** dengan driver adapter
-- **NextAuth v5** (autentikasi + peran/role)
-- **@react-pdf/renderer** (generate surat KGB)
-- Deploy: **Cloudflare Workers** via [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare)
+- **Tailwind CSS v4** (dashboard sebagian besar memakai gaya inline dan token CSS di `app/globals.css`)
+- **NextAuth v5** (masuk dengan NIP dan password, peran di `lib/auth/roles.ts`)
+- **@react-pdf/renderer** (SK KGB biasa dan versi Srikandi, `lib/generateSuratKGB.tsx`)
+- Deploy: **Cloudflare Workers** via [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare), berkas SK di **Cloudflare R2** (`SK_BUCKET`)
 
-## Database
+## Penyimpanan data
 
-Aplikasi memilih adapter Prisma berdasarkan skema `DATABASE_URL` (lihat `lib/prisma.ts`):
+Semua route membaca dan menulis lewat `import { db } from "@/lib/db"`. Penyimpanan dipilih di `lib/db/index.ts`:
 
-- `DATABASE_URL="file:..."` → **SQLite** lokal (libsql) untuk dev — tanpa perlu database cloud.
-- selain itu → **Neon Postgres** (produksi / Cloudflare Workers).
+- `DATA_BACKEND=sheets` atau `DATA_BACKEND=supabase` memilih secara tegas.
+- Tanpa `DATA_BACKEND`, Supabase dipakai bila `SUPABASE_URL` diisi; selain itu **Google Sheets** (penyimpanan produksi saat ini).
 
-Prisma mewajibkan `provider` berupa string statis, jadi disediakan skrip untuk menukarnya:
-
-```bash
-npm run db:sqlite     # provider=sqlite  + prisma generate  (dev lokal)
-npm run db:postgres   # provider=postgresql + prisma generate (produksi/Neon)
-```
+Definisi tab Sheets ada di `lib/sheets/tables.ts`; skema Supabase untuk migrasi ada di `supabase/migrations/`. Keduanya harus tetap memuat tabel dan kolom yang sama.
 
 ## Menjalankan lokal
 
 ```bash
 npm install
-cp .env.example .env          # isi nilai; untuk dev cukup DATABASE_URL="file:./dev.db"
-npm run db:sqlite             # set provider SQLite + generate client
-npx prisma db push            # buat skema di dev.db
-npm run dev                   # http://localhost:3000
+npm run dev                   # http://localhost:3100
 ```
 
-### Variabel environment
-
-Lihat `.env.example`. Ringkas:
+Variabel environment diisi di `.env` untuk `next dev` dan di secret Cloudflare untuk produksi (contoh: `.env.example`, `.dev.vars.example`).
 
 | Variabel | Kegunaan |
 |----------|----------|
-| `DATABASE_URL` | Koneksi runtime (`file:...` untuk SQLite dev, URL pooled Neon untuk prod) |
-| `DIRECT_URL` | Koneksi direct Neon untuk `prisma migrate`/`db push` (prod) |
-| `NEXTAUTH_SECRET` / `NEXTAUTH_URL` | NextAuth v5 |
-| `CRON_SECRET` | Bearer token endpoint notifikasi terjadwal |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob (penyimpanan SK PDF) — di Cloudflare memakai R2 (`SK_BUCKET`) |
-| `SEED_PASSWORD_*` | Dipakai `prisma db seed` |
+| `GOOGLE_SHEET_ID` | Spreadsheet data (backend Sheets) |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `GOOGLE_PRIVATE_KEY` | Akun layanan Google untuk Sheets |
+| `DATA_BACKEND` | Opsional: `sheets` atau `supabase` |
+| `SUPABASE_URL` / `SUPABASE_SECRET_KEY` | Backend Supabase |
+| `AUTH_SECRET` | Secret NextAuth v5 |
+| `CRON_SECRET` | Bearer token endpoint cron harian |
 
-## Skrip
+## Skrip dan pemeriksaan
 
-| Skrip | Aksi |
-|-------|------|
-| `npm run dev` | Dev server (port 3000) |
-| `npm run build` | `prisma generate` + `next build` |
-| `npm run cf:build` | Build bundel Cloudflare (OpenNext, provider Postgres) |
+| Perintah | Aksi |
+|----------|------|
+| `npm run dev` | Dev server (port 3100) |
+| `npm run build` | `next build` |
+| `npm run lint` | ESLint |
+| `npm run cf:build` | Build bundel Cloudflare (OpenNext) |
 | `npm run cf:preview` | Preview worker lokal |
 | `npm run cf:deploy` | Deploy ke Cloudflare Workers |
 | `npm run cf:typegen` | Regenerasi `cloudflare-env.d.ts` dari `wrangler.jsonc` |
-| `npm run lint` | ESLint |
+| `node --import tsx --test lib/**/*.test.ts` | Uji unit logika murni di `lib/` |
 
-## Deploy
+## Deploy dan cron
 
-Deploy ke Cloudflare Workers (OpenNext), database Neon Postgres, SK PDF di Cloudflare R2, notifikasi harian via Cron Triggers. Panduan lengkap: **[`DEPLOY-CLOUDFLARE.md`](DEPLOY-CLOUDFLARE.md)**.
+Worker utama adalah `worker-entry.js`, yang membungkus output OpenNext dan menambahkan handler `scheduled`. Cron Trigger `0 0 * * *` (08:00 WITA) memanggil `/api/cron/notifikasi` dengan `CRON_SECRET`. Endpoint itu menonaktifkan penanda hukdis yang sudah lewat tanggal berakhir (`lib/hukdisKedaluwarsa.ts`), lalu membuat notifikasi harian (`lib/generateNotifikasi.ts`). Catatan deploy ada di [`DEPLOY-CLOUDFLARE.md`](DEPLOY-CLOUDFLARE.md).
+
+## Halaman publik: `app/(publik)`
+
+Route group tanpa login dengan kerangka sendiri (`layout.tsx`, `HeaderPublik.tsx`, `publik.css`). Semua gaya berada di bawah kelas `.pub`, sehingga tidak bercampur dengan dashboard. Tema terang atau gelap disimpan di `localStorage` (`kgb-theme`) dan dipasang sebagai `data-pub-theme` pada `<html>` oleh script di `app/layout.tsx`. Kelas dan token didokumentasikan di awal `publik.css`; kelas khusus halaman berawalan `ck-` (cek status), `pg-` (panduan), dan `lg-` (masuk).
+
+| Route | Isi |
+|-------|-----|
+| `/kgb` | Cek status KGB menurut NIP (`CekStatus.tsx`, `GET /api/public/cek-kgb`). Label status dari `lib/statusKgb.ts`. |
+| `/panduan` | Panduan KGB untuk admin UPT, Tata Usaha, Tim SDM, dan keuangan: kewenangan, jadwal, surat permohonan, langkah di SIM-KGB, konfirmasi keuangan, pengiriman SK dan KPPN mitra, contoh kasus, arti status, dan dasar hukum. |
+| `/login` | Masuk untuk pengelola, dengan dialog Lupa password yang membuka WhatsApp admin (`GET /api/public/kontak`). |
+
+### Memelihara `/panduan`
+
+- Contoh perhitungan, jendela proses, dan tabel KPPN dihitung dari `lib/tabelGaji.ts` dan `lib/satker.ts`, sehingga ikut berubah bila kode berubah.
+- Nama menu, tombol, dan judul jendela ditulis persis seperti di dashboard. Bila label di `app/dashboard` atau `app/dashboard/components/kgb` berubah, perbarui `app/(publik)/panduan/page.tsx` pada perubahan yang sama.
+- Rumusan dasar hukum berasal dari hasil penelusuran peraturan; ubah hanya bila ada peraturan baru.
+- `/dashboard/panduan` dialihkan ke `/panduan`, dan menu Panduan di sidebar membukanya di tab baru.
 
 ## Struktur
 
 ```
-app/                 Route (halaman + API) App Router
-lib/                 Util domain (prisma, authGuard, gaji, dsb.)
-lib/ui/              Komponen UI bersama (hasil inline dari @sdmpas/ui)
-lib/auth/            Helper peran/role (hasil inline dari @sdmpas/auth)
-prisma/              schema.prisma, migrations, seed
-scripts/             Utilitas (set-db-provider, dsb.)
+app/(publik)/        Halaman publik: /kgb, /panduan, /login
+app/dashboard/       Halaman pengelola; komponen modal KGB bersama di components/kgb
+app/api/             Route API (kgb, pegawai, hukdis, keuangan, notifikasi, cron, public)
+lib/                 Logika domain murni dan teruji (tabelGaji, jadwalKgb, prosesKgb, waktu, satker, statusKgb, dsb.)
+lib/db/              Pemilih penyimpanan dan repository Supabase
+lib/sheets/          Klien dan definisi tab Google Sheets
+lib/auth/            Peran dan helper hak akses
+lib/ui/              themeMode.ts: hook useThemeMode (mode terang/gelap dashboard, kunci kgb-theme), dipakai DashboardShell dan Sidebar
+supabase/migrations/ Skema awal Supabase
+scripts/             Utilitas penyiapan dan migrasi data
+worker-entry.js      Wrapper worker Cloudflare (fetch + scheduled)
 wrangler.jsonc       Konfigurasi Cloudflare Workers
 open-next.config.ts  Konfigurasi OpenNext
 ```

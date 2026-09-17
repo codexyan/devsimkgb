@@ -1,68 +1,88 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
+import { formatTanggalId, hariIniWita } from "@/lib/waktu";
+import { tahunTmt } from "@/lib/rekapKgb";
 
 /* ─── interfaces ─── */
 interface LogEntry {
   id: string; waktu: string; aksi: string; detail: string;
-  targetNama: string | null; user: { nama: string; nip: string } | null;
+  user: { nama: string; nip: string } | null;
 }
-interface RekonBulanan {
-  id: string; bulanTmt: string; tanggalInput: string;
-  jumlahData: number; catatan: string | null;
-  creator: { nama: string; nip: string };
+/** Rekap per bulan TMT dari GET /api/keuangan/rekon (lib/rekapKgb.ts rekapPerBulanTmt). */
+interface RekapBulan {
+  bulanTmt: string;
+  total: number;
+  dikonfirmasi: number;
+  menungguKeuangan: number;
+  belumSampaiKeuangan: number;
+  dibatalkan: number;
+  rapelanDitetapkan: number;
+  berpotensiRapelan: number;
+  konfirmasiTerakhir: string | null;
 }
 interface KGBItem {
   id: string; status: string; nomorSK: string;
+  isVirtual?: boolean;
   tmtKgbBaru: string; golonganLama: string; golonganBaru: string;
-  gajiPokokLama: number; gajiPokokBaru: number;
-  mkgTahunBaru: number; mkgBulanBaru: number;
-  flagRapelan: boolean; rapelanDitetapkan: boolean | null;
-  createdAt: string;
-  pegawai: { id: string; nama: string; nip: string; jabatan: string; unitKerja: string };
+  gajiPokokLama: number; gajiPokokBaru: number | null;
+  mkgTahunBaru: number | null; mkgBulanBaru: number | null;
+  rapelanDitetapkan: boolean | null;
+  pegawai: { nama: string; nip: string; jabatan: string; unitKerja: string } | null;
   surat: { nomorSurat: string; pathFile?: string | null } | null;
 }
+type KGBRiwayat = KGBItem & { pegawai: NonNullable<KGBItem["pegawai"]> };
 
 /* ─── helpers ─── */
 function fmtTgl(s: string) {
-  return new Date(s).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" });
 }
 function fmtWaktu(s: string) {
-  return new Date(s).toLocaleDateString("id-ID", {
-    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-  });
+  return formatTanggalId(s, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 function bulanLabel(key: string) {
   const [y, m] = key.split("-");
   return new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 }
-function fmtRp(n: number) { return "Rp " + n.toLocaleString("id-ID"); }
+function fmtRp(n: number | null) { return typeof n === "number" ? "Rp " + n.toLocaleString("id-ID") : "-"; }
 
-const STATUS_CFG: Record<string, { bg: string; color: string; label: string }> = {
-  belum_diproses:    { bg: "var(--tint-amber-bg)", color: "var(--st-amber)",  label: "Belum Diproses" },
-  sedang_diproses:   { bg: "var(--tint-navy)", color: "var(--dtn)",  label: "Sedang Diproses" },
-  menunggu_keuangan: { bg: "var(--tint-violet-bg)", color: "var(--st-violet)",  label: "Menunggu Konfirmasi" },
-  selesai:           { bg: "var(--tint-green-bg)", color: "var(--st-green)",  label: "Selesai" },
-  ditolak:           { bg: "var(--tint-red-bg)", color: "var(--st-red)",  label: "Dibatalkan" },
-};
+const badgeStatus = (status: string) => ({ label: infoStatusKgb(status).label, ...warnaStatusKgb(status) });
+
+// Baris yang dapat diklik juga dapat dibuka dengan Enter atau spasi.
+function tekanBuka(e: React.KeyboardEvent, buka: () => void) {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); buka(); }
+}
+
+async function bacaJson<T>(res: Response, bawaan: T): Promise<T> {
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return bawaan;
+  }
+}
 
 /* ─── PegawaiRow ─── */
 function PegawaiRow({
   nama, nip, jabatan, unitKerja, kgbs, expanded, onToggle,
 }: {
   nama: string; nip: string; jabatan: string; unitKerja: string;
-  kgbs: KGBItem[]; expanded: boolean; onToggle: () => void;
+  kgbs: KGBRiwayat[]; expanded: boolean; onToggle: () => void;
 }) {
   const latest   = kgbs[0];
-  const st       = STATUS_CFG[latest?.status] ?? STATUS_CFG.belum_diproses;
-  const thisYear = new Date().getFullYear();
-  const hasThisYear = kgbs.some((k) => new Date(k.tmtKgbBaru).getFullYear() === thisYear);
+  const st       = badgeStatus(latest?.status ?? "");
+  const thisYear = hariIniWita().getFullYear();
+  const hasThisYear = kgbs.some((k) => tahunTmt(k) === thisYear);
   const initials = nama.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 
   return (
     <>
       <tr
         onClick={onToggle}
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-label={`Riwayat KGB ${nama}`}
+        onKeyDown={(e) => tekanBuka(e, onToggle)}
         className="cursor-pointer transition-colors"
         style={{ borderBottom: expanded ? "none" : "1px solid var(--ln2)" }}
         onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--sub)"; }}
@@ -150,7 +170,7 @@ function PegawaiRow({
                   </thead>
                   <tbody>
                     {kgbs.map((k, idx) => {
-                      const s = STATUS_CFG[k.status] ?? STATUS_CFG.belum_diproses;
+                      const s = badgeStatus(k.status);
                       const isLatest = idx === 0;
                       return (
                         <tr key={k.id} style={{ borderBottom: "1px solid var(--ln2)" }}>
@@ -182,7 +202,7 @@ function PegawaiRow({
                             {fmtRp(k.gajiPokokBaru)}
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--dt4)" }}>
-                            {k.mkgTahunBaru} Thn {k.mkgBulanBaru} Bln
+                            {k.mkgTahunBaru === null ? "-" : `${k.mkgTahunBaru} Thn ${k.mkgBulanBaru ?? 0} Bln`}
                           </td>
                           <td className="px-3 py-2">
                             <span className="px-1.5 py-px rounded-full font-semibold whitespace-nowrap"
@@ -225,8 +245,8 @@ function PegawaiRow({
 /* ─── page ─── */
 export default function RiwayatKeuanganPage() {
   const [logs,      setLogs]      = useState<LogEntry[]>([]);
-  const [rekonList, setRekonList] = useState<RekonBulanan[]>([]);
-  const [kgbList,   setKgbList]   = useState<KGBItem[]>([]);
+  const [rekonList, setRekonList] = useState<RekapBulan[]>([]);
+  const [kgbList,   setKgbList]   = useState<KGBRiwayat[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [tab,       setTab]       = useState<"kgb" | "log" | "rekon">("kgb");
   const [kgbSearch, setKgbSearch] = useState("");
@@ -240,21 +260,26 @@ export default function RiwayatKeuanganPage() {
         fetch("/api/keuangan/rekon"),
         fetch("/api/kgb"),
       ]);
-      if (r1.ok) setLogs(await r1.json() as any);
-      if (r2.ok) setRekonList(await r2.json() as any);
+      if (r1.ok) { const d = await bacaJson<unknown>(r1, []); setLogs(Array.isArray(d) ? (d as LogEntry[]) : []); }
+      if (r2.ok) { const d = await bacaJson<unknown>(r2, []); setRekonList(Array.isArray(d) ? (d as RekapBulan[]) : []); }
       if (r3.ok) {
-        const d = await r3.json() as any;
-        setKgbList(Array.isArray(d) ? d : (d.kgbList ?? []));
+        const d = await bacaJson<unknown>(r3, []);
+        // Entri virtual (belum punya record KGB) bukan riwayat.
+        const daftar = Array.isArray(d) ? (d as KGBItem[]) : [];
+        setKgbList(daftar.filter((k): k is KGBRiwayat => !k.isVirtual && !!k.id && !!k.pegawai));
       }
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    const t = setTimeout(fetchAll, 0);
+    return () => clearTimeout(t);
+  }, [fetchAll]);
 
   /* ── Group KGBs by pegawai, sorted: current year first ── */
-  const thisYear = new Date().getFullYear();
+  const thisYear = hariIniWita().getFullYear();
 
-  const pegawaiMap = new Map<string, KGBItem[]>();
+  const pegawaiMap = new Map<string, KGBRiwayat[]>();
   for (const k of kgbList) {
     const key = k.pegawai.nip;
     if (!pegawaiMap.has(key)) pegawaiMap.set(key, []);
@@ -271,7 +296,7 @@ export default function RiwayatKeuanganPage() {
       jabatan:      sorted[0].pegawai.jabatan,
       unitKerja:    sorted[0].pegawai.unitKerja,
       kgbs:         sorted,
-      hasThisYear:  kgbs.some((k) => new Date(k.tmtKgbBaru).getFullYear() === thisYear),
+      hasThisYear:  kgbs.some((k) => tahunTmt(k) === thisYear),
     };
   });
 
@@ -316,7 +341,7 @@ export default function RiwayatKeuanganPage() {
       {/* Tab switcher */}
       <div className="flex gap-1 p-1 rounded-xl overflow-x-auto" style={{ background: "var(--ln2)", width: "fit-content", maxWidth: "100%" }}>
         {TAB.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)}
+          <button key={t.key} type="button" onClick={() => setTab(t.key)} aria-pressed={tab === t.key}
             className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
             style={{
               background: tab === t.key ? "var(--card)" : "transparent",
@@ -378,12 +403,15 @@ export default function RiwayatKeuanganPage() {
               <div className="md:hidden divide-y" style={{ borderColor: "var(--ln2)" }}>
                 {filteredEmployees.map((e) => {
                   const latest = e.kgbs[0];
-                  const st = latest ? (STATUS_CFG[latest.status] ?? STATUS_CFG.belum_diproses) : null;
+                  const st = latest ? badgeStatus(latest.status) : null;
                   const isExp = expanded === e.nip;
                   const initials = e.nama.split(" ").map((n: string) => n[0]).slice(0,2).join("").toUpperCase();
+                  const toggle = () => setExpanded(isExp ? null : e.nip);
                   return (
                     <div key={e.nip}>
-                      <div onClick={() => setExpanded(isExp ? null : e.nip)}
+                      <div onClick={toggle}
+                        role="button" tabIndex={0} aria-expanded={isExp} aria-label={`Riwayat KGB ${e.nama}`}
+                        onKeyDown={(ev) => tekanBuka(ev, toggle)}
                         className="px-4 py-3 flex items-center gap-3 cursor-pointer"
                         style={{ borderBottom: isExp ? "none" : "1px solid var(--ln2)", background: isExp ? "var(--sub)" : "var(--card)" }}>
                         <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold"
@@ -416,7 +444,7 @@ export default function RiwayatKeuanganPage() {
                           </p>
                           <div className="flex flex-col gap-2">
                             {e.kgbs.map((k, idx) => {
-                              const s = STATUS_CFG[k.status] ?? STATUS_CFG.belum_diproses;
+                              const s = badgeStatus(k.status);
                               return (
                                 <div key={k.id} className="rounded-xl p-3" style={{ background: "var(--card)", border: `1px solid ${idx === 0 ? "var(--ln0)" : "var(--ln2)"}` }}>
                                   <div className="flex items-start justify-between gap-2 mb-2">
@@ -442,7 +470,7 @@ export default function RiwayatKeuanganPage() {
                                     </div>
                                     <div>
                                       <p style={{ fontSize: "9px", color: "var(--dt5)" }}>MKG</p>
-                                      <p style={{ fontSize: "11px", color: "var(--dt3)" }}>{k.mkgTahunBaru} Thn {k.mkgBulanBaru} Bln</p>
+                                      <p style={{ fontSize: "11px", color: "var(--dt3)" }}>{k.mkgTahunBaru === null ? "-" : `${k.mkgTahunBaru} Thn ${k.mkgBulanBaru ?? 0} Bln`}</p>
                                     </div>
                                     {k.surat?.pathFile && (
                                       <div className="flex items-end">
@@ -538,9 +566,6 @@ export default function RiwayatKeuanganPage() {
                             {!isRekon && log.detail.includes("Rapelan: Ya") && (
                               <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: 999, background: "var(--tint-amber-bg2)", color: "var(--st-amber)" }}>RAPELAN</span>
                             )}
-                            {isRekon && (
-                              <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: 999, background: "var(--tint-green-bg)", color: "var(--st-green)" }}>OTOMATIS</span>
-                            )}
                           </div>
                           <p className="text-xs leading-relaxed mb-1.5" style={{ color: "var(--dt3)" }}>{log.detail}</p>
                           <p style={{ fontSize: "10px", color: "var(--dt5)" }}>
@@ -585,9 +610,6 @@ export default function RiwayatKeuanganPage() {
                                 {!isRekon && log.detail.includes("Rapelan: Ya") && (
                                   <span className="px-1 py-px rounded font-semibold" style={{ background: "var(--tint-amber-bg2)", color: "var(--st-amber)", fontSize: "9px" }}>RAPELAN</span>
                                 )}
-                                {isRekon && (
-                                  <span className="px-1 py-px rounded font-semibold" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", fontSize: "9px" }}>OTOMATIS</span>
-                                )}
                               </div>
                             </div>
                           </td>
@@ -621,68 +643,79 @@ export default function RiwayatKeuanganPage() {
                   <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
                 </svg>
               </div>
-              <p className="text-xs font-medium" style={{ color: "var(--dt5)" }}>Belum ada rekon tercatat</p>
-              <p className="text-xs mt-1" style={{ color: "var(--dt6)" }}>Otomatis tercatat saat semua KGB TMT dikonfirmasi dalam window 1–15</p>
+              <p className="text-xs font-medium" style={{ color: "var(--dt5)" }}>Belum ada KGB untuk direkap</p>
+              <p className="text-xs mt-1" style={{ color: "var(--dt6)" }}>Rekap dihitung dari data KGB per bulan TMT setiap kali halaman dibuka.</p>
             </div>
           ) : (
             <>
-              {/* ── Mobile: rekon cards ── */}
+              <p className="px-4 py-2.5 text-xs" style={{ color: "var(--dt4)", borderBottom: "1px solid var(--ln2)", background: "var(--sub)" }}>
+                Dasar input Sistem Gaji Web per bulan TMT, dihitung dari data KGB saat halaman dibuka. KGB arsip tidak dihitung; KGB yang dibatalkan lalu diinput ulang dihitung satu kali.
+              </p>
+              {/* ── Mobile: rekap cards ── */}
               <div className="md:hidden divide-y" style={{ borderColor: "var(--ln2)" }}>
-                {rekonList.map((r, i) => (
-                  <div key={r.id} className="px-4 py-3.5" style={{ background: i % 2 === 0 ? "var(--card)" : "var(--sub)" }}>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--tint-green-bg)" }}>
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0f6e56" strokeWidth="2">
-                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                          </svg>
-                        </div>
+                {rekonList.map((r, i) => {
+                  const lengkap = r.total > 0 && r.dikonfirmasi === r.total;
+                  return (
+                    <div key={r.bulanTmt} className="px-4 py-3.5" style={{ background: i % 2 === 0 ? "var(--card)" : "var(--sub)" }}>
+                      <div className="flex items-start justify-between gap-2 mb-2">
                         <p className="text-sm font-bold" style={{ color: "var(--dtn)" }}>KGB TMT {bulanLabel(r.bulanTmt)}</p>
+                        <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 9px", borderRadius: 999, background: lengkap ? "var(--tint-green-bg)" : "var(--tint-violet-bg)", color: lengkap ? "var(--st-green)" : "var(--st-violet)", whiteSpace: "nowrap" }}>
+                          {lengkap ? "Lengkap" : `${r.dikonfirmasi} dari ${r.total} dikonfirmasi`}
+                        </span>
                       </div>
-                      <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 9px", borderRadius: 999, background: "var(--tint-green-bg)", color: "var(--st-green)", whiteSpace: "nowrap" }}>
-                        {r.jumlahData} data
-                      </span>
+                      <p style={{ fontSize: "11px", color: "var(--dt3)" }}>
+                        {r.menungguKeuangan} menunggu keuangan · {r.belumSampaiKeuangan} belum sampai keuangan{r.dibatalkan > 0 ? ` (${r.dibatalkan} dibatalkan)` : ""}
+                      </p>
+                      <p style={{ fontSize: "10px", color: "var(--dt5)", marginTop: "2px" }}>
+                        Rapelan: {r.rapelanDitetapkan} ditetapkan, {r.berpotensiRapelan} berpotensi
+                        {r.konfirmasiTerakhir ? ` · Konfirmasi terakhir ${fmtWaktu(r.konfirmasiTerakhir)}` : ""}
+                      </p>
                     </div>
-                    <p style={{ fontSize: "11px", color: "var(--dt3)" }}>{r.creator.nama} <span style={{ color: "var(--dt6)" }}>({r.creator.nip})</span></p>
-                    <p style={{ fontSize: "10px", color: "var(--dt5)", marginTop: "2px" }}>{fmtWaktu(r.tanggalInput)}</p>
-                    {r.catatan && <p style={{ fontSize: "10px", color: "var(--dt5)", fontStyle: "italic", marginTop: "4px" }}>{r.catatan}</p>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* ── Desktop: table ── */}
-              <table className="hidden md:table w-full" style={{ borderCollapse: "collapse", fontSize: "12px" }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--ln2)", background: "var(--sub)" }}>
-                    {["Bulan TMT","Jumlah Data","Dicatat Oleh","Tanggal Input","Catatan"].map(h => (
-                      <th key={h} className="px-4 py-2.5 text-left"
-                        style={{ color: "var(--dt5)", fontWeight: 600, fontSize: "11px", whiteSpace: "nowrap" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rekonList.map((r, i) => (
-                    <tr key={r.id} style={{ borderBottom: "1px solid var(--ln2)", background: i % 2 === 0 ? "var(--card)" : "var(--sub)" }}>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--tint-green-bg)" }}>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f6e56" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-                          </div>
-                          <span className="font-semibold whitespace-nowrap" style={{ color: "var(--dtn)" }}>KGB TMT {bulanLabel(r.bulanTmt)}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className="px-2 py-0.5 rounded-full font-bold" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", fontSize: "11px" }}>{r.jumlahData} data</span>
-                      </td>
-                      <td className="px-4 py-2.5" style={{ color: "var(--dt3)", fontSize: "11px" }}>
-                        {r.creator.nama}<p style={{ color: "var(--dt6)", fontSize: "10px" }}>{r.creator.nip}</p>
-                      </td>
-                      <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: "var(--dt4)", fontSize: "11px" }}>{fmtWaktu(r.tanggalInput)}</td>
-                      <td className="px-4 py-2.5" style={{ color: "var(--dt5)", fontSize: "11px", fontStyle: "italic" }}>{r.catatan ?? "-"}</td>
+              <div className="hidden md:block overflow-x-auto tbl-scroll">
+                <table className="w-full" style={{ borderCollapse: "collapse", fontSize: "12px" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--ln2)", background: "var(--sub)" }}>
+                      {["Bulan TMT","Total KGB","Dikonfirmasi","Menunggu Keuangan","Belum Sampai Keuangan","Rapelan","Konfirmasi Terakhir"].map(h => (
+                        <th key={h} className="px-4 py-2.5 text-left"
+                          style={{ color: "var(--dt5)", fontWeight: 600, fontSize: "11px", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {rekonList.map((r, i) => {
+                      const lengkap = r.total > 0 && r.dikonfirmasi === r.total;
+                      return (
+                        <tr key={r.bulanTmt} style={{ borderBottom: "1px solid var(--ln2)", background: i % 2 === 0 ? "var(--card)" : "var(--sub)" }}>
+                          <td className="px-4 py-2.5">
+                            <span className="font-semibold whitespace-nowrap" style={{ color: "var(--dtn)" }}>KGB TMT {bulanLabel(r.bulanTmt)}</span>
+                          </td>
+                          <td className="px-4 py-2.5" style={{ color: "var(--dtn)", fontWeight: 700 }}>{r.total}</td>
+                          <td className="px-4 py-2.5 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-full font-bold" style={{ background: lengkap ? "var(--tint-green-bg)" : "var(--sub)", color: lengkap ? "var(--st-green)" : "var(--dtn)", fontSize: "11px" }}>
+                              {r.dikonfirmasi}{lengkap ? " (lengkap)" : ""}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5" style={{ color: r.menungguKeuangan > 0 ? "var(--st-violet)" : "var(--dt4)", fontSize: "11px" }}>{r.menungguKeuangan}</td>
+                          <td className="px-4 py-2.5" style={{ color: "var(--dt3)", fontSize: "11px" }}>
+                            {r.belumSampaiKeuangan}{r.dibatalkan > 0 ? ` (${r.dibatalkan} dibatalkan)` : ""}
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: "var(--dt3)", fontSize: "11px" }}>
+                            {r.rapelanDitetapkan} ditetapkan · {r.berpotensiRapelan} berpotensi
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: "var(--dt4)", fontSize: "11px" }}>
+                            {r.konfirmasiTerakhir ? fmtWaktu(r.konfirmasiTerakhir) : "-"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
         </div>

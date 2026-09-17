@@ -2,15 +2,6 @@
 
 /* ── Clearbit Design System ─────────────────────────────────────── */
 @theme {
-  --color-midnight-ink:   #091135;
-  --color-electric-blue:  #0f77ff;
-  --color-cobalt-surface: #127ee3;
-  --color-slate:          #36394a;
-  --color-frost-border:   #e1e9f0;
-  --color-mist:           #b1bbcd;
-  --color-graphite:       #000000;
-  --color-paper:          #ffffff;
-  --color-lavender-wash:  #f5f3ff;
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
@@ -45,7 +36,7 @@
   --tint-violet-bg: #f3f0ff; --tint-violet-ln: #c4b5fd; --st-violet: #6d28d9;
   --accent: #1254a7;  --accent-bg: rgba(17, 84, 167, 0.07);
   --navy-solid: #1a3a5c;  --red-solid: #dc2626;  --green-solid: #0f6e56;
-  --amber-solid: #b87c0a; --violet-solid: #6d28d9; --blue-solid: #1e40af; --accent-solid: #1254a7;
+  --amber-solid: #b87c0a; --violet-solid: #6d28d9; --accent-solid: #1254a7;
 }
 
 /* ── Mode gelap dashboard ────────────────────────────────────────
@@ -76,7 +67,7 @@ html[data-dash-theme="dark"] {
   --tint-violet-bg: rgba(167,139,250,0.15); --tint-violet-ln: rgba(167,139,250,0.42); --st-violet: #b79df8;
   --accent: #6ea8ff;  --accent-bg: rgba(110, 168, 255, 0.14);
   --navy-solid: #1f4d7e;  --red-solid: #cf3d3d;  --green-solid: #0d8465;
-  --amber-solid: #b8770a; --violet-solid: #7c4fe0; --blue-solid: #2e63c9; --accent-solid: #2e6fc2;
+  --amber-solid: #b8770a; --violet-solid: #7c4fe0; --accent-solid: #2e6fc2;
   color-scheme: dark;
 }
 
@@ -84,10 +75,27 @@ html[data-dash-theme="dark"] {
 html[data-dash-theme="dark"] .bg-white   { background-color: var(--card); }
 html[data-dash-theme="dark"] .bg-gray-50 { background-color: var(--sub); }
 
-html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+/* ── Halaman publik gelap ────────────────────────────────────────
+   Latar kanvas (area overscroll/rubber-band di luar .pub) mengikuti
+   tema publik. Hanya berlaku bila halaman memuat .pub, sehingga
+   dashboard tidak terpengaruh; saat dicetak tetap terang.          */
+@media screen {
+  html[data-pub-theme="dark"]:has(.pub) {
+    --background: #0e141d;
+    --foreground: #d3dae4;
+    background-color: #0e141d;
+    color-scheme: dark;
+  }
+}
+
+html { -webkit-font-smoothing: antialiased; }
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  body { transition: background-color 120ms ease, color 120ms ease; }
+}
 
 body {
-  transition: background 0.35s ease, color 0.35s ease;
   background: var(--background);
   color: var(--foreground);
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -101,54 +109,7 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--frost-border); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--mist); }
 
-/* ── Keyframes ──────────────────────────────────── */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes slideRight {
-  from { opacity: 0; transform: translateX(-10px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-.anim-fade-up    { animation: fadeUp    0.4s cubic-bezier(.22,1,.36,1) both; }
-.anim-fade-in    { animation: fadeIn    0.25s ease both; }
-.anim-slide-right{ animation: slideRight 0.3s cubic-bezier(.22,1,.36,1) both; }
-
-/* ── Reveal scroll (keep for existing pages) ─────── */
-.reveal {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.55s cubic-bezier(.22,1,.36,1), transform 0.55s cubic-bezier(.22,1,.36,1);
-}
-.reveal.visible { opacity: 1; transform: none; }
-
 /* ── Clearbit components ─────────────────────────── */
-.cb-card {
-  background: var(--paper);
-  border: 1px solid var(--frost-border);
-  border-radius: 12px;
-}
-
-.cb-input {
-  width: 100%;
-  border: 1px solid var(--frost-border);
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 14px;
-  color: var(--midnight-ink);
-  background: var(--paper);
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  font-family: inherit;
-}
-.cb-input::placeholder { color: var(--mist); }
-.cb-input:focus { border-color: var(--electric-blue); box-shadow: var(--focus-ring); }
-
 .cb-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   background: var(--cobalt-surface); color: #fff;

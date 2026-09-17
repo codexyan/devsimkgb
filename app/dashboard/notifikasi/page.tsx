@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatTanggalId } from "@/lib/waktu";
 
 interface Notifikasi {
   id: string;
   judul: string;
   pesan: string;
   tipe: string;
-  referenceId: string | null;
   dibaca: boolean;
   createdAt: string;
   prioritas: string;
@@ -16,36 +16,43 @@ interface Notifikasi {
   kategori: string | null;
 }
 
-type TabFilter = "semua" | "belum" | "kgb" | "hukdis";
+// Server hanya mengirim tipe notifikasi yang boleh dilihat role pengguna (GET /api/notifikasi),
+// sehingga tab kategori disusun dari notifikasi yang benar-benar diterima.
+type KunciKategori = "kgb" | "followup" | "sk" | "hukdis";
+type TabFilter = "semua" | "belum" | KunciKategori;
 
-const TIPE_CONFIG: Record<
-  string,
-  { icon: string; bg: string; color: string; border: string }
-> = {
-  hukdis_berakhir: {
-    icon: "⚠",
-    bg: "var(--tint-amber-bg)",
-    color: "var(--st-amber)",
-    border: "var(--tint-amber-ln)",
-  },
-  kgb_jatuh_tempo: {
-    icon: "📅",
-    bg: "var(--tint-navy)",
-    color: "var(--dtn)",
-    border: "var(--ln0)",
-  },
-  rapelan: {
-    icon: "⏰",
-    bg: "var(--tint-red-bg)",
-    color: "var(--st-red)",
-    border: "var(--tint-red-ln)",
-  },
+const KATEGORI: { key: KunciKategori; label: string; tipe: readonly string[] }[] = [
+  { key: "kgb", label: "KGB & Rapelan", tipe: ["kgb_jatuh_tempo", "rapelan"] },
+  { key: "followup", label: "Follow Up Keuangan", tipe: ["followup_keuangan"] },
+  { key: "sk", label: "SK Menunggu Keuangan", tipe: ["sk_menunggu_keuangan"] },
+  { key: "hukdis", label: "Hukdis", tipe: ["hukdis_berakhir"] },
+];
+
+function IkonTipe({ tipe }: { tipe: string }) {
+  const umum = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, "aria-hidden": true } as const;
+  switch (tipe) {
+    case "hukdis_berakhir":
+      return <svg {...umum}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
+    case "rapelan":
+      return <svg {...umum}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+    case "followup_keuangan":
+      return <svg {...umum}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
+    case "sk_menunggu_keuangan":
+      return <svg {...umum}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>;
+    default:
+      return <svg {...umum}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+  }
+}
+
+const TIPE_CONFIG: Record<string, { bg: string; color: string; border: string }> = {
+  hukdis_berakhir: { bg: "var(--tint-amber-bg)", color: "var(--st-amber)", border: "var(--tint-amber-ln)" },
+  kgb_jatuh_tempo: { bg: "var(--tint-navy)", color: "var(--dtn)", border: "var(--ln0)" },
+  rapelan: { bg: "var(--tint-red-bg)", color: "var(--st-red)", border: "var(--tint-red-ln)" },
+  followup_keuangan: { bg: "var(--tint-amber-bg)", color: "var(--st-amber)", border: "var(--tint-amber-ln)" },
+  sk_menunggu_keuangan: { bg: "var(--tint-violet-bg)", color: "var(--st-violet)", border: "var(--tint-violet-ln)" },
 };
 
-const PRIORITAS_BADGE: Record<
-  string,
-  { label: string; bg: string; color: string }
-> = {
+const PRIORITAS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
   critical: { label: "Kritis", bg: "var(--tint-red-bg)", color: "var(--st-red)" },
   warning: { label: "Peringatan", bg: "var(--tint-amber-bg)", color: "var(--st-amber)" },
   info: { label: "Info", bg: "var(--tint-blue-bg)", color: "var(--st-blue)" },
@@ -65,11 +72,7 @@ function waktuRelatif(dateStr: string): string {
   if (diffJam < 24) return `${diffJam} jam lalu`;
   if (diffHari === 1) return "Kemarin";
   if (diffHari < 30) return `${diffHari} hari lalu`;
-  return d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatTanggalId(d, { day: "numeric", month: "short", year: "numeric" });
 }
 
 export default function NotifikasiPage() {
@@ -86,8 +89,8 @@ export default function NotifikasiPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/notifikasi?limit=100");
-      const data = await res.json() as any;
-      setNotifikasi(Array.isArray(data) ? data : []);
+      const data = (await res.json()) as unknown;
+      setNotifikasi(res.ok && Array.isArray(data) ? (data as Notifikasi[]) : []);
     } catch {
       setNotifikasi([]);
     } finally {
@@ -95,99 +98,88 @@ export default function NotifikasiPage() {
     }
   }
 
-  async function tandaiBaca(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    await fetch("/api/notifikasi", {
+  async function tandaiBaca(id: string) {
+    const res = await fetch("/api/notifikasi", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
-    });
-    setNotifikasi((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, dibaca: true } : n)),
-    );
+    }).catch(() => null);
+    if (!res?.ok) return;
+    setNotifikasi((prev) => prev.map((n) => (n.id === id ? { ...n, dibaca: true } : n)));
   }
 
   async function tandaiSemuaBaca() {
-    await fetch("/api/notifikasi", {
+    const res = await fetch("/api/notifikasi", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dibacaSemua: true }),
-    });
+    }).catch(() => null);
+    if (!res?.ok) return;
     setNotifikasi((prev) => prev.map((n) => ({ ...n, dibaca: true })));
   }
 
-  function handleCardClick(n: Notifikasi) {
-    if (!n.dibaca) {
-      fetch("/api/notifikasi", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: n.id }),
-      });
-      setNotifikasi((prev) =>
-        prev.map((x) => (x.id === n.id ? { ...x, dibaca: true } : x)),
-      );
-    }
+  function bukaNotifikasi(n: Notifikasi) {
+    if (!n.dibaca) void tandaiBaca(n.id);
     if (n.linkHref) router.push(n.linkHref);
   }
 
-  async function hapusNotifikasi(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
+  async function hapusNotifikasi(id: string) {
     setDeletingId(id);
     try {
-      await fetch(`/api/notifikasi?id=${id}`, { method: "DELETE" });
-      setNotifikasi((prev) => prev.filter((n) => n.id !== id));
+      const res = await fetch(`/api/notifikasi?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (res.ok) setNotifikasi((prev) => prev.filter((n) => n.id !== id));
     } finally {
       setDeletingId(null);
     }
   }
 
   async function hapusSemua() {
-    if (!confirm("Hapus semua notifikasi? Tindakan ini tidak dapat dibatalkan.")) return;
+    if (!confirm("Hapus semua notifikasi? Pengingat untuk KGB atau hukdis yang masih berlaku akan dibuat kembali pada pemeriksaan berikutnya.")) return;
     setDeletingAll(true);
     try {
-      await fetch("/api/notifikasi?all=true", { method: "DELETE" });
-      setNotifikasi([]);
+      const res = await fetch("/api/notifikasi?all=true", { method: "DELETE" });
+      if (res.ok) setNotifikasi([]);
     } finally {
       setDeletingAll(false);
     }
   }
 
   useEffect(() => {
-    fetchNotifikasi();
-    fetch("/api/auth/session")
-      .then((r) => r.json() as any)
-      .then((s) => setRole(s?.user?.role ?? ""));
+    const t = setTimeout(() => {
+      void fetchNotifikasi();
+      fetch("/api/auth/session")
+        .then((r) => r.json() as Promise<{ user?: { role?: string } } | null>)
+        .then((s) => setRole(s?.user?.role ?? ""))
+        .catch(() => setRole(""));
+    }, 0);
+    return () => clearTimeout(t);
   }, []);
 
   const unread = notifikasi.filter((n) => !n.dibaca).length;
-  const unreadKGB = notifikasi.filter(
-    (n) =>
-      !n.dibaca &&
-      (n.tipe === "kgb_jatuh_tempo" || n.tipe === "rapelan"),
-  ).length;
-  const unreadHukdis = notifikasi.filter(
-    (n) => !n.dibaca && n.tipe === "hukdis_berakhir",
-  ).length;
-
-  const filtered = notifikasi.filter((n) => {
-    if (tab === "belum") return !n.dibaca;
-    if (tab === "kgb")
-      return n.tipe === "kgb_jatuh_tempo" || n.tipe === "rapelan";
-    if (tab === "hukdis") return n.tipe === "hukdis_berakhir";
-    return true;
-  });
-
+  const kategoriAda = KATEGORI.filter((k) => notifikasi.some((n) => k.tipe.includes(n.tipe)));
+  // Tab kategori hanya ditampilkan bila notifikasi yang diterima berasal dari lebih dari satu kategori.
+  const tabKategori = kategoriAda.length > 1 ? kategoriAda : [];
   const tabs: { key: TabFilter; label: string; count?: number }[] = [
     { key: "semua", label: "Semua" },
     { key: "belum", label: "Belum Dibaca", count: unread },
-    { key: "kgb", label: "KGB & Rapelan", count: unreadKGB },
-    { key: "hukdis", label: "Hukdis", count: unreadHukdis },
+    ...tabKategori.map((k) => ({
+      key: k.key,
+      label: k.label,
+      count: notifikasi.filter((n) => !n.dibaca && k.tipe.includes(n.tipe)).length,
+    })),
   ];
+  const tabAktif: TabFilter = tabs.some((t) => t.key === tab) ? tab : "semua";
+
+  const filtered = notifikasi.filter((n) => {
+    if (tabAktif === "semua") return true;
+    if (tabAktif === "belum") return !n.dibaca;
+    return KATEGORI.find((k) => k.key === tabAktif)?.tipe.includes(n.tipe) ?? false;
+  });
 
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-base font-semibold" style={{ color: "var(--dtn)" }}>
             Notifikasi
@@ -195,10 +187,14 @@ export default function NotifikasiPage() {
           <p className="text-xs mt-0.5" style={{ color: "var(--dt4)" }}>
             {loading ? "Memuat..." : unread > 0 ? `${unread} belum dibaca dari ${notifikasi.length} notifikasi` : `${notifikasi.length} notifikasi · semua sudah dibaca`}
           </p>
+          <p className="text-xs mt-0.5" style={{ color: "var(--dt5)" }}>
+            Status dibaca berlaku untuk semua pengguna yang menerima notifikasi yang sama.
+          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {unread > 0 && (
             <button
+              type="button"
               onClick={tandaiSemuaBaca}
               className="text-xs px-3 py-1.5 rounded-lg transition"
               style={{ background: "var(--tint-navy)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}
@@ -208,12 +204,13 @@ export default function NotifikasiPage() {
           )}
           {isSuperAdmin && notifikasi.length > 0 && (
             <button
+              type="button"
               onClick={hapusSemua}
               disabled={deletingAll}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition disabled:opacity-50"
               style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", border: "0.5px solid var(--tint-red-ln)" }}
             >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
               {deletingAll ? "Menghapus..." : "Hapus Semua"}
             </button>
           )}
@@ -221,14 +218,17 @@ export default function NotifikasiPage() {
       </div>
 
       {/* Tab + List dalam satu card */}
-      <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
+      <div className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "0.5px solid var(--ln1)" }}>
         {/* Tab Filter */}
-        <div className="flex gap-1 px-4 pt-3 pb-0 flex-wrap" style={{ borderBottom: "0.5px solid var(--ln2)" }}>
+        <div className="flex gap-1 px-4 pt-3 pb-0 flex-wrap" role="tablist" aria-label="Filter notifikasi" style={{ borderBottom: "0.5px solid var(--ln2)" }}>
           {tabs.map((t) => {
-            const active = tab === t.key;
+            const active = tabAktif === t.key;
             return (
               <button
                 key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
                 onClick={() => setTab(t.key)}
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition relative"
                 style={{
@@ -240,8 +240,9 @@ export default function NotifikasiPage() {
                 {t.label}
                 {t.count !== undefined && t.count > 0 && (
                   <span
-                    className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold"
+                    className="inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold"
                     style={{ background: "var(--navy-solid)", color: "#fff" }}
+                    aria-label={`${t.count} belum dibaca`}
                   >
                     {t.count}
                   </span>
@@ -258,12 +259,12 @@ export default function NotifikasiPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d0dce8" strokeWidth="1.5">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: "var(--dt6)" }} aria-hidden>
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
             <p className="text-xs" style={{ color: "var(--dt5)" }}>
-              {tab === "semua" ? "Belum ada notifikasi" : "Tidak ada notifikasi untuk filter ini"}
+              {tabAktif === "semua" ? "Belum ada notifikasi" : "Tidak ada notifikasi untuk filter ini"}
             </p>
           </div>
         ) : (
@@ -282,22 +283,32 @@ export default function NotifikasiPage() {
                     opacity: n.dibaca ? 0.75 : 1,
                     cursor: clickable ? "pointer" : "default",
                   }}
-                  onClick={() => handleCardClick(n)}
+                  role={clickable ? "link" : undefined}
+                  tabIndex={clickable ? 0 : undefined}
+                  onClick={() => bukaNotifikasi(n)}
+                  onKeyDown={(e) => {
+                    if (!clickable || e.target !== e.currentTarget) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      bukaNotifikasi(n);
+                    }
+                  }}
                 >
                   {/* Unread dot */}
                   {!n.dibaca && (
                     <span
                       className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full shrink-0"
                       style={{ background: cfg.color }}
+                      aria-hidden
                     />
                   )}
 
                   {/* Icon */}
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
-                    style={{ background: cfg.bg, border: `1px solid ${cfg.border}` }}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                    style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color }}
                   >
-                    {cfg.icon}
+                    <IkonTipe tipe={n.tipe} />
                   </div>
 
                   {/* Konten */}
@@ -306,6 +317,11 @@ export default function NotifikasiPage() {
                       <p className="text-xs font-semibold" style={{ color: cfg.color }}>
                         {n.judul}
                       </p>
+                      {!n.dibaca && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ background: "var(--card)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}>
+                          Belum dibaca
+                        </span>
+                      )}
                       {n.prioritas !== "normal" && (
                         <span
                           className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
@@ -323,7 +339,7 @@ export default function NotifikasiPage() {
                         {waktuRelatif(n.createdAt)}
                       </p>
                       {clickable && (
-                        <p className="text-[11px]" style={{ color: "var(--dt5)" }}>· Klik untuk lihat</p>
+                        <p className="text-[11px]" style={{ color: "var(--dt5)" }}>· Klik untuk membuka</p>
                       )}
                     </div>
                   </div>
@@ -332,23 +348,25 @@ export default function NotifikasiPage() {
                   <div className="flex items-center gap-1 shrink-0">
                     {!n.dibaca && (
                       <button
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs transition hover:opacity-70"
-                        style={{ background: "var(--ln1)", color: "var(--dt4)" }}
-                        title="Tandai dibaca"
-                        onClick={(e) => tandaiBaca(n.id, e)}
+                        type="button"
+                        className="text-[11px] px-2 py-1 rounded-lg transition hover:opacity-80"
+                        style={{ background: "var(--ln2)", color: "var(--dt3)" }}
+                        onClick={(e) => { e.stopPropagation(); void tandaiBaca(n.id); }}
                       >
-                        ×
+                        Tandai dibaca
                       </button>
                     )}
                     {isSuperAdmin && (
                       <button
+                        type="button"
                         className="w-6 h-6 rounded-full flex items-center justify-center transition hover:opacity-70"
                         style={{ background: deletingId === n.id ? "var(--tint-red-ln)" : "var(--tint-red-bg)", color: "var(--st-red)" }}
                         title="Hapus notifikasi"
+                        aria-label={`Hapus notifikasi: ${n.judul}`}
                         disabled={deletingId === n.id}
-                        onClick={(e) => hapusNotifikasi(n.id, e)}
+                        onClick={(e) => { e.stopPropagation(); void hapusNotifikasi(n.id); }}
                       >
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                       </button>
                     )}
                   </div>

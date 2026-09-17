@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { auth } from "@/auth";
+import { auth, lupakanSesiPengguna } from "@/auth";
+import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
+import { logAudit } from "@/lib/auditLog";
+import { ROLE_LABEL } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 
 export const runtime = "nodejs";
@@ -15,10 +18,28 @@ export async function PATCH(
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
   }
 
-  const { id } = await params;
-  const { password } = (await req.json()) as any;
+  const admin = await penggunaLogin(session);
+  if (!admin) {
+    return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
+  }
 
-  if (!password || password.length < 6) {
+  const { id } = await params;
+  // Password akun sendiri diganti lewat Profil Saya, yang meminta password lama dan mengarahkan
+  // pengguna masuk kembali; atur ulang di sini akan mengakhiri sesi Super Admin tanpa penjelasan.
+  if (id === admin.id) {
+    return NextResponse.json({ error: "Password akun sendiri diganti lewat Profil Saya" }, { status: 400 });
+  }
+
+  let password = "";
+  try {
+    const body: unknown = await req.json();
+    const nilai = body && typeof body === "object" ? (body as { password?: unknown }).password : undefined;
+    if (typeof nilai === "string") password = nilai;
+  } catch {
+    // body tidak valid diperlakukan sebagai password kosong
+  }
+
+  if (password.length < 6) {
     return NextResponse.json({ error: "Password minimal 6 karakter" }, { status: 400 });
   }
 
@@ -29,6 +50,14 @@ export async function PATCH(
 
   const hashedPassword = await bcrypt.hash(password, 12);
   await db.user.update({ id }, { password: hashedPassword });
+  // Sesi yang dibuat dengan password lama berakhir (lihat auth.ts); isolate ini memeriksa ulang segera.
+  lupakanSesiPengguna();
+
+  logAudit({
+    userId: admin.id,
+    aksi: "reset_password",
+    detail: `Atur ulang password pengguna ${user.nama} (${user.nip})`,
+  });
 
   return NextResponse.json({ ok: true });
 }
@@ -45,9 +74,13 @@ export async function DELETE(
 
   const { id } = await params;
 
+  const me = await penggunaLogin(session);
+  if (!me) {
+    return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
+  }
+
   // Cegah hapus diri sendiri
-  const me = await db.user.findUnique({ nip: session.user.nip! });
-  if (me?.id === id) {
+  if (me.id === id) {
     return NextResponse.json({ error: "Tidak bisa menghapus akun yang sedang login" }, { status: 400 });
   }
 
@@ -58,11 +91,22 @@ export async function DELETE(
 
   let reassignTo: string | null = null;
   try {
-    const body = (await req.json()) as any;
-    reassignTo = body?.reassignTo ?? null;
+    const body: unknown = await req.json();
+    const nilai = body && typeof body === "object" ? (body as { reassignTo?: unknown }).reassignTo : null;
+    reassignTo = typeof nilai === "string" && nilai ? nilai : null;
   } catch {
     // body kosong = tidak ada reassign
   }
+
+  // Entri riwayat aktivitas pengguna ini tetap menyimpan id-nya; nama, NIP, dan id pengguna yang
+  // dihapus dicatat pada entri hapus_pengguna agar entri lama dapat ditelusuri.
+  const catatHapus = (tambahan: string) => {
+    logAudit({
+      userId: me.id,
+      aksi: "hapus_pengguna",
+      detail: `Hapus pengguna ${user.nama} (${user.nip}), peran ${ROLE_LABEL[user.role] ?? user.role}, id ${user.id}${tambahan}`,
+    });
+  };
 
   const [kgbCount, suratCount, serahTerimaCount, hukdisCount] = await Promise.all([
     db.riwayatKGB.count({ createdBy: id }),
@@ -91,18 +135,20 @@ export async function DELETE(
 
     // Reassign semua record lalu hapus user (sekuensial, pengganti $transaction).
     await db.riwayatKGB.updateMany({ createdBy: id }, { createdBy: reassignTo });
-    await db.suratKGB.updateMany({ generatedBy: id }, { generatedBy: reassignTo } as any);
-    await db.serahTerima.updateMany({ createdBy: id }, { createdBy: reassignTo } as any);
-    await db.riwayatHukdis.updateMany({ createdBy: id }, { createdBy: reassignTo } as any);
-    await db.auditLog.updateMany({ userId: id }, { userId: null });
+    await db.suratKGB.updateMany({ generatedBy: id }, { generatedBy: reassignTo });
+    await db.serahTerima.updateMany({ createdBy: id }, { createdBy: reassignTo });
+    await db.riwayatHukdis.updateMany({ createdBy: id }, { createdBy: reassignTo });
+    catatHapus(`, ${total} data dialihkan ke ${targetUser.nama} (${targetUser.nip})`);
     await db.user.delete({ id });
+    lupakanSesiPengguna();
 
     return NextResponse.json({ ok: true, reassigned: total });
   }
 
   // Tidak ada record terkait, langsung hapus.
-  await db.auditLog.updateMany({ userId: id }, { userId: null });
+  catatHapus("");
   await db.user.delete({ id });
+  lupakanSesiPengguna();
 
   return NextResponse.json({ ok: true });
 }

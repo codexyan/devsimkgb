@@ -1,6 +1,7 @@
 ﻿"use client";
 // v2 : no useSession dependency
 import { useEffect, useState } from "react";
+import { signOut } from "next-auth/react";
 
 interface UserProfile {
   id: string;
@@ -154,8 +155,10 @@ export default function ProfilePage() {
       if (!res.ok) {
         setAlertPw({ type: "error", message: data.error ?? "Gagal mengganti password" });
       } else {
-        setAlertPw({ type: "success", message: "Password berhasil diperbarui." });
+        // Sesi dengan password lama berakhir di server, jadi pengguna diarahkan masuk kembali.
+        setAlertPw({ type: "success", message: "Password berhasil diperbarui. Silakan masuk kembali." });
         setPasswordLama(""); setPasswordBaru(""); setKonfirmasi("");
+        setTimeout(() => signOut({ callbackUrl: "/login" }), 2000);
       }
     } catch {
       setAlertPw({ type: "error", message: "Terjadi kesalahan. Coba lagi." });
@@ -277,7 +280,7 @@ export default function ProfilePage() {
                     className="text-xs px-5 py-2.5 rounded-xl font-semibold transition disabled:opacity-50"
                     style={{ background: "var(--navy-solid)", color: "#fff" }}
                   >
-                    {submitting ? "Mengajukan..." : "Ajukan Perubahan →"}
+                    {submitting ? "Mengajukan..." : "Ajukan Perubahan"}
                   </button>
                 </div>
               )}

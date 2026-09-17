@@ -5,8 +5,8 @@ import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
-  // Optimasi gambar dimatikan: satu-satunya pemakaian next/image adalah logo
-  // kecil (LogoMark); menghindari kebutuhan sharp/layanan optimasi.
+  // Optimasi gambar dimatikan: next/image hanya dipakai untuk logo crest kecil
+  // (header publik dan sidebar); menghindari kebutuhan sharp/layanan optimasi.
   images: { unoptimized: true },
 };
 

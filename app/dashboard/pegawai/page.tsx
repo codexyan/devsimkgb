@@ -8,9 +8,14 @@ import {
   getGajiPokok,
   getPangkat,
   hitungMKGKenaikanPangkat,
+  jendelaProsesKgb,
 } from "@/lib/tabelGaji";
 import { ROLES } from "@/lib/auth";
+import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
+import { infoStatusKgb, isStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
+import { formatTanggalId, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 import { useRole } from "@/app/dashboard/components/RoleContext";
+import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 
 interface Pegawai {
   id: string;
@@ -29,17 +34,33 @@ interface Pegawai {
   jenisHukdis?: string | null;
   aktif: boolean;
   statusKGB?: string | null;
-  kgbId?: string | null;
 }
 
-/* Status KGB terkini per pegawai (integrasi Kepegawaian ⇄ KGB) */
-const KGB_STATUS: Record<string, { label: string; bg: string; color: string }> = {
-  belum_diproses:   { label: "KGB belum diproses", bg: "var(--tint-amber-bg)",  color: "var(--st-amber)"  },
-  sedang_diproses:  { label: "KGB diproses",       bg: "var(--tint-blue-bg)",   color: "var(--st-blue)"   },
-  menunggu_keuangan:{ label: "KGB di keuangan",    bg: "var(--tint-violet-bg)", color: "var(--st-violet)" },
-  selesai:          { label: "KGB selesai",        bg: "var(--tint-green-bg)",  color: "var(--st-green)"  },
-  ditolak:          { label: "KGB dibatalkan",     bg: "var(--tint-red-bg)",    color: "var(--st-red)"    },
-};
+/* Data lengkap dari GET /api/pegawai/[id] untuk mengisi form */
+interface PegawaiDetail {
+  nama?: string | null; nip?: string | null; tempatLahir?: string | null; tanggalLahir?: string | null;
+  jenisKelamin?: string | null; pendidikanTerakhir?: string | null; jabatan?: string | null;
+  pangkat?: string | null; golonganRuang?: string | null; unitKerja?: string | null; eselon?: string | null;
+  jenisJabatan?: string | null; tmtGolongan?: string | null; mkgTahun?: number | null; mkgBulan?: number | null;
+  gajiPokok?: number | null; tmtKgbTerakhir?: string | null; tmtKgbBerikutnya?: string | null;
+  statusHukdis?: boolean | null; keteranganHukdis?: string | null; tanggalHukdisBerakhir?: string | null;
+  jenisHukdis?: string | null; aktif?: boolean | null;
+}
+
+const FORMAT_TANGGAL_PENDEK: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+
+/* Nilai input date dari tanggal tersimpan, dibaca sebagai tanggal kalender WITA. */
+function keIsianTanggal(val: string | null | undefined): string {
+  const tanggal = tanggalKalender(val);
+  return tanggal ? isoTanggalLokal(tanggal) : "";
+}
+
+/* Label unit kerja untuk daftar; nama Kanwil yang panjang disingkat. Unit kerja kosong berarti Kanwil, sama dengan SK KGB. */
+function labelUnitKerja(unitKerja: string | null | undefined): { teks: string; dikenal: boolean } {
+  const satker = unitKerja?.trim() ? cariSatker(unitKerja) : SATKER_KANWIL;
+  if (!satker) return { teks: unitKerja?.trim() || "-", dikenal: false };
+  return { teks: satker.jenis === "kanwil" ? "Kanwil Ditjenpas Kalsel" : satker.nama, dikenal: true };
+}
 
 const inputClass =
   "w-full rounded-lg px-3 py-2 text-xs outline-none transition";
@@ -71,7 +92,7 @@ const formInit = {
   jabatan: "",
   pangkat: "",
   golonganRuang: "",
-  unitKerja: "Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan",
+  unitKerja: SATKER_KANWIL.nama,
   eselon: "",
   jenisJabatan: "",
   tmtGolongan: "",
@@ -124,6 +145,7 @@ export default function PegawaiPage() {
   const [filterAktif, setFilterAktif] = useState(true);
   const [filterGolongan, setFilterGolongan] = useState("");
   const [filterHukdis, setFilterHukdis] = useState("");
+  const [filterSatker, setFilterSatker] = useState("");
   const [sortBy, setSortBy] = useState("nama_asc");
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState<Pegawai | null>(null);
@@ -135,11 +157,18 @@ export default function PegawaiPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [peringatan, setPeringatan] = useState("");
 
   // Checkbox selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showBulkNonaktif, setShowBulkNonaktif] = useState(false);
   const [showBulkHapus, setShowBulkHapus] = useState(false);
+
+  const refModalPegawai = useDialogModal(showModal, () => setShowModal(false), submitting);
+  const refModalNonaktif = useDialogModal(!!showHapus, () => setShowHapus(null), submitting);
+  const refModalBulkNonaktif = useDialogModal(showBulkNonaktif, () => setShowBulkNonaktif(false), submitting);
+  const refModalBulkHapus = useDialogModal(showBulkHapus, () => setShowBulkHapus(false), submitting);
+  const refModalHapusPermanen = useDialogModal(!!showHapusPermanent, () => setShowHapusPermanent(null), submitting);
 
   async function fetchAll() {
     setLoading(true);
@@ -148,10 +177,10 @@ export default function PegawaiPage() {
         fetch("/api/pegawai?search=&status="),
         fetch("/api/pegawai?search=&status=nonaktif"),
       ]);
-      const a = await r1.json() as any;
-      const n = await r2.json() as any;
-      setAktifList(Array.isArray(a) ? a : []);
-      setNonaktifList(Array.isArray(n) ? n : []);
+      const a: unknown = await r1.json();
+      const n: unknown = await r2.json();
+      setAktifList(Array.isArray(a) ? (a as Pegawai[]) : []);
+      setNonaktifList(Array.isArray(n) ? (n as Pegawai[]) : []);
     } catch {
       setAktifList([]);
       setNonaktifList([]);
@@ -160,7 +189,16 @@ export default function PegawaiPage() {
     }
   }
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetchAll();
+      // Diarahkan dari halaman impor oleh guard peran (app/dashboard/pegawai/import/layout.tsx).
+      if (new URLSearchParams(window.location.search).get("impor") === "ditolak") {
+        setPeringatan("Impor data pegawai hanya dapat dilakukan oleh Super Admin dan SDM KGB.");
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
 
   function openTambah() {
     setEditData(null);
@@ -173,33 +211,33 @@ export default function PegawaiPage() {
     setEditData(p);
     setError("");
     const res = await fetch(`/api/pegawai/${p.id}`);
-    const full = await res.json() as any;
-    const toDate = (val: string | null) =>
-      val ? new Date(val).toISOString().split("T")[0] : "";
+    const full = (await res.json()) as PegawaiDetail;
     setForm({
       nama: full.nama || "",
       nip: full.nip || "",
       tempatLahir: full.tempatLahir || "",
-      tanggalLahir: toDate(full.tanggalLahir),
+      tanggalLahir: keIsianTanggal(full.tanggalLahir),
       jenisKelamin: full.jenisKelamin || "",
       pendidikanTerakhir: full.pendidikanTerakhir || "",
       jabatan: full.jabatan || "",
       pangkat: full.pangkat || "",
       golonganRuang: full.golonganRuang || "",
-      unitKerja: full.unitKerja || "",
+      // Ejaan lain dari nama satker diseragamkan; nilai di luar daftar dibiarkan agar terlihat dan dipilih ulang.
+      // Unit kerja kosong berarti Kanwil.
+      unitKerja: full.unitKerja?.trim() ? (cariSatker(full.unitKerja)?.nama ?? full.unitKerja) : SATKER_KANWIL.nama,
       eselon: full.eselon || "",
       jenisJabatan: full.jenisJabatan || "",
-      tmtGolongan: toDate(full.tmtGolongan),
+      tmtGolongan: keIsianTanggal(full.tmtGolongan),
       mkgTahun: full.mkgTahun?.toString() || "0",
       mkgBulan: full.mkgBulan?.toString() || "0",
       gajiPokok: full.gajiPokok?.toString() || "",
-      tmtKgbTerakhir: toDate(full.tmtKgbTerakhir),
-      tmtKgbBerikutnya: toDate(full.tmtKgbBerikutnya),
+      tmtKgbTerakhir: keIsianTanggal(full.tmtKgbTerakhir),
+      tmtKgbBerikutnya: keIsianTanggal(full.tmtKgbBerikutnya),
       statusHukdis: full.statusHukdis || false,
       keteranganHukdis: full.keteranganHukdis || "",
-      tanggalHukdisBerakhir: toDate(full.tanggalHukdisBerakhir),
+      tanggalHukdisBerakhir: keIsianTanggal(full.tanggalHukdisBerakhir),
       jenisHukdis: full.jenisHukdis || "",
-      aktif: full.aktif,
+      aktif: full.aktif ?? true,
     });
     setShowModal(true);
   }
@@ -223,6 +261,8 @@ export default function PegawaiPage() {
     for (const [val, label] of required) {
       if (!val) { setError(`${label} wajib diisi`); return; }
     }
+    const satker = cariSatker(form.unitKerja);
+    if (!satker) { setError("Pilih Unit Kerja dari daftar satker"); return; }
 
     setSubmitting(true);
     const url = editData ? `/api/pegawai/${editData.id}` : "/api/pegawai";
@@ -230,9 +270,9 @@ export default function PegawaiPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, unitKerja: satker.nama }),
     });
-    const data = await res.json() as any;
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
     setSubmitting(false);
     if (!res.ok) {
       setError(data.error || "Terjadi kesalahan");
@@ -240,8 +280,8 @@ export default function PegawaiPage() {
     }
     setSuccess(
       editData
-        ? "Data pegawai berhasil diupdate!"
-        : "Pegawai berhasil ditambahkan!",
+        ? "Data pegawai berhasil diperbarui."
+        : "Pegawai berhasil ditambahkan.",
     );
     setShowModal(false);
     fetchAll();
@@ -274,25 +314,29 @@ export default function PegawaiPage() {
 
   async function handleAktifkan(p: Pegawai) {
     const res = await fetch(`/api/pegawai/${p.id}`);
-    const full = await res.json() as any;
-    const toDate = (val: string | null) =>
-      val ? new Date(val).toISOString().split("T")[0] : "";
-    await fetch(`/api/pegawai/${p.id}`, {
+    const full = (await res.json()) as PegawaiDetail;
+    const hasil = await fetch(`/api/pegawai/${p.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...full,
         aktif: true,
-        tanggalLahir: toDate(full.tanggalLahir),
-        tmtGolongan: toDate(full.tmtGolongan),
-        tmtKgbTerakhir: toDate(full.tmtKgbTerakhir),
-        tmtKgbBerikutnya: toDate(full.tmtKgbBerikutnya),
+        tanggalLahir: keIsianTanggal(full.tanggalLahir),
+        tmtGolongan: keIsianTanggal(full.tmtGolongan),
+        tmtKgbTerakhir: keIsianTanggal(full.tmtKgbTerakhir),
+        tmtKgbBerikutnya: keIsianTanggal(full.tmtKgbBerikutnya),
         gajiPokok: full.gajiPokok?.toString(),
         mkgTahun: full.mkgTahun?.toString() || "0",
         mkgBulan: full.mkgBulan?.toString() || "0",
       }),
     });
-    setSuccess(`${p.nama} berhasil diaktifkan kembali!`);
+    // Aktivasi dapat ditolak, misalnya bila unit kerja tersimpan tidak ada di daftar satker.
+    if (!hasil.ok) {
+      const galat = (await hasil.json().catch(() => ({}))) as { error?: string };
+      setPeringatan(`${p.nama} gagal diaktifkan kembali: ${galat.error ?? "terjadi kesalahan"}`);
+      return;
+    }
+    setSuccess(`${p.nama} berhasil diaktifkan kembali.`);
     fetchAll();
     setTimeout(() => setSuccess(""), 3000);
   }
@@ -352,14 +396,9 @@ export default function PegawaiPage() {
   // Computed list berdasarkan tab : tab switch instant tanpa API call
   const pegawaiList = filterAktif ? aktifList : nonaktifList;
 
-  // Stat global (dari aktifList, tidak terpengaruh filter)
-  const today = new Date();
+  // Stat global (dari aktifList, tidak terpengaruh filter). Batas SDM dihitung menurut hari ini WITA.
   const hukdisCount   = aktifList.filter((p) => p.statusHukdis).length;
-  const terlambatCount = aktifList.filter((p) => {
-    const tmt = new Date(p.tmtKgbBerikutnya);
-    const deadline = new Date(tmt.getFullYear(), tmt.getMonth() - 1, 0);
-    return today > deadline;
-  }).length;
+  const terlambatCount = aktifList.filter((p) => jendelaProsesKgb(p.tmtKgbBerikutnya)?.flagRapelan).length;
 
   // Golongan unik dari data yang sudah di-load
   const golonganOptions = Array.from(
@@ -374,12 +413,17 @@ export default function PegawaiPage() {
         if (
           !p.nama.toLowerCase().includes(q) &&
           !p.nip.includes(q) &&
-          !p.jabatan.toLowerCase().includes(q)
+          !p.jabatan.toLowerCase().includes(q) &&
+          !(p.unitKerja ?? "").toLowerCase().includes(q)
         ) return false;
       }
       if (filterGolongan && p.golonganRuang !== filterGolongan) return false;
       if (filterHukdis === "hukdis" && !p.statusHukdis) return false;
       if (filterHukdis === "normal" && p.statusHukdis) return false;
+      if (filterSatker) {
+        const kode = (p.unitKerja?.trim() ? cariSatker(p.unitKerja)?.kode : SATKER_KANWIL.kode) ?? "__lain__";
+        if (kode !== filterSatker) return false;
+      }
       return true;
     })
     .sort((a, b) => {
@@ -396,6 +440,8 @@ export default function PegawaiPage() {
 
   const f = (key: string, val: string | boolean) =>
     setForm((p) => ({ ...p, [key]: val }));
+  const satkerTerpilih = cariSatker(form.unitKerja);
+  const adaFilter = !!(filterGolongan || filterHukdis || filterSatker);
 
   const overlayStyle = {
     position: "fixed" as const,
@@ -479,7 +525,7 @@ export default function PegawaiPage() {
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                Export CSV
+                Ekspor CSV
               </button>
               <Link
                 href="/dashboard/pegawai/import"
@@ -502,7 +548,7 @@ export default function PegawaiPage() {
                   <polyline points="17 8 12 3 7 8" />
                   <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
-                Import CSV
+                Impor CSV
               </Link>
               <button
                 onClick={openTambah}
@@ -598,6 +644,7 @@ export default function PegawaiPage() {
 
       {success && (
         <div
+          role="status"
           className="mb-4 px-4 py-3 rounded-xl text-xs font-medium"
           style={{
             background: "var(--tint-green-bg)",
@@ -609,16 +656,30 @@ export default function PegawaiPage() {
         </div>
       )}
 
+      {peringatan && (
+        <div
+          role="status"
+          className="mb-4 px-4 py-3 rounded-xl text-xs font-medium flex items-center justify-between gap-3"
+          style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber2)", border: "1px solid var(--tint-amber-ln)" }}
+        >
+          {peringatan}
+          <button onClick={() => setPeringatan("")} className="text-xs underline shrink-0" style={{ color: "var(--st-amber2)" }}>
+            Tutup
+          </button>
+        </div>
+      )}
+
       {/* Search + Filter + Sort */}
       <div className="flex flex-wrap gap-2 mb-4">
         {/* Search */}
         <div className="relative flex-1 min-w-48">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a0b4c8" strokeWidth="2">
+          <svg aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a0b4c8" strokeWidth="2">
             <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <input
             type="text"
-            placeholder="Cari nama, NIP, jabatan..."
+            aria-label="Cari pegawai"
+            placeholder="Cari nama, NIP, jabatan, unit kerja..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 rounded-xl text-xs outline-none"
@@ -628,6 +689,7 @@ export default function PegawaiPage() {
 
         {/* Filter Golongan */}
         <select
+          aria-label="Filter golongan"
           value={filterGolongan}
           onChange={(e) => setFilterGolongan(e.target.value)}
           className="rounded-xl px-3 py-2 text-xs outline-none"
@@ -641,6 +703,7 @@ export default function PegawaiPage() {
 
         {/* Filter Hukdis */}
         <select
+          aria-label="Filter status hukdis"
           value={filterHukdis}
           onChange={(e) => setFilterHukdis(e.target.value)}
           className="rounded-xl px-3 py-2 text-xs outline-none"
@@ -651,29 +714,45 @@ export default function PegawaiPage() {
           <option value="hukdis">Hukdis Aktif</option>
         </select>
 
+        {/* Filter Unit Kerja */}
+        <select
+          aria-label="Filter unit kerja"
+          value={filterSatker}
+          onChange={(e) => setFilterSatker(e.target.value)}
+          className="rounded-xl px-3 py-2 text-xs outline-none"
+          style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: filterSatker ? "var(--dtn)" : "var(--dt5)", minWidth: "150px", maxWidth: "240px" }}
+        >
+          <option value="">Semua Unit Kerja</option>
+          {SATKER.map((s) => (
+            <option key={s.kode} value={s.kode}>{labelUnitKerja(s.nama).teks}</option>
+          ))}
+          <option value="__lain__">Belum sesuai daftar satker</option>
+        </select>
+
         {/* Sort */}
         <select
+          aria-label="Urutkan"
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
           className="rounded-xl px-3 py-2 text-xs outline-none"
           style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: "var(--dtn)", minWidth: "150px" }}
         >
-          <option value="nama_asc">Nama A → Z</option>
-          <option value="nama_desc">Nama Z → A</option>
+          <option value="nama_asc">Nama A–Z</option>
+          <option value="nama_desc">Nama Z–A</option>
           <option value="tmt_asc">TMT KGB Terdekat</option>
           <option value="tmt_desc">TMT KGB Terjauh</option>
-          <option value="golongan_asc">Golongan I → IV</option>
-          <option value="golongan_desc">Golongan IV → I</option>
+          <option value="golongan_asc">Golongan I–IV</option>
+          <option value="golongan_desc">Golongan IV–I</option>
         </select>
 
         {/* Reset filter */}
-        {(filterGolongan || filterHukdis || sortBy !== "nama_asc") && (
+        {(adaFilter || sortBy !== "nama_asc") && (
           <button
-            onClick={() => { setFilterGolongan(""); setFilterHukdis(""); setSortBy("nama_asc"); }}
+            onClick={() => { setFilterGolongan(""); setFilterHukdis(""); setFilterSatker(""); setSortBy("nama_asc"); }}
             className="px-3 py-2 rounded-xl text-xs transition"
             style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", border: "1px solid var(--tint-red-ln)" }}
           >
-            Reset
+            Atur Ulang
           </button>
         )}
       </div>
@@ -717,7 +796,7 @@ export default function PegawaiPage() {
       )}
 
       {/* Info jumlah hasil */}
-      {(filterGolongan || filterHukdis) && !loading && (
+      {adaFilter && !loading && (
         <p className="text-xs mb-3" style={{ color: "var(--dt4)" }}>
           Menampilkan <span className="font-semibold" style={{ color: "var(--dtn)" }}>{displayList.length}</span> dari {pegawaiList.length} pegawai
         </p>
@@ -734,7 +813,7 @@ export default function PegawaiPage() {
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
           </svg>
           <p className="text-xs" style={{ color: "var(--dt5)" }}>
-            {filterGolongan || filterHukdis
+            {adaFilter
               ? "Tidak ada pegawai yang cocok dengan filter"
               : filterAktif
                 ? isHukdisOnly
@@ -762,23 +841,22 @@ export default function PegawaiPage() {
                   <th className="px-4 py-3 w-9">
                     <input
                       type="checkbox"
+                      aria-label="Pilih semua pegawai yang tampil"
                       className="w-4 h-4 rounded"
                       checked={selected.size === displayList.length && displayList.length > 0}
                       onChange={toggleSelectAll}
                     />
                   </th>
-                  {["Pegawai", "Jabatan · Golongan", "Gaji · MKG", "TMT KGB · Deadline", "Status", isHukdisOnly ? "Hukdis" : "Aksi"].map((h) => (
+                  {["Pegawai", "Jabatan · Golongan", "Unit Kerja", "Gaji · MKG", "TMT KGB · Deadline", "Status", isHukdisOnly ? "Hukdis" : "Aksi"].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--dt4)" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {displayList.map((p, i) => {
-                  const _pTmt = new Date(p.tmtKgbBerikutnya);
-                  const _pDeadline = new Date(_pTmt.getFullYear(), _pTmt.getMonth() - 1, 0);
-                  const _pNow = new Date();
-                  const _pToday = new Date(_pNow.getFullYear(), _pNow.getMonth(), _pNow.getDate());
-                  const isOverdue = p.aktif && !p.statusHukdis && _pToday > _pDeadline;
+                  const jendela = jendelaProsesKgb(p.tmtKgbBerikutnya);
+                  const isOverdue = p.aktif && !p.statusHukdis && !!jendela?.flagRapelan;
+                  const uk = labelUnitKerja(p.unitKerja);
                   return (
                   <tr
                     key={p.id}
@@ -793,6 +871,7 @@ export default function PegawaiPage() {
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
+                        aria-label={`Pilih ${p.nama}`}
                         className="w-4 h-4 rounded"
                         checked={selected.has(p.id)}
                         onChange={() => toggleSelect(p.id)}
@@ -816,16 +895,22 @@ export default function PegawaiPage() {
                         <span className="text-xs" style={{ color: "var(--dt5)" }}>{p.pangkat}</span>
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      <p className="text-xs" style={{ color: filterAktif ? "var(--dt2)" : "var(--dt5)", maxWidth: "200px" }} title={p.unitKerja || undefined}>{uk.teks}</p>
+                      {!uk.dikenal && (
+                        <p className="text-xs mt-0.5" style={{ color: "var(--st-amber)", fontSize: "10px" }}>Belum sesuai daftar satker</p>
+                      )}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <p className="text-xs font-semibold" style={{ color: filterAktif ? "var(--dtn)" : "var(--dt5)" }}>Rp {p.gajiPokok.toLocaleString("id-ID")}</p>
                       <p className="text-xs" style={{ color: "var(--dt5)" }}>{p.mkgTahun} thn {p.mkgBulan > 0 ? `${p.mkgBulan} bln` : ""} MKG</p>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <p className="text-xs font-medium" style={{ color: "var(--dt3)" }}>
-                        {_pTmt.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                        {formatTanggalId(p.tmtKgbBerikutnya, FORMAT_TANGGAL_PENDEK)}
                       </p>
                       <p className="text-xs mt-0.5" style={{ color: isOverdue ? "var(--st-red)" : "var(--dt5)" }}>
-                        Deadline: {_pDeadline.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                        Deadline: {jendela ? jendela.deadlineSDM.toLocaleDateString("id-ID", FORMAT_TANGGAL_PENDEK) : "-"}
                       </p>
                     </td>
                     <td className="px-4 py-3">
@@ -861,13 +946,13 @@ export default function PegawaiPage() {
                           </span>
                         )}
                         {/* Status KGB terkini (peran KGB, pegawai aktif) */}
-                        {filterAktif && !isHukdisOnly && p.statusKGB && KGB_STATUS[p.statusKGB] && (
+                        {filterAktif && !isHukdisOnly && p.statusKGB && isStatusKgb(p.statusKGB) && (
                           <span
-                            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
-                            style={{ background: KGB_STATUS[p.statusKGB].bg, color: KGB_STATUS[p.statusKGB].color, fontSize: "10px" }}
+                            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
+                            style={{ background: warnaStatusKgb(p.statusKGB).bg, color: warnaStatusKgb(p.statusKGB).color, fontSize: "10px" }}
                           >
-                            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "currentColor", display: "inline-block" }} />
-                            {KGB_STATUS[p.statusKGB].label}
+                            <span aria-hidden="true" style={{ width: "5px", height: "5px", borderRadius: "50%", background: "currentColor", display: "inline-block" }} />
+                            KGB: {infoStatusKgb(p.statusKGB).label}
                           </span>
                         )}
                       </div>
@@ -879,6 +964,7 @@ export default function PegawaiPage() {
                           <Link
                             href={`/dashboard/kgb?pegawaiId=${p.id}`}
                             title="Proses KGB pegawai ini"
+                            aria-label={`Proses KGB ${p.nama}`}
                             className="w-8 h-8 rounded-lg flex items-center justify-center transition"
                             style={{ background: "var(--tint-amber-bg)", border: "0.5px solid var(--tint-amber-ln)", color: "var(--st-amber)" }}
                           >
@@ -887,7 +973,8 @@ export default function PegawaiPage() {
                         )}
                         <Link
                           href={`/dashboard/pegawai/${p.id}/riwayat`}
-                          title={isHukdisOnly ? "Kelola Hukdis" : "Riwayat & Hukdis"}
+                          title={isHukdisOnly ? "Kelola Hukdis" : "Riwayat dan Hukdis"}
+                          aria-label={isHukdisOnly ? undefined : `Riwayat dan hukdis ${p.nama}`}
                           className={isHukdisOnly ? "flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-semibold transition whitespace-nowrap" : "w-8 h-8 rounded-lg flex items-center justify-center transition"}
                           style={{ background: "var(--tint-green-bg)", border: "0.5px solid var(--tint-green-ln)", color: "var(--st-green)" }}
                         >
@@ -898,7 +985,8 @@ export default function PegawaiPage() {
                           <>
                             <button
                               onClick={() => openEdit(p)}
-                              title="Edit data pegawai"
+                              title="Ubah data pegawai"
+                              aria-label={`Ubah data ${p.nama}`}
                               className="w-8 h-8 rounded-lg flex items-center justify-center transition"
                               style={{ background: "var(--tint-navy)", border: "0.5px solid var(--ln0)", color: "var(--dtn)" }}
                             >
@@ -907,6 +995,7 @@ export default function PegawaiPage() {
                             <button
                               onClick={() => setShowHapus(p)}
                               title="Nonaktifkan pegawai"
+                              aria-label={`Nonaktifkan ${p.nama}`}
                               className="w-8 h-8 rounded-lg flex items-center justify-center transition"
                               style={{ background: "var(--tint-red-bg)", border: "0.5px solid var(--tint-red-ln)", color: "var(--st-red)" }}
                             >
@@ -919,6 +1008,7 @@ export default function PegawaiPage() {
                             <button
                               onClick={() => handleAktifkan(p)}
                               title="Aktifkan kembali"
+                              aria-label={`Aktifkan kembali ${p.nama}`}
                               className="w-8 h-8 rounded-lg flex items-center justify-center transition"
                               style={{ background: "var(--tint-green-bg)", border: "0.5px solid var(--tint-green-ln)", color: "var(--st-green)" }}
                             >
@@ -927,6 +1017,7 @@ export default function PegawaiPage() {
                             <button
                               onClick={() => setShowHapusPermanent(p)}
                               title="Hapus permanen"
+                              aria-label={`Hapus permanen ${p.nama}`}
                               className="w-8 h-8 rounded-lg flex items-center justify-center transition"
                               style={{ background: "var(--tint-red-bg)", border: "0.5px solid var(--tint-red-ln)", color: "var(--st-red)" }}
                             >
@@ -947,10 +1038,9 @@ export default function PegawaiPage() {
         {/* ── Mobile cards ── */}
         <div className="md:hidden space-y-2">
           {displayList.map((p) => {
-            const _mTmt = new Date(p.tmtKgbBerikutnya);
-            const _mDeadline = new Date(_mTmt.getFullYear(), _mTmt.getMonth() - 1, 0);
-            const _mToday = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
-            const mOverdue = p.aktif && !p.statusHukdis && _mToday > _mDeadline;
+            const mJendela = jendelaProsesKgb(p.tmtKgbBerikutnya);
+            const mOverdue = p.aktif && !p.statusHukdis && !!mJendela?.flagRapelan;
+            const mUk = labelUnitKerja(p.unitKerja);
             return (
               <div
                 key={p.id}
@@ -959,7 +1049,7 @@ export default function PegawaiPage() {
               >
                 {/* Card header */}
                 <div className="flex items-start gap-3 p-4">
-                  <input type="checkbox" className="w-4 h-4 rounded mt-0.5 shrink-0" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} />
+                  <input type="checkbox" aria-label={`Pilih ${p.nama}`} className="w-4 h-4 rounded mt-0.5 shrink-0" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} />
                   <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: filterAktif ? "var(--tint-navy)" : "var(--ln2)", color: filterAktif ? "var(--dtn)" : "var(--dt5)" }}>
                     {p.nama.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
                   </div>
@@ -970,6 +1060,9 @@ export default function PegawaiPage() {
                       <span className="text-xs px-1.5 py-0.5 rounded-md font-medium" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>{p.golonganRuang}</span>
                       <span className="text-xs" style={{ color: "var(--dt3)" }}>{p.jabatan}</span>
                     </div>
+                    <p className="text-xs mt-1" style={{ color: mUk.dikenal ? "var(--dt4)" : "var(--st-amber)" }}>
+                      {mUk.teks}{mUk.dikenal ? "" : " (belum sesuai daftar satker)"}
+                    </p>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {!filterAktif
@@ -981,9 +1074,9 @@ export default function PegawaiPage() {
                     {mOverdue && (
                       <span className="rounded-full font-bold" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)", border: "1px solid var(--tint-amber-ln)", fontSize: "10px", padding: "1px 6px" }}>Terlambat</span>
                     )}
-                    {filterAktif && !isHukdisOnly && p.statusKGB && KGB_STATUS[p.statusKGB] && (
-                      <span className="rounded-full font-medium" style={{ background: KGB_STATUS[p.statusKGB].bg, color: KGB_STATUS[p.statusKGB].color, fontSize: "10px", padding: "1px 6px" }}>
-                        {KGB_STATUS[p.statusKGB].label}
+                    {filterAktif && !isHukdisOnly && p.statusKGB && isStatusKgb(p.statusKGB) && (
+                      <span className="rounded-full font-medium" style={{ background: warnaStatusKgb(p.statusKGB).bg, color: warnaStatusKgb(p.statusKGB).color, fontSize: "10px", padding: "1px 6px" }}>
+                        KGB: {infoStatusKgb(p.statusKGB).label}
                       </span>
                     )}
                   </div>
@@ -995,11 +1088,11 @@ export default function PegawaiPage() {
                     <p style={{ fontSize: "10px", color: "var(--dt5)" }}>Gaji Pokok</p>
                   </div>
                   <div className="px-4 py-2.5" style={{ borderRight: "0.5px solid var(--ln2)" }}>
-                    <p className="text-xs font-semibold" style={{ color: "var(--dt3)" }}>{_mTmt.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}</p>
+                    <p className="text-xs font-semibold" style={{ color: "var(--dt3)" }}>{formatTanggalId(p.tmtKgbBerikutnya, { day: "numeric", month: "short", year: "2-digit" })}</p>
                     <p style={{ fontSize: "10px", color: "var(--dt5)" }}>TMT KGB</p>
                   </div>
                   <div className="px-4 py-2.5">
-                    <p className="text-xs font-semibold" style={{ color: mOverdue ? "var(--st-red)" : "var(--dt3)" }}>{_mDeadline.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}</p>
+                    <p className="text-xs font-semibold" style={{ color: mOverdue ? "var(--st-red)" : "var(--dt3)" }}>{mJendela ? mJendela.deadlineSDM.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" }) : "-"}</p>
                     <p style={{ fontSize: "10px", color: mOverdue ? "#f87171" : "var(--dt5)" }}>Deadline SDM</p>
                   </div>
                 </div>
@@ -1019,9 +1112,9 @@ export default function PegawaiPage() {
                     <>
                       <button onClick={() => openEdit(p)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition" style={{ background: "var(--tint-navy)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}>
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        Edit
+                        Ubah
                       </button>
-                      <button onClick={() => setShowHapus(p)} title="Nonaktifkan" className="w-9 h-9 flex items-center justify-center rounded-xl transition shrink-0" style={{ background: "var(--tint-red-bg)", border: "0.5px solid var(--tint-red-ln)", color: "var(--st-red)" }}>
+                      <button onClick={() => setShowHapus(p)} title="Nonaktifkan" aria-label={`Nonaktifkan ${p.nama}`} className="w-9 h-9 flex items-center justify-center rounded-xl transition shrink-0" style={{ background: "var(--tint-red-bg)", border: "0.5px solid var(--tint-red-ln)", color: "var(--st-red)" }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
                       </button>
                     </>
@@ -1031,7 +1124,7 @@ export default function PegawaiPage() {
                       <button onClick={() => handleAktifkan(p)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", border: "0.5px solid var(--tint-green-ln)" }}>
                         Aktifkan Kembali
                       </button>
-                      <button onClick={() => setShowHapusPermanent(p)} title="Hapus permanen" className="w-9 h-9 flex items-center justify-center rounded-xl transition shrink-0" style={{ background: "var(--tint-red-bg)", border: "0.5px solid var(--tint-red-ln)", color: "var(--st-red)" }}>
+                      <button onClick={() => setShowHapusPermanent(p)} title="Hapus permanen" aria-label={`Hapus permanen ${p.nama}`} className="w-9 h-9 flex items-center justify-center rounded-xl transition shrink-0" style={{ background: "var(--tint-red-bg)", border: "0.5px solid var(--tint-red-ln)", color: "var(--st-red)" }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
                       </button>
                     </>
@@ -1050,7 +1143,12 @@ export default function PegawaiPage() {
           <div style={overlayStyle} onClick={() => setShowModal(false)} />
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
             <div
-              className="bg-white rounded-t-2xl sm:rounded-2xl w-full overflow-hidden flex flex-col"
+              ref={refModalPegawai}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="judul-modal-pegawai"
+              tabIndex={-1}
+              className="bg-white rounded-t-2xl sm:rounded-2xl w-full overflow-hidden flex flex-col outline-none"
               style={{ maxWidth: "580px", maxHeight: "95dvh", zIndex: 51 }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -1061,10 +1159,11 @@ export default function PegawaiPage() {
               >
                 <div>
                   <h2
+                    id="judul-modal-pegawai"
                     className="text-sm font-semibold"
                     style={{ color: "var(--dtn)" }}
                   >
-                    {editData ? "Edit Data Pegawai" : "Tambah Pegawai Baru"}
+                    {editData ? "Ubah Data Pegawai" : "Tambah Pegawai Baru"}
                   </h2>
                   <p className="text-xs mt-0.5" style={{ color: "var(--dt4)" }}>
                     {editData
@@ -1074,6 +1173,7 @@ export default function PegawaiPage() {
                 </div>
                 <button
                   onClick={() => setShowModal(false)}
+                  aria-label="Tutup"
                   className="w-7 h-7 rounded-lg flex items-center justify-center transition"
                   style={{ background: "var(--sub)" }}
                 >
@@ -1175,16 +1275,35 @@ export default function PegawaiPage() {
                         {jenisJabatanList.map((j) => <option key={j} value={j}>{j}</option>)}
                       </select>
                     </div>
+                    <div className="col-span-1 sm:col-span-2 min-w-0">
+                      <label htmlFor="unit-kerja-pegawai" className={labelClass} style={{ color: "var(--dt2)" }}>Unit Kerja <span style={{ color: "var(--st-red)" }}>*</span></label>
+                      <select
+                        id="unit-kerja-pegawai"
+                        className={inputClass}
+                        style={inputStyle}
+                        value={satkerTerpilih?.nama ?? form.unitKerja}
+                        onChange={(e) => f("unitKerja", e.target.value)}
+                        aria-describedby="keterangan-unit-kerja"
+                      >
+                        {!satkerTerpilih && (
+                          <option value={form.unitKerja} disabled={!form.unitKerja}>
+                            {form.unitKerja ? `${form.unitKerja} (tidak ada di daftar satker)` : "Pilih unit kerja"}
+                          </option>
+                        )}
+                        {SATKER.map((s) => <option key={s.kode} value={s.nama}>{s.nama}</option>)}
+                      </select>
+                      <p id="keterangan-unit-kerja" className="text-xs mt-1" style={{ color: satkerTerpilih ? "var(--dt5)" : "var(--st-amber)" }}>
+                        {satkerTerpilih
+                          ? `KPPN mitra: ${satkerTerpilih.kppn}. SK KGB pegawai ini ditujukan ke KPPN tersebut.`
+                          : "Unit kerja tersimpan tidak cocok dengan daftar satker, sehingga SK KGB pegawai ini tidak dapat dibuat atau diunduh. Pilih satker yang benar lalu simpan."}
+                      </p>
+                    </div>
                     <div className="min-w-0">
                       <label className={labelClass} style={{ color: "var(--dt2)" }}>Eselon</label>
                       <select className={inputClass} style={inputStyle} value={form.eselon} onChange={(e) => f("eselon", e.target.value)}>
                         <option value="">Tidak Ada</option>
                         {eselonList.map((e) => <option key={e} value={e}>{e}</option>)}
                       </select>
-                    </div>
-                    <div className="min-w-0">
-                      <label className={labelClass} style={{ color: "var(--dt2)" }}>Unit Kerja</label>
-                      <input className={`${inputClass} truncate`} style={readonlyStyle} value={form.unitKerja} readOnly title={form.unitKerja} />
                     </div>
                   </div>
                 </div>
@@ -1300,7 +1419,7 @@ export default function PegawaiPage() {
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                             </svg>
-                            Kelola Riwayat Hukdis →
+                            Kelola Riwayat Hukdis
                           </Link>
                         </div>
                       ) : (
@@ -1347,7 +1466,7 @@ export default function PegawaiPage() {
                   {submitting
                     ? "Menyimpan..."
                     : editData
-                      ? "Update Data"
+                      ? "Simpan Perubahan"
                       : "Simpan Pegawai"}
                 </button>
               </div>
@@ -1372,7 +1491,12 @@ export default function PegawaiPage() {
             }}
           >
             <div
-              className="bg-white rounded-2xl p-6 w-full"
+              ref={refModalNonaktif}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Nonaktifkan pegawai"
+              tabIndex={-1}
+              className="bg-white rounded-2xl p-6 w-full outline-none"
               style={{ maxWidth: "360px", zIndex: 51 }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -1381,6 +1505,7 @@ export default function PegawaiPage() {
                 style={{ background: "var(--tint-amber-bg)" }}
               >
                 <svg
+                  aria-hidden="true"
                   width="20"
                   height="20"
                   viewBox="0 0 24 24"
@@ -1460,7 +1585,12 @@ export default function PegawaiPage() {
             }}
           >
             <div
-              className="bg-white rounded-2xl p-6 w-full"
+              ref={refModalBulkNonaktif}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Nonaktifkan pegawai terpilih"
+              tabIndex={-1}
+              className="bg-white rounded-2xl p-6 w-full outline-none"
               style={{ maxWidth: "360px", zIndex: 51 }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -1468,7 +1598,7 @@ export default function PegawaiPage() {
                 className="w-11 h-11 rounded-full flex items-center justify-center mb-4"
                 style={{ background: "var(--tint-amber-bg)" }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b87c0a" strokeWidth="2">
+                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b87c0a" strokeWidth="2">
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                   <line x1="12" y1="9" x2="12" y2="13" />
                   <line x1="12" y1="17" x2="12.01" y2="17" />
@@ -1518,7 +1648,12 @@ export default function PegawaiPage() {
             }}
           >
             <div
-              className="bg-white rounded-2xl p-6 w-full"
+              ref={refModalBulkHapus}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Hapus permanen pegawai terpilih"
+              tabIndex={-1}
+              className="bg-white rounded-2xl p-6 w-full outline-none"
               style={{ maxWidth: "360px", zIndex: 51 }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -1526,7 +1661,7 @@ export default function PegawaiPage() {
                 className="w-11 h-11 rounded-full flex items-center justify-center mb-4"
                 style={{ background: "var(--tint-red-bg)" }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2">
+                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2">
                   <polyline points="3 6 5 6 21 6" />
                   <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
                   <path d="M10 11v6" /><path d="M14 11v6" />
@@ -1541,7 +1676,7 @@ export default function PegawaiPage() {
                 <strong style={{ color: "var(--st-red)" }}>secara permanen</strong> dan tidak dapat dipulihkan.
               </p>
               <p className="text-xs mb-5" style={{ color: "var(--st-red)" }}>
-                ⚠ Semua data KGB dan riwayat pegawai tersebut juga akan ikut terhapus.
+                Perhatian: semua data KGB dan riwayat pegawai tersebut juga akan ikut terhapus.
               </p>
               <div className="flex gap-2">
                 <button
@@ -1584,7 +1719,12 @@ export default function PegawaiPage() {
             }}
           >
             <div
-              className="bg-white rounded-2xl p-6 w-full"
+              ref={refModalHapusPermanen}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Hapus permanen pegawai"
+              tabIndex={-1}
+              className="bg-white rounded-2xl p-6 w-full outline-none"
               style={{ maxWidth: "360px", zIndex: 51 }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -1593,6 +1733,7 @@ export default function PegawaiPage() {
                 style={{ background: "var(--tint-red-bg)" }}
               >
                 <svg
+                  aria-hidden="true"
                   width="20"
                   height="20"
                   viewBox="0 0 24 24"
@@ -1636,7 +1777,7 @@ export default function PegawaiPage() {
                 </p>
               </div>
               <p className="text-xs mb-5" style={{ color: "var(--st-red)" }}>
-                ⚠ Semua data KGB dan riwayat pegawai ini juga akan ikut
+                Perhatian: semua data KGB dan riwayat pegawai ini juga akan ikut
                 terhapus.
               </p>
               <div className="flex gap-2">

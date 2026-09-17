@@ -4,10 +4,26 @@ import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
-import { getGajiPokok } from "@/lib/tabelGaji";
 import { canManageHukdis } from "@/lib/auth";
+import { bacaTanggal, kgbBerjalanTerbaru, teksAtauNull, teksIsian } from "@/lib/dataPegawai";
+import { hukdisMasihBerlaku, ringkasanHukdisPegawai, type RiwayatHukdisRow } from "@/lib/hukdisKedaluwarsa";
+import {
+  rencanaPenundaanHukdis,
+  rencanaSiklusBerikutnya,
+  type RencanaPenundaanHukdis,
+  type RencanaSiklusKgb,
+} from "@/lib/jadwalKgb";
+import { formatTanggalId, hariIniWita } from "@/lib/waktu";
 
 export const runtime = "nodejs";
+
+type HukdisJenisRow = {
+  kode: string;
+  label: string | null;
+  berdampakKGB: boolean | null;
+  durasiTunda: number | null;
+  dasarHukum: string | null;
+};
 
 export async function GET(
   _req: Request,
@@ -21,12 +37,14 @@ export async function GET(
     return NextResponse.json({ error: "Akses ditolak: hanya SDM Hukdis dan Super Admin" }, { status: 403 });
 
   const { id } = await params;
-  const list = await db.riwayatHukdis.findMany({
+  const list = (await db.riwayatHukdis.findMany({
     where: { pegawaiId: id },
     orderBy: { field: "tmtMulai", dir: "desc" },
-  });
+  })) as unknown as RiwayatHukdisRow[];
 
-  return NextResponse.json(list);
+  // Status berlaku diturunkan dari tanggal berakhir menurut WITA.
+  const hariIni = hariIniWita();
+  return NextResponse.json(list.map((h) => ({ ...h, aktif: hukdisMasihBerlaku(h.tmtBerakhir, hariIni) })));
 }
 
 export async function POST(
@@ -41,7 +59,23 @@ export async function POST(
     return NextResponse.json({ error: "Akses ditolak: hanya SDM Hukdis dan Super Admin" }, { status: 403 });
 
   const { id: pegawaiId } = await params;
-  const body = (await req.json()) as any;
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Request body tidak valid" }, { status: 400 });
+  }
+
+  const jenisHukdis = teksIsian(body.jenisHukdis);
+  if (!jenisHukdis)
+    return NextResponse.json({ error: "Jenis hukuman disiplin wajib dipilih." }, { status: 400 });
+  const tanggalSK = bacaTanggal(body.tanggalSK);
+  const tmtMulai = bacaTanggal(body.tmtMulai);
+  const tmtBerakhir = bacaTanggal(body.tmtBerakhir);
+  if (tanggalSK.status !== "valid" || tmtMulai.status !== "valid" || tmtBerakhir.status !== "valid")
+    return NextResponse.json({ error: "Tanggal SK, TMT mulai, dan TMT berakhir wajib diisi dengan tanggal yang valid." }, { status: 400 });
+  if (tmtBerakhir.tanggal < tmtMulai.tanggal)
+    return NextResponse.json({ error: "TMT berakhir tidak boleh sebelum TMT mulai." }, { status: 400 });
 
   const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
@@ -51,12 +85,12 @@ export async function POST(
   if (!pegawai)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
-  const jenisConfig = (await db.hukdisJenis.findUnique({ kode: body.jenisHukdis })) as any;
+  const jenisConfig = (await db.hukdisJenis.findUnique({ kode: jenisHukdis })) as unknown as HukdisJenisRow | null;
 
   const berdampakKGB: boolean =
     typeof body.berdampakKGB === "boolean"
       ? body.berdampakKGB
-      : (jenisConfig?.berdampakKGB ?? (body.jenisHukdis === "penundaan_kgb"));
+      : (jenisConfig?.berdampakKGB ?? jenisHukdis === "penundaan_kgb");
 
   const durasiTundaInput = Number(body.durasiTunda);
   const durasiTunda: number | null = berdampakKGB
@@ -64,89 +98,169 @@ export async function POST(
         ? Math.round(durasiTundaInput)
         : (jenisConfig?.durasiTunda ?? 12))
     : null;
+  if (durasiTunda !== null && !(Number.isInteger(durasiTunda) && durasiTunda >= 1 && durasiTunda <= 60))
+    return NextResponse.json({ error: "Lama penundaan KGB harus 1 sampai 60 bulan." }, { status: 400 });
 
-  const dasarHukum: string | null =
-    (typeof body.dasarHukum === "string" && body.dasarHukum.trim())
-      ? body.dasarHukum.trim()
-      : (jenisConfig?.dasarHukum ?? null);
+  const dasarHukum = teksAtauNull(body.dasarHukum) ?? jenisConfig?.dasarHukum ?? null;
+  const hariIni = hariIniWita();
 
-  const tmtKgbLama = pegawai.tmtKgbBerikutnya ? new Date(pegawai.tmtKgbBerikutnya) : new Date();
-  const tmtKgbBerikutnnyaBaru = berdampakKGB
-    ? new Date(tmtKgbLama.getFullYear(), tmtKgbLama.getMonth() + (durasiTunda ?? 12), tmtKgbLama.getDate())
-    : tmtKgbLama;
+  // Rencana jadwal dihitung sebelum menulis apa pun, agar penolakan tidak meninggalkan data setengah jadi.
+  const riwayatKgb = await db.riwayatKGB.findMany({ where: { pegawaiId } });
+  const kgbAktif = kgbBerjalanTerbaru(riwayatKgb);
+  let penundaan: Extract<RencanaPenundaanHukdis, { aksi: "geser" }> | null = null;
+  let placeholderBaru: RencanaSiklusKgb | null = null;
+  if (berdampakKGB) {
+    const rencana = rencanaPenundaanHukdis({
+      pegawai,
+      kgbAktif,
+      tmtMulaiHukdis: tmtMulai.tanggal,
+      durasiTunda: durasiTunda ?? 0,
+      hariIni,
+    });
+    if (rencana.aksi === "tolak")
+      return NextResponse.json({ error: rencana.alasan }, { status: kgbAktif ? 409 : 422 });
+    penundaan = rencana;
 
-  // Pengganti $transaction: create + update sekuensial (best-effort).
-  const hukdis = {
+    if (rencana.buatPlaceholder) {
+      const placeholderLama = riwayatKgb
+        .filter((k) => k.status === "belum_diproses")
+        .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))[0];
+      try {
+        placeholderBaru = rencanaSiklusBerikutnya({
+          ...pegawai,
+          tmtKgbBerikutnya: rencana.tmtKgbBerikutnya,
+          tmtKgbTerakhir: rencana.tmtKgbTerakhir,
+          penetapSkDasar: placeholderLama?.penetapSkDasar ?? null,
+          hariIni,
+        });
+      } catch (e) {
+        const pesan = e instanceof Error ? e.message : "Jadwal KGB tidak dapat dihitung";
+        return NextResponse.json({ error: `${pesan}. Periksa data pegawai terlebih dahulu.` }, { status: 422 });
+      }
+    }
+  }
+
+  const hukdis: RiwayatHukdisRow = {
     id: newId(),
     pegawaiId,
-    jenisHukdis: body.jenisHukdis,
-    nomorSK: body.nomorSK,
-    tanggalSK: new Date(body.tanggalSK),
-    tmtMulai: new Date(body.tmtMulai),
-    tmtBerakhir: new Date(body.tmtBerakhir),
+    jenisHukdis,
+    nomorSK: teksIsian(body.nomorSK),
+    tanggalSK: tanggalSK.tanggal,
+    tmtMulai: tmtMulai.tanggal,
+    tmtBerakhir: tmtBerakhir.tanggal,
     berdampakKGB,
     durasiTunda,
     dasarHukum,
-    keterangan: body.keterangan || null,
+    keterangan: teksAtauNull(body.keterangan),
     createdAt: new Date(),
     createdBy: userLogin.id,
+    // TMT hasil penundaan, acuan pemulihan saat hukdis dihapus. Tersimpan setelah kolomnya
+    // ditambahkan ke tabel RiwayatHukdis; sebelum itu nilai ini diabaikan lapisan data.
+    tmtSetelahTunda: penundaan?.tmtKgbBerikutnya ?? null,
   };
+
+  // Penanda hukdis pegawai diambil dari seluruh hukdis yang masih berlaku, termasuk yang baru ini.
+  const riwayatHukdis = (await db.riwayatHukdis.findMany({
+    where: { pegawaiId },
+    orderBy: { field: "createdAt", dir: "asc" },
+  })) as unknown as RiwayatHukdisRow[];
+  const penanda = ringkasanHukdisPegawai([...riwayatHukdis, hukdis], hariIni);
+
   await db.riwayatHukdis.create(hukdis);
 
-  await db.pegawai.update(
-    { id: pegawaiId },
-    {
-      statusHukdis: true,
-      tanggalHukdisBerakhir: new Date(body.tmtBerakhir),
-      jenisHukdis: body.jenisHukdis,
-      keteranganHukdis: body.keterangan || null,
-      ...(berdampakKGB ? { tmtKgbBerikutnya: tmtKgbBerikutnnyaBaru } : {}),
-    },
-  );
-
-  // Sinkronisasi riwayatKGB placeholder agar selaras dengan TMT baru.
-  if (berdampakKGB) {
-    const newTmt = tmtKgbBerikutnnyaBaru;
-    const newTmtBerikutnya = new Date(newTmt.getFullYear() + 2, newTmt.getMonth(), newTmt.getDate());
-    // Masa penundaan ikut dihitung sebagai masa kerja; simpan sebagai tahun dan bulan utuh.
-    const totalBulan = pegawai.mkgTahun * 12 + pegawai.mkgBulan + 24 + durasiTunda!;
-    const mkgTahunBaru = Math.floor(totalBulan / 12);
-    const mkgBulanBaru = totalBulan % 12;
-    const gajiPokokBaru = getGajiPokok(pegawai.golonganRuang, mkgTahunBaru, mkgBulanBaru);
-    const today = new Date();
-    const deadlineNew = new Date(newTmt.getFullYear(), newTmt.getMonth() - 1, 0);
-    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const flagRapelan = todayDate > deadlineNew;
-
-    await db.riwayatKGB.deleteMany({ pegawaiId, status: "belum_diproses" });
-    await db.riwayatKGB.create(
-      makeRiwayatKGB({
-        pegawaiId,
-        tanggalSK: newTmt,
-        tmtSK: newTmt,
-        golonganLama: pegawai.golonganRuang,
-        gajiPokokLama: pegawai.gajiPokok,
-        mkgTahunLama: pegawai.mkgTahun,
-        mkgBulanLama: pegawai.mkgBulan,
-        golonganBaru: pegawai.golonganRuang,
-        gajiPokokBaru,
-        mkgTahunBaru,
-        mkgBulanBaru,
-        tmtKgbBaru: newTmt,
-        tmtKgbBerikutnya: newTmtBerikutnya,
-        status: "belum_diproses",
-        flagRapelan,
-        createdBy: userLogin.id,
-      }),
+  // Sheets tidak punya transaksi. Bila langkah sesudah hukdis tersimpan gagal, perubahan dibatalkan sebisa
+  // mungkin: hukdis yang tertinggal tanpa TMT yang digeser akan memulihkan TMT ke tanggal yang terlalu awal
+  // saat hukdis itu dihapus.
+  let pegawaiDiubah = false;
+  let kgbAktifDiubah = false;
+  let placeholderDihapus = false;
+  try {
+    await db.pegawai.update(
+      { id: pegawaiId },
+      {
+        ...penanda,
+        ...(penundaan
+          ? { tmtKgbBerikutnya: penundaan.tmtKgbBerikutnya, tmtKgbTerakhir: penundaan.tmtKgbTerakhir, updatedAt: new Date() }
+          : {}),
+      },
     );
+    pegawaiDiubah = true;
+
+    // Dengan KGB berjalan, siklus sesudah KGB itu yang digeser; konfirmasi keuangan membuat placeholder berikutnya.
+    if (penundaan?.geserKgbAktif && kgbAktif) {
+      await db.riwayatKGB.update({ id: kgbAktif.id }, { tmtKgbBerikutnya: penundaan.tmtKgbBerikutnya });
+      kgbAktifDiubah = true;
+    }
+    if (placeholderBaru) {
+      await db.riwayatKGB.deleteMany({ pegawaiId, status: "belum_diproses" });
+      placeholderDihapus = true;
+      await db.riwayatKGB.create(makeRiwayatKGB({ pegawaiId, createdBy: userLogin.id, ...placeholderBaru }));
+    }
+  } catch (err) {
+    console.error("[hukdis] pencatatan hukdis gagal di tengah jalan, perubahan dibatalkan:", err);
+    const gagalDibatalkan: string[] = [];
+    const batalkan = async (bagian: string, langkah: () => Promise<unknown>) => {
+      try {
+        await langkah();
+      } catch (e) {
+        console.error(`[hukdis] pembatalan ${bagian} gagal:`, e);
+        gagalDibatalkan.push(bagian);
+      }
+    };
+
+    await batalkan("catatan hukdis", () => db.riwayatHukdis.delete({ id: hukdis.id }));
+    if (pegawaiDiubah) {
+      await batalkan("data pegawai", () =>
+        db.pegawai.update(
+          { id: pegawaiId },
+          {
+            statusHukdis: pegawai.statusHukdis,
+            tanggalHukdisBerakhir: pegawai.tanggalHukdisBerakhir,
+            jenisHukdis: pegawai.jenisHukdis,
+            keteranganHukdis: pegawai.keteranganHukdis,
+            tmtKgbBerikutnya: pegawai.tmtKgbBerikutnya,
+            tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
+          },
+        ),
+      );
+    }
+    if (kgbAktifDiubah && kgbAktif) {
+      await batalkan("KGB yang sedang berjalan", () =>
+        db.riwayatKGB.update({ id: kgbAktif.id }, { tmtKgbBerikutnya: kgbAktif.tmtKgbBerikutnya }),
+      );
+    }
+    if (placeholderDihapus) {
+      await batalkan("jadwal KGB Belum Diproses", async () => {
+        await db.riwayatKGB.deleteMany({ pegawaiId, status: "belum_diproses" });
+        for (const lama of riwayatKgb.filter((k) => k.status === "belum_diproses")) await db.riwayatKGB.create(lama);
+      });
+    }
+
+    const error =
+      gagalDibatalkan.length === 0
+        ? "Hukuman disiplin gagal dicatat dan tidak ada perubahan yang tersimpan. Coba lagi beberapa saat lagi."
+        : `Hukuman disiplin gagal dicatat dan sebagian perubahan tidak dapat dibatalkan (${gagalDibatalkan.join(", ")}). ` +
+          `Sebelum mencoba lagi, periksa catatan hukdis dan data KGB ${pegawai.nama}: TMT KGB berikutnya sebelum ` +
+          `pencatatan adalah ${formatTanggalId(pegawai.tmtKgbBerikutnya)}.`;
+    return NextResponse.json({ error }, { status: 500 });
   }
 
+  const keteranganJadwal = penundaan
+    ? `, TMT KGB digeser ${durasiTunda} bulan dari ${formatTanggalId(penundaan.tmtSebelumTunda)} ke ${formatTanggalId(penundaan.tmtKgbBerikutnya)}`
+    : "";
   logAudit({
     userId: userLogin.id,
     aksi: "input_hukdis",
-    detail: `Hukdis ${jenisConfig?.label ?? body.jenisHukdis} untuk ${pegawai.nama} (${pegawai.nip})${berdampakKGB ? `, TMT KGB digeser ${durasiTunda} bulan` : ""}`,
+    detail: `Hukdis ${jenisConfig?.label ?? jenisHukdis} untuk ${pegawai.nama} (${pegawai.nip})${keteranganJadwal}`,
     targetNama: pegawai.nama,
   });
 
-  return NextResponse.json(hukdis, { status: 201 });
+  return NextResponse.json(
+    {
+      ...hukdis,
+      aktif: hukdisMasihBerlaku(hukdis.tmtBerakhir, hariIni),
+      tmtKgbBerikutnya: penundaan?.tmtKgbBerikutnya ?? null,
+    },
+    { status: 201 },
+  );
 }

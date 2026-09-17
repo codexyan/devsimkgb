@@ -3,9 +3,14 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
+import { canEditPegawai } from "@/lib/auth";
+import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
+import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "@/lib/dataPegawai";
+import { useRole } from "@/app/dashboard/components/RoleContext";
 
 // Kolom wajib yang harus ada di CSV
 // gajiPokok tidak wajib : jika kosong, auto-lookup dari Tabel PP 5/2024
+// unitKerja tidak wajib : jika kosong, pegawai dicatat pada Kanwil
 const REQUIRED_COLUMNS = [
   "nip",
   "nama",
@@ -24,6 +29,7 @@ const TEMPLATE_HEADER = [
   "nip",
   "nama",
   "jabatan",
+  "unitKerja",
   "pangkat",
   "golonganRuang",
   "tmtGolongan",
@@ -41,10 +47,12 @@ const TEMPLATE_HEADER = [
   "keteranganHukdis",
 ];
 
+// Contoh fiktif; bukan data pegawai sebenarnya.
 const TEMPLATE_EXAMPLE = [
-  "197701102000031002",
-  "MUHIDI ASPARI",
-  "Penata Muda Tk. I",
+  "199001012015031001",
+  "NAMA PEGAWAI CONTOH",
+  "Analis Kepegawaian",
+  SATKER_KANWIL.nama,
   "Penata Muda Tingkat I",
   "III/b",
   "2024-04-01",
@@ -54,13 +62,18 @@ const TEMPLATE_EXAMPLE = [
   "2024-03-01",
   "2026-03-01",
   "Banjarmasin",
-  "1977-01-10",
+  "1990-01-01",
   "Laki-laki",
   "S1",
   "Non Eselon",
   "false",
   "",
 ];
+
+/* Nilai CSV diberi tanda kutip bila berisi koma, kutip, atau baris baru. */
+function selCsv(nilai: string): string {
+  return /[",\n]/.test(nilai) ? `"${nilai.replace(/"/g, '""')}"` : nilai;
+}
 
 interface RowData {
   [key: string]: string;
@@ -71,9 +84,15 @@ interface ValidationResult {
   errors: { row: number; nip: string; nama: string; pesan: string }[];
 }
 
+interface HasilImpor {
+  berhasil: number;
+  gagal: number;
+  errors: string[];
+}
+
 function downloadTemplate() {
   const rows = [TEMPLATE_HEADER, TEMPLATE_EXAMPLE];
-  const csv = rows.map((r) => r.join(",")).join("\n");
+  const csv = rows.map((r) => r.map(selCsv).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -99,7 +118,7 @@ function validateRows(rows: RowData[]): ValidationResult {
         row: rowNum,
         nip: row.nip,
         nama: row.nama || "-",
-        pesan: `NIP rusak, Excel mengubah NIP menjadi "${row.nip}" (scientific notation). Jangan simpan file CSV dari Excel. Gunakan Notepad/VS Code untuk edit CSV, atau ketik NIP di Excel dengan format ="199804022090120010" agar tidak dikonversi.`,
+        pesan: `NIP rusak: Excel mengubah NIP menjadi "${row.nip}" (notasi ilmiah). Jangan simpan berkas CSV dari Excel. Sunting CSV dengan Notepad, atau ketik NIP di Excel dengan format ="199001012015031001" agar tidak dikonversi.`,
       });
       return;
     }
@@ -116,18 +135,33 @@ function validateRows(rows: RowData[]): ValidationResult {
       return;
     }
 
-    // Validasi format tanggal
-    const dateFields = ["tmtGolongan", "tmtKgbTerakhir", "tmtKgbBerikutnya"];
+    // Validasi format tanggal, dengan aturan yang sama seperti server (lib/dataPegawai.ts)
+    const dateFields = ["tmtGolongan", "tmtKgbTerakhir", "tmtKgbBerikutnya", "tanggalLahir"];
     for (const field of dateFields) {
-      if (row[field] && isNaN(new Date(row[field]).getTime())) {
+      if (bacaTanggal(row[field]).status === "tidak_valid") {
         errors.push({
           row: rowNum,
           nip: row.nip,
           nama: row.nama,
-          pesan: `Format tanggal ${field} tidak valid (gunakan YYYY-MM-DD)`,
+          pesan: `Format tanggal ${field} tidak valid (gunakan ${FORMAT_TANGGAL_DITERIMA})`,
         });
         return;
       }
+    }
+
+    // Unit kerja harus salah satu satker; kosong berarti Kanwil
+    if (row.unitKerja?.trim()) {
+      const satker = cariSatker(row.unitKerja);
+      if (!satker) {
+        errors.push({
+          row: rowNum,
+          nip: row.nip,
+          nama: row.nama,
+          pesan: `Unit kerja "${row.unitKerja.trim()}" tidak ada dalam daftar satker. Gunakan nama satker seperti pada panduan kolom.`,
+        });
+        return;
+      }
+      row.unitKerja = satker.nama;
     }
 
     // Validasi golongan
@@ -168,6 +202,8 @@ function validateRows(rows: RowData[]): ValidationResult {
 
 export default function ImportPage() {
   const router = useRouter();
+  const role = useRole();
+  const bolehImpor = canEditPegawai(role);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<"upload" | "preview" | "hasil">("upload");
@@ -178,11 +214,7 @@ export default function ImportPage() {
     { row: number; nip: string; nama: string; pesan: string }[]
   >([]);
   const [importing, setImporting] = useState(false);
-  const [hasil, setHasil] = useState<{
-    berhasil: number;
-    gagal: number;
-    errors: string[];
-  } | null>(null);
+  const [hasil, setHasil] = useState<HasilImpor | null>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -223,7 +255,7 @@ export default function ImportPage() {
       },
       error: () => {
         setErrorRows([
-          { row: 0, nip: "-", nama: "-", pesan: "File CSV tidak bisa dibaca" },
+          { row: 0, nip: "-", nama: "-", pesan: "Berkas CSV tidak dapat dibaca" },
         ]);
         setStep("preview");
       },
@@ -232,13 +264,21 @@ export default function ImportPage() {
 
   async function handleImport() {
     setImporting(true);
-    const res = await fetch("/api/pegawai/import", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rows: validRows }),
-    });
-    const data = await res.json() as any;
-    setHasil(data);
+    try {
+      const res = await fetch("/api/pegawai/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: validRows }),
+      });
+      const data = (await res.json().catch(() => ({}))) as Partial<HasilImpor> & { error?: string };
+      if (!res.ok || !Array.isArray(data.errors)) {
+        setHasil({ berhasil: 0, gagal: validRows.length, errors: [data.error ?? "Impor gagal diproses server. Coba lagi."] });
+      } else {
+        setHasil({ berhasil: data.berhasil ?? 0, gagal: data.gagal ?? 0, errors: data.errors });
+      }
+    } catch {
+      setHasil({ berhasil: 0, gagal: validRows.length, errors: ["Gagal menghubungi server. Periksa koneksi lalu coba lagi."] });
+    }
     setStep("hasil");
     setImporting(false);
   }
@@ -252,16 +292,36 @@ export default function ImportPage() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
+  // Guard server ada di layout.tsx; pemberitahuan ini berlaku bila halaman tetap terbuka untuk peran lain.
+  if (!bolehImpor) {
+    return (
+      <div
+        role="status"
+        className="rounded-xl px-4 py-4 text-xs space-y-2"
+        style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber2)", border: "1px solid var(--tint-amber-ln)" }}
+      >
+        <p className="font-semibold">Impor data pegawai tidak tersedia untuk peran Anda</p>
+        <p>Impor hanya dapat dilakukan oleh Super Admin dan SDM KGB. Hubungi Super Admin bila data pegawai perlu ditambahkan.</p>
+        <button onClick={() => router.push("/dashboard/pegawai")} className="underline font-medium" style={{ color: "var(--st-amber2)" }}>
+          Kembali ke Data Pegawai
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => router.push("/dashboard/pegawai")}
+          aria-label="Kembali ke Data Pegawai"
+          title="Kembali ke Data Pegawai"
           className="w-8 h-8 rounded-lg flex items-center justify-center transition"
           style={{ background: "var(--sub)", color: "var(--dt3)" }}
         >
           <svg
+            aria-hidden="true"
             width="14"
             height="14"
             viewBox="0 0 24 24"
@@ -274,10 +334,10 @@ export default function ImportPage() {
         </button>
         <div>
           <h1 className="text-base font-semibold" style={{ color: "var(--dtn)" }}>
-            Import Pegawai dari CSV
+            Impor Pegawai dari CSV
           </h1>
           <p className="text-xs mt-0.5" style={{ color: "var(--dt4)" }}>
-            Upload file CSV untuk menambahkan banyak pegawai sekaligus
+            Unggah berkas CSV untuk menambahkan banyak pegawai sekaligus
           </p>
         </div>
       </div>
@@ -285,9 +345,9 @@ export default function ImportPage() {
       {/* Step indicator */}
       <div className="flex items-center gap-2 mb-6">
         {[
-          { key: "upload", label: "1. Upload" },
-          { key: "preview", label: "2. Preview" },
-          { key: "hasil", label: "3. Hasil" },
+          { key: "upload", label: "Unggah" },
+          { key: "preview", label: "Pratinjau" },
+          { key: "hasil", label: "Hasil" },
         ].map((s, i) => (
           <div key={s.key} className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
@@ -324,7 +384,7 @@ export default function ImportPage() {
           >
             <div>
               <p className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>
-                Download Template CSV
+                Unduh Template CSV
               </p>
               <p className="text-xs mt-0.5" style={{ color: "var(--dt3)" }}>
                 Gunakan template ini sebagai panduan format data
@@ -347,7 +407,7 @@ export default function ImportPage() {
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              Download Template
+              Unduh Template
             </button>
           </div>
 
@@ -355,6 +415,8 @@ export default function ImportPage() {
           <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--ln1)" }}>
             <button
               onClick={() => setShowPanduan((v) => !v)}
+              aria-expanded={showPanduan}
+              aria-controls="panduan-kolom-csv"
               className="w-full px-4 py-3 flex items-center justify-between transition hover:opacity-80"
               style={{ background: "var(--sub)", borderBottom: showPanduan ? "1px solid var(--ln1)" : "none" }}
             >
@@ -374,9 +436,9 @@ export default function ImportPage() {
             </button>
 
             {showPanduan && (
-              <>
+              <div id="panduan-kolom-csv">
               <div className="px-4 py-3 flex items-center justify-between" style={{ background: "var(--sub)", borderBottom: "1px solid var(--ln1)" }}>
-              <p className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>Panduan Pengisian Kolom CSV</p>
+              <p className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>Keterangan Kolom</p>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs px-2 py-0.5 rounded font-semibold" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>Wajib</span>
@@ -396,21 +458,28 @@ export default function ImportPage() {
                   wajib: true,
                   deskripsi: "Nomor Induk Pegawai",
                   format: "18 digit angka",
-                  contoh: "197701102000031002",
+                  contoh: "199001012015031001",
                 },
                 {
                   kolom: "nama",
                   wajib: true,
                   deskripsi: "Nama lengkap pegawai",
                   format: "Teks bebas, gunakan huruf kapital",
-                  contoh: "MUHIDI ASPARI",
+                  contoh: "NAMA PEGAWAI CONTOH",
                 },
                 {
                   kolom: "jabatan",
                   wajib: true,
                   deskripsi: "Nama jabatan struktural/fungsional",
                   format: "Teks bebas",
-                  contoh: "Penata Muda Tk. I",
+                  contoh: "Analis Kepegawaian",
+                },
+                {
+                  kolom: "unitKerja",
+                  wajib: false,
+                  deskripsi: "Satuan kerja pegawai. SK KGB ditujukan ke KPPN mitra satker ini. Jika kosong, pegawai dicatat pada Kanwil",
+                  format: "Nama satker sesuai daftar di bawah tabel ini",
+                  contoh: "Rutan Kelas IIB Barabai",
                 },
                 {
                   kolom: "pangkat",
@@ -430,7 +499,7 @@ export default function ImportPage() {
                   kolom: "tmtGolongan",
                   wajib: true,
                   deskripsi: "Tanggal Mulai Terhitung (TMT) golongan saat ini",
-                  format: "YYYY-MM-DD",
+                  format: FORMAT_TANGGAL_DITERIMA,
                   contoh: "2024-04-01",
                 },
                 {
@@ -458,14 +527,14 @@ export default function ImportPage() {
                   kolom: "tmtKgbTerakhir",
                   wajib: true,
                   deskripsi: "TMT KGB yang terakhir diterima",
-                  format: "YYYY-MM-DD",
+                  format: FORMAT_TANGGAL_DITERIMA,
                   contoh: "2024-03-01",
                 },
                 {
                   kolom: "tmtKgbBerikutnya",
                   wajib: true,
                   deskripsi: "TMT KGB periode berikutnya (biasanya +2 tahun dari terakhir)",
-                  format: "YYYY-MM-DD",
+                  format: FORMAT_TANGGAL_DITERIMA,
                   contoh: "2026-03-01",
                 },
                 {
@@ -479,8 +548,8 @@ export default function ImportPage() {
                   kolom: "tanggalLahir",
                   wajib: false,
                   deskripsi: "Tanggal lahir pegawai",
-                  format: "YYYY-MM-DD",
-                  contoh: "1977-01-10",
+                  format: FORMAT_TANGGAL_DITERIMA,
+                  contoh: "1990-01-01",
                 },
                 {
                   kolom: "jenisKelamin",
@@ -506,14 +575,14 @@ export default function ImportPage() {
                 {
                   kolom: "statusHukdis",
                   wajib: false,
-                  deskripsi: "Status Hukuman Disiplin aktif",
+                  deskripsi: "Status Hukuman Disiplin aktif; hanya dibaca bila Super Admin yang mengimpor",
                   format: "true · false (default: false)",
                   contoh: "false",
                 },
                 {
                   kolom: "keteranganHukdis",
                   wajib: false,
-                  deskripsi: "Keterangan hukuman disiplin jika ada",
+                  deskripsi: "Keterangan hukuman disiplin jika ada; hanya dibaca bila Super Admin yang mengimpor",
                   format: "Teks bebas, kosongkan jika tidak ada",
                   contoh: "",
                 },
@@ -547,6 +616,18 @@ export default function ImportPage() {
               ))}
             </div>
 
+            {/* Daftar satker yang diterima kolom unitKerja */}
+            <div className="px-4 py-3" style={{ borderTop: "1px solid var(--ln1)" }}>
+              <p className="text-xs font-semibold mb-1.5" style={{ color: "var(--dtn)" }}>Daftar unit kerja (kolom unitKerja)</p>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5">
+                {SATKER.map((s) => (
+                  <li key={s.kode} className="text-xs" style={{ color: "var(--dt3)" }}>
+                    {s.nama} <span style={{ color: "var(--dt5)" }}>(KPPN {s.kppn})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
             {/* Catatan penting */}
             <div className="px-4 py-3 space-y-1.5" style={{ background: "var(--tint-amber-bg)", borderTop: "1px solid var(--tint-amber-ln)" }}>
               <p className="text-xs font-semibold" style={{ color: "var(--st-amber2)" }}>Catatan Penting</p>
@@ -562,17 +643,17 @@ export default function ImportPage() {
                 </div>
               ))}
             </div>
-              </>
+              </div>
             )}
           </div>
 
-          {/* Upload area */}
-          <div
-            className="rounded-xl border-2 border-dashed flex flex-col items-center justify-center py-12 cursor-pointer transition"
+          {/* Area unggah: label membungkus input berkas agar dapat dibuka dengan Tab lalu Enter atau Spasi */}
+          <label
+            className="rounded-xl border-2 border-dashed flex flex-col items-center justify-center py-12 cursor-pointer transition focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-sky-600"
             style={{ borderColor: "var(--ln0)" }}
-            onClick={() => fileRef.current?.click()}
           >
             <svg
+              aria-hidden="true"
               width="32"
               height="32"
               viewBox="0 0 24 24"
@@ -584,23 +665,23 @@ export default function ImportPage() {
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            <p
-              className="text-xs font-medium mt-3"
+            <span
+              className="block text-xs font-medium mt-3"
               style={{ color: "var(--dt3)" }}
             >
-              Klik untuk pilih file CSV
-            </p>
-            <p className="text-xs mt-1" style={{ color: "var(--dt5)" }}>
-              Hanya file .csv yang didukung
-            </p>
+              Pilih berkas CSV
+            </span>
+            <span className="block text-xs mt-1" style={{ color: "var(--dt5)" }}>
+              Klik area ini, atau tekan Enter saat area ini terfokus. Hanya berkas .csv yang didukung.
+            </span>
             <input
               ref={fileRef}
               type="file"
-              accept=".csv"
-              className="hidden"
+              accept=".csv,text/csv"
+              className="sr-only"
               onChange={handleFileChange}
             />
-          </div>
+          </label>
         </div>
       )}
 
@@ -614,7 +695,7 @@ export default function ImportPage() {
               style={{ background: "var(--tint-green-bg)", border: "1px solid var(--tint-green-ln)" }}
             >
               <p className="text-xs" style={{ color: "var(--st-green)" }}>
-                Data valid siap diimport
+                Data valid siap diimpor
               </p>
               <p
                 className="text-2xl font-bold mt-1"
@@ -686,7 +767,7 @@ export default function ImportPage() {
                   className="text-xs font-semibold"
                   style={{ color: "var(--st-red)" }}
                 >
-                  Baris bermasalah, tidak akan diimport
+                  Baris bermasalah, tidak akan diimpor
                 </p>
               </div>
               <div className="divide-y" style={{ borderColor: "var(--tint-red-bg)" }}>
@@ -726,7 +807,7 @@ export default function ImportPage() {
                   className="text-xs font-semibold"
                   style={{ color: "var(--dtn)" }}
                 >
-                  Preview data valid ({validRows.length} baris)
+                  Pratinjau data valid ({validRows.length} baris)
                 </p>
               </div>
               <div className="overflow-x-auto">
@@ -737,6 +818,7 @@ export default function ImportPage() {
                         "NIP",
                         "Nama",
                         "Jabatan",
+                        "Unit Kerja",
                         "Golongan",
                         "TMT KGB Berikutnya",
                       ].map((h) => (
@@ -783,6 +865,12 @@ export default function ImportPage() {
                           className="px-4 py-2 text-xs"
                           style={{ color: "var(--dt3)" }}
                         >
+                          {row.unitKerja?.trim() || SATKER_KANWIL.nama}
+                        </td>
+                        <td
+                          className="px-4 py-2 text-xs"
+                          style={{ color: "var(--dt3)" }}
+                        >
                           {row.golonganRuang}
                         </td>
                         <td
@@ -817,7 +905,7 @@ export default function ImportPage() {
               className="flex-1 text-xs py-2.5 rounded-xl transition"
               style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}
             >
-              Upload Ulang
+              Unggah Ulang
             </button>
             {validRows.length > 0 && (
               <button
@@ -827,8 +915,8 @@ export default function ImportPage() {
                 style={{ background: "var(--navy-solid)" }}
               >
                 {importing
-                  ? "Mengimport..."
-                  : `Import ${validRows.length} Pegawai`}
+                  ? "Mengimpor..."
+                  : `Impor ${validRows.length} Pegawai`}
               </button>
             )}
           </div>
@@ -873,7 +961,7 @@ export default function ImportPage() {
               )}
             </div>
             <p className="text-sm font-semibold" style={{ color: "var(--dtn)" }}>
-              Import Selesai
+              Impor Selesai
             </p>
             <p className="text-xs mt-1" style={{ color: "var(--dt3)" }}>
               <span style={{ color: "var(--st-green)", fontWeight: 600 }}>
@@ -926,7 +1014,7 @@ export default function ImportPage() {
               className="flex-1 text-xs py-2.5 rounded-xl transition"
               style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}
             >
-              Import Lagi
+              Impor Lagi
             </button>
             <button
               onClick={() => router.push("/dashboard/pegawai")}

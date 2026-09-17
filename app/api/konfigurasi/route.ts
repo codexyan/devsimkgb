@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
+import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 
 export const runtime = "nodejs";
@@ -9,6 +10,9 @@ export async function GET() {
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Hanya dipanggil halaman Pengaturan (Super Admin); layout dashboard membaca durasi sesi langsung dari db.
+  if (session.user.role !== "superAdminCore")
+    return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
   const config = await db.konfigurasiKanwil.findUnique({ id: "default" });
   return NextResponse.json(config);
@@ -20,7 +24,13 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
   }
 
-  const body = (await req.json()) as any;
+  const userLogin = await penggunaLogin(session);
+  if (!userLogin) return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
+
+  const body = (await req.json()) as {
+    nomorPP?: string; tahunPP?: string; waAdmin?: unknown;
+    notifKgbH1?: unknown; notifKgbH2?: unknown; sesiTimeoutMenit?: unknown;
+  };
 
   const clampInt = (v: unknown, def: number, min: number, max: number) => {
     const n = Math.round(Number(v));
@@ -48,20 +58,17 @@ export async function PATCH(req: Request) {
   const existing = await db.konfigurasiKanwil.findUnique({ id: "default" });
   let config;
   if (existing) {
-    config = await db.konfigurasiKanwil.update({ id: "default" }, data as any);
+    config = await db.konfigurasiKanwil.update({ id: "default" }, data);
   } else {
     config = { id: "default", namaKepala: "", nipKepala: "", ...data };
-    await db.konfigurasiKanwil.create(config as any);
+    await db.konfigurasiKanwil.create(config);
   }
 
-  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
-  if (userLogin) {
-    logAudit({
-      userId: userLogin.id,
-      aksi: "edit_konfigurasi",
-      detail: `Update konfigurasi kanwil: dasar hukum ${data.nomorPP}, notifikasi H-${notifKgbH1}/H-${notifKgbH2}, sesi ${sesiTimeoutMenit} menit`,
-    });
-  }
+  logAudit({
+    userId: userLogin.id,
+    aksi: "edit_konfigurasi",
+    detail: `Update konfigurasi kanwil: dasar hukum ${data.nomorPP}, notifikasi H-${notifKgbH1}/H-${notifKgbH2}, sesi ${sesiTimeoutMenit} menit`,
+  });
 
   return NextResponse.json(config);
 }

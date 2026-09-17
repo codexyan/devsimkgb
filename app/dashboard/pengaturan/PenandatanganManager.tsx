@@ -12,6 +12,7 @@ import {
   type JenisPenandatangan,
   type Penandatangan,
 } from "@/lib/penandatangan";
+import { isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Penandatangan surat KGB (seksi Pengaturan). Surat memilih penandatangan
@@ -25,7 +26,11 @@ interface FormState {
   jabatan: string; dasarPenunjukan: string; berlakuMulai: string; berlakuSampai: string;
 }
 
-const keIso = (t: Date | string | null | undefined) => (t ? new Date(t).toISOString().slice(0, 10) : "");
+// Nilai input date dari tanggal kalender WITA; toISOString bergeser sehari untuk tengah malam WITA.
+const keIso = (t: Date | string | null | undefined) => {
+  const tanggal = tanggalKalender(t);
+  return tanggal ? isoTanggalLokal(tanggal) : "";
+};
 const formBaru = (): FormState => ({
   id: null, jenis: "definitif", nama: "", nip: "", jabatan: JABATAN_BAWAAN.definitif,
   dasarPenunjukan: "", berlakuMulai: keIso(new Date()), berlakuSampai: "",

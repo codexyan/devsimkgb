@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
+import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 
 export const runtime = "nodejs";
@@ -12,8 +13,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
   }
 
-  const admin = await db.user.findUnique({ nip: session.user.nip! });
-  if (!admin) return NextResponse.json({ error: "Admin tidak ditemukan" }, { status: 404 });
+  const admin = await penggunaLogin(session);
+  if (!admin) return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
 
   const { id } = await params;
   const { action, alasanTolak } = (await req.json()) as any;

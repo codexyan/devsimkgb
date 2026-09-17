@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
+import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 
 export const runtime = "nodejs";
@@ -26,8 +27,8 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const user = await db.user.findUnique({ nip: session.user.nip! });
-  if (!user) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
+  const user = await penggunaLogin(session);
+  if (!user) return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
 
   const { nama, jabatan, email } = (await req.json()) as any;
 

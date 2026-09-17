@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { makeRiwayatKGB } from "@/lib/sheets/tables";
-import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
-import { getGajiPokok } from "@/lib/tabelGaji";
+import { canAccessKeuangan } from "@/lib/auth";
 import { penetapDariSurat } from "@/lib/penetapSk";
+import { rencanaSetelahKgbSelesai, type RencanaSetelahKgbSelesai } from "@/lib/jadwalKgb";
+import { placeholderBerlebih, type SuratKgbTersimpan } from "@/lib/prosesKgb";
+import { hariIniWita, tanggalKalender } from "@/lib/waktu";
 
 export const runtime = "nodejs";
 
@@ -17,7 +19,7 @@ export async function POST(
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (session.user.role !== "keuangan" && session.user.role !== "superAdminCore")
+  if (!canAccessKeuangan(session.user.role!))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const userLogin = await db.user.findUnique({ nip: session.user.nip! });
@@ -27,9 +29,13 @@ export async function POST(
   const { id } = await params;
 
   let isRapelan = false;
+  // cepat: dikirim oleh Konfirmasi cepat (beberapa SK sekaligus, semuanya tidak rapelan).
+  let cepat = false;
   try {
-    const body = (await req.json()) as any;
-    isRapelan = body.isRapelan === true;
+    const body: unknown = await req.json();
+    const isi = body && typeof body === "object" ? (body as { isRapelan?: unknown; cepat?: unknown }) : null;
+    isRapelan = isi?.isRapelan === true;
+    cepat = isi?.cepat === true;
   } catch {
     // body kosong → tidak rapelan
   }
@@ -39,9 +45,56 @@ export async function POST(
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
 
   if (kgb.status !== "menunggu_keuangan")
-    return NextResponse.json({ error: "KGB tidak dalam status menunggu_keuangan" }, { status: 400 });
+    return NextResponse.json({ error: "KGB ini tidak sedang menunggu konfirmasi keuangan." }, { status: 409 });
 
-  const kgbSelesai = (await db.riwayatKGB.update(
+  // Konfirmasi cepat hanya untuk SK yang tidak berpotensi rapelan dan TMT-nya (tanggal WITA) masih
+  // sesudah hari ini. SK lain harus ditinjau satu per satu agar keputusan rapelan tidak terlewat.
+  if (cepat) {
+    const tmt = tanggalKalender(kgb.tmtKgbBaru);
+    if (!tmt || tmt.getTime() <= hariIniWita().getTime())
+      return NextResponse.json({ error: "TMT sudah lewat, tinjau satu per satu" }, { status: 409 });
+    if (kgb.flagRapelan || isRapelan)
+      return NextResponse.json({ error: "SK berpotensi rapelan, tinjau satu per satu" }, { status: 409 });
+  }
+
+  const [pegawai, suratSelesai] = await Promise.all([
+    db.pegawai.findUnique({ id: kgb.pegawaiId }),
+    db.suratKGB.findUnique({ kgbId: kgb.id }) as Promise<SuratKgbTersimpan | null>,
+  ]);
+  if (!pegawai)
+    return NextResponse.json({ error: "Data pegawai tidak ditemukan" }, { status: 404 });
+
+  // TMT berikutnya memakai yang paling akhir antara record KGB dan data pegawai, agar penundaan hukdis
+  // yang dicatat selama KGB berjalan tidak hilang. SK dasar siklus berikutnya adalah surat KGB ini,
+  // jadi penetapnya = penandatangan surat ini.
+  let rencana: RencanaSetelahKgbSelesai;
+  try {
+    rencana = rencanaSetelahKgbSelesai({
+      kgb,
+      tmtKgbBerikutnyaPegawai: pegawai.tmtKgbBerikutnya,
+      penetapSkDasar: penetapDariSurat(suratSelesai),
+    });
+  } catch (e) {
+    const pesan = e instanceof Error ? e.message : "Jadwal KGB berikutnya tidak dapat dihitung";
+    return NextResponse.json({ error: `${pesan}. Hubungi Tim SDM untuk memeriksa data KGB ini.` }, { status: 422 });
+  }
+
+  // Status Selesai ditulis paling akhir. Bila salah satu langkah gagal, KGB tetap Menunggu Keuangan
+  // dan konfirmasi dapat diulang: data pegawai dihitung dari record KGB yang tidak berubah, dan
+  // placeholder yang setengah jadi diganti.
+  await db.pegawai.update({ id: pegawai.id }, rencana.pegawai);
+  await db.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
+  await db.riwayatKGB.create(
+    makeRiwayatKGB({ ...rencana.placeholder, pegawaiId: pegawai.id, createdBy: userLogin.id }),
+  );
+
+  // Dua konfirmasi yang berjalan bersamaan bisa sama-sama membuat placeholder; sisakan satu.
+  const placeholderList = await db.riwayatKGB.findMany({ where: { pegawaiId: pegawai.id, status: "belum_diproses" } });
+  for (const idBerlebih of placeholderBerlebih(placeholderList)) {
+    await db.riwayatKGB.delete({ id: idBerlebih });
+  }
+
+  await db.riwayatKGB.update(
     { id },
     {
       status: "selesai",
@@ -49,123 +102,14 @@ export async function POST(
       konfirmasiKeuanganBy: userLogin.id,
       rapelanDitetapkan: isRapelan,
     },
-  ))!;
+  );
 
-  // Auto-generate KGB berikutnya
-  const pegawai = await db.pegawai.findUnique({ id: kgbSelesai.pegawaiId });
-  if (pegawai) {
-    const tmtNext = new Date(kgbSelesai.tmtKgbBerikutnya as Date);
-    const tmtNextBerikutnya = new Date(tmtNext);
-    tmtNextBerikutnya.setFullYear(tmtNextBerikutnya.getFullYear() + 2);
+  logAudit({
+    userId: userLogin.id,
+    aksi: "konfirmasi_keuangan",
+    detail: `Konfirmasi KGB ${pegawai.nama} (${pegawai.nip}), Gol. ${kgb.golonganBaru}, Gaji Rp ${kgb.gajiPokokBaru.toLocaleString("id-ID")}, Rapelan: ${isRapelan ? "Ya" : "Tidak"}${cepat ? ", melalui Konfirmasi cepat" : ""}`,
+    targetNama: pegawai.nama,
+  });
 
-    const nextMkgTahunLama = kgbSelesai.mkgTahunBaru;
-    const nextMkgBulanLama = kgbSelesai.mkgBulanBaru;
-    const nextGolonganLama = kgbSelesai.golonganBaru;
-    const nextGajiPokokLama = kgbSelesai.gajiPokokBaru;
-
-    const nextMkgTahunBaru = nextMkgTahunLama + 2;
-    const nextMkgBulanBaru = nextMkgBulanLama;
-    const nextGajiPokokBaru = getGajiPokok(nextGolonganLama, nextMkgTahunBaru, nextMkgBulanBaru);
-
-    const today = new Date();
-    const deadlineSDM = new Date(tmtNext.getFullYear(), tmtNext.getMonth() - 1, 0);
-    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const flagRapelan = todayDate > deadlineSDM;
-
-    await db.pegawai.update(
-      { id: pegawai.id },
-      {
-        golonganRuang: kgbSelesai.golonganBaru,
-        gajiPokok: kgbSelesai.gajiPokokBaru,
-        mkgTahun: kgbSelesai.mkgTahunBaru,
-        mkgBulan: kgbSelesai.mkgBulanBaru,
-        tmtKgbBerikutnya: tmtNext,
-      },
-    );
-
-    await db.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
-
-    // SK dasar siklus berikutnya adalah surat KGB ini, jadi penetapnya = penandatangan surat ini.
-    const suratSelesai = (await db.suratKGB.findUnique({ kgbId: kgbSelesai.id })) as Parameters<typeof penetapDariSurat>[0];
-
-    await db.riwayatKGB.create(
-      makeRiwayatKGB({
-        pegawaiId: pegawai.id,
-        tanggalSK: tmtNext,
-        tmtSK: tmtNext,
-        penetapSkDasar: penetapDariSurat(suratSelesai),
-        golonganLama: nextGolonganLama,
-        gajiPokokLama: nextGajiPokokLama,
-        mkgTahunLama: nextMkgTahunLama,
-        mkgBulanLama: nextMkgBulanLama,
-        golonganBaru: nextGolonganLama,
-        gajiPokokBaru: nextGajiPokokBaru,
-        mkgTahunBaru: nextMkgTahunBaru,
-        mkgBulanBaru: nextMkgBulanBaru,
-        tmtKgbBaru: tmtNext,
-        tmtKgbBerikutnya: tmtNextBerikutnya,
-        status: "belum_diproses",
-        flagRapelan,
-        createdBy: userLogin.id,
-      }),
-    );
-
-    logAudit({
-      userId: userLogin.id,
-      aksi: "konfirmasi_keuangan",
-      detail: `Konfirmasi KGB ${pegawai.nama} (${pegawai.nip}), Gol. ${kgbSelesai.golonganBaru}, Gaji Rp ${kgbSelesai.gajiPokokBaru.toLocaleString("id-ID")}, Rapelan: ${isRapelan ? "Ya" : "Tidak"}`,
-      targetNama: pegawai.nama,
-    });
-  }
-
-  // ── Auto-rekon: cek apakah semua KGB bulan TMT ini sudah dikonfirmasi ──
-  const tmtDate = new Date(kgbSelesai.tmtKgbBaru as Date);
-  const tmtYear = tmtDate.getFullYear();
-  const tmtMonth = tmtDate.getMonth();
-  const bulanTmt = `${tmtYear}-${String(tmtMonth + 1).padStart(2, "0")}`;
-  const monthLo = new Date(tmtYear, tmtMonth, 1);
-  const monthHi = new Date(tmtYear, tmtMonth + 1, 1);
-
-  const allKgb = await db.riwayatKGB.findMany();
-  const sisa = allKgb.filter(
-    (k) => k.status === "menunggu_keuangan" && k.tmtKgbBaru && k.tmtKgbBaru >= monthLo && k.tmtKgbBaru < monthHi,
-  ).length;
-
-  if (sisa === 0) {
-    const now = new Date();
-    const h1Year = tmtMonth === 0 ? tmtYear - 1 : tmtYear;
-    const h1Month = tmtMonth === 0 ? 11 : tmtMonth - 1;
-    const inWindow =
-      now.getFullYear() === h1Year && now.getMonth() === h1Month && now.getDate() >= 1 && now.getDate() <= 15;
-
-    if (inWindow) {
-      const already = await db.rekonBulanan.findUnique({ bulanTmt });
-      if (!already) {
-        const jumlah = allKgb.filter(
-          (k) => k.konfirmasiKeuanganAt && k.tmtKgbBaru && k.tmtKgbBaru >= monthLo && k.tmtKgbBaru < monthHi,
-        ).length;
-
-        await db.rekonBulanan.create({
-          id: newId(),
-          bulanTmt,
-          tanggalInput: now,
-          inputBy: userLogin.id,
-          jumlahData: jumlah,
-          catatan: "Otomatis, seluruh KGB bulan ini telah dikonfirmasi",
-          createdAt: now,
-        });
-
-        const namaBulan = new Date(tmtYear, tmtMonth, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-
-        logAudit({
-          userId: userLogin.id,
-          aksi: "rekon_keuangan",
-          detail: `Rekap dasar input Sistem Gaji Web, KGB TMT ${namaBulan}, ${jumlah} data (semua KGB bulan ini telah dikonfirmasi)`,
-          targetNama: `KGB TMT ${namaBulan}`,
-        });
-      }
-    }
-  }
-
-  return NextResponse.json({ ok: true, autoRekon: sisa === 0 }, { status: 200 });
+  return NextResponse.json({ ok: true }, { status: 200 });
 }

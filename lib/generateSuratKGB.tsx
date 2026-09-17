@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Document,
   Page,
@@ -11,6 +10,7 @@ import {
 import path from "path";
 import fs from "fs";
 import type { JenisPenandatangan } from "./penandatangan";
+import { formatTanggalId, type NilaiTanggal } from "./waktu";
 
 Font.register({
   family: "Times",
@@ -97,23 +97,9 @@ const S = StyleSheet.create({
   tembusanItem: { fontSize: 10, paddingLeft: 8 },
 });
 
-function tgl(date: Date | string): string {
-  const d = new Date(date);
-  const bln = [
-    "Januari",
-    "Februari",
-    "Maret",
-    "April",
-    "Mei",
-    "Juni",
-    "Juli",
-    "Agustus",
-    "September",
-    "Oktober",
-    "November",
-    "Desember",
-  ];
-  return `${d.getDate()} ${bln[d.getMonth()]} ${d.getFullYear()}`;
+// Tanggal di surat dibaca menurut WITA, bukan zona server (Cloudflare Workers berjalan dalam UTC).
+function tgl(date: NilaiTanggal): string {
+  return formatTanggalId(date);
 }
 
 function rp(n: number): string {
@@ -122,7 +108,12 @@ function rp(n: number): string {
 
 interface SuratKGBProps {
   nomorSurat: string;
-  tanggalSurat: Date | string;
+  tanggalSurat: NilaiTanggal;
+  /**
+   * KPPN mitra satker pegawai (lib/satker.ts), dicetak pada tujuan surat. Unit kerja kosong berarti
+   * Kanwil; route PDF menolak unit kerja di luar daftar satker, jadi nilai ini selalu KPPN yang dikenal.
+   */
+  kppn: string;
   pegawai: {
     nama: string;
     nip: string;
@@ -134,8 +125,8 @@ interface SuratKGBProps {
   kgb: {
     gajiPokokLama: number;
     nomorSK: string;
-    tanggalSK: Date | string;
-    tmtSK: Date | string;
+    tanggalSK: NilaiTanggal;
+    tmtSK: NilaiTanggal;
     /** Pejabat penetap SK dasar, dicetak pada baris "Oleh". */
     penetapSkDasar: string;
     mkgTahunLama: number;
@@ -144,8 +135,8 @@ interface SuratKGBProps {
     mkgTahunBaru: number;
     mkgBulanBaru: number;
     golonganBaru: string;
-    tmtKgbBaru: Date | string;
-    tmtKgbBerikutnya: Date | string;
+    tmtKgbBaru: NilaiTanggal;
+    tmtKgbBerikutnya: NilaiTanggal;
     flagRapelan: boolean;
   };
   /** Hasil tentukanPenandatangan(); jabatan sudah berawalan Plh./Plt. bila perlu. */
@@ -164,6 +155,7 @@ interface SuratKGBProps {
 export function SuratKGBDocument({
   nomorSurat,
   tanggalSurat,
+  kppn,
   pegawai,
   kgb,
   penandatangan,
@@ -238,7 +230,7 @@ export function SuratKGBDocument({
         {/* TUJUAN */}
         <View style={S.tujuan}>
           <Text>Yth. Kepala Kantor Pelayanan Perbendaharaan Negara</Text>
-          <Text>Di Banjarmasin</Text>
+          <Text>Di {kppn}</Text>
         </View>
 
         {/* PEMBUKA */}
@@ -266,6 +258,7 @@ export function SuratKGBDocument({
           <Text style={S.liColon}>:</Text>
           <Text style={S.liValue}>
             {pegawai.pangkat} ({pegawai.golonganRuang})
+            {pegawai.jabatan?.trim() ? ` / ${pegawai.jabatan.trim()}` : ""}
           </Text>
         </View>
         <View style={S.li}>

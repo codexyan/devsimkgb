@@ -1,0 +1,83 @@
+/* Halaman masuk /login. Melengkapi publik.css; semua kelas berawalan lg-. */
+
+.pub .lg-kolom {
+  max-width: 26rem;
+}
+
+.pub .pub-lead.lg-lead {
+  margin-bottom: 0.5rem;
+}
+
+.pub .lg-publik {
+  margin: 0 0 1.5rem;
+  color: var(--text);
+}
+
+.pub .lg-form > .pub-field + .pub-field {
+  margin-top: 1.25rem;
+}
+
+/* Label password dan tombol "Lupa password?" dalam satu baris */
+.pub .lg-label-baris {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 0.5rem;
+  margin-top: -0.5rem;
+}
+
+.pub .lg-lupa {
+  margin-right: -0.5rem;
+  font-size: 0.9375rem;
+}
+
+.pub .lg-sandi {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pub .lg-sandi .pub-input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+/* Lebar tetap agar kolom tidak bergeser saat teks tombol berganti */
+.pub .lg-sandi .lg-toggle {
+  flex: 0 0 auto;
+  min-width: 8.75rem;
+  padding-inline: 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.pub .lg-galat {
+  margin-top: 1.25rem;
+}
+
+.pub .lg-kirim {
+  margin-top: 1.5rem;
+}
+
+.pub .lg-dialog > * {
+  margin: 0;
+}
+
+.pub .lg-dialog > * + * {
+  margin-top: 1rem;
+}
+
+.pub .lg-dialog-judul {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.pub .lg-dialog-aksi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pub .lg-dialog > .lg-dialog-aksi {
+  margin-top: 1.5rem;
+}

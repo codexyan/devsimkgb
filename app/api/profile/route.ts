@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { auth } from "@/auth";
+import { auth, lupakanSesiPengguna } from "@/auth";
+import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import bcrypt from "bcryptjs";
 import { logAudit } from "@/lib/auditLog";
 
@@ -25,22 +26,19 @@ export async function PATCH(req: Request) {
   const body = (await req.json()) as any;
   const { nama, jabatan, email, passwordLama, passwordBaru, konfirmasiPassword } = body;
 
-  const user = await db.user.findUnique({ nip: session.user.nip! });
-  if (!user) return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
+  // Nama, jabatan, dan email hanya berubah lewat permintaan yang disetujui Super Admin
+  // (POST /api/profile/request), jadi rute ini khusus ganti password.
+  if (nama !== undefined || jabatan !== undefined || email !== undefined) {
+    return NextResponse.json(
+      { error: "Perubahan nama, jabatan, atau email diajukan lewat permintaan perubahan profil" },
+      { status: 403 },
+    );
+  }
+
+  const user = await penggunaLogin(session);
+  if (!user) return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
 
   const updateData: Record<string, string> = {};
-
-  if (nama !== undefined) {
-    if (!nama.trim()) return NextResponse.json({ error: "Nama tidak boleh kosong" }, { status: 400 });
-    updateData.nama = nama.trim();
-  }
-  if (jabatan !== undefined) updateData.jabatan = jabatan.trim();
-  if (email !== undefined) {
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: "Format email tidak valid" }, { status: 400 });
-    }
-    updateData.email = email.trim();
-  }
 
   if (passwordBaru) {
     if (!passwordLama) return NextResponse.json({ error: "Password lama wajib diisi" }, { status: 400 });
@@ -58,6 +56,8 @@ export async function PATCH(req: Request) {
   }
 
   await db.user.update({ id: user.id }, updateData);
+  // Sesi dengan password lama berakhir (lihat auth.ts), termasuk sesi ini: pengguna perlu masuk kembali.
+  if (updateData.password) lupakanSesiPengguna();
 
   logAudit({
     userId: user.id,

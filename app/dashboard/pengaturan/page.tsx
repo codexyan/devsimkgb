@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { ROLES } from "@/lib/auth";
 import PenandatanganManager from "./PenandatanganManager";
+import PemeriksaanData from "./PemeriksaanData";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Pengaturan (super admin). Terbagi menjadi beberapa seksi:
@@ -12,6 +13,7 @@ import PenandatanganManager from "./PenandatanganManager";
    3. Notifikasi KGB            — ambang H-… peringatan
    4. Keamanan sesi             — durasi auto-logout
    5. Kontak                    — nomor WA admin (dipakai tombol lupa password)
+   6. Pemeriksaan data          — temuan data pegawai tidak konsisten (hanya membaca)
    ───────────────────────────────────────────────────────────────────────── */
 
 interface Konfigurasi {
@@ -197,6 +199,16 @@ export default function PengaturanPage() {
                   <span title={n.ok ? "Terisi" : "Belum diatur"} style={{ width: "7px", height: "7px", borderRadius: "50%", background: n.ok ? "#22c55e" : "#f59e0b", flexShrink: 0 }} />
                 </a>
               ))}
+              {/* Pemeriksaan data tidak dihitung dalam kelengkapan pengaturan */}
+              <a href="#pemeriksaan" className="flex items-center gap-2.5 px-2.5 py-2 mt-1 rounded-lg transition"
+                style={{ textDecoration: "none", borderTop: "0.5px solid var(--ln2)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--sub)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg,#6d5bd0,var(--navy-solid))" }}>
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#fff" }} />
+                </span>
+                <span className="text-xs flex-1 truncate" style={{ color: "var(--dt2)" }}>Pemeriksaan Data</span>
+              </a>
             </nav>
           </div>
         </aside>
@@ -248,6 +260,12 @@ export default function PengaturanPage() {
         </Section>
 
         </div>{/* end masonry */}
+
+        {/* 6. Pemeriksaan data: hanya membaca, di luar masonry karena daftarnya bisa panjang */}
+        <Section id="pemeriksaan" grad="linear-gradient(135deg,#6d5bd0,var(--navy-solid))" title="Pemeriksaan Data" desc="Menemukan data pegawai yang tidak konsisten · tidak mengubah data"
+          icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><polyline points="8 11 10.5 13.5 14 9"/></svg>}>
+          <PemeriksaanData />
+        </Section>
 
         {initial?.updatedAt && (
           <div className="rounded-xl px-3 py-2 flex items-center gap-2" style={{ background: "var(--sub)", border: "0.5px solid var(--ln1)" }}>

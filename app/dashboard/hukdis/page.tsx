@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { canManageHukdis } from "@/lib/auth";
+import { formatTanggalId, isoTanggalLokal } from "@/lib/waktu";
+import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
+import { tmtBerakhirOtomatis } from "@/lib/hukdisJenis";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Modul Hukuman Disiplin (mandiri). Daftar SEMUA catatan hukdis lintas
@@ -18,7 +21,7 @@ interface Hukdis {
   berdampakKGB: boolean; durasiTunda: number | null; dasarHukum: string | null; keterangan: string | null;
   aktif: boolean;
 }
-interface Summary { total: number; aktif: number; ringan: number; sedang: number; berat: number; berdampakKGB: number; }
+interface Summary { aktif: number; ringan: number; sedang: number; berat: number; berdampakKGB: number; }
 interface Jenis { kode: string; label: string; kategori: string; durasiHukdis: number; berdampakKGB: boolean; durasiTunda: number | null; dasarHukum: string | null; aktif: boolean; }
 interface PegawaiOpt { id: string; nip: string; nama: string; jabatan: string; golonganRuang: string; statusHukdis: boolean; }
 interface RegulasiOpt { id: string; nomor: string; tahun: string; tentang: string; status: string; }
@@ -30,9 +33,10 @@ const KAT: Record<string, { label: string; bg: string; color: string; grad: stri
   berat:  { label: "Berat",  bg: "var(--tint-red-bg)",   color: "var(--st-red)",   grad: "linear-gradient(135deg,#e35d5d,var(--red-solid))" },
 };
 const initials = (n: string) => n.split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase();
-const fmt = (s: string) => new Date(s).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
-const isoAddMonths = (iso: string, months: number) => { const d = new Date(iso); d.setMonth(d.getMonth() + months); return d.toISOString().slice(0, 10); };
-const todayIso = () => new Date().toISOString().slice(0, 10);
+// Tanggal tersimpan ditampilkan menurut kalender WITA.
+const fmt = (s: string) => formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" });
+// Tanggal hari ini menurut kalender perangkat (bukan UTC, yang mundur sehari sebelum pukul 08.00 WITA).
+const todayIso = () => isoTanggalLokal();
 
 export default function HukdisPage() {
   const role = useRole();
@@ -64,6 +68,10 @@ export default function HukdisPage() {
   // Delete modal
   const [delTarget, setDelTarget] = useState<Hukdis | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [delError, setDelError] = useState("");
+
+  const refModalInput = useDialogModal(showInput, () => setShowInput(false), submitting);
+  const refModalHapus = useDialogModal(!!delTarget, () => setDelTarget(null), deleting);
 
   function fetchData() {
     setLoading(true);
@@ -98,12 +106,12 @@ export default function HukdisPage() {
       berdampakKGB: j?.berdampakKGB ?? false,
       durasiTunda: j?.durasiTunda ?? 12,
       dasarHukum: j?.dasarHukum ?? f.dasarHukum,
-      tmtBerakhir: j && j.durasiHukdis > 0 && f.tmtMulai ? isoAddMonths(f.tmtMulai, j.durasiHukdis) : f.tmtBerakhir,
+      tmtBerakhir: j && j.durasiHukdis > 0 && f.tmtMulai ? tmtBerakhirOtomatis(f.tmtMulai, j.durasiHukdis) : f.tmtBerakhir,
     }));
   }
   function setTmtMulai(v: string) {
     const j = jenisList.find((x) => x.kode === form.jenisHukdis);
-    setForm((f) => ({ ...f, tmtMulai: v, tmtBerakhir: j && j.durasiHukdis > 0 && v ? isoAddMonths(v, j.durasiHukdis) : f.tmtBerakhir }));
+    setForm((f) => ({ ...f, tmtMulai: v, tmtBerakhir: j && j.durasiHukdis > 0 && v ? tmtBerakhirOtomatis(v, j.durasiHukdis) : f.tmtBerakhir }));
   }
 
   const filteredPeg = useMemo(() => {
@@ -137,10 +145,18 @@ export default function HukdisPage() {
   async function handleDelete() {
     if (!delTarget) return;
     setDeleting(true);
+    setDelError("");
     try {
       const res = await fetch(`/api/hukdis/${delTarget.id}`, { method: "DELETE" });
-      if (res.ok) { setDelTarget(null); setSuccess("Catatan hukdis dihapus."); setTimeout(() => setSuccess(""), 3000); fetchData(); }
-    } finally { setDeleting(false); }
+      const d = (await res.json().catch(() => ({}))) as { error?: string; pesan?: string };
+      if (!res.ok) { setDelError(d.error || "Catatan hukdis gagal dihapus."); return; }
+      // Pesan API menyebut apakah TMT KGB dipulihkan atau perlu diperiksa, jadi ditampilkan lebih lama.
+      setDelTarget(null);
+      setSuccess(d.pesan || "Catatan hukdis dihapus.");
+      setTimeout(() => setSuccess(""), 8000);
+      fetchData();
+    } catch { setDelError("Gagal menghubungi server"); }
+    finally { setDeleting(false); }
   }
 
   const filtered = useMemo(() => {
@@ -297,10 +313,10 @@ export default function HukdisPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5">
-                          <Link href={`/dashboard/pegawai/${h.pegawai.id}/riwayat`} title="Lihat riwayat pegawai" className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--tint-navy)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}>
+                          <Link href={`/dashboard/pegawai/${h.pegawai.id}/riwayat`} title="Lihat riwayat pegawai" aria-label={`Lihat riwayat ${h.pegawai.nama}`} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--tint-navy)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                           </Link>
-                          <button onClick={() => setDelTarget(h)} title="Hapus catatan hukdis" className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", border: "0.5px solid var(--tint-red-ln)" }}>
+                          <button onClick={() => { setDelError(""); setDelTarget(h); }} title="Hapus catatan hukdis" aria-label={`Hapus catatan hukdis ${h.pegawai.nama}`} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", border: "0.5px solid var(--tint-red-ln)" }}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                           </button>
                         </div>
@@ -317,13 +333,13 @@ export default function HukdisPage() {
       {/* Modal Input Hukdis */}
       {showInput && (
         <div className="adm-overlay" onClick={() => !submitting && setShowInput(false)}>
-          <div className="adm-modal" style={{ maxWidth: "30rem", maxHeight: "92dvh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
+          <div ref={refModalInput} role="dialog" aria-modal="true" aria-labelledby="judul-input-hukdis" tabIndex={-1} className="adm-modal outline-none" style={{ maxWidth: "30rem", maxHeight: "92dvh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 px-5 py-4 shrink-0" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
               <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg,#e35d5d,var(--red-solid))" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               </div>
-              <div className="flex-1"><h2 className="text-sm font-semibold leading-tight" style={{ color: "var(--dtn)" }}>Input Hukuman Disiplin</h2><p className="text-xs" style={{ color: "var(--dt4)" }}>Pilih pegawai lalu isi detail SK hukdis</p></div>
-              <button onClick={() => setShowInput(false)} className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--ln2)", color: "var(--dt3)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+              <div className="flex-1"><h2 id="judul-input-hukdis" className="text-sm font-semibold leading-tight" style={{ color: "var(--dtn)" }}>Input Hukuman Disiplin</h2><p className="text-xs" style={{ color: "var(--dt4)" }}>Pilih pegawai lalu isi detail SK hukdis</p></div>
+              <button onClick={() => setShowInput(false)} disabled={submitting} aria-label="Tutup" className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--ln2)", color: "var(--dt3)" }}><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
 
             <div className="p-5 space-y-3.5 overflow-y-auto">
@@ -375,7 +391,7 @@ export default function HukdisPage() {
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="block text-xs font-medium" style={{ color: "var(--dt2)" }}>Dasar Hukum / Peraturan</label>
-                      <Link href="/dashboard/hukdis/regulasi" className="text-xs" style={{ color: "var(--accent)", fontSize: "10px" }}>Kelola regulasi →</Link>
+                      <Link href="/dashboard/hukdis/regulasi" className="text-xs" style={{ color: "var(--accent)", fontSize: "10px" }}>Kelola regulasi <span aria-hidden="true">→</span></Link>
                     </div>
                     {!dasarManual && regulasiList.length > 0 ? (
                       <select
@@ -453,11 +469,12 @@ export default function HukdisPage() {
       {/* Modal Hapus */}
       {delTarget && (
         <div className="adm-overlay" onClick={() => !deleting && setDelTarget(null)}>
-          <div className="adm-modal" style={{ maxWidth: "24rem" }} onClick={(e) => e.stopPropagation()}>
+          <div ref={refModalHapus} role="alertdialog" aria-modal="true" aria-labelledby="judul-hapus-hukdis" tabIndex={-1} className="adm-modal outline-none" style={{ maxWidth: "24rem" }} onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: "var(--tint-red-bg)" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--st-red)" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div>
-              <h2 className="text-sm font-semibold mb-1" style={{ color: "var(--dtn)" }}>Hapus Catatan Hukdis?</h2>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: "var(--tint-red-bg)" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--st-red)" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div>
+              <h2 id="judul-hapus-hukdis" className="text-sm font-semibold mb-1" style={{ color: "var(--dtn)" }}>Hapus Catatan Hukdis?</h2>
               <p className="text-xs mb-5 leading-relaxed" style={{ color: "var(--dt4)" }}>Hapus hukdis <strong style={{ color: "var(--dtn)" }}>{delTarget.jenisLabel}</strong> milik <strong style={{ color: "var(--dtn)" }}>{delTarget.pegawai.nama}</strong>? Tindakan ini tidak bisa dibatalkan.</p>
+              {delError && <p role="alert" className="text-xs rounded-lg px-3 py-2 mb-3" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>{delError}</p>}
               <div className="flex gap-2">
                 <button onClick={() => setDelTarget(null)} disabled={deleting} className="flex-1 text-xs py-2.5 rounded-xl" style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}>Batal</button>
                 <button onClick={handleDelete} disabled={deleting} className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white disabled:opacity-50" style={{ background: "var(--red-solid)" }}>{deleting ? "Menghapus…" : "Ya, Hapus"}</button>

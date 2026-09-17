@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
+import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 interface RegulasiRef { id: string; nomor: string; tahun: string; status: string; }
 interface HukdisJenis {
-  id: string; kode: string; label: string; kategori: string;
+  id: string; label: string; kategori: string;
   dasarHukum: string | null; regulasiId: string | null; regulasi: RegulasiRef | null;
   durasiHukdis: number;
   berdampakKGB: boolean; durasiTunda: number | null;
@@ -93,11 +94,9 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
   saving: boolean; error: string; regulasiList: RegulasiRef[];
 }) {
   const [manual, setManual] = useState(false);
-  useEffect(() => {
-    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", fn);
-    return () => document.removeEventListener("keydown", fn);
-  }, [onClose]);
+  // Modal ini dipasang hanya saat terbuka; Escape tidak menutup selama menyimpan.
+  const refPanel = useDialogModal(true, onClose, saving);
+  const idBidang = useId();
 
   const set = <K extends keyof NewForm>(k: K, v: NewForm[K]) => setForm({ ...form, [k]: v });
 
@@ -108,7 +107,7 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
     boxSizing: "border-box",
   };
   const labelStyle: React.CSSProperties = {
-    fontSize: "11px", fontWeight: 600, color: "#475569",
+    fontSize: "11px", fontWeight: 600, color: "var(--dt2)",
     display: "block", marginBottom: "6px",
     textTransform: "uppercase", letterSpacing: "0.05em",
   };
@@ -122,9 +121,9 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
         display: "flex", alignItems: "center", justifyContent: "center", padding: "20px",
       }}
     >
-      <div style={{
+      <div ref={refPanel} role="dialog" aria-modal="true" aria-labelledby="judul-tambah-jenis" tabIndex={-1} style={{
         width: "100%", maxWidth: "500px", background: "var(--card)",
-        borderRadius: "18px", overflow: "hidden",
+        borderRadius: "18px", overflow: "hidden", outline: "none",
         boxShadow: "0 24px 64px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)",
         animation: "slideUp .22s cubic-bezier(.22,1,.36,1) both",
       }}>
@@ -132,14 +131,14 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
         <div style={{ padding: "20px 22px 16px", borderBottom: "1px solid var(--ln2)" }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
             <div>
-              <p style={{ fontSize: "15px", fontWeight: 700, color: "var(--dt1)", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
+              <p id="judul-tambah-jenis" style={{ fontSize: "15px", fontWeight: 700, color: "var(--dt1)", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
                 Tambah Jenis Hukdis Baru
               </p>
               <p style={{ fontSize: "12px", color: "var(--dt4)", margin: 0 }}>
                 Jenis baru akan langsung tersedia di form input hukdis pegawai.
               </p>
             </div>
-            <button onClick={onClose} style={{
+            <button onClick={onClose} aria-label="Tutup" style={{
               width: "28px", height: "28px", flexShrink: 0, borderRadius: "8px",
               border: "1px solid var(--ln2)", background: "var(--sub)",
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
@@ -153,8 +152,8 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
         {/* Body */}
         <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: "14px" }}>
           <div>
-            <label style={labelStyle}>Nama Jenis Hukdis <span style={{ color: "var(--st-red)" }}>*</span></label>
-            <input type="text" value={form.label} placeholder="Contoh: Penundaan KGB Selama 2 Tahun"
+            <label htmlFor={`${idBidang}-nama`} style={labelStyle}>Nama Jenis Hukdis <span style={{ color: "var(--st-red)" }}>*</span></label>
+            <input id={`${idBidang}-nama`} type="text" value={form.label} placeholder="Contoh: Penundaan KGB Selama 2 Tahun"
               onChange={(e) => set("label", e.target.value)} style={inputStyle}
               onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
               onBlur={(e)  => (e.target.style.borderColor = "var(--ln1)")}
@@ -163,11 +162,12 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
 
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-              <label style={{ ...labelStyle, marginBottom: 0 }}>Dasar Hukum / Regulasi <span style={{ color: "var(--st-red)" }}>*</span></label>
-              <Link href="/dashboard/hukdis/regulasi" style={{ fontSize: "10px", color: "var(--accent)" }}>Kelola regulasi →</Link>
+              <label htmlFor={`${idBidang}-regulasi`} style={{ ...labelStyle, marginBottom: 0 }}>Dasar Hukum / Regulasi <span style={{ color: "var(--st-red)" }}>*</span></label>
+              <Link href="/dashboard/hukdis/regulasi" style={{ fontSize: "10px", color: "var(--accent)" }}>Kelola regulasi <span aria-hidden="true">→</span></Link>
             </div>
             {!manual && regulasiList.length > 0 ? (
               <select
+                id={`${idBidang}-regulasi`}
                 value={form.regulasiId}
                 onChange={(e) => { if (e.target.value === "__manual__") { setManual(true); setForm({ ...form, regulasiId: "", dasarHukum: "" }); } else setForm({ ...form, regulasiId: e.target.value }); }}
                 style={{ ...inputStyle, cursor: "pointer", background: "var(--card)" }}>
@@ -179,7 +179,7 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
               </select>
             ) : (
               <div style={{ display: "flex", gap: "8px" }}>
-                <input type="text" value={form.dasarHukum} placeholder="Contoh: PP Nomor 94 Tahun 2021"
+                <input id={`${idBidang}-regulasi`} type="text" value={form.dasarHukum} placeholder="Contoh: PP Nomor 94 Tahun 2021"
                   onChange={(e) => set("dasarHukum", e.target.value)} style={inputStyle}
                   onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
                   onBlur={(e)  => (e.target.style.borderColor = "var(--ln1)")} />
@@ -193,8 +193,8 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
             <div>
-              <label style={labelStyle}>Kategori</label>
-              <select value={form.kategori} onChange={(e) => set("kategori", e.target.value)}
+              <label htmlFor={`${idBidang}-kategori`} style={labelStyle}>Kategori</label>
+              <select id={`${idBidang}-kategori`} value={form.kategori} onChange={(e) => set("kategori", e.target.value)}
                 style={{ ...inputStyle, cursor: "pointer", background: "var(--card)" }}>
                 <option value="ringan">Ringan</option>
                 <option value="sedang">Sedang</option>
@@ -202,9 +202,9 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Masa Berlaku</label>
+              <label htmlFor={`${idBidang}-masa`} style={labelStyle}>Masa Berlaku</label>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <input type="number" min={0} max={120} value={form.durasiHukdis}
+                <input id={`${idBidang}-masa`} type="number" min={0} max={120} value={form.durasiHukdis}
                   onChange={(e) => { const v = parseInt(e.target.value,10); if (!isNaN(v)) set("durasiHukdis", Math.min(120,Math.max(0,v))); }}
                   style={{ ...inputStyle, width: "72px" }}
                   onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
@@ -275,7 +275,7 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
           <button onClick={onClose} style={{
             padding: "9px 18px", borderRadius: "9px",
             border: "1.5px solid var(--ln1)", background: "var(--card)",
-            fontSize: "13px", fontWeight: 500, color: "#475569",
+            fontSize: "13px", fontWeight: 500, color: "var(--dt2)",
             cursor: "pointer", fontFamily: "inherit",
           }}>
             Batal
@@ -298,13 +298,15 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
 }
 
 /* ── Jenis Row ─────────────────────────────────────────────────────────── */
-function JenisRow({ j, onPatch, onDelete, deleting, confirmId, setConfirmId }: {
+function JenisRow({ j, onPatch, onDelete, deleting, confirmId, setConfirmId, galatHapus }: {
   j: HukdisJenis;
   onPatch: (id: string, p: Partial<HukdisJenis>) => void;
   onDelete: (id: string) => void;
   deleting: boolean;
   confirmId: string | null;
   setConfirmId: (id: string | null) => void;
+  /** Pesan bila penghapusan jenis ini ditolak atau gagal. */
+  galatHapus: string | null;
 }) {
   const k = KAT[j.kategori] ?? KAT.ringan;
   const isConfirm = confirmId === j.id;
@@ -358,6 +360,11 @@ function JenisRow({ j, onPatch, onDelete, deleting, confirmId, setConfirmId }: {
           onFocus={(e) => { e.target.style.borderColor = "var(--dt4)"; e.target.style.background = "var(--sub)"; }}
           onBlur={(e)  => { e.target.style.borderColor = "transparent"; e.target.style.background = "transparent"; }}
         />
+        {galatHapus && (
+          <p role="alert" style={{ fontSize: "11px", color: "var(--st-red)", margin: "4px 7px 0", lineHeight: 1.5 }}>
+            {galatHapus}
+          </p>
+        )}
       </div>
 
       {/* Kontrol sisi kanan, lebar kolom tetap agar sejajar dengan header */}
@@ -466,12 +473,14 @@ export default function HukdisKonfigurasiPage() {
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [savedOk,    setSavedOk]    = useState(false);
-  const [showAdd,    setShowAdd]    = useState(false);
+  const [saveError,  setSaveError]  = useState("");
+  const [showAdd,   setShowAdd]    = useState(false);
   const [addForm,    setAddForm]    = useState<NewForm>(EMPTY_FORM);
   const [addSaving,  setAddSaving]  = useState(false);
   const [addError,   setAddError]   = useState("");
   const [confirmId,  setConfirmId]  = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [galatHapus, setGalatHapus] = useState<{ id: string; pesan: string } | null>(null);
   const [filterKat,  setFilterKat]  = useState("semua");
   const [loadError,  setLoadError]  = useState("");
   const [regulasiList, setRegulasiList] = useState<RegulasiRef[]>([]);
@@ -510,7 +519,7 @@ export default function HukdisKonfigurasiPage() {
   const isDirty = JSON.stringify(draft) !== JSON.stringify(orig);
 
   async function handleSave() {
-    setSaving(true); setSavedOk(false);
+    setSaving(true); setSavedOk(false); setSaveError("");
     const jenisUpdates = draft
       .filter((j, i) => JSON.stringify(j) !== JSON.stringify(orig[i]))
       .map((j) => ({
@@ -520,11 +529,24 @@ export default function HukdisKonfigurasiPage() {
         durasiTunda: j.berdampakKGB ? (j.durasiTunda ?? 12) : null,
         aktif: j.aktif,
       }));
-    await fetch("/api/hukdis/konfigurasi", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jenisUpdates }),
-    });
+    // API memeriksa semua perubahan sebelum menulis: bila ditolak, tidak ada yang tersimpan dan draf tetap.
+    try {
+      const res = await fetch("/api/hukdis/konfigurasi", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jenisUpdates }),
+      });
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string };
+        setSaveError(d.error || "Perubahan gagal disimpan.");
+        setSaving(false);
+        return;
+      }
+    } catch {
+      setSaveError("Gagal menghubungi server. Periksa koneksi, lalu coba lagi.");
+      setSaving(false);
+      return;
+    }
     setOrig(JSON.parse(JSON.stringify(draft)));
     setSaving(false); setSavedOk(true);
     setTimeout(() => setSavedOk(false), 3000);
@@ -556,16 +578,22 @@ export default function HukdisKonfigurasiPage() {
 
   async function handleDelete(id: string) {
     setDeletingId(id);
-    const res = await fetch(`/api/hukdis/jenis/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      setDraft((p) => p.filter((j) => j.id !== id));
-      setOrig((p)  => p.filter((j) => j.id !== id));
-      setConfirmId(null);
-    } else {
-      const d = await res.json() as any;
-      alert(d.error || "Gagal menghapus");
+    setGalatHapus(null);
+    try {
+      const res = await fetch(`/api/hukdis/jenis/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setDraft((p) => p.filter((j) => j.id !== id));
+        setOrig((p)  => p.filter((j) => j.id !== id));
+        setConfirmId(null);
+      } else {
+        const d = (await res.json().catch(() => ({}))) as { error?: string };
+        setGalatHapus({ id, pesan: d.error || "Jenis hukdis gagal dihapus." });
+      }
+    } catch {
+      setGalatHapus({ id, pesan: "Gagal menghubungi server. Coba lagi." });
+    } finally {
+      setDeletingId(null);
     }
-    setDeletingId(null);
   }
 
   const filtered = filterKat === "semua" ? draft : draft.filter((j) => j.kategori === filterKat);
@@ -794,7 +822,8 @@ export default function HukdisKonfigurasiPage() {
                   onDelete={handleDelete}
                   deleting={deletingId === j.id}
                   confirmId={confirmId}
-                  setConfirmId={setConfirmId}
+                  setConfirmId={(id) => { setConfirmId(id); setGalatHapus(null); }}
+                  galatHapus={galatHapus?.id === j.id ? galatHapus.pesan : null}
                 />
               ))}
             </div>
@@ -827,6 +856,11 @@ export default function HukdisKonfigurasiPage() {
           <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12px", fontWeight: 500, color: "var(--st-green)" }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
             Perubahan tersimpan
+          </span>
+        )}
+        {saveError && (
+          <span role="alert" style={{ fontSize: "12px", fontWeight: 500, color: "var(--st-red)" }}>
+            {saveError}
           </span>
         )}
         {isDirty && !saving && (

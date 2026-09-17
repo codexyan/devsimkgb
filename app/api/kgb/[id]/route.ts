@@ -4,11 +4,13 @@ import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { canProcessKGB } from "@/lib/auth";
+import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
+import { alasanTolakUbahSkTerakhir, bacaTanggalInput, tmtTerakhirSebelumInput } from "@/lib/prosesKgb";
+import { samaTanggalKalender } from "@/lib/waktu";
+import { penundaanHukdisSelamaKgb } from "@/lib/dataPegawai";
+import type { RiwayatHukdisRow } from "@/lib/hukdisKedaluwarsa";
 
 export const runtime = "nodejs";
-
-const samaHari = (a: Date | string | null | undefined, b: Date | string | null | undefined) =>
-  !!a && !!b && new Date(a).toDateString() === new Date(b).toDateString();
 
 export async function PATCH(
   req: Request,
@@ -21,48 +23,64 @@ export async function PATCH(
   if (!canProcessKGB(session.user.role!))
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
-  const { id } = await params;
-  const body = (await req.json()) as any;
+  // Akun yang sudah dihapus tidak boleh mengubah data, karena perubahan dicatat atas nama pelakunya.
+  const userLogin = await penggunaLogin(session);
+  if (!userLogin)
+    return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
 
-  // Toggle flagRapelan manual
-  if (body.flagRapelan !== undefined) {
-    const kgb = await db.riwayatKGB.update({ id }, { flagRapelan: body.flagRapelan });
-    if (!kgb) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
-    return NextResponse.json(kgb);
+  const { id } = await params;
+  let body: Record<string, unknown>;
+  try {
+    const parsed: unknown = await req.json();
+    if (!parsed || typeof parsed !== "object") throw new Error("bukan objek");
+    body = parsed as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Request body tidak valid" }, { status: 400 });
   }
 
-  // Update data SK terakhir (dasar surat)
+  // Update data SK terakhir (dasar surat), hanya selama KGB Sedang Diproses.
   if (body.nomorSK !== undefined) {
+    if (typeof body.nomorSK !== "string")
+      return NextResponse.json({ error: "Nomor SK Terakhir tidak valid" }, { status: 400 });
+
     const lama = await db.riwayatKGB.findUnique({ id });
     if (!lama) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
+    const alasan = alasanTolakUbahSkTerakhir(lama.status);
+    if (alasan) return NextResponse.json({ error: alasan }, { status: 409 });
 
-    const patch: Record<string, unknown> = { nomorSK: body.nomorSK };
-    if (body.tanggalSK) patch.tanggalSK = new Date(body.tanggalSK);
-    if (body.tmtSK) patch.tmtSK = new Date(body.tmtSK);
+    const patch: { nomorSK: string; tanggalSK?: Date; tmtSK?: Date; penetapSkDasar?: string | null } = {
+      nomorSK: body.nomorSK.trim(),
+    };
+    // Tanggal kosong berarti tidak diubah; tanggal yang diisi harus valid.
+    for (const kolom of ["tanggalSK", "tmtSK"] as const) {
+      const nilai = body[kolom];
+      if (nilai === undefined || nilai === null || nilai === "") continue;
+      const tanggal = bacaTanggalInput(nilai);
+      if (!tanggal) {
+        const label = kolom === "tanggalSK" ? "Tanggal SK Terakhir" : "TMT SK Terakhir";
+        return NextResponse.json({ error: `${label} tidak valid` }, { status: 400 });
+      }
+      patch[kolom] = tanggal;
+    }
     if (typeof body.penetapSkDasar === "string") patch.penetapSkDasar = body.penetapSkDasar.trim() || null;
     const kgb = await db.riwayatKGB.update({ id }, patch);
 
     // Penetap SK dasar tercetak di surat, jadi perubahan sesudah surat dibuat dicatat.
     const penetapBerubah = "penetapSkDasar" in patch && patch.penetapSkDasar !== (lama.penetapSkDasar ?? null);
     if (penetapBerubah && (await db.suratKGB.findUnique({ kgbId: id }))) {
-      const [pegawai, userLogin] = await Promise.all([
-        db.pegawai.findUnique({ id: lama.pegawaiId }),
-        db.user.findUnique({ nip: session.user.nip! }),
-      ]);
-      if (userLogin) {
-        logAudit({
-          userId: userLogin.id,
-          aksi: "ubah_penetap_sk",
-          detail: `Ubah penetap SK dasar KGB ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}) setelah surat dibuat: "${lama.penetapSkDasar ?? "-"}" menjadi "${patch.penetapSkDasar ?? "-"}"`,
-          targetNama: pegawai?.nama ?? "-",
-        });
-      }
+      const pegawai = await db.pegawai.findUnique({ id: lama.pegawaiId });
+      logAudit({
+        userId: userLogin.id,
+        aksi: "ubah_penetap_sk",
+        detail: `Ubah penetap SK dasar KGB ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}) setelah surat dibuat: "${lama.penetapSkDasar ?? "-"}" menjadi "${patch.penetapSkDasar ?? "-"}"`,
+        targetNama: pegawai?.nama ?? "-",
+      });
     }
     return NextResponse.json(kgb);
   }
 
-  // Pembatalan. Status lain hanya berpindah lewat input KGB, pembuatan surat,
-  // unggah SK final, dan konfirmasi keuangan.
+  // Pembatalan. Status lain hanya berpindah lewat Input KGB, unggah SK final, dan konfirmasi keuangan;
+  // penanda rapelan diturunkan dari batas input SDM dan tidak diubah manual.
   if (body.status !== "ditolak") {
     return NextResponse.json({ error: "Status tidak valid" }, { status: 400 });
   }
@@ -80,68 +98,66 @@ export async function PATCH(
     );
   }
 
-  const [pegawai, userLogin] = await Promise.all([
-    db.pegawai.findUnique({ id: lama.pegawaiId }),
-    db.user.findUnique({ nip: session.user.nip! }),
-  ]);
+  const pegawai = await db.pegawai.findUnique({ id: lama.pegawaiId });
+
+  // Input KGB menggeser TMT pegawai ke periode berikutnya; kembalikan agar KGB dapat diinput ulang.
+  const pulihkanTmt =
+    pegawai !== null &&
+    samaTanggalKalender(pegawai.tmtKgbBerikutnya, lama.tmtKgbBerikutnya) &&
+    !samaTanggalKalender(lama.tmtKgbBaru, lama.tmtKgbBerikutnya);
+
+  // Penundaan hukdis yang dicatat selama KGB ini berjalan hanya tersimpan pada TMT KGB berikutnya,
+  // yang ikut dikembalikan saat pembatalan. Pembatalan ditolak agar penundaan itu tidak hilang diam-diam.
+  if (pulihkanTmt) {
+    const riwayatHukdis = (await db.riwayatHukdis.findMany({
+      where: { pegawaiId: lama.pegawaiId },
+    })) as unknown as RiwayatHukdisRow[];
+    const bulanTunda = penundaanHukdisSelamaKgb({ kgb: lama, riwayatHukdis });
+    if (bulanTunda > 0) {
+      return NextResponse.json(
+        {
+          error: `KGB ini tidak dapat dibatalkan karena selama KGB ini berjalan tercatat hukuman disiplin yang menunda KGB berikutnya ${bulanTunda} bulan. Pembatalan mengembalikan jadwal KGB pegawai sehingga penundaan tersebut akan hilang. Hapus catatan hukuman disiplin itu terlebih dahulu, batalkan KGB, lalu catat kembali hukuman disiplin setelah KGB diinput ulang.`,
+        },
+        { status: 409 },
+      );
+    }
+  }
 
   const kgb = await db.riwayatKGB.update({ id }, { status: "ditolak" });
 
-  // Input KGB menggeser TMT pegawai ke periode berikutnya; kembalikan agar KGB dapat diinput ulang.
-  if (
-    pegawai &&
-    samaHari(pegawai.tmtKgbBerikutnya, lama.tmtKgbBerikutnya) &&
-    !samaHari(lama.tmtKgbBaru, lama.tmtKgbBerikutnya)
-  ) {
-    const selesaiTerakhir = (
-      await db.riwayatKGB.findMany({
-        where: { pegawaiId: lama.pegawaiId, status: "selesai" },
-        orderBy: { field: "tmtKgbBaru", dir: "desc" },
-      })
-    )[0];
+  if (pulihkanTmt && pegawai) {
+    // TMT terakhir diturunkan dari tambahan MKG saat input, bukan dari TMT SK dasar yang bisa berupa
+    // SK kenaikan pangkat; KGB selesai terakhir hanya dipakai bila tambahan itu tidak diketahui.
+    let tmtKgbTerakhir = tmtTerakhirSebelumInput(lama);
+    if (!tmtKgbTerakhir) {
+      const selesaiTerakhir = (
+        await db.riwayatKGB.findMany({
+          where: { pegawaiId: lama.pegawaiId, status: "selesai" },
+          orderBy: { field: "tmtKgbBaru", dir: "desc" },
+        })
+      )[0];
+      tmtKgbTerakhir = selesaiTerakhir?.tmtKgbBaru ?? pegawai.tmtKgbTerakhir;
+    }
     await db.pegawai.update(
       { id: pegawai.id },
-      {
-        tmtKgbBerikutnya: lama.tmtKgbBaru,
-        tmtKgbTerakhir: selesaiTerakhir?.tmtKgbBaru ?? lama.tmtSK ?? pegawai.tmtKgbTerakhir,
-      },
+      { tmtKgbBerikutnya: lama.tmtKgbBaru, tmtKgbTerakhir },
     );
   }
 
-  if (userLogin) {
-    await db.serahTerima.create({
-      id: newId(),
-      kgbId: id,
-      namaAdmin: session.user.nama || userLogin.nama,
-      keterangan: `DITOLAK: ${alasan}`,
-      tanggalSerahTerima: new Date(),
-      createdBy: userLogin.id,
-    });
-    logAudit({
-      userId: userLogin.id,
-      aksi: "reject_kgb",
-      detail: `Status KGB ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}) diubah menjadi "Ditolak", Alasan: ${alasan}`,
-      targetNama: pegawai?.nama ?? "-",
-    });
-  }
+  await db.serahTerima.create({
+    id: newId(),
+    kgbId: id,
+    namaAdmin: session.user.nama || userLogin.nama,
+    keterangan: `DITOLAK: ${alasan}`,
+    tanggalSerahTerima: new Date(),
+    createdBy: userLogin.id,
+  });
+  logAudit({
+    userId: userLogin.id,
+    aksi: "reject_kgb",
+    detail: `Status KGB ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}) diubah menjadi "Dibatalkan", Alasan: ${alasan}`,
+    targetNama: pegawai?.nama ?? "-",
+  });
 
   return NextResponse.json({ ...kgb, pegawai: pegawai ? { nama: pegawai.nama, nip: pegawai.nip } : null });
-}
-
-export async function DELETE(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const session = await auth();
-  if (!session)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  if (!canProcessKGB(session.user.role!))
-    return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
-
-  const { id } = await params;
-  const ok = await db.riwayatKGB.delete({ id });
-  if (!ok) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
-
-  return NextResponse.json({ message: "Data KGB berhasil dihapus" });
 }

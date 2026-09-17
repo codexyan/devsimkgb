@@ -8,6 +8,9 @@
 //   • KGB milik pimpinan Kanwil sendiri   → Direktur Jenderal Pemasyarakatan
 //
 // Modul ini murni (tanpa akses Sheets) agar bisa dipakai di server maupun di halaman.
+// Masa berlaku dibandingkan sebagai tanggal kalender WITA.
+
+import { formatTanggalId, tanggalKalender } from "./waktu";
 
 export const JENIS_PENANDATANGAN = ["definitif", "plh", "plt", "dirjen"] as const;
 export type JenisPenandatangan = (typeof JENIS_PENANDATANGAN)[number];
@@ -48,7 +51,7 @@ export type Penandatangan = Omit<PenandatanganRow, "berlakuMulai" | "berlakuSamp
   updatedAt?: Tanggal;
 };
 
-export type DataPenandatangan = Pick<
+type DataPenandatangan = Pick<
   PenandatanganRow,
   "jenis" | "nama" | "nip" | "jabatan" | "dasarPenunjukan" | "berlakuMulai" | "berlakuSampai"
 >;
@@ -60,12 +63,13 @@ export function jabatanTercetak(p: Pick<Penandatangan, "jenis" | "jabatan">): st
   return p.jabatan;
 }
 
-/** Awal hari (waktu lokal) dalam milidetik; null bila kosong atau tidak valid. */
+/**
+ * Tanggal kalender WITA dalam milidetik; null bila kosong atau tidak valid. Tanggal tersimpan dapat
+ * berupa tengah malam UTC atau tengah malam WITA (16.00 UTC hari sebelumnya), jadi getter lokal
+ * saja akan menggeser masa berlaku sehari pada proses UTC.
+ */
 function hari(t: Tanggal): number | null {
-  if (!t) return null;
-  const d = new Date(t);
-  if (Number.isNaN(d.getTime())) return null;
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return tanggalKalender(t)?.getTime() ?? null;
 }
 
 /** Berlaku pada tanggal tertentu; tanggal akhir ikut dihitung. */
@@ -78,8 +82,7 @@ export function berlakuPada(p: Pick<Penandatangan, "berlakuMulai" | "berlakuSamp
 }
 
 export function rentangBerlaku(p: Pick<Penandatangan, "berlakuMulai" | "berlakuSampai">): string {
-  const f = (t: Tanggal) =>
-    t ? new Date(t).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const f = (t: Tanggal) => (t ? formatTanggalId(t, { day: "numeric", month: "short", year: "numeric" }) : "");
   return `${f(p.berlakuMulai)} – ${p.berlakuSampai ? f(p.berlakuSampai) : "sekarang"}`;
 }
 
@@ -91,7 +94,7 @@ function terbaru<T extends Penandatangan>(daftar: T[], jenis: JenisPenandatangan
     .sort((a, b) => (hari(b.berlakuMulai) ?? 0) - (hari(a.berlakuMulai) ?? 0))[0];
 }
 
-export type HasilPenandatangan<T extends Penandatangan = Penandatangan> =
+type HasilPenandatangan<T extends Penandatangan = Penandatangan> =
   | { ok: true; penandatangan: T; jabatan: string; milikPimpinan: boolean }
   | { ok: false; error: string };
 

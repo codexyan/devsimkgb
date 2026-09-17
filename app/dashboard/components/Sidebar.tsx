@@ -5,9 +5,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { usePageTransition } from "@/lib/ui";
 import { ROLES, ROLE_LABEL } from "@/lib/auth";
-import { useThemeMode } from "@/lib/landingTheme";
+import { useThemeMode } from "@/lib/ui/themeMode";
 
 interface SidebarProps {
   role: string;
@@ -21,7 +20,6 @@ interface Notif {
   pesan: string;
   prioritas: string;
   dibaca: boolean;
-  createdAt: string;
   linkHref?: string;
 }
 
@@ -50,8 +48,15 @@ const Ic = {
   dot:       <svg width="7" height="7" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="3"/></svg>,
 };
 
+/* Prioritas notifikasi ditulis sebagai teks, tidak hanya dibedakan warna titik. */
+const PRIORITAS_NOTIF: Record<string, { label: string; warna: string; bg: string }> = {
+  critical: { label: "Mendesak",  warna: "var(--st-red)",   bg: "var(--tint-red-bg)"   },
+  warning:  { label: "Perhatian", warna: "var(--st-amber)", bg: "var(--tint-amber-bg)" },
+  info:     { label: "Informasi", warna: "var(--st-blue)",  bg: "var(--tint-blue-bg)"  },
+};
+
 /* ── Menus ────────────────────────────────────────────────────────────────── */
-type Leaf  = { href: string; label: string; icon: React.ReactNode };
+type Leaf  = { href: string; label: string; icon: React.ReactNode; newTab?: boolean };
 type Group = { groupLabel: string; icon: React.ReactNode; children: Leaf[] };
 type Entry = Leaf | Group;
 const isGroup = (e: Entry): e is Group => "children" in e;
@@ -97,8 +102,9 @@ const menuKeuanganSub = [
   { href: "/dashboard/keuangan",         label: "Keuangan",          icon: Ic.lock    },
   { href: "/dashboard/keuangan/riwayat", label: "Riwayat Aktivitas", icon: Ic.history },
 ];
-const menuBantuan = [
-  { href: "/dashboard/panduan", label: "Panduan", icon: Ic.book },
+// Panduan berada di halaman publik; dibuka di tab baru agar pekerjaan di dashboard tidak hilang.
+const menuBantuan: Leaf[] = [
+  { href: "/panduan", label: "Panduan", icon: Ic.book, newTab: true },
 ];
 const menuAdmin = [
   { href: "/dashboard/users",         label: "Pengguna",      icon: Ic.person  },
@@ -123,15 +129,17 @@ const SB = {
 
 /* ── NavItem ──────────────────────────────────────────────────────────────── */
 function NavItem({
-  href, label, icon, isActive, expanded, onClose, indent = false,
+  href, label, icon, isActive, expanded, onClose, indent = false, newTab = false,
 }: {
   href: string; label: string; icon: React.ReactNode;
-  isActive: boolean; expanded: boolean; onClose: () => void; indent?: boolean;
+  isActive: boolean; expanded: boolean; onClose: () => void; indent?: boolean; newTab?: boolean;
 }) {
   return (
     <Link
       href={href}
       onClick={onClose}
+      target={newTab ? "_blank" : undefined}
+      rel={newTab ? "noopener" : undefined}
       title={!expanded ? label : undefined}
       className={isActive ? "sb-item sb-active" : "sb-item"}
       style={{
@@ -269,9 +277,8 @@ function GroupLabel({ text, expanded }: { text: string; expanded: boolean }) {
 
 /* ── Main Sidebar ─────────────────────────────────────────────────────────── */
 export default function Sidebar({ role, nama, nip }: SidebarProps) {
-  const pathname          = usePathname();
-  const router            = useRouter();
-  const triggerTransition = usePageTransition();
+  const pathname = usePathname();
+  const router   = useRouter();
 
   const [isOpen,      setIsOpen]      = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -293,21 +300,21 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
   async function fetchNotif() {
     try {
       const res  = await fetch("/api/notifikasi");
-      const data = await res.json() as any;
+      const data: unknown = await res.json();
       if (Array.isArray(data)) {
-        setNotifList(data.slice(0, 6));
-        setUnread(data.filter((n: Notif) => !n.dibaca).length);
+        const daftar = data as Notif[];
+        setNotifList(daftar.slice(0, 6));
+        setUnread(daftar.filter((n) => !n.dibaca).length);
       }
     } catch { /* silent */ }
   }
 
-  /* notif polling (dilewati untuk role hukdis yang tidak punya modul notifikasi) */
+  /* notif polling untuk semua peran; GET /api/notifikasi menyaring tipe notifikasi per peran */
   useEffect(() => {
-    if (role === ROLES.SDM_HUKDIS) return;
     const t  = setTimeout(fetchNotif, 1200);
     const iv = setInterval(fetchNotif, 5 * 60 * 1000);
     return () => { clearTimeout(t); clearInterval(iv); };
-  }, [role]);
+  }, []);
 
   async function markRead(id: string) {
     await fetch(`/api/notifikasi/${id}/baca`, { method: "PATCH" }).catch(() => {});
@@ -315,19 +322,28 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
     setUnread((c) => Math.max(0, c - 1));
   }
 
-  /* close dropdowns on outside click */
+  /* close dropdowns on outside click, dan dengan Escape */
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (notifRef.current   && !notifRef.current.contains(e.target as Node))   setShowNotif(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setShowProfile(false);
     }
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setShowNotif(false);
+      setShowProfile(false);
+      setIsOpen(false);
+    }
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   function handleLogout() {
-    if (triggerTransition) triggerTransition(() => signOut({ callbackUrl: "/login" }));
-    else signOut({ callbackUrl: "/login" });
+    signOut({ callbackUrl: "/login" });
   }
 
   /* menu by role */
@@ -358,12 +374,13 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
         <button
           className="lg:hidden"
           onClick={() => setIsOpen(true)}
+          aria-label="Buka menu"
           style={{
             position: "fixed", top: "14px", left: "14px", zIndex: 19,
             width: "36px", height: "36px", borderRadius: "10px",
             background: "var(--card)", border: "1px solid var(--ln1)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", color: "#334155",
+            cursor: "pointer", color: "var(--dt2)",
             boxShadow: "0 1px 6px rgba(15,23,42,0.08)",
           }}
         >
@@ -439,7 +456,8 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
           <button
             className="hidden lg:flex items-center justify-center sb-chev"
             onClick={() => setIsCollapsed((p) => !p)}
-            title={isCollapsed ? "Perluas" : "Ciutkan"}
+            title={isCollapsed ? "Perluas menu" : "Ciutkan menu"}
+            aria-label={isCollapsed ? "Perluas menu" : "Ciutkan menu"}
             style={{
               width: "24px", height: "24px", borderRadius: "6px",
               background: "transparent", border: "none",
@@ -493,21 +511,17 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
             </>
           )}
 
-          {/* Bantuan */}
-          {role !== ROLES.KEUANGAN && (
-            <>
-              <GroupLabel text="Bantuan" expanded={expanded} />
-              {menuBantuan.map((item) => (
-                <NavItem
-                  key={item.href}
-                  {...item}
-                  isActive={pathname === item.href}
-                  expanded={expanded}
-                  onClose={() => setIsOpen(false)}
-                />
-              ))}
-            </>
-          )}
+          {/* Bantuan (semua peran, termasuk keuangan) */}
+          <GroupLabel text="Bantuan" expanded={expanded} />
+          {menuBantuan.map((item) => (
+            <NavItem
+              key={item.href}
+              {...item}
+              isActive={pathname === item.href}
+              expanded={expanded}
+              onClose={() => setIsOpen(false)}
+            />
+          ))}
 
           {/* Admin */}
           {role === ROLES.SUPER_ADMIN && (
@@ -525,13 +539,14 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
             </>
           )}
 
-          {/* Notifikasi (tidak untuk role hukdis) */}
-          {role !== ROLES.SDM_HUKDIS && (
+          {/* Notifikasi (semua peran; isi daftar mengikuti peran) */}
           <div ref={notifRef}>
             <Sep />
             <button
               onClick={() => { setShowNotif((v) => !v); setShowProfile(false); }}
               title={!expanded ? `Notifikasi${unread > 0 ? ` (${unread})` : ""}` : undefined}
+              aria-label={`Notifikasi${unread > 0 ? `, ${unread} belum dibaca` : ""}`}
+              aria-expanded={showNotif}
               className={showNotif ? "" : "sb-btn"}
               style={{
                 width: "calc(100% - 20px)",
@@ -605,6 +620,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
                     </div>
                   ) : notifList.map((n, i) => {
                     const dotColor = n.prioritas === "critical" ? "#ef4444" : n.prioritas === "warning" ? "#f59e0b" : "#3b82f6";
+                    const prio = PRIORITAS_NOTIF[n.prioritas] ?? PRIORITAS_NOTIF.info;
                     return (
                       <button
                         key={n.id}
@@ -618,8 +634,12 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
                           border: "none", cursor: "pointer", fontFamily: "inherit",
                         }}
                       >
-                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: n.dibaca ? "var(--dt6)" : dotColor, flexShrink: 0, marginTop: "5px" }} />
+                        <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "50%", background: n.dibaca ? "var(--dt6)" : dotColor, flexShrink: 0, marginTop: "5px" }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: "inline-block", fontSize: "9px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: prio.warna, background: prio.bg, borderRadius: "4px", padding: "1px 5px", marginBottom: "3px" }}>
+                            {prio.label}
+                          </span>
+                          {!n.dibaca && <span className="sr-only">, belum dibaca</span>}
                           <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--dt1)", margin: 0, lineHeight: 1.3 }}>{n.judul}</p>
                           <p style={{ fontSize: "11px", color: "var(--dt3)", margin: "2px 0 0", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{n.pesan}</p>
                         </div>
@@ -633,7 +653,6 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
               </div>
             )}
           </div>
-          )}
         </nav>
 
         {/* ── User section ── */}
@@ -644,6 +663,8 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
             <button
               onClick={() => { setShowProfile((v) => !v); setShowNotif(false); }}
               title={!expanded ? nama : undefined}
+              aria-label={!expanded ? `Menu profil ${nama}` : undefined}
+              aria-expanded={showProfile}
               className={showProfile ? "" : "sb-btn"}
               style={{
                 width: "100%",
@@ -716,7 +737,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
                     style={{
                       display: "flex", alignItems: "center", gap: "10px",
                       padding: "8px 10px", borderRadius: "8px",
-                      color: "#334155", textDecoration: "none",
+                      color: "var(--dt2)", textDecoration: "none",
                       transition: "background 0.1s",
                     }}
                   >
@@ -724,8 +745,8 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
                       {Ic.edit}
                     </div>
                     <div>
-                      <p style={{ fontSize: "12px", fontWeight: 500, color: "var(--dt1)", margin: 0 }}>Edit Profil</p>
-                      <p style={{ fontSize: "10px", color: "var(--dt4)", margin: 0 }}>Ubah data dan password</p>
+                      <p style={{ fontSize: "12px", fontWeight: 500, color: "var(--dt1)", margin: 0 }}>Profil Saya</p>
+                      <p style={{ fontSize: "10px", color: "var(--dt4)", margin: 0 }}>Ajukan perubahan data, ganti kata sandi</p>
                     </div>
                   </Link>
                 </div>
@@ -737,6 +758,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
           <button
             onClick={toggleTheme}
             title={!expanded ? (themeMode === "dark" ? "Mode terang" : "Mode gelap") : undefined}
+            aria-label={!expanded ? (themeMode === "dark" ? "Mode terang" : "Mode gelap") : undefined}
             className="sb-btn"
             style={{
               width: "100%",
@@ -767,6 +789,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
           <button
             onClick={handleLogout}
             title={!expanded ? "Keluar" : undefined}
+            aria-label={!expanded ? "Keluar" : undefined}
             style={{
               width: "100%",
               display: "flex",

@@ -1,120 +1,151 @@
 # Deploy SIM-KGB ke Cloudflare Workers
 
-SIM-KGB dideploy ke **Cloudflare Workers** memakai [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare).
-Database tetap **Neon Postgres**. Berkas SK pindah dari Vercel Blob ke **Cloudflare R2**.
-Notifikasi harian berjalan lewat **Cloudflare Cron Triggers**.
+SIM-KGB berjalan sebagai satu Worker Cloudflare bernama `sim-kgb`, dibangun dengan
+[`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) (OpenNext). Berkas SK disimpan di
+Cloudflare R2, data dibaca dari Google Sheets atau Supabase, dan pekerjaan harian berjalan lewat
+Cron Trigger. Semua perintah dijalankan dari akar repositori.
 
-> Semua perintah dijalankan dari folder `apps/kgb`.
+## 1. Susunan Worker
 
----
+Konfigurasi ada di `wrangler.jsonc`:
 
-## 1. Prasyarat (sekali saja)
+| Bagian | Nilai | Kegunaan |
+|--------|-------|----------|
+| `name` | `sim-kgb` | Nama Worker. Nama Worker di dashboard harus sama. |
+| `main` | `worker-entry.js` | Membungkus `.open-next/worker.js` (hasil build OpenNext): meneruskan `fetch` dan menambahkan handler `scheduled`. |
+| `assets` | `.open-next/assets`, binding `ASSETS` | Berkas statis hasil build. |
+| `services` | `WORKER_SELF_REFERENCE` ke `sim-kgb` | Dipakai handler `scheduled` untuk memanggil endpoint cron di Worker yang sama. |
+| `r2_buckets` | `SK_BUCKET` ke bucket `sim-kgb-sk` | Berkas SK KGB. |
+| `triggers.crons` | `0 0 * * *` | Cron harian pukul 00.00 UTC (08.00 WITA). |
+| `compatibility_flags` | `nodejs_compat`, `global_fetch_strictly_public` | Runtime Node yang dibutuhkan Next.js. |
 
-1. Akun Cloudflare (Workers Paid tidak wajib — bundel worker ~0,7 MB gzip, muat di plan Free 3 MB).
-2. Login wrangler:
-   ```bash
-   npx wrangler login
-   ```
-3. Database **Neon** siap (URL pooled untuk runtime + URL direct untuk migrasi).
+`open-next.config.ts` memakai konfigurasi bawaan (tanpa incremental cache), karena hampir semua
+halaman dinamis dan terlindungi login.
 
----
+Tidak ada `middleware.ts` atau `proxy.ts`. Pembatasan peran halaman dilakukan di layout server
+(`lib/authGuard.ts`), dan setiap route API memeriksa sesi dengan `auth()`.
 
-## 2. Siapkan Prisma untuk Neon (Postgres)
+## 2. Bucket R2 untuk berkas SK
 
-Dev lokal memakai SQLite; **produksi memakai Neon Postgres**. Prisma mewajibkan
-`provider` berupa string statis di `prisma/schema.prisma`, jadi harus di-switch.
-Sudah disediakan skrip untuk itu (URL koneksi diambil `prisma.config.ts` dari
-`DIRECT_URL`, sehingga blok datasource cukup berisi `provider`):
-
-1. Switch ke Postgres + generate client:
-   ```bash
-   npm run db:postgres      # set provider=postgresql lalu prisma generate
-   ```
-2. Terapkan skema ke Neon (butuh `DIRECT_URL` Neon di `.env`):
-   ```bash
-   npx prisma db push
-   ```
-3. Seed super admin bila perlu (lihat `scripts/reset-superadmin.ts`).
-4. Kembali ke dev lokal SQLite kapan saja:
-   ```bash
-   npm run db:sqlite
-   ```
-
-> Catatan: `npm run cf:build` / `cf:deploy` **sudah otomatis** menyetel provider ke
-> postgresql sebelum build, jadi client yang dideploy pasti Postgres. Setelah
-> deploy, jalankan `npm run db:sqlite` untuk melanjutkan dev lokal.
->
-> `lib/prisma.ts` memakai adapter Neon untuk URL non-`file:`; adapter libsql
-> (SQLite) di-load dinamis dan **tidak** ikut dibundel ke Worker.
-
----
-
-## 3. Buat R2 bucket (penyimpanan SK)
+Buat bucket sekali saja:
 
 ```bash
+npx wrangler login
 npx wrangler r2 bucket create sim-kgb-sk
 ```
 
-Binding `SK_BUCKET` → `sim-kgb-sk` sudah didefinisikan di `wrangler.jsonc`.
+Binding `SK_BUCKET` dipakai oleh:
 
----
+- `POST /api/kgb/[id]/upload-sk`: menyimpan PDF SK bertanda tangan dengan kunci `sk/<nip>_<waktu>.pdf`.
+- `GET /api/blob/download`: mengunduh berkas SK (hanya kunci di bawah `sk/`).
+- `DELETE /api/pegawai/[id]`: menghapus berkas SK milik pegawai yang dihapus.
 
-## 4. Set secrets Worker (produksi)
+Saat `next dev`, binding tersedia lewat `initOpenNextCloudflareForDev()` di `next.config.ts`.
+
+## 3. Penyimpanan data
+
+Semua route memakai `import { db } from "@/lib/db"`. Penyimpanan dipilih di `lib/db/index.ts` setiap kali
+data diakses:
+
+- `DATA_BACKEND=sheets` memakai Google Sheets (penyimpanan produksi saat ini).
+- `DATA_BACKEND=supabase` memakai Supabase (Postgres lewat REST).
+- Tanpa `DATA_BACKEND`, Supabase dipakai bila `SUPABASE_URL` terisi; selain itu Google Sheets.
+- Nilai `DATA_BACKEND` lain membuat request gagal dengan pesan galat yang jelas.
+
+Google Sheets membutuhkan akun layanan yang diberi akses Editor ke spreadsheet, dengan Google Sheets API
+aktif di project Google Cloud. Supabase membutuhkan secret key proyek; key itu melewati RLS, jadi hanya
+boleh dipakai di server.
+
+## 4. Variabel dan secret
+
+Isi sebagai secret Worker, lewat dashboard (Worker `sim-kgb`, Settings, Variables and Secrets) atau CLI:
 
 ```bash
-npx wrangler secret put NEXTAUTH_SECRET     # openssl rand -base64 32
-npx wrangler secret put DATABASE_URL        # Neon pooled URL (…-pooler…)
-npx wrangler secret put DIRECT_URL          # Neon direct URL
-npx wrangler secret put CRON_SECRET         # rahasia acak; melindungi endpoint cron
-npx wrangler secret put NEXTAUTH_URL        # https://<domain-produksi>
+npx wrangler secret put AUTH_SECRET
+npx wrangler secret put CRON_SECRET
+npx wrangler secret put DATA_BACKEND
+npx wrangler secret put GOOGLE_SHEET_ID
+npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_EMAIL
+npx wrangler secret put GOOGLE_PRIVATE_KEY
+# bila memakai Supabase
+npx wrangler secret put SUPABASE_URL
+npx wrangler secret put SUPABASE_SECRET_KEY
 ```
 
-`BLOB_READ_WRITE_TOKEN` **tidak diperlukan lagi** (sudah pindah ke R2).
+| Variabel | Wajib | Kegunaan |
+|----------|-------|----------|
+| `AUTH_SECRET` | Ya | Kunci sesi NextAuth v5 (buat dengan `openssl rand -base64 32`). NextAuth juga membaca `NEXTAUTH_SECRET` sebagai nama lama. |
+| `CRON_SECRET` | Ya | Bearer token endpoint cron. Tanpa nilai ini endpoint cron menjawab 503. |
+| `DATA_BACKEND` | Tidak | `sheets` atau `supabase` (lihat bagian 3). |
+| `GOOGLE_SHEET_ID` | Untuk Sheets | ID spreadsheet dari URL `docs.google.com/spreadsheets/d/<ID>/edit`. |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Untuk Sheets | Email akun layanan. |
+| `GOOGLE_PRIVATE_KEY` | Untuk Sheets | `private_key` dari JSON key; boleh ditulis satu baris dengan `\n`. |
+| `SUPABASE_URL` | Untuk Supabase | URL proyek, misalnya `https://PROJECT_REF.supabase.co`. |
+| `SUPABASE_SECRET_KEY` | Untuk Supabase | Secret key proyek (hanya server). |
+| `AUTH_URL` | Tidak | URL kanonik. Tidak diperlukan karena `auth.config.ts` memakai `trustHost: true`. |
 
-Untuk preview lokal (`wrangler dev`/`preview`), salin `.dev.vars.example` → `.dev.vars`
-dan isi nilainya (gitignored).
+Nama variabel sama dengan `.env.example`. Variabel lama di `.env.example` dan `.dev.vars.example`
+(`DATABASE_URL`, `DIRECT_URL`, `BLOB_READ_WRITE_TOKEN`, `SEED_PASSWORD_*`) tidak dibaca kode aplikasi.
 
----
+Secret dibaca dari `process.env` saat request berjalan, sehingga perubahan secret berlaku setelah
+Worker menerima versi konfigurasi baru tanpa perlu build ulang.
 
-## 5. Deploy
+## 5. Build dan deploy otomatis dari Git (Workers Builds)
+
+Deploy produksi berjalan dengan Workers Builds yang terhubung ke repositori Git.
+
+1. Dashboard Cloudflare, Workers & Pages, Worker `sim-kgb`, Settings, Build: hubungkan repositori.
+2. Branch produksi: `main`.
+3. Perintah build: `npm run cf:build` (menjalankan `wrangler types` untuk `cloudflare-env.d.ts`, lalu
+   `opennextjs-cloudflare build`).
+4. Perintah deploy: `npx opennextjs-cloudflare deploy`.
+5. Secret runtime diisi seperti bagian 4. Build tidak membutuhkan variabel tambahan.
+
+Workers Builds memasang dependensi dengan `npm ci`, jadi `package-lock.json` harus sesuai dengan
+`package.json` setiap kali dependensi berubah.
+
+Deploy manual dari komputer lokal:
 
 ```bash
-npm run cf:deploy      # prisma generate → opennextjs-cloudflare build → deploy
+npm run cf:deploy     # cf:typegen, opennextjs-cloudflare build, lalu deploy
 ```
 
-Cek ukuran/bundel tanpa deploy: `npx wrangler deploy --dry-run`
-(saat ini: **±673 KiB gzip**). Preview lokal: `npm run cf:preview`.
+`cloudflare-env.d.ts` dibuat oleh `npm run cf:typegen` dan tidak disimpan di Git. Tanpa berkas itu,
+`tsc` melaporkan `Property 'SK_BUCKET' does not exist on type 'CloudflareEnv'`. Jalankan ulang setelah
+mengubah binding di `wrangler.jsonc`.
 
----
+## 6. Cron harian
 
-## 6. Cron (notifikasi harian)
+1. Cron Trigger `0 0 * * *` memanggil handler `scheduled` di `worker-entry.js`.
+2. Handler itu memanggil `https://sim-kgb.internal/api/cron/notifikasi` lewat binding
+   `WORKER_SELF_REFERENCE`, dengan header `Authorization: Bearer <CRON_SECRET>`.
+3. `app/api/cron/notifikasi/route.ts` menjawab 503 bila `CRON_SECRET` belum diisi dan 401 bila token
+   tidak cocok. Bila token cocok, route menjalankan:
+   - `bersihkanHukdisKedaluwarsa()` (`lib/hukdisKedaluwarsa.ts`): menonaktifkan penanda hukdis pegawai
+     yang sudah lewat tanggal berakhir. Kegagalan langkah ini dicatat dan tidak menghentikan langkah berikutnya.
+   - `generateNotifikasi()` (`lib/generateNotifikasi.ts`): membuat notifikasi harian.
 
-- Jadwal `0 0 * * *` (07:00 WIB) terdaftar di `wrangler.jsonc` → `triggers.crons`.
-- `worker-entry.js` menambahkan handler `scheduled` yang memanggil
-  `/api/cron/notifikasi` secara internal (via self-reference binding) dengan header
-  `Authorization: Bearer $CRON_SECRET`.
-- Uji manual dari dashboard Cloudflare (Workers → Triggers → "Trigger scheduled event")
-  atau tunggu jadwal.
+Hasil dan galat terlihat di log Worker (observability aktif). Untuk menguji tanpa menunggu jadwal:
 
----
+```bash
+curl -H "Authorization: Bearer <CRON_SECRET>" https://<domain-produksi>/api/cron/notifikasi
+```
 
-## 7. Custom domain (opsional)
+Di luar cron, `GET /api/notifikasi` juga membuat notifikasi paling sering sekali tiap 15 menit per isolate.
 
-Cloudflare Dashboard → Worker `sim-kgb` → **Settings → Domains & Routes** → tambahkan
-domain/route. Pastikan `NEXTAUTH_URL` menunjuk domain final.
+## 7. Menjalankan lokal
 
----
+```bash
+npm install
+npm run dev          # next dev di http://localhost:3100, variabel dari .env
+npm run cf:preview   # build OpenNext lalu jalankan di runtime Workers lokal, variabel dari .dev.vars
+```
 
-## Catatan / gotcha
+`.env` dan `.dev.vars` tidak disimpan di Git. Isi dengan variabel di bagian 4. Dev server dan preview
+lokal memakai spreadsheet atau proyek Supabase yang ditunjuk variabel tersebut, jadi arahkan ke data uji
+bila tidak ingin mengubah data produksi.
 
-- **Middleware**: `proxy.ts` dihapus. OpenNext belum mendukung Node middleware
-  (Next 16 memaksa proxy ke runtime Node, tak bisa Edge). Proteksi peran kini di
-  layout server (`lib/authGuard.ts`) + tiap API route sudah cek `auth()` sendiri.
-- **Type errors**: sudah bersih (tsc 0 error) — `next build` kini type-check penuh
-  tanpa `ignoreBuildErrors`. Mayoritas perbaikan: hasil `.json()` di-cast `as any`
-  karena `Request/Response.json()` global (undici) bertipe `unknown`. Bila ingin
-  keamanan tipe lebih kuat, ganti `as any` dengan interface respons per-endpoint.
-- **Dev lokal** tetap pakai SQLite: provider `sqlite` + `DATABASE_URL="file:dev.db"`
-  di `.env`, jalankan `npm run dev`. `cf:build`/`cf:deploy` otomatis switch ke
-  postgres; setelah deploy jalankan `npm run db:sqlite` untuk kembali ke dev.
-- **Regenerate tipe binding** setelah mengubah `wrangler.jsonc`: `npm run cf:typegen`.
+## 8. Domain
+
+Domain produksi dipasang di Worker `sim-kgb`, Settings, Domains & Routes. Produksi saat ini dilayani di
+`kgb.paskalsel.online`.

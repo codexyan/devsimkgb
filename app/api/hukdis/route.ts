@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { canManageHukdis } from "@/lib/auth";
+import { hukdisMasihBerlaku } from "@/lib/hukdisKedaluwarsa";
+import { hariIniWita } from "@/lib/waktu";
 
 export const runtime = "nodejs";
 
@@ -22,7 +24,8 @@ export async function GET() {
 
     const jenisMap = new Map(jenisList.map((j) => [j.kode, j]));
     const pegawaiMap = new Map(pegawaiList.map((p) => [p.id, p]));
-    const now = Date.now();
+    // Sama dengan penahanan KGB: tanggal berakhir ikut dihitung (tanggal kalender WITA).
+    const hariIni = hariIniWita();
 
     const data = rows.map((r) => {
       const j = jenisMap.get(r.jenisHukdis);
@@ -44,7 +47,7 @@ export async function GET() {
         dasarHukum: r.dasarHukum ?? j?.dasarHukum ?? null,
         keterangan: r.keterangan,
         createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
-        aktif: r.tmtBerakhir ? new Date(r.tmtBerakhir).getTime() >= now : false,
+        aktif: hukdisMasihBerlaku(r.tmtBerakhir, hariIni),
       };
     });
 

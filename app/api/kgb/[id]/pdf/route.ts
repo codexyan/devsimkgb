@@ -11,15 +11,11 @@ import React from "react";
 import { canProcessKGB, ROLES } from "@/lib/auth";
 import { tentukanPenandatangan, type JenisPenandatangan } from "@/lib/penandatangan";
 import { PENETAP_KANWIL } from "@/lib/penetapSk";
+import { cariSatker, SATKER_KANWIL } from "@/lib/satker";
+import { tanggalKalender } from "@/lib/waktu";
+import { alasanTolakBuatSk, bacaTanggalInput, type SuratKgbTersimpan } from "@/lib/prosesKgb";
 
 export const runtime = "nodejs";
-
-// Surat hanya boleh dibuat (ulang) sebelum SK final diunggah.
-const STATUS_TERKUNCI: Record<string, string> = {
-  menunggu_keuangan: "SK final sudah diunggah dan menunggu keuangan, jadi surat tidak dapat dibuat ulang.",
-  selesai: "KGB sudah selesai, jadi surat tidak dapat dibuat ulang.",
-  ditolak: "KGB ini sudah dibatalkan. Input ulang KGB sebelum membuat surat.",
-};
 
 /** Teks peraturan gaji: nilai lengkap dipakai apa adanya, nomor polos digabung dengan tahunnya. */
 function teksDasarHukum(nomorPP?: string | null, tahunPP?: string | null): string {
@@ -52,17 +48,30 @@ export async function POST(
 
   const { id } = await params;
 
-  let bodyData: { nomorSurat?: string; tanggalSurat?: string } = {};
-  try { bodyData = (await req.json()) as any; } catch { /* ok */ }
+  let bodyData: { nomorSurat?: unknown; tanggalSurat?: unknown } = {};
+  try {
+    const parsed: unknown = await req.json();
+    if (parsed && typeof parsed === "object") bodyData = parsed as typeof bodyData;
+  } catch { /* ok */ }
+  const nomorSuratBody = typeof bodyData.nomorSurat === "string" ? bodyData.nomorSurat.trim() : "";
+  const tanggalSuratBody = typeof bodyData.tanggalSurat === "string" ? bodyData.tanggalSurat.trim() : "";
 
   // Preview tanpa nomor & tanggal = unduh ulang surat tersimpan, apa adanya.
-  const unduhUlang = isPreview && !(bodyData.nomorSurat && bodyData.tanggalSurat);
+  const unduhUlang = isPreview && !(nomorSuratBody && tanggalSuratBody);
 
   const kgb = await db.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
-  if (!isPreview && STATUS_TERKUNCI[kgb.status])
-    return NextResponse.json({ error: STATUS_TERKUNCI[kgb.status] }, { status: 409 });
+  // SK hanya boleh dibuat (ulang) selama KGB Sedang Diproses, yaitu sesudah Input KGB dan sebelum SK final diunggah.
+  const alasanTolak = isPreview ? null : alasanTolakBuatSk(kgb.status);
+  if (alasanTolak)
+    return NextResponse.json({ error: alasanTolak }, { status: 409 });
+  if (!unduhUlang && !(kgb.nomorSK?.trim() && kgb.tanggalSK && kgb.tmtSK)) {
+    return NextResponse.json(
+      { error: "Data SK terakhir belum lengkap. Isi Nomor SK Terakhir, Tanggal SK Terakhir, dan TMT SK Terakhir sebelum membuat SK." },
+      { status: 422 },
+    );
+  }
   if (!unduhUlang && !kgb.penetapSkDasar?.trim()) {
     return NextResponse.json(
       { error: "Pejabat penetap SK terakhir belum diisi. Lengkapi data SK terakhir sebelum membuat surat." },
@@ -75,41 +84,61 @@ export async function POST(
     db.suratKGB.findMany({
       where: { kgbId: id },
       orderBy: { field: "tanggalSurat", dir: "desc" },
-    }) as Promise<any[]>,
+    }) as Promise<SuratKgbTersimpan[]>,
     db.penandatangan.findMany(),
-    db.konfigurasiKanwil.findUnique({ id: "default" }) as Promise<any>,
+    db.konfigurasiKanwil.findUnique({ id: "default" }) as Promise<{ nomorPP?: string | null; tahunPP?: string | null } | null>,
   ]);
   if (!pegawai)
     return NextResponse.json({ error: "Data pegawai tidak ditemukan" }, { status: 404 });
   const existingSurat = suratList[0] ?? null;
 
+  // SK dikirim ke KPPN mitra satker pegawai, juga saat unduh ulang. Unit kerja kosong berarti Kanwil,
+  // sama dengan pembacaan data pegawai; unit kerja di luar daftar satker ditolak karena KPPN-nya tidak diketahui.
+  const unitKerja = pegawai.unitKerja?.trim() ?? "";
+  const satker = unitKerja ? cariSatker(unitKerja) : SATKER_KANWIL;
+  if (!satker) {
+    return NextResponse.json(
+      {
+        error: `Unit kerja "${unitKerja}" belum sesuai daftar satker, sehingga KPPN tujuan SK tidak dapat ditentukan. Pilih satker yang benar di Data Pegawai.`,
+      },
+      { status: 422 },
+    );
+  }
+  const kppn = satker.kppn;
+
   let nomorSurat: string;
-  let tanggalSurat: string;
+  let tanggalSurat: Date;
   if (unduhUlang) {
-    if (!existingSurat) {
+    const tersimpan = existingSurat?.tanggalSurat ? new Date(existingSurat.tanggalSurat) : null;
+    if (!existingSurat || !tersimpan || Number.isNaN(tersimpan.getTime())) {
       return NextResponse.json({ error: "Belum ada surat yang digenerate" }, { status: 404 });
     }
     nomorSurat = existingSurat.nomorSurat;
-    tanggalSurat = new Date(existingSurat.tanggalSurat).toISOString();
+    tanggalSurat = tersimpan;
   } else {
-    nomorSurat = bodyData.nomorSurat ?? "";
-    tanggalSurat = bodyData.tanggalSurat ?? "";
-    if (!nomorSurat || !tanggalSurat) {
+    if (!nomorSuratBody || !tanggalSuratBody) {
       return NextResponse.json({ error: "Nomor surat dan tanggal wajib diisi" }, { status: 400 });
     }
+    const tanggal = bacaTanggalInput(tanggalSuratBody);
+    if (!tanggal) {
+      return NextResponse.json({ error: "Tanggal SK Baru tidak valid" }, { status: 400 });
+    }
+    nomorSurat = nomorSuratBody;
+    tanggalSurat = tanggal;
   }
 
   let penandatangan: { id: string | null; jenis: JenisPenandatangan; jabatan: string; nama: string; nip: string };
-  if (unduhUlang && existingSurat.jabatanPenandatangan) {
+  if (unduhUlang && existingSurat?.jabatanPenandatangan) {
     penandatangan = {
       id: existingSurat.penandatanganId ?? null,
-      jenis: existingSurat.jenisPenandatangan,
+      jenis: existingSurat.jenisPenandatangan as JenisPenandatangan,
       jabatan: existingSurat.jabatanPenandatangan,
-      nama: existingSurat.namaKepalaKanwil,
-      nip: existingSurat.nipKepalaKanwil,
+      nama: existingSurat.namaKepalaKanwil ?? "",
+      nip: existingSurat.nipKepalaKanwil ?? "",
     };
   } else {
-    const hasil = tentukanPenandatangan(daftarPenandatangan, new Date(tanggalSurat), pegawai.nip);
+    // Penandatangan dipilih menurut tanggal kalender WITA dari tanggal surat.
+    const hasil = tentukanPenandatangan(daftarPenandatangan, tanggalKalender(tanggalSurat)!, pegawai.nip);
     if (!hasil.ok) return NextResponse.json({ error: hasil.error }, { status: 422 });
     penandatangan = {
       id: hasil.penandatangan.id,
@@ -123,7 +152,8 @@ export async function POST(
   const pdfBuffer = await renderToBuffer(
     React.createElement(SuratKGBDocument, {
       nomorSurat,
-      tanggalSurat: new Date(tanggalSurat),
+      tanggalSurat,
+      kppn,
       pegawai: {
         nama: pegawai.nama,
         nip: pegawai.nip,
@@ -135,8 +165,8 @@ export async function POST(
       kgb: {
         gajiPokokLama: kgb.gajiPokokLama,
         nomorSK: kgb.nomorSK,
-        tanggalSK: kgb.tanggalSK as Date,
-        tmtSK: kgb.tmtSK as Date,
+        tanggalSK: kgb.tanggalSK,
+        tmtSK: kgb.tmtSK,
         // Surat lama (sebelum kolom ini ada) selalu mencetak penetap Kanwil.
         penetapSkDasar: kgb.penetapSkDasar?.trim() || PENETAP_KANWIL,
         mkgTahunLama: kgb.mkgTahunLama,
@@ -145,8 +175,8 @@ export async function POST(
         mkgTahunBaru: kgb.mkgTahunBaru,
         mkgBulanBaru: kgb.mkgBulanBaru,
         golonganBaru: kgb.golonganBaru,
-        tmtKgbBaru: kgb.tmtKgbBaru as Date,
-        tmtKgbBerikutnya: kgb.tmtKgbBerikutnya as Date,
+        tmtKgbBaru: kgb.tmtKgbBaru,
+        tmtKgbBerikutnya: kgb.tmtKgbBerikutnya,
         flagRapelan: kgb.flagRapelan,
       },
       penandatangan: {
@@ -160,7 +190,7 @@ export async function POST(
     }) as ReactElement<DocumentProps>,
   );
 
-  // Preview mode hanya render PDF.
+  // Preview mode hanya render PDF. Status sudah Sedang Diproses (dijaga di atas), jadi tidak diubah.
   if (!isPreview) {
     // Salinan penandatangan diperbarui setiap kali surat dibuat, agar unduhan ulang sama persis.
     const salinanPenandatangan = {
@@ -173,22 +203,20 @@ export async function POST(
     if (existingSurat) {
       await db.suratKGB.update(
         { kgbId: id },
-        { nomorSurat, tanggalSurat: new Date(tanggalSurat), generatedBy: userLogin.id, ...salinanPenandatangan } as any,
+        { nomorSurat, tanggalSurat, generatedBy: userLogin.id, ...salinanPenandatangan },
       );
     } else {
       await db.suratKGB.create({
         id: newId(),
         kgbId: id,
         nomorSurat,
-        tanggalSurat: new Date(tanggalSurat),
+        tanggalSurat,
         ...salinanPenandatangan,
         pathFile: null,
         generatedAt: new Date(),
         generatedBy: userLogin.id,
-      } as any);
+      });
     }
-
-    await db.riwayatKGB.update({ id }, { status: "sedang_diproses" });
 
     logAudit({
       userId: userLogin.id,

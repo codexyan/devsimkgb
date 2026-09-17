@@ -5,6 +5,16 @@ import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { canProcessKGB } from "@/lib/auth";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import {
+  adaPenandaPdf,
+  BATAS_UKURAN_SK_BYTE,
+  bacaTanggalInput,
+  izinUnggahSk,
+  PESAN_SK_TERLALU_BESAR,
+  suratSudahDibuat,
+  type SuratKgbTersimpan,
+} from "@/lib/prosesKgb";
+import { hariIniWita, isoTanggalLokal } from "@/lib/waktu";
 
 export const runtime = "nodejs";
 
@@ -29,25 +39,50 @@ export async function POST(
   const kgb = await db.riwayatKGB.findUnique({ id });
   if (!kgb)
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
-  if (kgb.status === "ditolak")
-    return NextResponse.json({ error: "KGB ini sudah dibatalkan. Input ulang KGB sebelum mengunggah SK." }, { status: 409 });
 
   const [pegawai, existingSurat] = await Promise.all([
     db.pegawai.findUnique({ id: kgb.pegawaiId }),
-    db.suratKGB.findUnique({ kgbId: id }) as Promise<any>,
+    db.suratKGB.findUnique({ kgbId: id }) as Promise<SuratKgbTersimpan | null>,
   ]);
 
-  const formData = await req.formData();
-  const file = formData.get("file") as File | null;
+  // Semua pemeriksaan dilakukan sebelum file disimpan, agar permintaan yang ditolak tidak
+  // meninggalkan file di R2.
+  const izin = izinUnggahSk({ status: kgb.status, isArsip: kgb.isArsip, skSudahDibuat: suratSudahDibuat(existingSurat) });
+  if (!izin.ok)
+    return NextResponse.json({ error: izin.error }, { status: 409 });
+
+  // Ukuran menurut header diperiksa sebelum isi permintaan dibaca ke memori; ruang tambahan untuk
+  // bagian formulir selain berkas.
+  const panjangIsi = Number(req.headers.get("content-length"));
+  if (Number.isFinite(panjangIsi) && panjangIsi > BATAS_UKURAN_SK_BYTE + 64 * 1024)
+    return NextResponse.json({ error: PESAN_SK_TERLALU_BESAR }, { status: 413 });
+
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Data unggahan tidak valid" }, { status: 400 });
+  }
+  const file = formData.get("file");
   const nomorSuratParam = (formData.get("nomorSurat") as string | null)?.trim() || null;
   const tanggalSuratParam = (formData.get("tanggalSurat") as string | null)?.trim() || null;
-  const tanggalSuratFinal = tanggalSuratParam ? new Date(tanggalSuratParam) : new Date();
 
-  if (!file)
+  if (!(file instanceof File))
     return NextResponse.json({ error: "File tidak ditemukan" }, { status: 400 });
 
   if (file.type !== "application/pdf")
     return NextResponse.json({ error: "Hanya file PDF yang diperbolehkan" }, { status: 400 });
+
+  if (file.size > BATAS_UKURAN_SK_BYTE)
+    return NextResponse.json({ error: PESAN_SK_TERLALU_BESAR }, { status: 413 });
+
+  // Jenis file dari peramban tidak dijamin benar, jadi isi file diperiksa memuat penanda PDF.
+  if (!adaPenandaPdf(new Uint8Array(await file.slice(0, 1024).arrayBuffer())))
+    return NextResponse.json({ error: "File yang diunggah bukan PDF yang valid" }, { status: 400 });
+
+  const tanggalSuratInput = tanggalSuratParam ? bacaTanggalInput(tanggalSuratParam) : null;
+  if (tanggalSuratParam && !tanggalSuratInput)
+    return NextResponse.json({ error: "Tanggal SK tidak valid" }, { status: 400 });
 
   // Simpan ke Cloudflare R2 (privat).
   const pathFile = `sk/${pegawai?.nip ?? "unknown"}_${Date.now()}.pdf`;
@@ -61,39 +96,44 @@ export async function POST(
     return NextResponse.json({ error: "Gagal menyimpan file. Coba lagi." }, { status: 500 });
   }
 
-  const nomorSuratFinal = nomorSuratParam ?? existingSurat?.nomorSurat ?? "-";
   if (existingSurat) {
     await db.suratKGB.update(
       { kgbId: id },
       {
         pathFile,
         ...(nomorSuratParam ? { nomorSurat: nomorSuratParam } : {}),
-        ...(tanggalSuratParam ? { tanggalSurat: tanggalSuratFinal } : {}),
-      } as any,
+        ...(tanggalSuratInput ? { tanggalSurat: tanggalSuratInput } : {}),
+      },
     );
   } else {
     await db.suratKGB.create({
       id: newId(),
       kgbId: id,
-      nomorSurat: nomorSuratFinal,
-      tanggalSurat: tanggalSuratFinal,
+      nomorSurat: nomorSuratParam ?? "-",
+      // Tanpa tanggal dari formulir, dipakai tanggal hari ini menurut WITA.
+      tanggalSurat: tanggalSuratInput ?? bacaTanggalInput(isoTanggalLokal(hariIniWita())),
       namaKepalaKanwil: "-",
       nipKepalaKanwil: "-",
       pathFile,
       generatedAt: new Date(),
       generatedBy: userLogin.id,
-    } as any);
+    });
   }
 
-  const sudahSelesai = kgb.status === "selesai";
-  if (!sudahSelesai) {
+  if (izin.jenis === "unggah") {
     await db.riwayatKGB.update({ id }, { status: "menunggu_keuangan" });
   }
 
+  const keterangan =
+    izin.jenis === "unggah"
+      ? "menunggu konfirmasi keuangan"
+      : izin.jenis === "ganti"
+        ? "mengganti file SK yang menunggu konfirmasi keuangan"
+        : "file SK arsip";
   logAudit({
     userId: userLogin.id,
     aksi: "upload_sk",
-    detail: `Upload SK TTD untuk ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}), menunggu konfirmasi keuangan`,
+    detail: `Upload SK TTD untuk ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}), ${keterangan}`,
     targetNama: pegawai?.nama ?? "-",
   });
 

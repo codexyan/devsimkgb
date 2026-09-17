@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { canManageHukdis } from "@/lib/auth";
+import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Master Regulasi/Peraturan (untuk modul Hukdis). Mengelola siklus hidup
@@ -40,6 +41,9 @@ export default function RegulasiPage() {
   const [error, setError] = useState("");
   const [delTarget, setDelTarget] = useState<Regulasi | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const refModalForm = useDialogModal(showForm, () => setShowForm(false), saving);
+  const refModalHapus = useDialogModal(!!delTarget, () => setDelTarget(null), deleting);
 
   function fetchData() {
     setLoading(true);
@@ -95,8 +99,8 @@ export default function RegulasiPage() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Link href="/dashboard/hukdis" className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--sub)", color: "var(--dt3)", border: "0.5px solid var(--ln1)" }} title="Kembali ke Hukdis">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        <Link href="/dashboard/hukdis" className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--sub)", color: "var(--dt3)", border: "0.5px solid var(--ln1)" }} title="Kembali ke Hukdis" aria-label="Kembali ke Hukdis">
+          <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
         </Link>
         <div className="adm-chip" style={{ background: "linear-gradient(135deg,#8a9ec0,#5f7690)" }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
@@ -193,10 +197,10 @@ export default function RegulasiPage() {
       {/* Modal Form */}
       {showForm && (
         <div className="adm-overlay" onClick={() => !saving && setShowForm(false)}>
-          <div className="adm-modal" style={{ maxWidth: "28rem", maxHeight: "92dvh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
+          <div ref={refModalForm} role="dialog" aria-modal="true" aria-labelledby="judul-form-regulasi" tabIndex={-1} className="adm-modal outline-none" style={{ maxWidth: "28rem", maxHeight: "92dvh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 px-5 py-4 shrink-0" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
-              <div className="flex-1"><h2 className="text-sm font-semibold" style={{ color: "var(--dtn)" }}>{editing ? "Ubah Regulasi" : "Tambah Regulasi"}</h2></div>
-              <button onClick={() => setShowForm(false)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "var(--ln2)", color: "var(--dt3)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+              <div className="flex-1"><h2 id="judul-form-regulasi" className="text-sm font-semibold" style={{ color: "var(--dtn)" }}>{editing ? "Ubah Regulasi" : "Tambah Regulasi"}</h2></div>
+              <button onClick={() => setShowForm(false)} disabled={saving} aria-label="Tutup" className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "var(--ln2)", color: "var(--dt3)" }}><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
             <div className="p-5 space-y-3.5 overflow-y-auto">
               <div className="grid grid-cols-3 gap-2.5">
@@ -210,7 +214,7 @@ export default function RegulasiPage() {
                   {Object.entries(STATUS).map(([k, s]) => {
                     const active = form.status === k;
                     return (
-                      <button key={k} type="button" onClick={() => setForm((f) => ({ ...f, status: k }))} className="px-2 py-2 rounded-xl text-xs font-medium transition"
+                      <button key={k} type="button" aria-pressed={active} onClick={() => setForm((f) => ({ ...f, status: k }))} className="px-2 py-2 rounded-xl text-xs font-medium transition"
                         style={{ border: active ? `1.5px solid ${s.dot}` : "1px solid var(--ln1)", background: active ? s.bg : "var(--card)", color: active ? s.color : "var(--dt4)" }}>
                         {s.label}
                       </button>
@@ -244,9 +248,9 @@ export default function RegulasiPage() {
       {/* Modal Hapus */}
       {delTarget && (
         <div className="adm-overlay" onClick={() => !deleting && setDelTarget(null)}>
-          <div className="adm-modal" style={{ maxWidth: "24rem" }} onClick={(e) => e.stopPropagation()}>
+          <div ref={refModalHapus} role="alertdialog" aria-modal="true" aria-labelledby="judul-hapus-regulasi" tabIndex={-1} className="adm-modal outline-none" style={{ maxWidth: "24rem" }} onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
-              <h2 className="text-sm font-semibold mb-1" style={{ color: "var(--dtn)" }}>Hapus Regulasi?</h2>
+              <h2 id="judul-hapus-regulasi" className="text-sm font-semibold mb-1" style={{ color: "var(--dtn)" }}>Hapus Regulasi?</h2>
               <p className="text-xs mb-5 leading-relaxed" style={{ color: "var(--dt4)" }}>Hapus <strong style={{ color: "var(--dtn)" }}>{regLabel(delTarget)}</strong> dari daftar? Catatan hukdis yang sudah memakainya tetap aman (dasar hukum tersimpan sebagai teks).</p>
               <div className="flex gap-2">
                 <button onClick={() => setDelTarget(null)} disabled={deleting} className="flex-1 text-xs py-2.5 rounded-xl" style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}>Batal</button>

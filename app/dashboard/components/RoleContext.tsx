@@ -9,7 +9,7 @@ export function useRole(): string {
 }
 
 /* Info user login untuk komponen dashboard (sapaan header, dsb.) */
-export interface DashUser {
+interface DashUser {
   nama: string;
   nip: string;
   role: string;

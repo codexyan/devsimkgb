@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
+import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 
 export const runtime = "nodejs";
@@ -58,7 +59,8 @@ export async function GET(req: NextRequest) {
       data: pageData.map((item) => ({
         id: item.id,
         waktu: item.waktu ? item.waktu.toISOString() : "",
-        user: (item.userId ? namaById.get(item.userId) : null) || "Sistem",
+        // Entri milik pengguna yang sudah dihapus tetap menyimpan id-nya; nama dan NIP-nya ada pada entri hapus_pengguna.
+        user: item.userId ? namaById.get(item.userId) || "Pengguna dihapus" : "Sistem",
         aksi: item.aksi,
         detail: item.detail,
         ipAddress: item.ipAddress || null,
@@ -81,7 +83,10 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
+  const userLogin = await penggunaLogin(session);
+  if (!userLogin) {
+    return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
+  }
 
   const body = (await req.json().catch(() => ({}))) as any;
   const ids: string[] = Array.isArray(body.ids) ? body.ids : [];
@@ -92,13 +97,11 @@ export async function DELETE(req: NextRequest) {
 
   const count = await db.auditLog.deleteMany({ id: { in: ids } });
 
-  if (userLogin) {
-    logAudit({
-      userId: userLogin.id,
-      aksi: "hapus_riwayat",
-      detail: `Super Admin menghapus ${count} entri riwayat aktivitas`,
-    });
-  }
+  logAudit({
+    userId: userLogin.id,
+    aksi: "hapus_riwayat",
+    detail: `Super Admin menghapus ${count} entri riwayat aktivitas`,
+  });
 
   return NextResponse.json({ deleted: count });
 }

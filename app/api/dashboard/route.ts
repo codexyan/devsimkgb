@@ -2,226 +2,143 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { type RiwayatKGBRow } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
+import { canProcessKGB } from "@/lib/auth";
+import { NON_KEUANGAN } from "@/lib/authGuard";
 import { penetapDariSurat } from "@/lib/penetapSk";
+import { jendelaProsesKgb } from "@/lib/tabelGaji";
+import { hariIniWita, tanggalKalender } from "@/lib/waktu";
+import { penandaHukdisBerlaku } from "@/lib/hukdisKedaluwarsa";
+import { suratSudahDibuat, type SuratKgbTersimpan } from "@/lib/prosesKgb";
+import {
+  entriRekapKgb,
+  hitungRekapStatus,
+  isoTanggalKalender,
+  pilihKgbSiklus,
+  rapelanSiklus,
+  satuPerSiklus,
+  tahunTmt,
+} from "@/lib/rekapKgb";
 
 export const runtime = "nodejs";
 
-type Surat = {
-  id: string; nomorSurat: string; tanggalSurat: Date | null;
-  jenisPenandatangan: string | null; jabatanPenandatangan: string | null;
-};
+type KgbDenganSurat = RiwayatKGBRow & { surat: SuratKgbTersimpan | null };
 
 export async function GET() {
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  try {
-    const today = new Date();
-    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const awalBulanIni = new Date(today.getFullYear(), today.getMonth(), 1);
-    const awalBulanDepan = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    const bulanIniAkhir = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    const rapelanCutoff = new Date(today.getFullYear(), today.getMonth() + 2, 1);
-    const tahunBerjalan = today.getFullYear();
-    const tahunAwal = new Date(`${tahunBerjalan}-01-01`);
-    const tahunAkhir = new Date(`${tahunBerjalan + 1}-01-01`);
-    const bulan3Lalu = new Date(today.getFullYear(), today.getMonth() - 3, 1);
-    bulan3Lalu.setHours(0, 0, 0, 0);
-    const bulan3Depan = new Date(today.getFullYear(), today.getMonth() + 4, 1);
+  const role = session.user.role ?? "";
+  const bolehLihatFollowup = canProcessKGB(role);
 
-    // Sekali tarik seluruh tab yang dibutuhkan (pengganti banyak query paralel).
-    const [allPegawai, allKgb, allSurat, allAudit, allNotif, users] = await Promise.all([
+  try {
+    // Semua batas tanggal memakai tanggal kalender WITA.
+    const hariIni = hariIniWita();
+    const tahun = hariIni.getFullYear();
+    const bulan = hariIni.getMonth();
+    const tahunAwal = new Date(tahun, 0, 1);
+    const tahunAkhir = new Date(tahun + 1, 0, 1);
+    const awalBulanDepan = new Date(tahun, bulan + 1, 1);
+    const bulan3Lalu = new Date(tahun, bulan - 3, 1);
+    const bulan3Depan = new Date(tahun, bulan + 4, 1);
+    // Pipeline memuat TMT tahun ini dan TMT yang masa inputnya sudah dibuka (sebelum awal bulan ke-3 dari sekarang).
+    const batasPipeline = new Date(Math.max(tahunAkhir.getTime(), new Date(tahun, bulan + 3, 1).getTime()));
+
+    const [allPegawai, allKgb, allSurat, followupRows] = await Promise.all([
       db.pegawai.findMany(),
       db.riwayatKGB.findMany(),
-      db.suratKGB.findMany(),
-      db.auditLog.findMany({ orderBy: { field: "waktu", dir: "desc" } }),
-      db.notifikasi.findMany(),
-      db.user.findMany(),
+      db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
+      bolehLihatFollowup
+        ? db.notifikasi.findMany({ where: { tipe: "followup_keuangan", dibaca: false } })
+        : Promise.resolve([]),
     ]);
 
-    const pegawaiAktif = allPegawai.filter((p) => p.aktif);
-    const kgbByPegawai = new Map<string, RiwayatKGBRow[]>();
+    const pegawaiAktif = allPegawai.filter((p) => p.aktif).map((p) => penandaHukdisBerlaku(p, hariIni));
+    const suratByKgbId = new Map(allSurat.map((s) => [s.kgbId, s]));
+    const kgbByPegawai = new Map<string, KgbDenganSurat[]>();
     for (const k of allKgb) {
       const arr = kgbByPegawai.get(k.pegawaiId) ?? [];
-      arr.push(k);
+      arr.push({ ...k, surat: suratByKgbId.get(k.id) ?? null });
       kgbByPegawai.set(k.pegawaiId, arr);
     }
     const kgbsFor = (pid: string) => kgbByPegawai.get(pid) ?? [];
-    const suratByKgbId = new Map<string, Surat>();
-    for (const sRow of allSurat as any[]) {
-      suratByKgbId.set(sRow.kgbId, {
-        id: sRow.id, nomorSurat: sRow.nomorSurat, tanggalSurat: sRow.tanggalSurat,
-        jenisPenandatangan: sRow.jenisPenandatangan ?? null, jabatanPenandatangan: sRow.jabatanPenandatangan ?? null,
-      });
-    }
-    const namaById = new Map(users.map((u) => [u.id, u.nama]));
 
-    // Helper perbandingan tanggal (null → false).
-    const inRange = (d: Date | null, lo: Date, hi: Date) => !!d && d >= lo && d < hi;
-    const lt = (d: Date | null, x: Date) => !!d && d < x;
-    const gte = (d: Date | null, x: Date) => !!d && d >= x;
-    const lte = (d: Date | null, x: Date) => !!d && d <= x;
-    const proc = ["sedang_diproses", "menunggu_keuangan"];
+    const dalam = (d: Date | null, lo: Date, hi: Date) => !!d && d >= lo && d < hi;
 
-    // Pegawai jatuh tempo (gabungan beberapa kondisi OR).
+    // Pipeline: satu kartu per pegawai untuk siklus KGB berjalan (lihat pilihKgbSiklus).
     const pegawaiJatuhTempo = pegawaiAktif
       .filter((p) => {
-        const ks = kgbsFor(p.id);
-        const cA = lt(p.tmtKgbBerikutnya, rapelanCutoff) && !ks.some((k) => k.status === "selesai");
-        const cB = gte(p.tmtKgbBerikutnya, rapelanCutoff) && lt(p.tmtKgbBerikutnya, tahunAkhir);
-        const cC = ks.some((k) => k.status === "selesai" && inRange(k.tmtKgbBaru, tahunAwal, tahunAkhir) && !k.isArsip);
-        const cD = ks.some((k) => proc.includes(k.status) && inRange(k.tmtKgbBaru, tahunAwal, tahunAkhir) && !k.isArsip);
-        const cE = ks.some((k) => k.status === "ditolak" && inRange(k.tmtKgbBaru, tahunAwal, tahunAkhir) && !k.isArsip);
-        return cA || cB || cC || cD || cE;
+        const tmt = tanggalKalender(p.tmtKgbBerikutnya);
+        if (tmt && tmt < batasPipeline) return true;
+        return kgbsFor(p.id).some(
+          (k) =>
+            !k.isArsip &&
+            (k.status === "sedang_diproses" ||
+              k.status === "menunggu_keuangan" ||
+              ((k.status === "selesai" || k.status === "ditolak") && dalam(tanggalKalender(k.tmtKgbBaru), tahunAwal, tahunAkhir))),
+        );
       })
-      .sort((a, b) => (a.tmtKgbBerikutnya?.getTime() ?? 0) - (b.tmtKgbBerikutnya?.getTime() ?? 0));
+      .map((p) => {
+        const { kgbBerjalan, selesaiSebelumnya } = pilihKgbSiklus({
+          tmtKgbBerikutnya: p.tmtKgbBerikutnya,
+          kgb: kgbsFor(p.id),
+          hariIni,
+          tahun,
+        });
+        const effectiveTmt = tanggalKalender(kgbBerjalan?.tmtKgbBaru) ?? tanggalKalender(p.tmtKgbBerikutnya);
+        return { p, kgbBerjalan, selesaiSebelumnya, effectiveTmt };
+      })
+      .filter((x): x is typeof x & { effectiveTmt: Date } => x.effectiveTmt !== null)
+      .sort((a, b) => a.effectiveTmt.getTime() - b.effectiveTmt.getTime());
 
-    // riwayatKGB per pegawai: non-belum_diproses, terbaru dulu, ambil 2, +surat.
-    const riwayatFor = (pid: string) =>
-      kgbsFor(pid)
-        .filter((k) => k.status !== "belum_diproses")
-        .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
-        .slice(0, 2)
-        .map((k) => ({ ...k, surat: suratByKgbId.get(k.id) ?? null }));
+    // Hitungan memakai definisi bersama lib/rekapKgb.ts.
+    const siklusSemua = satuPerSiklus(entriRekapKgb(allKgb, allPegawai));
+    const siklusTahunIni = siklusSemua.filter((k) => tahunTmt(k) === tahun);
+    const rekapTahunIni = hitungRekapStatus(siklusTahunIni, hariIni);
+    const rekapSemua = hitungRekapStatus(siklusSemua, hariIni);
 
-    const totalPegawai = pegawaiAktif.length;
-    const totalHukdis = pegawaiAktif.filter((p) => p.statusHukdis).length;
-    const totalKGB = allKgb.filter((k) => !k.isArsip).length;
-
-    const sedangDiproses = pegawaiAktif.filter((p) => {
-      const ks = kgbsFor(p.id);
-      return (
-        ks.some((k) => proc.includes(k.status) && !k.isArsip && inRange(k.tmtKgbBaru, tahunAwal, tahunAkhir)) &&
-        !ks.some((k) => k.status === "selesai" && !k.isArsip)
-      );
-    }).length;
-
-    const selesai = allKgb.filter(
-      (k) => !k.isArsip && k.status === "selesai" && inRange(k.tmtKgbBaru, tahunAwal, tahunAkhir),
-    ).length;
-
-    const ditolak = pegawaiAktif.filter((p) => {
-      const ks = kgbsFor(p.id);
-      return (
-        ks.some((k) => k.status === "ditolak" && !k.isArsip && inRange(k.tmtKgbBaru, tahunAwal, tahunAkhir)) &&
-        !ks.some((k) => ["selesai", ...proc].includes(k.status) && !k.isArsip)
-      );
-    }).length;
-
-    const rapelanKonfirmasi = allKgb.filter((k) => !k.isArsip && k.rapelanDitetapkan === true).length;
-    const rapelanBerisiko = allKgb.filter(
-      (k) => !k.isArsip && k.flagRapelan && !["selesai", "ditolak"].includes(k.status),
-    ).length;
-
-    const belumDiprosesTotal = pegawaiAktif.filter((p) => {
-      const ks = kgbsFor(p.id);
-      return (
-        inRange(p.tmtKgbBerikutnya, tahunAwal, tahunAkhir) &&
-        !ks.some((k) => ["selesai", "ditolak", ...proc].includes(k.status) && !k.isArsip)
-      );
-    }).length;
-
-    const kgbBulanIni = pegawaiAktif.filter(
-      (p) => gte(p.tmtKgbBerikutnya, awalBulanIni) && lte(p.tmtKgbBerikutnya, bulanIniAkhir),
-    ).length;
-
-    const kgbUntukTren = allKgb.filter(
-      (k) => gte(k.tmtKgbBaru, bulan3Lalu) && lt(k.tmtKgbBaru, awalBulanDepan) && !k.isArsip,
-    );
-
-    const pegawaiMendatang = pegawaiAktif.filter(
-      (p) => gte(p.tmtKgbBerikutnya, awalBulanDepan) && lt(p.tmtKgbBerikutnya, bulan3Depan),
-    );
-
-    const activityLog = allAudit.slice(0, 10).map((a) => ({
-      id: a.id,
-      waktu: a.waktu ? a.waktu.toISOString() : "",
-      user: (a.userId ? namaById.get(a.userId) : null) ?? "Sistem",
-      aksi: a.aksi,
-      detail: a.detail,
-    }));
-
-    // Kalender: KGB dengan tmtKgbBaru tahun ini (non-arsip).
-    const kgbInYearRaw = allKgb
-      .filter((k) => !k.isArsip && inRange(k.tmtKgbBaru, tahunAwal, tahunAkhir))
-      .map((k) => ({ pegawaiId: k.pegawaiId, tmtKgbBaru: k.tmtKgbBaru as Date, status: k.status }));
-
-    // Kalender virtual: pegawai dengan tmtKgbBerikutnya tahun ini tapi belum ada riwayat tahun ini.
-    const kgbVirtualRaw = pegawaiAktif
-      .filter(
-        (p) =>
-          inRange(p.tmtKgbBerikutnya, tahunAwal, tahunAkhir) &&
-          !kgbsFor(p.id).some((k) => inRange(k.tmtKgbBaru, tahunAwal, tahunAkhir) && !k.isArsip),
-      )
-      .map((p) => ({ id: p.id, tmtKgbBerikutnya: p.tmtKgbBerikutnya as Date }));
-
-    const kgbPerPegawai = new Map<string, { pegawaiId: string; tmtKgbBaru: Date; status: string }>();
-    for (const k of kgbInYearRaw) {
-      if (!kgbPerPegawai.has(k.pegawaiId)) kgbPerPegawai.set(k.pegawaiId, k);
-    }
-    const kgbInYearDeduped = [...kgbPerPegawai.values()];
-
-    const kalenderKombinasi = [
-      ...kgbInYearDeduped.map((k) => ({ id: k.pegawaiId, tmtKgbBerikutnya: k.tmtKgbBaru.toISOString() })),
-      ...kgbVirtualRaw.map((p) => ({ id: p.id, tmtKgbBerikutnya: p.tmtKgbBerikutnya.toISOString() })),
-    ];
-    const kalenderSelesai = kgbInYearRaw
-      .filter((k) => k.status === "selesai")
-      .map((k) => ({ tmtKgbBerikutnya: k.tmtKgbBaru.toISOString() }));
-    const kgbTahunIniTotal = kalenderKombinasi.length;
-
-    // Distribusi golongan (groupBy golonganRuang).
-    const golonganMap = new Map<string, number>();
-    for (const p of pegawaiAktif) golonganMap.set(p.golonganRuang, (golonganMap.get(p.golonganRuang) ?? 0) + 1);
-    const golonganDistribusi = [...golonganMap.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([golongan, count]) => ({ golongan, count }));
-
-    const followupNotifs = allNotif
-      .filter((n) => n.tipe === "followup_keuangan" && !n.dibaca)
+    const followupNotifs = followupRows
       .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
       .slice(0, 10)
       .map((n) => ({ id: n.id, pesan: n.pesan, createdAt: n.createdAt ? n.createdAt.toISOString() : "" }));
 
-    // Tren bulanan (-3 s.d. +3 bulan).
+    // Tren bulanan (-3 s.d. +3 bulan) menurut bulan TMT.
+    const kunciTren = (d: Date) => d.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
     const trenMap: Record<string, { selesai: number; diproses: number; terlambat: number; mendatang: number; isFuture: boolean }> = {};
     for (let i = -3; i <= 3; i++) {
-      const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-      const key = d.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
-      trenMap[key] = { selesai: 0, diproses: 0, terlambat: 0, mendatang: 0, isFuture: i > 0 };
+      trenMap[kunciTren(new Date(tahun, bulan + i, 1))] = { selesai: 0, diproses: 0, terlambat: 0, mendatang: 0, isFuture: i > 0 };
     }
-    for (const k of kgbUntukTren) {
-      const key = new Date(k.tmtKgbBaru as Date).toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
-      if (!trenMap[key]) continue;
-      if (k.status === "selesai") trenMap[key].selesai++;
-      else if (proc.includes(k.status)) trenMap[key].diproses++;
-      if (k.flagRapelan) trenMap[key].terlambat++;
+    for (const k of siklusSemua) {
+      const tmt = tanggalKalender(k.tmtKgbBaru);
+      if (!tmt || !dalam(tmt, bulan3Lalu, awalBulanDepan)) continue;
+      const tren = trenMap[kunciTren(tmt)];
+      if (!tren) continue;
+      if (k.status === "selesai") tren.selesai++;
+      else if (k.status === "sedang_diproses" || k.status === "menunggu_keuangan") tren.diproses++;
+      if (rapelanSiklus(k, hariIni).rapelan) tren.terlambat++;
     }
-    for (const p of pegawaiMendatang) {
-      const key = new Date(p.tmtKgbBerikutnya as Date).toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
-      if (!trenMap[key]) continue;
-      trenMap[key].mendatang++;
+    for (const p of pegawaiAktif) {
+      const tmt = tanggalKalender(p.tmtKgbBerikutnya);
+      if (!tmt || !dalam(tmt, awalBulanDepan, bulan3Depan)) continue;
+      const tren = trenMap[kunciTren(tmt)];
+      if (tren) tren.mendatang++;
     }
-    const trenBulanan = Object.entries(trenMap).map(([bulan, val]) => ({ bulan, ...val }));
+    const trenBulanan = Object.entries(trenMap).map(([bulanLabel, val]) => ({ bulan: bulanLabel, ...val }));
 
-    const result = pegawaiJatuhTempo.map((p) => {
-      const riwayatKGB = riwayatFor(p.id);
-      const kgbTerakhir = riwayatKGB.find((k) => !k.isArsip) || null;
-      const prevSelesai = riwayatKGB.find((k) => k.status === "selesai") || null;
-      const statusKGB = kgbTerakhir?.status || null;
-
-      const effectiveTmt = kgbTerakhir?.tmtKgbBaru
-        ? new Date(kgbTerakhir.tmtKgbBaru)
-        : new Date(p.tmtKgbBerikutnya as Date);
-
-      const deadlineSDM = new Date(effectiveTmt.getFullYear(), effectiveTmt.getMonth() - 1, 0);
-      const inProgress = statusKGB !== "selesai" && statusKGB !== "menunggu_keuangan";
-      const flagRapelan = inProgress && todayDate > deadlineSDM;
-      const terlambat = inProgress && todayDate > deadlineSDM;
-
-      const unlockDate = new Date(effectiveTmt.getFullYear(), effectiveTmt.getMonth() - 2, 1);
-      const isLocked = statusKGB === null && today < unlockDate;
+    const result = pegawaiJatuhTempo.map(({ p, kgbBerjalan: k, selesaiSebelumnya: prev, effectiveTmt }) => {
+      const statusKGB = k?.status ?? null;
+      const jendela = jendelaProsesKgb(effectiveTmt, hariIni)!;
+      const { rapelan, terlambat } = rapelanSiklus(
+        {
+          status: statusKGB ?? "belum_diproses",
+          tmtKgbBaru: effectiveTmt,
+          flagRapelan: k?.flagRapelan,
+          rapelanDitetapkan: k?.rapelanDitetapkan,
+        },
+        hariIni,
+      );
+      const nomorPrev = prev?.surat?.nomorSurat;
+      const adaNomorPrev = !!nomorPrev && nomorPrev !== "-";
 
       return {
         id: p.id,
@@ -229,59 +146,56 @@ export async function GET() {
         nip: p.nip,
         jabatan: p.jabatan,
         golonganRuang: p.golonganRuang,
-        unitKerja: p.unitKerja,
-        tmtKgbBerikutnya: effectiveTmt,
-        deadlineSDM: deadlineSDM.toISOString(),
+        tmtKgbBerikutnya: isoTanggalKalender(effectiveTmt),
+        deadlineSDM: isoTanggalKalender(jendela.deadlineSDM),
         statusHukdis: p.statusHukdis,
-        tanggalHukdisBerakhir: p.tanggalHukdisBerakhir?.toISOString() ?? null,
-        jenisHukdis: p.jenisHukdis ?? null,
-        flagRapelan,
+        tanggalHukdisBerakhir: isoTanggalKalender(p.tanggalHukdisBerakhir),
+        flagRapelan: rapelan === "berpotensi",
         terlambat,
-        isLocked,
-        unlockDate: unlockDate.toISOString(),
+        isLocked: statusKGB === null && jendela.isLocked,
         statusKGB,
-        kgbId: kgbTerakhir?.id || null,
-        nomorSK: kgbTerakhir?.nomorSK ?? null,
-        penetapSkDasar: kgbTerakhir?.penetapSkDasar ?? null,
-        sudahGenerateSurat: !!kgbTerakhir?.surat,
-        suratNomorSurat: kgbTerakhir?.surat?.nomorSurat ?? null,
-        tanggalSK: kgbTerakhir?.tanggalSK?.toISOString() ?? null,
-        tmtSK: kgbTerakhir?.tmtSK?.toISOString() ?? null,
-        gajiPokokLama: kgbTerakhir?.gajiPokokLama ?? null,
-        gajiPokokBaru: kgbTerakhir?.gajiPokokBaru ?? null,
-        mkgTahunBaru: kgbTerakhir?.mkgTahunBaru ?? null,
-        mkgBulanBaru: kgbTerakhir?.mkgBulanBaru ?? null,
-        gajiPokok: p.gajiPokok,
-        mkgTahun: p.mkgTahun,
-        mkgBulan: p.mkgBulan,
-        prevNomorSK: (() => { const n = prevSelesai?.surat?.nomorSurat; return n && n !== "-" ? n : null; })(),
-        prevTanggalSK: (() => { const s = prevSelesai?.surat; return s?.nomorSurat && s.nomorSurat !== "-" ? s.tanggalSurat?.toISOString() ?? null : null; })(),
-        prevTmtSK: prevSelesai?.tmtKgbBaru?.toISOString() ?? null,
+        kgbId: k?.id || null,
+        nomorSK: k?.nomorSK ?? null,
+        penetapSkDasar: k?.penetapSkDasar ?? null,
+        // Syarat yang sama dengan POST /api/kgb/[id]/upload-sk: Unggah SK TTE hanya setelah Buat SK.
+        skSudahDibuat: suratSudahDibuat(k?.surat),
+        suratNomorSurat: k?.surat?.nomorSurat ?? null,
+        suratTanggalSurat: isoTanggalKalender(k?.surat?.tanggalSurat),
+        tanggalSK: isoTanggalKalender(k?.tanggalSK),
+        tmtSK: isoTanggalKalender(k?.tmtSK),
+        gajiPokokLama: k?.gajiPokokLama ?? null,
+        gajiPokokBaru: k?.gajiPokokBaru ?? null,
+        mkgTahunBaru: k?.mkgTahunBaru ?? null,
+        mkgBulanBaru: k?.mkgBulanBaru ?? null,
+        prevNomorSK: adaNomorPrev ? nomorPrev : null,
+        prevTanggalSK: adaNomorPrev ? isoTanggalKalender(prev?.surat?.tanggalSurat) : null,
+        prevTmtSK: isoTanggalKalender(prev?.tmtKgbBaru),
         // SK dasar KGB berikutnya = surat KGB yang terakhir selesai, jadi penetapnya penandatangan surat itu.
-        prevPenetapSkDasar: penetapDariSurat(prevSelesai?.surat),
+        prevPenetapSkDasar: penetapDariSurat(prev?.surat),
       };
     });
 
     return NextResponse.json({
       stats: {
-        totalPegawai,
-        totalHukdis,
-        totalKGB,
-        kgbTahunIni: kgbTahunIniTotal,
-        belumDiproses: belumDiprosesTotal,
-        sedangDiproses,
-        selesai,
-        ditolak,
-        rapelanKonfirmasi,
-        rapelanBerisiko,
-        kgbBulanIni,
+        totalPegawai: pegawaiAktif.length,
+        totalHukdis: pegawaiAktif.filter((p) => p.statusHukdis).length,
+        // KGB dengan TMT tahun ini, satu per pegawai per TMT, termasuk yang belum diinput.
+        kgbTahunIni: rekapTahunIni.total,
+        belumDiproses: rekapTahunIni.belumDiproses,
+        // Sedang diproses ditambah menunggu keuangan; rinciannya di menungguKeuangan.
+        sedangDiproses: rekapTahunIni.diproses,
+        menungguKeuangan: rekapTahunIni.menungguKeuangan,
+        selesai: rekapTahunIni.selesai,
+        ditolak: rekapTahunIni.ditolak,
+        // KGB dengan TMT tahun ini yang ditetapkan rapelan oleh keuangan.
+        rapelanKonfirmasi: rekapTahunIni.rapelanDitetapkan,
+        // Seluruh KGB yang belum selesai dan berpotensi rapelan, termasuk tahun sebelumnya.
+        rapelanBerisiko: rekapSemua.berpotensiRapelan,
+        terlambat: rekapSemua.terlambat,
       },
-      pegawaiJatuhTempo: result,
-      pegawaiKalender: kalenderKombinasi,
-      selesaiKalender: kalenderSelesai,
-      activityLog,
+      // Beranda keuangan hanya memakai statistik; data per pegawai, termasuk hukdis, tidak dikirim.
+      pegawaiJatuhTempo: NON_KEUANGAN.includes(role) ? result : [],
       trenBulanan,
-      golonganDistribusi,
       followupNotifs,
     });
   } catch (err) {

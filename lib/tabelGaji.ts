@@ -1,3 +1,5 @@
+import { hariIniWita, tanggalKalender, type NilaiTanggal } from "./waktu";
+
 export const GOLONGAN_PANGKAT: Record<string, string> = {
   "I/a": "Juru Muda",
   "I/b": "Juru Muda Tingkat I",
@@ -21,7 +23,7 @@ export const GOLONGAN_PANGKAT: Record<string, string> = {
 // Tabel Gaji PP No. 5 Tahun 2024
 // Format: { [golongan]: { [mkg]: gaji } }
 // MKG dalam format "tahun_bulan" misal "0_0", "2_0", "4_0"
-export const TABEL_GAJI: Record<string, Record<string, number>> = {
+const TABEL_GAJI: Record<string, Record<string, number>> = {
   "I/a": {
     "0_0": 1685700,
     "2_0": 1738800,
@@ -420,6 +422,7 @@ export interface HasilKalkulasiKGB {
   mkgTahunBaru: number;
   mkgBulanBaru: number;
   gajiPokokBaru: number;
+  /** Tanggal kalender WITA dari TMT, sebagai new Date(y, m, d). */
   tmtKgbBaru: Date;
   tmtKgbBerikutnya: Date;
   deadlineSDM: Date;
@@ -435,51 +438,121 @@ export interface HasilKalkulasiKGB {
  * Contoh: TMT 1 April 2026 → unlock 1 Februari 2026
  */
 export function hitungUnlockDate(tmtKgbBaru: Date): Date {
+  const tmt = tanggalKalender(tmtKgbBaru) ?? tmtKgbBaru;
   // getMonth() sudah 0-indexed, kurang 2 → bulan ke-2 sebelum TMT
-  return new Date(tmtKgbBaru.getFullYear(), tmtKgbBaru.getMonth() - 2, 1);
+  return new Date(tmt.getFullYear(), tmt.getMonth() - 2, 1);
 }
 
+/**
+ * Batas input Tim SDM: hari terakhir bulan ke-2 sebelum TMT.
+ * Contoh: TMT 1 Juni 2026 → 30 April 2026. Input sesudahnya berpotensi rapelan.
+ */
+export function hitungDeadlineSDM(tmtKgbBaru: Date): Date {
+  const tmt = tanggalKalender(tmtKgbBaru) ?? tmtKgbBaru;
+  return new Date(tmt.getFullYear(), tmt.getMonth() - 1, 0);
+}
+
+interface JendelaProsesKgb {
+  unlockDate: Date;
+  deadlineSDM: Date;
+  isLocked: boolean;
+  flagRapelan: boolean;
+}
+
+/**
+ * Jendela proses KGB untuk satu TMT dibandingkan dengan hari ini (bawaan: hari ini menurut WITA).
+ * Mengembalikan null bila TMT kosong atau tidak valid.
+ */
+export function jendelaProsesKgb(tmtKgbBaru: NilaiTanggal, hariIni?: Date): JendelaProsesKgb | null {
+  const tmt = tanggalKalender(tmtKgbBaru);
+  if (!tmt) return null;
+  const hari = normalisasiHariIni(hariIni);
+  const unlockDate = hitungUnlockDate(tmt);
+  const deadlineSDM = hitungDeadlineSDM(tmt);
+  return { unlockDate, deadlineSDM, isLocked: hari < unlockDate, flagRapelan: hari > deadlineSDM };
+}
+
+/** Hari ini sebagai tanggal kalender lokal proses; jam pada nilai yang diberikan diabaikan. */
+function normalisasiHariIni(hariIni?: Date): Date {
+  if (!hariIni || Number.isNaN(hariIni.getTime())) return hariIniWita();
+  return new Date(hariIni.getFullYear(), hariIni.getMonth(), hariIni.getDate());
+}
+
+/** Tanggal yang digeser sejumlah bulan (negatif untuk mundur); jam pada tanggal asal dipertahankan. */
+export function tambahBulan(tanggal: Date, bulan: number): Date {
+  const hasil = new Date(tanggal);
+  hasil.setMonth(hasil.getMonth() + bulan);
+  return hasil;
+}
+
+/** Selisih bulan penuh dari `awal` ke `akhir`. */
+function selisihBulan(awal: Date, akhir: Date): number {
+  const bulan = (akhir.getFullYear() - awal.getFullYear()) * 12 + (akhir.getMonth() - awal.getMonth());
+  return akhir.getDate() < awal.getDate() ? bulan - 1 : bulan;
+}
+
+/**
+ * Jumlah bulan dari masa kerja golongan sekarang sampai langkah kenaikan gaji berkala
+ * berikutnya di tabel gaji golongan itu. Umumnya 24 bulan; PNS yang pertama diangkat di
+ * golongan II/a (MKG 0) naik di MKG 1, jadi 12 bulan. Di atas langkah terakhir tabel,
+ * siklus 2 tahun tetap dipakai.
+ */
+export function bulanKeKgbBerikutnya(golongan: string, mkgTahun: number, mkgBulan: number): number {
+  const sekarang = (mkgTahun || 0) * 12 + (mkgBulan || 0);
+  const langkah = Object.keys(TABEL_GAJI[golongan] ?? {})
+    .map((kunci) => {
+      const [tahun, bulan] = kunci.split("_").map(Number);
+      return tahun * 12 + bulan;
+    })
+    .filter((mkg) => mkg > sekarang)
+    .sort((a, b) => a - b)[0];
+  return langkah === undefined ? 24 : langkah - sekarang;
+}
+
+/**
+ * Hitung KGB dari TMT berikutnya pegawai. TMT dibaca sebagai tanggal kalender WITA, dan
+ * flagRapelan serta isLocked dibandingkan dengan `hariIni` (bawaan: hari ini menurut WITA).
+ * Melempar Error bila golongan tidak dikenal atau TMT berikutnya kosong/tidak valid.
+ */
 export function kalkulasiKGB(pegawai: {
   golonganRuang: string;
   mkgTahun: number;
   mkgBulan: number;
-  tmtKgbBerikutnya: Date | string;
+  tmtKgbBerikutnya: Date | string | null;
   tmtKgbTerakhir?: Date | string | null;
+  hariIni?: Date;
 }): HasilKalkulasiKGB {
   if (!isGolonganDikenal(pegawai.golonganRuang)) {
     throw new Error(`Golongan "${pegawai.golonganRuang}" tidak dikenal di tabel gaji PP 5/2024`);
   }
-  const tmtKgbBaru = new Date(pegawai.tmtKgbBerikutnya);
-
-  // MKG baru: hitung dari selisih tahun aktual antara TMT terakhir dan TMT baru.
-  // PP No. 53/2010 Penjelasan Pasal 7 ayat (3): masa penundaan KGB dihitung penuh
-  // untuk KGB berikutnya, sehingga jika ada penundaan 1 tahun, MKG bertambah 3 tahun.
-  let tambahTahun = 2; // default siklus normal
-  if (pegawai.tmtKgbTerakhir) {
-    const tmtTerakhir = new Date(pegawai.tmtKgbTerakhir);
-    const yr = tmtKgbBaru.getFullYear() - tmtTerakhir.getFullYear();
-    const mo = tmtKgbBaru.getMonth() - tmtTerakhir.getMonth();
-    tambahTahun = Math.max(2, yr + (mo < 0 ? -1 : 0));
+  const tmtKgbBaru = tanggalKalender(pegawai.tmtKgbBerikutnya);
+  if (!tmtKgbBaru) {
+    throw new Error("TMT KGB berikutnya pegawai belum diisi atau tidak valid");
   }
+  const mkgSekarang = (pegawai.mkgTahun || 0) * 12 + (pegawai.mkgBulan || 0);
 
-  const mkgTahunBaru = pegawai.mkgTahun + tambahTahun;
-  const mkgBulanBaru = pegawai.mkgBulan;
+  // Masa kerja bertambah sampai langkah berikutnya di tabel gaji. Bila jarak dari TMT terakhir
+  // lebih panjang, misalnya karena KGB pernah ditunda, selisih itu ikut dihitung penuh.
+  let tambah = bulanKeKgbBerikutnya(pegawai.golonganRuang, pegawai.mkgTahun, pegawai.mkgBulan);
+  const tmtTerakhir = tanggalKalender(pegawai.tmtKgbTerakhir);
+  if (tmtTerakhir) tambah = Math.max(tambah, selisihBulan(tmtTerakhir, tmtKgbBaru));
+
+  const mkgTahunBaru = Math.floor((mkgSekarang + tambah) / 12);
+  const mkgBulanBaru = (mkgSekarang + tambah) % 12;
 
   const gajiPokokBaru = getGajiPokok(pegawai.golonganRuang, mkgTahunBaru, mkgBulanBaru);
 
-  const tmtKgbBerikutnya = new Date(tmtKgbBaru);
-  tmtKgbBerikutnya.setFullYear(tmtKgbBerikutnya.getFullYear() + 2);
+  const tmtKgbBerikutnya = tambahBulan(
+    tmtKgbBaru,
+    bulanKeKgbBerikutnya(pegawai.golonganRuang, mkgTahunBaru, mkgBulanBaru),
+  );
 
-  const today = new Date();
-
-  // Deadline SDM = akhir bulan ke-2 sebelum TMT (misal TMT Juni → deadline 30 April)
-  const deadlineSDM = new Date(tmtKgbBaru.getFullYear(), tmtKgbBaru.getMonth() - 1, 0);
-  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const flagRapelan = todayDate > deadlineSDM;
-
-  // Unlock date = tanggal 1 bulan ke-2 sebelum TMT (awal jendela proses, 1 bulan penuh)
+  // Jendela proses: dibuka tanggal 1 bulan ke-2 sebelum TMT, batas SDM akhir bulan yang sama.
+  const hariIni = normalisasiHariIni(pegawai.hariIni);
+  const deadlineSDM = hitungDeadlineSDM(tmtKgbBaru);
   const unlockDate = hitungUnlockDate(tmtKgbBaru);
-  const isLocked = today < unlockDate;
+  const flagRapelan = hariIni > deadlineSDM;
+  const isLocked = hariIni < unlockDate;
 
   return {
     mkgTahunBaru,

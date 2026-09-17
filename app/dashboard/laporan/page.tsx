@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
+import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
+import { hitungRekapStatus, rapelanSiklus, satuPerSiklus, type StatusRapelan } from "@/lib/rekapKgb";
 
 interface KGBLaporan {
   id: string;
-  pegawai: { nama: string; nip: string; jabatan: string; golonganRuang: string; unitKerja: string };
+  pegawaiId: string;
+  pegawai: { nama: string; nip: string; jabatan: string; golonganRuang: string; unitKerja: string } | null;
   golonganLama: string;
   golonganBaru: string;
   gajiPokokLama: number;
@@ -14,6 +18,9 @@ interface KGBLaporan {
   tmtKgbBaru: string;
   status: string;
   flagRapelan: boolean;
+  rapelanDitetapkan: boolean | null;
+  isArsip: boolean | null;
+  createdAt: string | null;
   surat: { nomorSurat: string; tanggalSurat: string; pathFile?: string | null } | null;
 }
 
@@ -27,12 +34,7 @@ const BULAN_LIST = [
   { value: "11", label: "November" }, { value: "12", label: "Desember" },
 ];
 
-const STATUS_CFG: Record<string, { label: string; bg: string; color: string; border: string; printLabel: string }> = {
-  belum_diproses: { label: "Belum Diproses", bg: "var(--tint-amber-bg)", color: "var(--st-amber)", border: "var(--tint-amber-ln)", printLabel: "Belum" },
-  sedang_diproses: { label: "Sedang Diproses", bg: "var(--tint-navy)", color: "var(--dtn)", border: "var(--ln0)", printLabel: "Diproses" },
-  selesai: { label: "Selesai", bg: "#ecfdf5", color: "var(--st-green)", border: "var(--tint-green-ln)", printLabel: "Selesai ✓" },
-  ditolak: { label: "Dibatalkan", bg: "var(--tint-red-bg)", color: "var(--st-red)", border: "var(--tint-red-ln)", printLabel: "Dibatalkan" },
-};
+const STATUS_FILTER = ["belum_diproses", "sedang_diproses", "menunggu_keuangan", "selesai", "ditolak"] as const;
 
 const GOL_COLOR: Record<string, { bar: string; badge: string; text: string }> = {
   I:   { bar: "#3b82f6", badge: "var(--tint-blue-bg)", text: "var(--st-blue)" },
@@ -41,91 +43,135 @@ const GOL_COLOR: Record<string, { bar: string; badge: string; text: string }> = 
   IV:  { bar: "#ef4444", badge: "var(--tint-red-bg)", text: "var(--st-red)" },
 };
 
-const todayNorm = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })();
-function isRapelan(k: KGBLaporan) {
-  if (k.status === "selesai" || k.status === "ditolak") return false;
-  const tmt = new Date(k.tmtKgbBaru);
-  return todayNorm > new Date(tmt.getFullYear(), tmt.getMonth() - 1, 0);
-}
-function fmtRp(n: number) { return "Rp " + n.toLocaleString("id-ID"); }
+const LABEL_RAPELAN: Record<StatusRapelan, string> = {
+  ditetapkan: "Rapelan",
+  berpotensi: "Berpotensi rapelan",
+};
+
+function fmtRp(n: number | null | undefined) { return typeof n === "number" ? "Rp " + n.toLocaleString("id-ID") : "-"; }
 function fmtTgl(s: string) {
-  return new Date(s).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" });
+}
+function bulanTmt(k: KGBLaporan) {
+  const tmt = tanggalKalender(k.tmtKgbBaru);
+  return tmt ? tmt.getMonth() + 1 : 0;
+}
+
+interface RekapBulanLaporan {
+  label: string;
+  total: number;
+  selesai: number;
+  menungguKeuangan: number;
+  sedangDiproses: number;
+  belumDiproses: number;
+  ditolak: number;
+  rapelanDitetapkan: number;
+  berpotensiRapelan: number;
 }
 
 export default function LaporanPage() {
+  // Tanggal hari ini (WITA) diambil sekali saat halaman dimuat.
+  const [hariIni] = useState(() => hariIniWita());
+  const tahunIni = hariIni.getFullYear();
   const [rawList, setRawList] = useState<KGBLaporan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tahun, setTahun]   = useState(new Date().getFullYear().toString());
+  const [tahun, setTahun]   = useState(tahunIni.toString());
   const [bulan, setBulan]   = useState("");
   const [status, setStatus] = useState("");
 
-  const tahunList = Array.from({ length: 5 }, (_, i) => (new Date().getFullYear() - i).toString());
+  const tahunList = Array.from({ length: 5 }, (_, i) => (tahunIni - i).toString());
 
   useEffect(() => {
     const t = setTimeout(() => {
       setLoading(true);
       fetch(`/api/laporan?tahun=${tahun}`)
-        .then(r => r.json() as any)
-        .then(d => setRawList(d.kgbList ?? []))
+        .then(r => r.json() as Promise<{ kgbList?: KGBLaporan[] }>)
+        .then(d => setRawList(Array.isArray(d.kgbList) ? d.kgbList : []))
         .catch(() => setRawList([]))
         .finally(() => setLoading(false));
     }, 0);
     return () => clearTimeout(t);
   }, [tahun]);
 
-  const kgbList = useMemo(() => rawList.filter(k => {
-    if (bulan && new Date(k.tmtKgbBaru).getMonth() + 1 !== parseInt(bulan)) return false;
-    if (status && k.status !== status) return false;
-    return true;
-  }), [rawList, bulan, status]);
+  // Daftar detail tetap memuat entri yang dibatalkan. Hitungan memakai definisi bersama lib/rekapKgb.ts:
+  // satu KGB per pegawai per TMT, jadi KGB yang dibatalkan lalu diinput ulang dihitung satu kali.
+  const dalamBulan = useMemo(
+    () => rawList.filter(k => !bulan || bulanTmt(k) === parseInt(bulan)),
+    [rawList, bulan],
+  );
+  const kgbList = useMemo(
+    () => dalamBulan.filter(k => !status || k.status === status),
+    [dalamBulan, status],
+  );
+  const siklus = useMemo(
+    () => satuPerSiklus(dalamBulan).filter(k => !status || k.status === status),
+    [dalamBulan, status],
+  );
 
-  const stats = useMemo(() => ({
-    total: kgbList.length,
-    selesai: kgbList.filter(k => k.status === "selesai").length,
-    diproses: kgbList.filter(k => k.status === "sedang_diproses").length,
-    belum: kgbList.filter(k => k.status === "belum_diproses").length,
-    ditolak: kgbList.filter(k => k.status === "ditolak").length,
-    rapelan: kgbList.filter(isRapelan).length,
-  }), [kgbList]);
+  // Status rapelan hanya untuk entri yang mewakili siklusnya; entri batal yang sudah diinput ulang tidak.
+  const rapelanPerId = useMemo(() => {
+    const peta = new Map<string, StatusRapelan | null>();
+    for (const k of siklus) peta.set(k.id, rapelanSiklus(k, hariIni).rapelan);
+    return peta;
+  }, [siklus, hariIni]);
+
+  const stats = useMemo(() => hitungRekapStatus(siklus, hariIni), [siklus, hariIni]);
 
   const perGolongan = useMemo(() => {
     const map: Record<string, number> = {};
-    kgbList.forEach(k => { map[k.golonganBaru] = (map[k.golonganBaru] || 0) + 1; });
+    siklus.forEach(k => { map[k.golonganBaru] = (map[k.golonganBaru] || 0) + 1; });
     return map;
-  }, [kgbList]);
+  }, [siklus]);
 
   const perBulan = useMemo(() => {
-    const map: Record<number, { label: string; selesai: number; diproses: number; belum: number; ditolak: number; rapelan: number; total: number }> = {};
-    kgbList.forEach(k => {
-      const bln = new Date(k.tmtKgbBaru).getMonth() + 1;
-      if (!map[bln]) map[bln] = { label: BULAN_LIST.find(b => b.value === String(bln))?.label || String(bln), selesai: 0, diproses: 0, belum: 0, ditolak: 0, rapelan: 0, total: 0 };
-      map[bln].total++;
-      if (k.status === "selesai") map[bln].selesai++;
-      else if (k.status === "sedang_diproses") map[bln].diproses++;
-      else if (k.status === "belum_diproses") map[bln].belum++;
-      else if (k.status === "ditolak") map[bln].ditolak++;
-      if (isRapelan(k)) map[bln].rapelan++;
+    const map: Record<number, RekapBulanLaporan> = {};
+    siklus.forEach(k => {
+      const bln = bulanTmt(k);
+      if (!bln) return;
+      if (!map[bln]) map[bln] = { label: BULAN_LIST.find(b => b.value === String(bln))?.label || String(bln), total: 0, selesai: 0, menungguKeuangan: 0, sedangDiproses: 0, belumDiproses: 0, ditolak: 0, rapelanDitetapkan: 0, berpotensiRapelan: 0 };
+      const r = map[bln];
+      r.total++;
+      if (k.status === "selesai") r.selesai++;
+      else if (k.status === "menunggu_keuangan") r.menungguKeuangan++;
+      else if (k.status === "sedang_diproses") r.sedangDiproses++;
+      else if (k.status === "belum_diproses") r.belumDiproses++;
+      else if (k.status === "ditolak") r.ditolak++;
+      const rapelan = rapelanPerId.get(k.id);
+      if (rapelan === "ditetapkan") r.rapelanDitetapkan++;
+      if (rapelan === "berpotensi") r.berpotensiRapelan++;
     });
     return Object.entries(map).sort(([a], [b]) => Number(a) - Number(b)).map(([, v]) => v);
-  }, [kgbList]);
+  }, [siklus, rapelanPerId]);
 
   const perUnit = useMemo(() => {
     const map: Record<string, { selesai: number; total: number }> = {};
-    kgbList.forEach(k => {
-      const u = k.pegawai.unitKerja || "Lainnya";
+    siklus.forEach(k => {
+      const u = k.pegawai?.unitKerja || "Lainnya";
       if (!map[u]) map[u] = { selesai: 0, total: 0 };
       map[u].total++;
       if (k.status === "selesai") map[u].selesai++;
     });
     return Object.entries(map).sort((a, b) => b[1].total - a[1].total);
-  }, [kgbList]);
+  }, [siklus]);
 
   const golEntries = Object.entries(perGolongan).sort((a, b) => a[0].localeCompare(b[0]));
 
   const judulBulan = bulan ? (BULAN_LIST.find(b => b.value === bulan)?.label + " ") : "";
   const judulLaporan = `Rekap KGB ${judulBulan}${tahun}`;
   const selesaiPct = stats.total > 0 ? Math.round((stats.selesai / stats.total) * 100) : 0;
-  const tanggalCetak = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const tanggalCetak = formatTanggalId(new Date());
+
+  const kolomStat = [
+    { label: "Total KGB",          value: stats.total,             color: "var(--dtn)",       bg: "var(--sub)" },
+    { label: infoStatusKgb("selesai").label,           value: stats.selesai,           color: "var(--st-green)",  bg: "var(--tint-green-bg)" },
+    { label: infoStatusKgb("menunggu_keuangan").label, value: stats.menungguKeuangan,  color: "var(--st-violet)", bg: stats.menungguKeuangan > 0 ? "var(--tint-violet-bg)" : "var(--sub)" },
+    { label: infoStatusKgb("sedang_diproses").label,   value: stats.sedangDiproses,    color: "var(--dtn)",       bg: "var(--sub)" },
+    { label: infoStatusKgb("belum_diproses").label,    value: stats.belumDiproses,     color: "var(--st-amber)",  bg: stats.belumDiproses > 0 ? "var(--tint-amber-bg)" : "var(--sub)" },
+    { label: infoStatusKgb("ditolak").label,           value: stats.ditolak,           color: "var(--st-red)",    bg: stats.ditolak > 0 ? "var(--tint-red-bg)" : "var(--sub)" },
+    { label: "Rapelan",            value: stats.rapelanDitetapkan, color: "var(--st-red)",    bg: stats.rapelanDitetapkan > 0 ? "var(--tint-red-bg)" : "var(--sub)" },
+    { label: "Berpotensi Rapelan", value: stats.berpotensiRapelan, color: "var(--st-amber)",  bg: stats.berpotensiRapelan > 0 ? "var(--tint-amber-bg)" : "var(--sub)" },
+  ];
+  const catatanHitungan = "Total dihitung satu KGB per pegawai per TMT: KGB yang dibatalkan lalu diinput ulang dihitung satu kali, dan Dibatalkan hanya memuat yang belum diinput ulang. Rapelan = ditetapkan keuangan saat konfirmasi.";
 
   return (
     <>
@@ -157,30 +203,27 @@ export default function LaporanPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2 items-center">
-            <select value={tahun} onChange={e => setTahun(e.target.value)}
+            <select value={tahun} onChange={e => setTahun(e.target.value)} aria-label="Tahun TMT"
               className="rounded-xl px-3 py-2 text-xs outline-none"
               style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: "var(--dtn)", minWidth: "90px" }}>
               {tahunList.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
-            <select value={bulan} onChange={e => setBulan(e.target.value)}
+            <select value={bulan} onChange={e => setBulan(e.target.value)} aria-label="Bulan TMT"
               className="rounded-xl px-3 py-2 text-xs outline-none"
               style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: "var(--dtn)", minWidth: "125px" }}>
               {BULAN_LIST.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
             </select>
-            <select value={status} onChange={e => setStatus(e.target.value)}
+            <select value={status} onChange={e => setStatus(e.target.value)} aria-label="Status KGB"
               className="rounded-xl px-3 py-2 text-xs outline-none"
               style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: "var(--dtn)", minWidth: "145px" }}>
               <option value="">Semua Status</option>
-              <option value="belum_diproses">Belum Diproses</option>
-              <option value="sedang_diproses">Sedang Diproses</option>
-              <option value="selesai">Selesai</option>
-              <option value="ditolak">Dibatalkan</option>
+              {STATUS_FILTER.map(s => <option key={s} value={s}>{infoStatusKgb(s).label}</option>)}
             </select>
             <button
               onClick={() => window.print()}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white transition hover:opacity-90"
               style={{ background: "var(--navy-solid)" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
                 <rect x="6" y="14" width="12" height="8"/>
               </svg>
@@ -231,16 +274,11 @@ export default function LaporanPage() {
               </p>
             </div>
             {/* Print stats row */}
-            <table className="print-stat-row" style={{ width: "100%", borderCollapse: "collapse", marginTop: "4px", marginBottom: "6px" }}>
+            <table className="print-stat-row" style={{ width: "100%", borderCollapse: "collapse", marginTop: "4px", marginBottom: "2px" }}>
               <tbody>
                 <tr>
                   {[
-                    { l: "Total", v: stats.total, c: "var(--dtn)" },
-                    { l: "Selesai", v: stats.selesai, c: "var(--st-green)" },
-                    { l: "Diproses", v: stats.diproses, c: "var(--dtn)" },
-                    { l: "Belum", v: stats.belum, c: "var(--st-amber)" },
-                    { l: "Dibatalkan", v: stats.ditolak, c: "var(--st-red)" },
-                    { l: "Rapelan", v: stats.rapelan, c: "var(--st-red)" },
+                    ...kolomStat.map(c => ({ l: c.label, v: c.value as number | string, c: c.color })),
                     { l: "Selesai %", v: `${selesaiPct}%`, c: "var(--st-green)" },
                   ].map(({ l, v, c }) => (
                     <td key={l} style={{ textAlign: "center", border: "0.5px solid var(--ln0)", padding: "3px 8px", background: "var(--sub)" }}>
@@ -251,20 +289,14 @@ export default function LaporanPage() {
                 </tr>
               </tbody>
             </table>
+            <p style={{ fontSize: "7px", color: "var(--dt4)", margin: "0 0 6px" }}>{catatanHitungan}</p>
           </div>
 
           {/* ════ STAT BAR (screen only) ════ */}
           <div className="no-print mb-3 rounded-xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
-            <div className="grid" style={{ gridTemplateColumns: "repeat(6, 1fr)", borderBottom: "0.5px solid var(--ln1)" }}>
-              {[
-                { label: "Total KGB",    value: stats.total,    color: "var(--dtn)", bg: "var(--sub)" },
-                { label: "Selesai",      value: stats.selesai,  color: "var(--st-green)", bg: "var(--tint-green-bg)" },
-                { label: "Diproses",     value: stats.diproses, color: "var(--dtn)", bg: "var(--sub)" },
-                { label: "Belum",        value: stats.belum,    color: "var(--st-amber)", bg: stats.belum > 0 ? "var(--tint-amber-bg)" : "var(--sub)" },
-                { label: "Dibatalkan",   value: stats.ditolak,  color: "var(--st-red)", bg: stats.ditolak > 0 ? "var(--tint-red-bg)" : "var(--sub)" },
-                { label: "Rapelan",      value: stats.rapelan,  color: "var(--st-red)", bg: stats.rapelan > 0 ? "var(--tint-red-bg)" : "var(--sub)" },
-              ].map((c, idx) => (
-                <div key={c.label} className="px-3 py-2.5" style={{ background: c.bg, borderRight: idx < 5 ? "0.5px solid var(--ln2)" : "none" }}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8" style={{ borderBottom: "0.5px solid var(--ln1)" }}>
+              {kolomStat.map((c) => (
+                <div key={c.label} className="px-3 py-2.5" style={{ background: c.bg, borderRight: "0.5px solid var(--ln2)", borderBottom: "0.5px solid var(--ln2)" }}>
                   <p style={{ fontSize: "18px", fontWeight: 800, color: c.color, lineHeight: 1 }}>{c.value}</p>
                   <p style={{ fontSize: "10px", color: "var(--dt4)", marginTop: "2px" }}>{c.label}</p>
                 </div>
@@ -278,6 +310,7 @@ export default function LaporanPage() {
               </div>
               <span style={{ fontSize: "10px", color: "var(--st-green)", whiteSpace: "nowrap" }}>{stats.selesai}/{stats.total}</span>
             </div>
+            <p className="px-3 pb-2" style={{ fontSize: "10px", color: "var(--dt5)", background: "var(--sub)" }}>{catatanHitungan}</p>
           </div>
 
           {/* ════ REKAP 3-KOLOM: Golongan | Bulan | Unit ════ */}
@@ -318,6 +351,7 @@ export default function LaporanPage() {
                     <tbody>
                       {perBulan.map(b => {
                         const pct = b.total > 0 ? (b.selesai / b.total) * 100 : 0;
+                        const rapelan = b.rapelanDitetapkan + b.berpotensiRapelan;
                         return (
                           <tr key={b.label} style={{ borderBottom: "0.5px solid var(--ln2)" }}>
                             <td className="px-3 py-1.5 font-medium" style={{ color: "var(--dtn)", whiteSpace: "nowrap" }}>{b.label}</td>
@@ -329,9 +363,9 @@ export default function LaporanPage() {
                                 <span style={{ fontSize: "10px", color: "var(--st-green)", whiteSpace: "nowrap" }}>{b.selesai}/{b.total}</span>
                               </div>
                             </td>
-                            {b.rapelan > 0 && (
-                              <td className="px-2 py-1.5">
-                                <span style={{ fontSize: "9px", color: "var(--st-red)", fontWeight: 700 }}>⚠{b.rapelan}</span>
+                            {rapelan > 0 && (
+                              <td className="px-2 py-1.5 whitespace-nowrap">
+                                <span style={{ fontSize: "9px", color: "var(--st-red)", fontWeight: 700 }}>{rapelan} rapelan</span>
                               </td>
                             )}
                           </tr>
@@ -387,7 +421,7 @@ export default function LaporanPage() {
               <p style={{ fontSize: "9px", fontWeight: 700, color: "var(--dtn)", marginBottom: "3px" }}>REKAP PER BULAN</p>
               <table style={{ width: "100%" }}>
                 <thead>
-                  <tr>{["Bulan","Total","Selesai","Diproses","Belum","Dibatalkan","Rapelan"].map(h => <th key={h} style={{ textAlign: "center" }}>{h}</th>)}</tr>
+                  <tr>{["Bulan","Total","Selesai","Menunggu Keuangan","Sedang Diproses","Belum Diproses","Dibatalkan","Rapelan","Berpotensi Rapelan"].map(h => <th key={h} style={{ textAlign: "center" }}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {perBulan.map(b => (
@@ -395,20 +429,24 @@ export default function LaporanPage() {
                       <td style={{ fontWeight: 600 }}>{b.label}</td>
                       <td style={{ textAlign: "center", fontWeight: 700 }}>{b.total}</td>
                       <td style={{ textAlign: "center", color: "var(--st-green)" }}>{b.selesai}</td>
-                      <td style={{ textAlign: "center", color: "var(--dtn)" }}>{b.diproses}</td>
-                      <td style={{ textAlign: "center", color: "var(--st-amber)" }}>{b.belum}</td>
+                      <td style={{ textAlign: "center", color: "var(--st-violet)" }}>{b.menungguKeuangan}</td>
+                      <td style={{ textAlign: "center", color: "var(--dtn)" }}>{b.sedangDiproses}</td>
+                      <td style={{ textAlign: "center", color: "var(--st-amber)" }}>{b.belumDiproses}</td>
                       <td style={{ textAlign: "center", color: "var(--st-red)" }}>{b.ditolak}</td>
-                      <td style={{ textAlign: "center", color: "var(--st-red)", fontWeight: b.rapelan > 0 ? 700 : 400 }}>{b.rapelan}</td>
+                      <td style={{ textAlign: "center", color: "var(--st-red)", fontWeight: b.rapelanDitetapkan > 0 ? 700 : 400 }}>{b.rapelanDitetapkan}</td>
+                      <td style={{ textAlign: "center", color: "var(--st-amber)", fontWeight: b.berpotensiRapelan > 0 ? 700 : 400 }}>{b.berpotensiRapelan}</td>
                     </tr>
                   ))}
                   <tr style={{ fontWeight: 700, borderTop: "1px solid var(--dtn)" }}>
                     <td>Total</td>
                     <td style={{ textAlign: "center" }}>{stats.total}</td>
                     <td style={{ textAlign: "center", color: "var(--st-green)" }}>{stats.selesai}</td>
-                    <td style={{ textAlign: "center" }}>{stats.diproses}</td>
-                    <td style={{ textAlign: "center", color: "var(--st-amber)" }}>{stats.belum}</td>
+                    <td style={{ textAlign: "center", color: "var(--st-violet)" }}>{stats.menungguKeuangan}</td>
+                    <td style={{ textAlign: "center" }}>{stats.sedangDiproses}</td>
+                    <td style={{ textAlign: "center", color: "var(--st-amber)" }}>{stats.belumDiproses}</td>
                     <td style={{ textAlign: "center", color: "var(--st-red)" }}>{stats.ditolak}</td>
-                    <td style={{ textAlign: "center", color: "var(--st-red)" }}>{stats.rapelan}</td>
+                    <td style={{ textAlign: "center", color: "var(--st-red)" }}>{stats.rapelanDitetapkan}</td>
+                    <td style={{ textAlign: "center", color: "var(--st-amber)" }}>{stats.berpotensiRapelan}</td>
                   </tr>
                 </tbody>
               </table>
@@ -419,7 +457,7 @@ export default function LaporanPage() {
           <div className="rounded-xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
             <div className="no-print px-4 py-2 flex items-center justify-between" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
               <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--dtn)" }}>Detail: {judulLaporan}</p>
-              <p style={{ fontSize: "10px", color: "var(--dt4)" }}>{kgbList.length} data</p>
+              <p style={{ fontSize: "10px", color: "var(--dt4)" }}>{kgbList.length} entri</p>
             </div>
             <div className="no-print-screen" style={{ marginBottom: "3px" }}>
               <p style={{ fontSize: "9px", fontWeight: 700, color: "var(--dtn)" }}>DAFTAR PEGAWAI KGB: {judulLaporan.toUpperCase()}</p>
@@ -441,21 +479,21 @@ export default function LaporanPage() {
                   </thead>
                   <tbody>
                     {kgbList.map((k, i) => {
-                      const selisih = k.gajiPokokBaru - k.gajiPokokLama;
-                      const rapelan = isRapelan(k);
-                      const stCfg = STATUS_CFG[k.status] ?? STATUS_CFG.belum_diproses;
+                      const selisih = (k.gajiPokokBaru ?? 0) - k.gajiPokokLama;
+                      const rapelan = rapelanPerId.get(k.id) ?? null;
+                      const warna = warnaStatusKgb(k.status);
                       const grp = k.golonganBaru.split("/")[0];
                       const gc = GOL_COLOR[grp] ?? { bar: "var(--dt4)", badge: "var(--ln2)", text: "#475569" };
                       return (
-                        <tr key={k.id} style={{ borderBottom: i < kgbList.length - 1 ? "0.5px solid var(--ln2)" : "none", background: rapelan ? "var(--tint-red-bg)" : i % 2 === 0 ? "var(--card)" : "var(--sub)" }}>
+                        <tr key={k.id} style={{ borderBottom: i < kgbList.length - 1 ? "0.5px solid var(--ln2)" : "none", background: rapelan === "berpotensi" ? "var(--tint-amber-bg)" : i % 2 === 0 ? "var(--card)" : "var(--sub)" }}>
                           <td className="px-3 py-2" style={{ color: "var(--dt5)", fontSize: "10px", whiteSpace: "nowrap" }}>{i + 1}</td>
                           <td className="px-3 py-2">
-                            <p className="font-semibold" style={{ fontSize: "11px", color: "var(--dtn)", whiteSpace: "nowrap" }}>{k.pegawai.nama}</p>
-                            <p style={{ fontSize: "10px", color: "var(--dt5)", fontFamily: "monospace" }}>{k.pegawai.nip}</p>
+                            <p className="font-semibold" style={{ fontSize: "11px", color: "var(--dtn)", whiteSpace: "nowrap" }}>{k.pegawai?.nama ?? "-"}</p>
+                            <p style={{ fontSize: "10px", color: "var(--dt5)", fontFamily: "monospace" }}>{k.pegawai?.nip ?? "-"}</p>
                           </td>
                           <td className="px-3 py-2" style={{ maxWidth: "160px" }}>
-                            <p style={{ fontSize: "10px", color: "var(--dtn)" }} className="truncate">{k.pegawai.jabatan}</p>
-                            <p style={{ fontSize: "9px", color: "var(--dt5)" }} className="truncate">{k.pegawai.unitKerja}</p>
+                            <p style={{ fontSize: "10px", color: "var(--dtn)" }} className="truncate">{k.pegawai?.jabatan ?? "-"}</p>
+                            <p style={{ fontSize: "9px", color: "var(--dt5)" }} className="truncate">{k.pegawai?.unitKerja ?? "-"}</p>
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap">
                             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -490,12 +528,12 @@ export default function LaporanPage() {
                           </td>
                           <td className="px-3 py-2">
                             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                              <span style={{ fontSize: "10px", fontWeight: 600, padding: "2px 7px", borderRadius: "999px", background: stCfg.bg, color: stCfg.color, border: `1px solid ${stCfg.border}`, whiteSpace: "nowrap", width: "fit-content" }}>
-                                {stCfg.printLabel}
+                              <span style={{ fontSize: "10px", fontWeight: 600, padding: "2px 7px", borderRadius: "999px", background: warna.bg, color: warna.color, border: `1px solid ${warna.color}`, whiteSpace: "nowrap", width: "fit-content" }}>
+                                {infoStatusKgb(k.status).label}
                               </span>
                               {rapelan && (
-                                <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: "999px", background: "var(--tint-amber-bg)", color: "var(--st-amber)", border: "1px solid var(--tint-amber-ln)", whiteSpace: "nowrap", width: "fit-content" }}>
-                                  ⚠ RAPELAN
+                                <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: "999px", background: rapelan === "ditetapkan" ? "var(--tint-red-bg)" : "var(--tint-amber-bg)", color: rapelan === "ditetapkan" ? "var(--st-red)" : "var(--st-amber)", border: `1px solid ${rapelan === "ditetapkan" ? "var(--tint-red-ln)" : "var(--tint-amber-ln)"}`, whiteSpace: "nowrap", width: "fit-content" }}>
+                                  {LABEL_RAPELAN[rapelan]}
                                 </span>
                               )}
                             </div>

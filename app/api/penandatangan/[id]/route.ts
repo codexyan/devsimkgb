@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
+import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 import { ROLES } from "@/lib/auth";
 import {
@@ -32,6 +33,9 @@ export async function PATCH(
     return NextResponse.json({ error: "Request body tidak valid" }, { status: 400 });
   }
 
+  const userLogin = await penggunaLogin(session);
+  if (!userLogin) return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
+
   const hasil = validasiPenandatangan({
     jenis: lama.jenis,
     nama: lama.nama,
@@ -52,8 +56,7 @@ export async function PATCH(
     { ...hasil.data, updatedAt: new Date(), updatedBy: session.user.nip ?? null },
   );
 
-  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
-  if (userLogin && baru) {
+  if (baru) {
     logAudit({
       userId: userLogin.id,
       aksi: "ubah_penandatangan",
@@ -77,6 +80,9 @@ export async function DELETE(
   const lama = await db.penandatangan.findUnique({ id });
   if (!lama) return NextResponse.json({ error: "Penandatangan tidak ditemukan" }, { status: 404 });
 
+  const userLogin = await penggunaLogin(session);
+  if (!userLogin) return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
+
   const dipakai = await db.suratKGB.count({ penandatanganId: id });
   if (dipakai > 0) {
     return NextResponse.json(
@@ -87,15 +93,12 @@ export async function DELETE(
 
   await db.penandatangan.delete({ id });
 
-  const userLogin = await db.user.findUnique({ nip: session.user.nip! });
-  if (userLogin) {
-    logAudit({
-      userId: userLogin.id,
-      aksi: "hapus_penandatangan",
-      detail: `Hapus penandatangan ${LABEL_JENIS_PENANDATANGAN[lama.jenis]}: ${lama.nama} (${lama.nip})`,
-      targetNama: lama.nama,
-    });
-  }
+  logAudit({
+    userId: userLogin.id,
+    aksi: "hapus_penandatangan",
+    detail: `Hapus penandatangan ${LABEL_JENIS_PENANDATANGAN[lama.jenis]}: ${lama.nama} (${lama.nip})`,
+    targetNama: lama.nama,
+  });
 
   return NextResponse.json({ ok: true });
 }

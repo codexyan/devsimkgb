@@ -1,0 +1,101 @@
+/* Halaman cek status KGB (/kgb). Token dan komponen dasar ada di ../publik.css;
+   berkas ini hanya mengatur tata letak halaman. Semua kelas berawalan ck-. */
+
+.pub .ck-tata {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2.5rem;
+  margin-top: 0.5rem;
+}
+
+.pub .ck-utama {
+  min-width: 0;
+  max-width: 40rem;
+}
+
+/* Formulir: kolom NIP dan tombol sebaris, tombol turun ke baris baru bila sempit */
+.pub .ck-baris {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.pub .ck-input {
+  flex: 1 1 14rem;
+  max-width: 22rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pub .ck-tombol {
+  flex: 0 0 auto;
+  min-width: 8.5rem;
+}
+
+/* Hasil dan galat */
+.pub .ck-hasil .ck-galat {
+  margin-top: 1.5rem;
+}
+
+.pub .ck-hasil .pub-h2 {
+  margin-top: 2.5rem;
+}
+
+/* Judul hasil menerima fokus lewat skrip, bukan elemen interaktif */
+.pub .ck-hasil .ck-judul-hasil:focus {
+  outline: none;
+}
+
+/* Status dan tanda rapelan sebaris, turun ke baris baru bila sempit */
+.pub .ck-lencana {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.pub .ck-keterangan {
+  margin-top: 0.375rem;
+}
+
+.pub .ck-catatan {
+  margin-top: 1.25rem;
+}
+
+.pub .ck-tautan-status {
+  margin: 1.25rem 0 0;
+}
+
+/* Tautan untuk pengelola kepegawaian */
+.pub .ck-samping .pub-h2 {
+  margin-top: 0;
+  font-size: 1.25rem;
+}
+
+.pub .ck-daftar-tautan {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pub .ck-daftar-tautan li + li {
+  margin-top: 0.75rem;
+}
+
+@media (min-width: 56rem) {
+  .pub .ck-tata {
+    grid-template-columns: minmax(0, 40rem) minmax(0, 20rem);
+    gap: 4rem;
+    align-items: start;
+  }
+
+  .pub .ck-samping {
+    padding-left: 2rem;
+    border-left: 1px solid var(--line);
+  }
+
+  .pub .ck-samping .pub-h2 {
+    padding-top: 0;
+    border-top: 0;
+  }
+}

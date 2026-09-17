@@ -5,8 +5,6 @@ export const ROLES = {
   SDM_HUKDIS:   "sdm_hukdis",
 } as const;
 
-export type Role = (typeof ROLES)[keyof typeof ROLES];
-
 // KGB: superAdminCore + sdm_kgb
 export const canProcessKGB = (role: string) =>
   role === ROLES.SUPER_ADMIN || role === ROLES.SDM_KGB;

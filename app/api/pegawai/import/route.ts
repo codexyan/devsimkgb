@@ -4,7 +4,11 @@ import { makeRiwayatKGB, type PegawaiRow, type RiwayatKGBRow } from "@/lib/sheet
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
-import { getGajiPokok, isGolonganDikenal, kalkulasiKGB } from "@/lib/tabelGaji";
+import { canEditPegawai, canManageHukdis } from "@/lib/auth";
+import { bacaIsianPegawai, teksAtauNull, teksIsian } from "@/lib/dataPegawai";
+import { rencanaSiklusBerikutnya } from "@/lib/jadwalKgb";
+import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
+import { hariIniWita } from "@/lib/waktu";
 
 export const runtime = "nodejs";
 
@@ -13,130 +17,84 @@ export async function POST(req: Request) {
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { rows } = (await req.json()) as any;
+  if (!canEditPegawai(session.user.role!))
+    return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
-  if (!rows || !Array.isArray(rows) || rows.length === 0) {
+  let rows: unknown;
+  try {
+    rows = ((await req.json()) as { rows?: unknown }).rows;
+  } catch {
+    return NextResponse.json({ error: "Request body tidak valid" }, { status: 400 });
+  }
+  if (!Array.isArray(rows) || rows.length === 0) {
     return NextResponse.json({ error: "Tidak ada data untuk diimport" }, { status: 400 });
   }
 
   const userLogin = await db.user.findUnique({ nip: session.user.nip! });
+  if (!userLogin)
+    return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
   // Kuota Sheets API terbatas (±60 tulis/menit) — import dikerjakan BATCH:
   // satu kali baca daftar NIP terdaftar, satu append Pegawai, satu append
   // RiwayatKGB. Per-baris create dulu membuat import besar kena 429.
   const terdaftar = new Set((await db.pegawai.findMany()).map((p) => p.nip));
+  const hariIni = hariIniWita();
+  // Kolom hukdis di berkas hanya dipakai bila pengimpor mengelola hukdis (Super Admin); peran lain
+  // mencatat hukdis lewat Riwayat Hukdis.
+  const bolehHukdis = canManageHukdis(session.user.role!);
 
   const results = { berhasil: 0, gagal: 0, errors: [] as string[] };
   const pegawaiBatch: PegawaiRow[] = [];
   const riwayatBatch: RiwayatKGBRow[] = [];
 
-  for (const row of rows) {
+  // Setiap baris diperiksa sendiri; baris yang salah dicatat dan baris lain tetap diproses.
+  for (const [indeks, mentah] of rows.entries()) {
+    const row: Record<string, unknown> = mentah && typeof mentah === "object" ? (mentah as Record<string, unknown>) : {};
+    const nipTeks = teksIsian(row.nip).replace(/^="(.*)"$/, "$1").trim();
+    const identitas = `Data ke-${indeks + 1}, NIP ${nipTeks || "-"} (${teksIsian(row.nama) || "-"})`;
     try {
-      row.nip = row.nip?.replace(/^="(.*)"$/, "$1").trim() ?? row.nip;
-
-      if (terdaftar.has(row.nip)) {
+      const hasil = bacaIsianPegawai(row, { denganNip: true });
+      if (hasil.galat !== undefined) {
         results.gagal++;
-        results.errors.push(`NIP ${row.nip} (${row.nama}) sudah terdaftar, dilewati`);
+        results.errors.push(`${identitas}: ${hasil.galat}`);
         continue;
       }
+      const isian = hasil.data;
 
-      if (!isGolonganDikenal(row.golonganRuang)) {
+      if (terdaftar.has(isian.nip)) {
         results.gagal++;
-        results.errors.push(
-          `NIP ${row.nip} (${row.nama}): golongan "${row.golonganRuang}" tidak dikenal di tabel gaji PP 5/2024`,
-        );
-        continue;
-      }
-
-      const mkgTahun = parseInt(row.mkgTahun) || 0;
-      const mkgBulan = parseInt(row.mkgBulan) || 0;
-      const gajiPokokRaw = row.gajiPokok ? parseInt(row.gajiPokok) : null;
-      const gajiPokok =
-        gajiPokokRaw && !isNaN(gajiPokokRaw) ? gajiPokokRaw : getGajiPokok(row.golonganRuang, mkgTahun, mkgBulan);
-
-      if (!gajiPokok) {
-        results.gagal++;
-        results.errors.push(`NIP ${row.nip} (${row.nama}): gaji pokok tidak dapat ditentukan dari MKG ${mkgTahun} tahun ${mkgBulan} bulan`);
+        results.errors.push(`${identitas}: NIP sudah terdaftar, dilewati`);
         continue;
       }
 
       const now = new Date();
-      const tmtKgbBerikutnya = new Date(row.tmtKgbBerikutnya);
       const pegawai: PegawaiRow = {
         id: newId(),
-        nip: row.nip,
-        nama: row.nama,
-        tempatLahir: row.tempatLahir || null,
-        tanggalLahir: row.tanggalLahir ? new Date(row.tanggalLahir) : null,
-        jenisKelamin: row.jenisKelamin || null,
-        pendidikanTerakhir: row.pendidikanTerakhir || null,
-        jabatan: row.jabatan,
-        pangkat: row.pangkat,
-        golonganRuang: row.golonganRuang,
-        unitKerja: "Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan",
-        eselon: row.eselon || null,
-        jenisJabatan: null,
-        tmtGolongan: new Date(row.tmtGolongan),
-        mkgTahun,
-        mkgBulan,
-        gajiPokok,
-        tmtKgbTerakhir: row.tmtKgbTerakhir
-          ? new Date(row.tmtKgbTerakhir)
-          : (() => { const d = new Date(row.tmtKgbBerikutnya); d.setFullYear(d.getFullYear() - 2); return d; })(),
-        tmtKgbBerikutnya,
-        statusHukdis: row.statusHukdis === "true" || row.statusHukdis === true,
+        ...isian,
+        // Tanpa TMT terakhir, masa kerja sekarang dianggap dicapai satu langkah tabel gaji sebelum TMT berikutnya.
+        tmtKgbTerakhir:
+          isian.tmtKgbTerakhir ??
+          tambahBulan(isian.tmtKgbBerikutnya, -bulanKeKgbBerikutnya(isian.golonganRuang, isian.mkgTahun, isian.mkgBulan)),
+        statusHukdis: bolehHukdis && (row.statusHukdis === true || teksIsian(row.statusHukdis).toLowerCase() === "true"),
         tanggalHukdisBerakhir: null,
         jenisHukdis: null,
-        keteranganHukdis: row.keteranganHukdis || null,
+        keteranganHukdis: bolehHukdis ? teksAtauNull(row.keteranganHukdis) : null,
         aktif: true,
         createdAt: now,
         updatedAt: now,
       };
+
+      // Jadwal KGB pertama dihitung sebelum baris dimasukkan ke batch agar pegawai tidak tersimpan tanpa jadwal.
+      const rencana = rencanaSiklusBerikutnya({ ...pegawai, hariIni });
+
       terdaftar.add(pegawai.nip); // tolak duplikat di dalam file yang sama
       pegawaiBatch.push(pegawai);
-
-      // Auto-create RiwayatKGB.
-      if (userLogin) {
-        const hasil = kalkulasiKGB({
-          golonganRuang: pegawai.golonganRuang,
-          mkgTahun: pegawai.mkgTahun,
-          mkgBulan: pegawai.mkgBulan,
-          tmtKgbBerikutnya: pegawai.tmtKgbBerikutnya as Date,
-          tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
-        });
-        const today = new Date();
-        const tmtKgb = new Date(hasil.tmtKgbBaru);
-        const deadlineSDM = new Date(tmtKgb.getFullYear(), tmtKgb.getMonth() - 1, 0);
-        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const flagRapelan = todayDate > deadlineSDM;
-
-        riwayatBatch.push(
-          makeRiwayatKGB({
-            pegawaiId: pegawai.id,
-            tanggalSK: new Date(hasil.tmtKgbBaru),
-            tmtSK: new Date(hasil.tmtKgbBaru),
-            golonganLama: pegawai.golonganRuang,
-            gajiPokokLama: pegawai.gajiPokok,
-            mkgTahunLama: pegawai.mkgTahun,
-            mkgBulanLama: pegawai.mkgBulan,
-            golonganBaru: pegawai.golonganRuang,
-            gajiPokokBaru: hasil.gajiPokokBaru,
-            mkgTahunBaru: hasil.mkgTahunBaru,
-            mkgBulanBaru: hasil.mkgBulanBaru,
-            tmtKgbBaru: hasil.tmtKgbBaru,
-            tmtKgbBerikutnya: hasil.tmtKgbBerikutnya,
-            status: "belum_diproses",
-            flagRapelan,
-            createdBy: userLogin.id,
-          }),
-        );
-      }
-
+      riwayatBatch.push(makeRiwayatKGB({ pegawaiId: pegawai.id, createdBy: userLogin.id, ...rencana }));
       results.berhasil++;
     } catch (e) {
       results.gagal++;
       const pesan = e instanceof Error ? e.message : "data tidak valid";
-      results.errors.push(`NIP ${row.nip} (${row.nama}): Gagal diproses — ${pesan}`);
+      results.errors.push(`${identitas}: gagal diproses, ${pesan}`);
     }
   }
 
@@ -148,17 +106,17 @@ export async function POST(req: Request) {
     } catch (e) {
       const pesan = e instanceof Error ? e.message : "unknown";
       results.errors.push(
-        `Pegawai tersimpan, tetapi pembuatan RiwayatKGB otomatis gagal: ${pesan}. Buat KGB pertama secara manual dari halaman pegawai.`,
+        `Pegawai tersimpan, tetapi pembuatan jadwal KGB Belum Diproses gagal: ${pesan}. Simpan ulang data pegawai terkait dari halaman Data Pegawai.`,
       );
     }
   } catch (e) {
     results.gagal += results.berhasil;
     results.berhasil = 0;
     const pesan = e instanceof Error ? e.message : "unknown";
-    results.errors.push(`Gagal menulis ke Google Sheets: ${pesan}. Tidak ada baris baru yang tersimpan — coba lagi.`);
+    results.errors.push(`Gagal menulis ke penyimpanan data: ${pesan}. Tidak ada baris baru yang tersimpan, silakan coba lagi.`);
   }
 
-  if (userLogin && results.berhasil > 0) {
+  if (results.berhasil > 0) {
     logAudit({
       userId: userLogin.id,
       aksi: "import_pegawai",

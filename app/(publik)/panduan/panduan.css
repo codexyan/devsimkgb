@@ -1,0 +1,91 @@
+/* panduan.css — tambahan khusus halaman /panduan. Semua kelas berawalan pg-
+   dan berada di bawah .pub; kelas bersama ada di ../publik.css. */
+
+/* Bagian panduan memakai ritme .pub-prose, tetapi tabel dan tiruan surat
+   boleh selebar kolom isi. Teks tetap dibatasi sekitar 70ch. */
+.pub .pub-prose.pg-bagian {
+  max-width: none;
+}
+
+.pub .pg-bagian > :not(h2, .pub-table-wrap, figure) {
+  max-width: 70ch;
+}
+
+.pub .pg-bagian > figure {
+  max-width: 52rem;
+}
+
+/* Blok pembuka: daftar bacaan menurut tugas */
+.pub .pg-peran {
+  max-width: 70ch;
+  margin-block: 1.75rem 2.5rem;
+}
+
+.pub .pg-peran-judul {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Hasil di akhir langkah */
+.pub .pg-hasil {
+  color: var(--text);
+}
+
+.pub .pg-hasil .pub-status {
+  margin-inline: 0.125rem;
+}
+
+/* ── Tiruan surat ──────────────────────────────────────────────────────── */
+.pub .pg-doc-meta {
+  margin: 0;
+}
+
+.pub .pg-doc-meta > div {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.pub .pg-doc-meta dt::after {
+  content: ":";
+}
+
+.pub .pg-doc-meta dd {
+  margin: 0;
+}
+
+.pub .pg-doc-kanan {
+  text-align: right;
+}
+
+.pub .pg-doc-gulir {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.pub .pg-doc-gulir .pub-doc-table {
+  min-width: 34rem;
+}
+
+.pub .pub-doc-table.pg-doc-form th {
+  width: 11rem;
+  text-align: left;
+}
+
+.pub .pg-doc-ttd {
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  padding-top: 0.75rem;
+}
+
+.pub .pg-doc-ttd > p {
+  margin: 0;
+}
+
+.pub .pg-doc-ttd .pg-doc-ttd-ruang {
+  margin-block: 1.25rem;
+  font-style: italic;
+  color: #3d4757;
+}
