@@ -1,0 +1,727 @@
+/* kerangka.css — nav melayang, kaki halaman, dan dok halaman publik.
+   Token dari publik.css. Semua selektor di bawah .pub.
+
+   nv-*  nav: transparan di atas, padat (kaca tipis) setelah digulir. Kaca hanya
+         dipakai di sini, lewat ::before, supaya elemen fixed di dalamnya tetap
+         mengacu ke layar. Penanda aktif (.nv-tanda) bergeser ke tautan aktif.
+   kk-*  kaki halaman: merek, peta halaman, jam layanan.
+   jl-*  status dan pil jam layanan.
+   dk-*  tombol kembali ke atas dan wadah pil jam layanan. */
+
+
+/* ── Penanda puncak untuk dok ──────────────────────────────────────────── */
+.pub .pub-puncak {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 80svh;
+  pointer-events: none;
+}
+
+
+/* ── Nav ───────────────────────────────────────────────────────────────── */
+.pub .nv {
+  --nv-tinggi: 76px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  isolation: isolate;
+}
+
+.pub .nv[data-padat="1"] {
+  --nv-tinggi: var(--nav);
+}
+
+.pub .nv::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(250, 251, 252, 0.78);
+  border-bottom: 1px solid rgba(20, 32, 46, 0.07);
+  box-shadow: 0 20px 40px -36px rgba(20, 32, 46, 0.4);
+  opacity: 0;
+  transition: opacity 600ms var(--ease);
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .pub .nv::before {
+    background: rgba(250, 251, 252, 0.7);
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    backdrop-filter: blur(20px) saturate(170%);
+  }
+}
+
+.pub .nv[data-padat="1"]::before {
+  opacity: 1;
+}
+
+.pub .nv-dalam {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: var(--kolom);
+  height: var(--nv-tinggi);
+  margin: 0 auto;
+  padding: 0 var(--sisi);
+  transition: height 600ms var(--ease-out);
+}
+
+/* Garis kemajuan gulir di kaki nav padat (animasi gulir CSS, tanpa JavaScript) */
+.pub .nv-prog {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1.5px;
+  background: linear-gradient(90deg, #1b3c68, #22518d 70%, var(--emas));
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 600ms var(--ease);
+}
+
+.pub .nv[data-padat="1"] .nv-prog {
+  opacity: 0.85;
+}
+
+@supports (animation-timeline: scroll()) {
+  .pub .nv-prog {
+    animation: nvProg linear both;
+    animation-timeline: scroll(root);
+  }
+}
+
+@keyframes nvProg {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.pub .nv-merek {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin-right: auto;
+  border-radius: 12px;
+  color: var(--tinta);
+  text-decoration: none;
+}
+
+.pub .nv-merek:hover {
+  color: var(--tinta);
+}
+
+.pub .nv-merek-logo {
+  display: flex;
+  flex-shrink: 0;
+  transition: transform 620ms var(--ease-spring);
+}
+
+.pub .nv-merek:hover .nv-merek-logo {
+  transform: scale(1.06) rotate(-3deg);
+}
+
+.pub .nv-merek-teks {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pub .nv-merek-nama {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.pub .nv-merek-sub {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.pub .nv-baris {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+}
+
+.pub .nv-tanda {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: var(--w, 0px);
+  border-radius: 999px;
+  background: rgba(20, 32, 46, 0.06);
+  opacity: var(--tampil, 0);
+  transform: translateX(var(--x, 0px));
+  pointer-events: none;
+  transition:
+    transform 620ms var(--ease-out),
+    width 620ms var(--ease-out),
+    opacity 300ms var(--ease);
+}
+
+.pub .nv-tautan {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: color 360ms var(--ease);
+}
+
+.pub .nv-tautan:hover,
+.pub .nv-tautan[aria-current] {
+  color: var(--tinta);
+}
+
+.pub .nv-instansi {
+  display: none;
+  flex-shrink: 0;
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+@media (min-width: 1320px) {
+  .pub .nv-instansi {
+    display: block;
+  }
+}
+
+.pub .nv-masuk {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid rgba(20, 32, 46, 0.14);
+  border-radius: 999px;
+  color: var(--tinta);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition: background-color 320ms var(--ease), border-color 320ms var(--ease), color 320ms var(--ease);
+}
+
+.pub .nv-masuk:hover,
+.pub .nv-masuk[aria-current] {
+  background: var(--tinta);
+  border-color: var(--tinta);
+  color: #fff;
+}
+
+.pub .nv-menu-tombol {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(20, 32, 46, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--tinta);
+  cursor: pointer;
+  transition: background-color 320ms var(--ease), transform 420ms var(--ease-spring);
+}
+
+.pub .nv-menu-tombol:active {
+  transform: scale(0.92);
+}
+
+.pub .nv-menu-ikon {
+  display: flex;
+  transition: transform 520ms var(--ease-out);
+}
+
+.pub .nv-menu-tombol[aria-expanded="true"] .nv-menu-ikon {
+  transform: rotate(90deg);
+}
+
+@media (max-width: 960px) {
+  .pub .nv-utama,
+  .pub .nv-masuk {
+    display: none;
+  }
+
+  .pub .nv-menu-tombol {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 380px) {
+  .pub .nv-merek-sub {
+    display: none;
+  }
+}
+
+@keyframes nvTirai {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes nvLembar {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) scale(0.97);
+  }
+}
+
+@keyframes nvItem {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+}
+
+.pub .nv-tirai {
+  position: fixed;
+  inset: var(--nv-tinggi) 0 0 0;
+  z-index: 98;
+  padding: 0;
+  border: 0;
+  background: rgba(14, 22, 34, 0.18);
+  cursor: default;
+  animation: nvTirai 420ms var(--ease) both;
+}
+
+.pub .nv-lembar {
+  position: absolute;
+  top: 100%;
+  left: 10px;
+  right: 10px;
+  z-index: 99;
+  margin-top: 6px;
+  padding: 10px;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 40px 80px -40px rgba(14, 22, 34, 0.5);
+  transform-origin: top center;
+  animation: nvLembar 560ms var(--ease-out) both;
+}
+
+.pub .nv-lembar nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.pub .nv-lembar-item {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: 16px;
+  color: var(--tinta);
+  font-size: 17px;
+  font-weight: 550;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  animation: nvItem 520ms var(--ease-out) both;
+  animation-delay: calc(60ms + var(--i, 0) * 40ms);
+  transition: background-color 280ms var(--ease);
+}
+
+.pub .nv-lembar-item:hover,
+.pub .nv-lembar-item[aria-current] {
+  background: var(--bg);
+  color: var(--tinta);
+}
+
+.pub .nv-lembar-item.nv-lembar-masuk {
+  margin-top: 6px;
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0 0 16px 16px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+
+/* ── Kaki ──────────────────────────────────────────────────────────────── */
+.pub .kk {
+  position: relative;
+  background: var(--bg);
+}
+
+.pub .kk-atas {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 36px;
+  max-width: var(--kolom);
+  margin: 0 auto;
+  padding: 56px var(--sisi) 40px;
+  border-top: 1px solid var(--line);
+}
+
+@media (min-width: 760px) {
+  .pub .kk-atas {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 48px;
+  }
+}
+
+.pub .kk-merek-baris {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pub .kk-merek-baris img {
+  flex-shrink: 0;
+}
+
+.pub .kk-merek-nama {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  color: var(--tinta);
+}
+
+.pub .kk-merek-sub {
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.pub .kk-teks {
+  max-width: 40ch;
+  margin: 18px 0 14px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+
+.pub .kk-label {
+  margin: 0 0 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+  color: var(--tinta);
+}
+
+.pub .kk-daftar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Garis bawah tumbuh dari kiri saat disorot */
+.pub .kk-tautan {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding-bottom: 1px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 calc(100% - 6px);
+  background-repeat: no-repeat;
+  background-size: 0% 1px;
+  transition: color 360ms var(--ease), background-size 620ms var(--ease-out);
+}
+
+.pub .kk-tautan:hover {
+  color: var(--tinta);
+  background-size: 100% 1px;
+}
+
+.pub .kk-jam {
+  margin: 0;
+}
+
+.pub .kk-jam > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 13.5px;
+  line-height: 2.1;
+}
+
+.pub .kk-jam dt {
+  color: var(--muted);
+}
+
+.pub .kk-jam dd {
+  margin: 0;
+  color: var(--tinta);
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+
+.pub .kk-catatan {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.pub .kk-bawah {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 20px;
+  max-width: var(--kolom);
+  margin: 0 auto;
+  /* Ruang bawah menjaga tautan tidak tertutup dok saat halaman digulir sampai habis */
+  padding: 16px var(--sisi) 84px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.pub .kk-bawah .kk-tautan {
+  font-size: 12.5px;
+  background-position: 0 calc(100% - 7px);
+}
+
+
+/* ── Jam layanan ───────────────────────────────────────────────────────── */
+.pub .jl-baris {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-height: 22px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pub .jl-baris b {
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.pub .jl-titik {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #8592a1;
+}
+
+.pub .jl-titik[data-buka="1"] {
+  background: #2f8f60;
+  box-shadow: 0 0 0 3px rgba(47, 143, 96, 0.16);
+}
+
+.pub .jl-apung {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+@keyframes jlKartu {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.97);
+  }
+}
+
+.pub .jl-kartu {
+  width: min(264px, calc(100vw - 28px));
+  padding: 14px 16px 12px;
+  border: 1px solid rgba(20, 32, 46, 0.08);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 30px 60px -36px rgba(14, 22, 34, 0.45);
+  transform-origin: bottom right;
+  animation: jlKartu 520ms var(--ease-out) both;
+}
+
+.pub .jl-kartu-judul {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--tinta);
+}
+
+.pub .jl-kartu-baris {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.95;
+  color: var(--muted);
+}
+
+.pub .jl-kartu-baris + .jl-kartu-baris {
+  border-top: 1px solid var(--line-soft);
+}
+
+.pub .jl-kartu-baris b {
+  font-weight: 600;
+  color: var(--tinta);
+  font-variant-numeric: tabular-nums;
+}
+
+.pub .jl-kartu-catatan {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pub .jl-pil {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(20, 32, 46, 0.1);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 16px 30px -24px rgba(20, 32, 46, 0.5);
+  color: var(--tinta);
+  font-family: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 320ms var(--ease), transform 520ms var(--ease-out);
+}
+
+.pub .jl-pil:hover {
+  border-color: rgba(20, 32, 46, 0.22);
+  transform: translateY(-1px);
+}
+
+.pub .jl-pil-judul {
+  font-weight: 600;
+}
+
+.pub .jl-pil-jam {
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .pub .jl-pil-jam {
+    display: none;
+  }
+}
+
+
+/* ── Dok ───────────────────────────────────────────────────────────────── */
+.pub .dk-atas,
+.pub .dk-kanan {
+  position: fixed;
+  bottom: 20px;
+  z-index: 90;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 420ms var(--ease), transform 720ms var(--ease-out);
+}
+
+.pub .dk-atas {
+  left: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(20, 32, 46, 0.1);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 16px 30px -22px rgba(20, 32, 46, 0.5);
+  color: var(--tinta);
+  cursor: pointer;
+  transform: translate3d(0, 12px, 0) scale(0.9);
+  transition:
+    opacity 420ms var(--ease),
+    transform 720ms var(--ease-out),
+    background-color 320ms var(--ease),
+    color 320ms var(--ease);
+}
+
+.pub .dk-atas svg {
+  transition: transform 620ms var(--ease-out);
+}
+
+.pub .dk-atas:hover {
+  background: var(--tinta);
+  color: #fff;
+}
+
+.pub .dk-atas:hover svg {
+  transform: translateY(-2px);
+}
+
+.pub .dk-kanan {
+  right: 20px;
+  transform: translate3d(0, 12px, 0);
+}
+
+.pub :is(.dk-atas, .dk-kanan)[data-tampak="1"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.pub .dk-atas[data-tampak="1"]:active {
+  transform: scale(0.94);
+}
+
+@media (max-width: 480px) {
+  .pub .dk-atas {
+    left: 14px;
+    bottom: 14px;
+  }
+
+  .pub .dk-kanan {
+    right: 14px;
+    bottom: 14px;
+  }
+}
+
+@media print {
+  .pub .nv,
+  .pub .dk-atas,
+  .pub .dk-kanan {
+    display: none;
+  }
+}

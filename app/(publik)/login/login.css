@@ -1,7 +1,9 @@
 /* Halaman masuk /login. Melengkapi publik.css; semua kelas berawalan lg-. */
 
+/* Satu kolom sempit di tengah: formulir menjadi satu-satunya fokus halaman */
 .pub .lg-kolom {
   max-width: 26rem;
+  margin-inline: auto;
 }
 
 .pub .pub-lead.lg-lead {

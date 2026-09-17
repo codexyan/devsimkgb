@@ -58,7 +58,7 @@ Worker utama adalah `worker-entry.js`, yang membungkus output OpenNext dan menam
 
 ## Halaman publik: `app/(publik)`
 
-Route group tanpa login dengan kerangka sendiri (`layout.tsx`, `HeaderPublik.tsx`, `publik.css`). Semua gaya berada di bawah kelas `.pub`, sehingga tidak bercampur dengan dashboard. Tema terang atau gelap disimpan di `localStorage` (`kgb-theme`) dan dipasang sebagai `data-pub-theme` pada `<html>` oleh script di `app/layout.tsx`. Kelas dan token didokumentasikan di awal `publik.css`; kelas khusus halaman berawalan `ck-` (cek status), `pg-` (panduan), dan `lg-` (masuk).
+Route group tanpa login dengan kerangka sendiri: `layout.tsx` memasang nav melayang (`NavPublik.tsx`), kaki halaman (`KakiPublik.tsx`), dok jam layanan dan tombol ke atas (`DokPublik.tsx`), serta gerak masuk saat digulir (`Muncul.tsx`). Bahasa visualnya mengikuti portal SDM Pas Kalsel dan hanya bertema terang. Semua gaya berada di bawah kelas `.pub`, sehingga tidak bercampur dengan dashboard; token dan kelas bersama didokumentasikan di awal `publik.css`, kerangka di `kerangka.css`, dan beranda di `kgb/beranda.css`. Beranda `/kgb` memuat lambang partikel three.js (`kgb/LogoPartikel.tsx`) secara lazy; tanpa WebGL atau saat pengguna memilih kurangi gerak, lambang tampil sebagai gambar diam. Kelas khusus halaman berawalan `pg-` (panduan) dan `lg-` (masuk).
 
 | Route | Isi |
 |-------|-----|

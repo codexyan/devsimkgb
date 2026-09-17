@@ -25,20 +25,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // suppressHydrationWarning: script bootstrap tema menyetel data-pub-theme
-    // dan data-dash-theme pada <html> sebelum React hydrate (pola
-    // next-themes); perbedaan atribut di elemen ini disengaja dan aman diabaikan.
+    // suppressHydrationWarning: script bootstrap tema menyetel data-dash-theme
+    // pada <html> sebelum React hydrate (pola next-themes); perbedaan atribut
+    // di elemen ini disengaja dan aman diabaikan.
     <html lang="id" suppressHydrationWarning className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        {/* Terapkan tema tersimpan SEBELUM hydration (anti-flash). data-pub-theme
-            dipasang di semua path untuk halaman publik, data-dash-theme hanya
-            di /dashboard. Di root layout agar hanya dirender saat full load
-            — React tidak mengeksekusi <script> pada navigasi client-side;
-            sinkronisasi selanjutnya ditangani efek DashboardShell dan
-            HeaderPublik. */}
+        {/* Terapkan tema dashboard tersimpan SEBELUM hydration (anti-flash).
+            Halaman publik hanya bertema terang. Di root layout agar hanya
+            dirender saat muat penuh; sinkronisasi berikutnya ditangani efek
+            DashboardShell. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("kgb-theme");if(t!=="dark"&&t!=="light"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}var d=document.documentElement;d.setAttribute("data-pub-theme",t);if(location.pathname.indexOf("/dashboard")===0){d.setAttribute("data-dash-theme",t)}}catch(e){}`,
+            __html: `try{if(location.pathname.indexOf("/dashboard")===0){var t=localStorage.getItem("kgb-theme");if(t!=="dark"&&t!=="light"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.setAttribute("data-dash-theme",t)}}catch(e){}`,
           }}
         />
         {children}
