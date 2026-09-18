@@ -1,15 +1,14 @@
-/* kerangka.css — nav melayang, kaki halaman, dan dok halaman publik.
-   Token dari publik.css. Semua selektor di bawah .pub.
+/* kerangka.css: nav, kaki, dan tombol kembali ke atas halaman publik. Token dari publik.css.
 
-   nv-*  nav: transparan di atas, padat (kaca tipis) setelah digulir. Kaca hanya
-         dipakai di sini, lewat ::before, supaya elemen fixed di dalamnya tetap
-         mengacu ke layar. Penanda aktif (.nv-tanda) bergeser ke tautan aktif.
-   kk-*  kaki halaman: merek, peta halaman, jam layanan.
-   jl-*  status dan pil jam layanan.
-   dk-*  tombol kembali ke atas dan wadah pil jam layanan. */
+   nv-*  nav: bilah yang menyatu dengan latar di puncak halaman lalu melayang setelah digulir.
+         Kaca hanya dipakai di sini, lewat ::before, supaya lembar menu (fixed) tetap mengacu
+         ke layar. Lembar dan tirai sengaja bukan turunan .nv-bingkai yang diberi transform.
+   kk-*  kaki halaman
+   jl-*  baris status jam layanan
+   dk-*  tombol kembali ke atas */
 
 
-/* ── Penanda puncak untuk dok ──────────────────────────────────────────── */
+/* ── Penanda puncak untuk tombol kembali ke atas ───────────────────────── */
 .pub .pub-puncak {
   position: absolute;
   top: 0;
@@ -22,77 +21,206 @@
 
 /* ── Nav ───────────────────────────────────────────────────────────────── */
 .pub .nv {
-  --nv-tinggi: 76px;
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  inset: 0 0 auto;
   z-index: 100;
+  pointer-events: none;
+}
+
+.pub .nv-bingkai {
+  position: relative;
+  z-index: 2;
+  max-width: calc(var(--kolom) + 16px);
+  margin-inline: auto;
+  padding: 6px max(8px, calc(var(--sisi) - 8px)) 0;
+  transition: transform 800ms var(--ease-out);
+}
+
+.pub .nv[data-padat="1"] .nv-bingkai {
+  transform: translate3d(0, 10px, 0);
+}
+
+.pub .nv-dalam {
+  position: relative;
   isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 60px;
+  padding: 0 10px 0 12px;
+  pointer-events: auto;
 }
 
-.pub .nv[data-padat="1"] {
-  --nv-tinggi: var(--nav);
-}
-
-.pub .nv::before {
+/* Latar bilah melayang: satu-satunya permukaan kaca di halaman publik. Isi yang lewat di bawahnya tetap
+   terbaca samar, sehingga pengguna tahu nav mengapung di atas halaman. */
+.pub .nv-dalam::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: rgba(250, 251, 252, 0.78);
-  border-bottom: 1px solid rgba(20, 32, 46, 0.07);
-  box-shadow: 0 20px 40px -36px rgba(20, 32, 46, 0.4);
+  border: 1px solid rgba(15, 30, 51, 0.08);
+  border-radius: 14px;
+  background: rgba(251, 249, 244, 0.86);
+  box-shadow: 0 18px 40px -30px rgba(15, 30, 51, 0.45);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
   opacity: 0;
-  transition: opacity 600ms var(--ease);
+  transform: scale(0.985);
+  transition: opacity 500ms var(--ease), transform 800ms var(--ease-out);
 }
 
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .pub .nv::before {
-    background: rgba(250, 251, 252, 0.7);
-    -webkit-backdrop-filter: blur(20px) saturate(170%);
-    backdrop-filter: blur(20px) saturate(170%);
-  }
-}
-
-.pub .nv[data-padat="1"]::before {
+.pub .nv[data-padat="1"] .nv-dalam::before {
   opacity: 1;
+  transform: none;
 }
 
-.pub .nv-dalam {
+.pub .nv-merek {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-right: auto;
+  padding: 0 6px 0 2px;
+  border-radius: 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.pub .nv-merek img {
+  width: 30px;
+  height: auto;
+  transition: transform 700ms var(--ease-spring);
+}
+
+.pub .nv-merek:hover img {
+  transform: rotate(-6deg) scale(1.04);
+}
+
+.pub .nv-merek-teks {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.pub .nv-merek-nama {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.pub .nv-merek-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pub .nv-utama {
+  display: flex;
+}
+
+.pub .nv-baris {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 16px;
-  max-width: var(--kolom);
-  height: var(--nv-tinggi);
-  margin: 0 auto;
-  padding: 0 var(--sisi);
-  transition: height 600ms var(--ease-out);
 }
 
-/* Garis kemajuan gulir di kaki nav padat (animasi gulir CSS, tanpa JavaScript) */
-.pub .nv-prog {
+.pub .nv-tautan {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 9px;
+  color: var(--text);
+  font-size: 14.5px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 320ms var(--ease), background-color 320ms var(--ease);
+}
+
+.pub .nv-tautan:hover {
+  background: rgba(15, 30, 51, 0.045);
+  color: var(--ink);
+}
+
+.pub .nv-tautan[aria-current="page"],
+.pub .nv-tautan[aria-current="location"] {
+  color: var(--ink);
+}
+
+/* Penanda emas "Anda di sini": elemen 1px yang diskala selebar teks tautan aktif, hanya transform. */
+.pub .nv-tanda {
   position: absolute;
   left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 1.5px;
-  background: linear-gradient(90deg, #1b3c68, #22518d 70%, var(--emas));
-  transform: scaleX(0);
+  bottom: 5px;
+  width: 1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--emas-garis);
+  opacity: var(--tampil, 0);
+  transform: translate3d(var(--x, 0), 0, 0) scaleX(var(--w, 0));
   transform-origin: 0 50%;
-  opacity: 0;
+  transition:
+    transform 700ms var(--ease-out),
+    opacity 300ms var(--ease);
   pointer-events: none;
-  transition: opacity 600ms var(--ease);
 }
 
-.pub .nv[data-padat="1"] .nv-prog {
-  opacity: 0.85;
+.pub .nv-masuk {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 44px;
+  margin-left: 10px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 360ms var(--ease), transform 600ms var(--ease-out);
+}
+
+.pub .nv-masuk:hover {
+  background: #20375a;
+  color: #fff;
+  transform: translate3d(0, -1px, 0);
+}
+
+/* Di halaman masuk tombol ini menjadi penanda halaman, bukan ajakan */
+.pub .nv-masuk[aria-current="page"],
+.pub .nv-masuk[aria-current="page"]:hover {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  background: transparent;
+  color: var(--ink);
+  transform: none;
+}
+
+/* Garis kemajuan baca di tepi bawah bilah melayang */
+.pub .nv-prog {
+  position: absolute;
+  left: calc(max(8px, var(--sisi) - 8px) + 14px);
+  right: calc(max(8px, var(--sisi) - 8px) + 14px);
+  top: 65px;
+  height: 1px;
+  background: var(--emas-garis);
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: opacity 500ms var(--ease);
+  pointer-events: none;
 }
 
 @supports (animation-timeline: scroll()) {
   .pub .nv-prog {
     animation: nvProg linear both;
     animation-timeline: scroll(root);
+  }
+
+  .pub .nv[data-padat="1"] .nv-prog {
+    opacity: 0.85;
   }
 }
 
@@ -102,363 +230,276 @@
   }
 }
 
-.pub .nv-merek {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  margin-right: auto;
-  border-radius: 12px;
-  color: var(--tinta);
-  text-decoration: none;
-}
-
-.pub .nv-merek:hover {
-  color: var(--tinta);
-}
-
-.pub .nv-merek-logo {
-  display: flex;
-  flex-shrink: 0;
-  transition: transform 620ms var(--ease-spring);
-}
-
-.pub .nv-merek:hover .nv-merek-logo {
-  transform: scale(1.06) rotate(-3deg);
-}
-
-.pub .nv-merek-teks {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.pub .nv-merek-nama {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-
-.pub .nv-merek-sub {
-  font-size: 11.5px;
-  line-height: 1.35;
-  color: var(--muted);
-}
-
-.pub .nv-baris {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px;
-  border-radius: 999px;
-}
-
-.pub .nv-tanda {
-  position: absolute;
-  top: 4px;
-  bottom: 4px;
-  left: 0;
-  width: var(--w, 0px);
-  border-radius: 999px;
-  background: rgba(20, 32, 46, 0.06);
-  opacity: var(--tampil, 0);
-  transform: translateX(var(--x, 0px));
-  pointer-events: none;
-  transition:
-    transform 620ms var(--ease-out),
-    width 620ms var(--ease-out),
-    opacity 300ms var(--ease);
-}
-
-.pub .nv-tautan {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  text-decoration: none;
-  transition: color 360ms var(--ease);
-}
-
-.pub .nv-tautan:hover,
-.pub .nv-tautan[aria-current] {
-  color: var(--tinta);
-}
-
-.pub .nv-instansi {
-  display: none;
-  flex-shrink: 0;
-  padding-left: 16px;
-  border-left: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-
-@media (min-width: 1320px) {
-  .pub .nv-instansi {
-    display: block;
-  }
-}
-
-.pub .nv-masuk {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  min-height: 40px;
-  padding: 0 18px;
-  border: 1px solid rgba(20, 32, 46, 0.14);
-  border-radius: 999px;
-  color: var(--tinta);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  text-decoration: none;
-  transition: background-color 320ms var(--ease), border-color 320ms var(--ease), color 320ms var(--ease);
-}
-
-.pub .nv-masuk:hover,
-.pub .nv-masuk[aria-current] {
-  background: var(--tinta);
-  border-color: var(--tinta);
-  color: #fff;
-}
-
 .pub .nv-menu-tombol {
   display: none;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 44px;
+  gap: 10px;
   height: 44px;
-  padding: 0;
-  border: 1px solid rgba(20, 32, 46, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.8);
-  color: var(--tinta);
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 320ms var(--ease), transform 420ms var(--ease-spring);
+  transition: background-color 320ms var(--ease), border-color 320ms var(--ease);
 }
 
-.pub .nv-menu-tombol:active {
-  transform: scale(0.92);
+.pub .nv-menu-tombol:hover {
+  border-color: var(--field-line);
+  background: var(--kartu);
 }
 
-.pub .nv-menu-ikon {
-  display: flex;
-  transition: transform 520ms var(--ease-out);
+.pub .nv-menu-garis {
+  position: relative;
+  width: 14px;
+  height: 10px;
 }
 
-.pub .nv-menu-tombol[aria-expanded="true"] .nv-menu-ikon {
-  transform: rotate(90deg);
+.pub .nv-menu-garis span {
+  position: absolute;
+  left: 0;
+  width: 14px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+  transition: transform 600ms var(--ease-out);
+}
+
+.pub .nv-menu-garis span:first-child {
+  top: 2px;
+}
+
+.pub .nv-menu-garis span:last-child {
+  top: 7px;
+}
+
+.pub .nv[data-menu="1"] .nv-menu-garis span:first-child {
+  transform: translate3d(0, 2.5px, 0) rotate(45deg);
+}
+
+.pub .nv[data-menu="1"] .nv-menu-garis span:last-child {
+  transform: translate3d(0, -2.5px, 0) rotate(-45deg);
+}
+
+/* Lembar menu (layar sempit): turun dari balik bilah, tautannya menyusul satu per satu */
+.pub .nv-lembar,
+.pub .nv-tirai {
+  display: none;
 }
 
 @media (max-width: 960px) {
   .pub .nv-utama,
-  .pub .nv-masuk {
+  .pub .nv-masuk,
+  .pub .nv-merek-sub,
+  .pub .nv-prog {
     display: none;
   }
 
   .pub .nv-menu-tombol {
     display: inline-flex;
   }
-}
 
-@media (max-width: 380px) {
-  .pub .nv-merek-sub {
-    display: none;
-  }
-}
-
-@keyframes nvTirai {
-  from {
+  .pub .nv-tirai {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    border: 0;
+    background: var(--backdrop);
     opacity: 0;
+    pointer-events: none;
+    transition: opacity 500ms var(--ease);
   }
-}
 
-@keyframes nvLembar {
-  from {
+  .pub .nv[data-menu="1"] .nv-tirai {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .pub .nv-lembar {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 1;
+    display: block;
+    max-height: 100dvh;
+    overflow-y: auto;
+    padding: 96px var(--sisi) 28px;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0 0 22px 22px;
+    background: var(--kartu);
+    box-shadow: 0 40px 70px -50px rgba(15, 30, 51, 0.5);
+    /* Saat tertutup lembar hanya digeser ke atas layar; `inert` di NavPublik yang menutup aksesnya,
+       sehingga tidak ada visibility yang perlu menunggu bingkai berikutnya saat fokus dipasang. */
+    pointer-events: none;
+    transform: translate3d(0, -104%, 0);
+    transition: transform 720ms var(--ease-out);
+  }
+
+  .pub .nv[data-menu="1"] .nv-lembar {
+    pointer-events: auto;
+    transform: none;
+  }
+
+  .pub .nv-lembar-daftar {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pub .nv-lembar-daftar li,
+  .pub .nv-lembar-masuk {
     opacity: 0;
-    transform: translate3d(0, -10px, 0) scale(0.97);
+    transform: translate3d(0, 14px, 0);
+    transition: opacity 400ms var(--ease), transform 700ms var(--ease-out);
   }
-}
 
-@keyframes nvItem {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 10px, 0);
+  .pub .nv[data-menu="1"] :is(.nv-lembar-daftar li, .nv-lembar-masuk) {
+    opacity: 1;
+    transform: none;
+    transition-delay: calc(140ms + var(--i, 0) * 45ms);
   }
-}
 
-.pub .nv-tirai {
-  position: fixed;
-  inset: var(--nv-tinggi) 0 0 0;
-  z-index: 98;
-  padding: 0;
-  border: 0;
-  background: rgba(14, 22, 34, 0.18);
-  cursor: default;
-  animation: nvTirai 420ms var(--ease) both;
-}
+  .pub .nv-lembar-item {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    min-height: 56px;
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--line-soft);
+    color: var(--ink);
+    font-family: var(--huruf-judul);
+    font-size: 1.75rem;
+    font-weight: 450;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+    text-decoration: none;
+  }
 
-.pub .nv-lembar {
-  position: absolute;
-  top: 100%;
-  left: 10px;
-  right: 10px;
-  z-index: 99;
-  margin-top: 6px;
-  padding: 10px;
-  border-radius: 24px;
-  background: #fff;
-  box-shadow: 0 40px 80px -40px rgba(14, 22, 34, 0.5);
-  transform-origin: top center;
-  animation: nvLembar 560ms var(--ease-out) both;
-}
+  .pub .nv-lembar-item:hover {
+    color: var(--accent-hover);
+  }
 
-.pub .nv-lembar nav {
-  display: flex;
-  flex-direction: column;
-}
+  .pub .nv-lembar-nomor {
+    min-width: 1.6rem;
+    font-family: var(--huruf-isi);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
 
-.pub .nv-lembar-item {
-  display: flex;
-  align-items: center;
-  min-height: 52px;
-  padding: 0 16px;
-  border-radius: 16px;
-  color: var(--tinta);
-  font-size: 17px;
-  font-weight: 550;
-  letter-spacing: -0.02em;
-  text-decoration: none;
-  animation: nvItem 520ms var(--ease-out) both;
-  animation-delay: calc(60ms + var(--i, 0) * 40ms);
-  transition: background-color 280ms var(--ease);
-}
+  .pub .nv-lembar-item[aria-current="page"],
+  .pub .nv-lembar-item[aria-current="location"] {
+    text-decoration: underline;
+    text-decoration-color: var(--emas-garis);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.2em;
+  }
 
-.pub .nv-lembar-item:hover,
-.pub .nv-lembar-item[aria-current] {
-  background: var(--bg);
-  color: var(--tinta);
-}
+  .pub .nv-lembar-masuk {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 52px;
+    margin-top: 22px;
+    border-radius: 12px;
+    background: var(--ink);
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+  }
 
-.pub .nv-lembar-item.nv-lembar-masuk {
-  margin-top: 6px;
-  border-top: 1px solid var(--line-soft);
-  border-radius: 0 0 16px 16px;
-  font-size: 15px;
-  font-weight: 600;
+  .pub .nv-lembar-masuk:hover {
+    color: #fff;
+  }
 }
 
 
 /* ── Kaki ──────────────────────────────────────────────────────────────── */
 .pub .kk {
   position: relative;
-  background: var(--bg);
+  padding-bottom: 40px;
+  color: var(--text);
+}
+
+.pub .kk-tangga {
+  display: block;
+  width: 100%;
+  height: 30px;
+  margin-bottom: clamp(40px, 6vw, 64px);
+  color: var(--line-strong);
 }
 
 .pub .kk-atas {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 36px;
-  max-width: var(--kolom);
-  margin: 0 auto;
-  padding: 56px var(--sisi) 40px;
-  border-top: 1px solid var(--line);
-}
-
-@media (min-width: 760px) {
-  .pub .kk-atas {
-    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1.1fr);
-    gap: 48px;
-  }
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.8fr) minmax(0, 1fr);
+  gap: clamp(32px, 5vw, 72px);
 }
 
 .pub .kk-merek-baris {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 0;
 }
 
 .pub .kk-merek-baris img {
-  flex-shrink: 0;
+  width: 36px;
+  height: auto;
 }
 
 .pub .kk-merek-nama {
-  display: block;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.3;
-  color: var(--tinta);
-}
-
-.pub .kk-merek-sub {
-  display: block;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--muted);
+  font-family: var(--huruf-judul);
+  font-size: 1.6rem;
+  font-weight: 450;
+  letter-spacing: -0.015em;
+  color: var(--ink);
 }
 
 .pub .kk-teks {
-  max-width: 40ch;
-  margin: 18px 0 14px;
-  font-size: 13.5px;
-  line-height: 1.75;
+  max-width: 44ch;
+  margin: 16px 0 18px;
+  font-size: 14.5px;
+  line-height: 1.7;
   color: var(--muted);
 }
 
 .pub .kk-label {
-  margin: 0 0 14px;
-  font-family: inherit;
+  margin: 0 0 10px;
+  font-family: var(--huruf-isi);
   font-size: 13px;
-  font-weight: 650;
-  letter-spacing: -0.005em;
-  color: var(--tinta);
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+
+.pub .kk-label-lanjut {
+  margin-top: 28px;
 }
 
 .pub .kk-daftar {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* Garis bawah tumbuh dari kiri saat disorot */
 .pub .kk-tautan {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  padding-bottom: 1px;
+  min-height: 34px;
   color: var(--text);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 14.5px;
   text-decoration: none;
-  background-image: linear-gradient(currentColor, currentColor);
-  background-position: 0 calc(100% - 6px);
-  background-repeat: no-repeat;
-  background-size: 0% 1px;
-  transition: color 360ms var(--ease), background-size 620ms var(--ease-out);
+  transition: color 320ms var(--ease);
 }
 
 .pub .kk-tautan:hover {
-  color: var(--tinta);
-  background-size: 100% 1px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--emas-garis);
+  text-underline-offset: 0.3em;
 }
 
 .pub .kk-jam {
@@ -467,11 +508,11 @@
 
 .pub .kk-jam > div {
   display: flex;
-  align-items: baseline;
   justify-content: space-between;
-  gap: 14px;
-  font-size: 13.5px;
-  line-height: 2.1;
+  gap: 16px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 14px;
 }
 
 .pub .kk-jam dt {
@@ -480,15 +521,14 @@
 
 .pub .kk-jam dd {
   margin: 0;
-  color: var(--tinta);
-  font-weight: 550;
+  color: var(--ink);
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 .pub .kk-catatan {
-  margin: 10px 0 0;
-  font-size: 12.5px;
-  line-height: 1.7;
+  margin: 8px 0 0;
+  font-size: 13px;
   color: var(--muted);
 }
 
@@ -497,20 +537,49 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 6px 20px;
-  max-width: var(--kolom);
-  margin: 0 auto;
-  /* Ruang bawah menjaga tautan tidak tertutup dok saat halaman digulir sampai habis */
-  padding: 16px var(--sisi) 84px;
-  border-top: 1px solid var(--line-soft);
-  font-size: 12.5px;
-  line-height: 1.6;
+  gap: 8px 24px;
+  margin-top: clamp(40px, 6vw, 64px);
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
   color: var(--muted);
 }
 
-.pub .kk-bawah .kk-tautan {
-  font-size: 12.5px;
-  background-position: 0 calc(100% - 7px);
+@media (max-width: 860px) {
+  .pub .kk-atas {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .pub .kk-merek {
+    grid-column: 1 / -1;
+  }
+
+  .pub .kk-tautan {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 520px) {
+  .pub .kk-atas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pub .kk {
+    padding-bottom: 88px;
+  }
+}
+
+/* Halaman masuk: kaki diringkas agar formulir tetap satu-satunya fokus. */
+.pub:has(.lg) :is(.kk-atas, .kk-tangga) {
+  display: none;
+}
+
+.pub:has(.lg) .kk-bawah {
+  margin-top: 0;
+}
+
+.pub:has(.lg) .kk-bawah .kk-tautan {
+  display: none;
 }
 
 
@@ -519,209 +588,76 @@
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 10px;
-  min-height: 22px;
-  font-size: 13px;
+  gap: 4px 8px;
+  min-height: 24px;
+  font-size: 14px;
   color: var(--muted);
 }
 
 .pub .jl-baris b {
   font-weight: 600;
-  color: var(--tinta);
+  color: var(--ink);
 }
 
 .pub .jl-titik {
-  width: 7px;
-  height: 7px;
-  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #8592a1;
+  background: var(--muted);
 }
 
 .pub .jl-titik[data-buka="1"] {
-  background: #2f8f60;
-  box-shadow: 0 0 0 3px rgba(47, 143, 96, 0.16);
-}
-
-.pub .jl-apung {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-@keyframes jlKartu {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 8px, 0) scale(0.97);
-  }
-}
-
-.pub .jl-kartu {
-  width: min(264px, calc(100vw - 28px));
-  padding: 14px 16px 12px;
-  border: 1px solid rgba(20, 32, 46, 0.08);
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 30px 60px -36px rgba(14, 22, 34, 0.45);
-  transform-origin: bottom right;
-  animation: jlKartu 520ms var(--ease-out) both;
-}
-
-.pub .jl-kartu-judul {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 8px;
-  font-size: 13.5px;
-  font-weight: 650;
-  color: var(--tinta);
-}
-
-.pub .jl-kartu-baris {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-  line-height: 1.95;
-  color: var(--muted);
-}
-
-.pub .jl-kartu-baris + .jl-kartu-baris {
-  border-top: 1px solid var(--line-soft);
-}
-
-.pub .jl-kartu-baris b {
-  font-weight: 600;
-  color: var(--tinta);
-  font-variant-numeric: tabular-nums;
-}
-
-.pub .jl-kartu-catatan {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.pub .jl-pil {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 14px;
-  border: 1px solid rgba(20, 32, 46, 0.1);
-  border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 16px 30px -24px rgba(20, 32, 46, 0.5);
-  color: var(--tinta);
-  font-family: inherit;
-  font-size: 13px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: border-color 320ms var(--ease), transform 520ms var(--ease-out);
-}
-
-.pub .jl-pil:hover {
-  border-color: rgba(20, 32, 46, 0.22);
-  transform: translateY(-1px);
-}
-
-.pub .jl-pil-judul {
-  font-weight: 600;
-}
-
-.pub .jl-pil-jam {
-  padding-left: 8px;
-  border-left: 1px solid var(--line);
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 480px) {
-  .pub .jl-pil-jam {
-    display: none;
-  }
+  background: var(--ok-text);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok-text) 16%, transparent);
 }
 
 
-/* ── Dok ───────────────────────────────────────────────────────────────── */
-.pub .dk-atas,
-.pub .dk-kanan {
-  position: fixed;
-  bottom: 20px;
-  z-index: 90;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 420ms var(--ease), transform 720ms var(--ease-out);
-}
-
+/* ── Kembali ke atas ───────────────────────────────────────────────────── */
 .pub .dk-atas {
-  left: 20px;
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 90;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 1px solid rgba(20, 32, 46, 0.1);
-  border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 16px 30px -22px rgba(20, 32, 46, 0.5);
-  color: var(--tinta);
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--kartu);
+  color: var(--ink);
   cursor: pointer;
-  transform: translate3d(0, 12px, 0) scale(0.9);
+  opacity: 0;
+  transform: translate3d(0, 12px, 0);
+  pointer-events: none;
   transition:
-    opacity 420ms var(--ease),
-    transform 720ms var(--ease-out),
-    background-color 320ms var(--ease),
-    color 320ms var(--ease);
+    opacity 400ms var(--ease),
+    transform 700ms var(--ease-out),
+    border-color 320ms var(--ease);
 }
 
-.pub .dk-atas svg {
-  transition: transform 620ms var(--ease-out);
+.pub .dk-atas[data-tampak="1"] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
 }
 
 .pub .dk-atas:hover {
-  background: var(--tinta);
-  color: #fff;
+  border-color: var(--field-line);
+}
+
+.pub .dk-atas svg {
+  transition: transform 600ms var(--ease-out);
 }
 
 .pub .dk-atas:hover svg {
-  transform: translateY(-2px);
-}
-
-.pub .dk-kanan {
-  right: 20px;
-  transform: translate3d(0, 12px, 0);
-}
-
-.pub :is(.dk-atas, .dk-kanan)[data-tampak="1"] {
-  opacity: 1;
-  pointer-events: auto;
-  transform: none;
-}
-
-.pub .dk-atas[data-tampak="1"]:active {
-  transform: scale(0.94);
-}
-
-@media (max-width: 480px) {
-  .pub .dk-atas {
-    left: 14px;
-    bottom: 14px;
-  }
-
-  .pub .dk-kanan {
-    right: 14px;
-    bottom: 14px;
-  }
+  transform: translate3d(0, -2px, 0);
 }
 
 @media print {
   .pub .nv,
-  .pub .dk-atas,
-  .pub .dk-kanan {
+  .pub .dk-atas {
     display: none;
   }
 }

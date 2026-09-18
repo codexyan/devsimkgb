@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Newsreader } from "next/font/google";
 import NavPublik from "./NavPublik";
 import KakiPublik from "./KakiPublik";
 import DokPublik from "./DokPublik";
@@ -7,16 +7,18 @@ import Muncul from "./Muncul";
 import "./publik.css";
 import "./kerangka.css";
 
-// Huruf judul yang sama dengan portal SDM Pas Kalsel, hanya untuk halaman publik.
-const hurufJudul = Plus_Jakarta_Sans({
+// Serif untuk judul: suara dokumen dinas (surat, SK) yang menjadi inti layanan KGB. Teks isi tetap Inter,
+// huruf yang sama dengan dashboard SIM-KGB.
+const hurufJudul = Newsreader({
   subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["700", "800"],
+  variable: "--font-serif",
+  style: ["normal", "italic"],
+  axes: ["opsz"],
   display: "swap",
 });
 
-/* Kerangka bersama halaman publik (/kgb, /panduan, /login). Token dan kelas didokumentasikan di awal
-   publik.css; nav, kaki, dan dok di kerangka.css. */
+/* Kerangka bersama halaman publik (/kgb, /tabel-gaji, /panduan, /login). Token dan kelas didokumentasikan
+   di awal publik.css; nav, kaki, dan dok di kerangka.css. */
 export default function LayoutPublik({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className={`pub ${hurufJudul.variable}`}>

@@ -16,23 +16,15 @@ const TAUTAN: Tautan[] = [
   { href: "/kgb#beranda", label: "Cek status", bagian: "beranda" },
   { href: "/kgb#alur", label: "Alur", bagian: "alur" },
   { href: "/kgb#jadwal", label: "Jadwal", bagian: "jadwal" },
-  { href: "/kgb#status", label: "Arti status", bagian: "status" },
+  { href: "/tabel-gaji", label: "Tabel gaji" },
   { href: "/panduan", label: "Panduan" },
 ];
 
-const BAGIAN_BERANDA = TAUTAN.flatMap((t) => (t.bagian ? [t.bagian] : []));
+const BAGIAN_BERANDA = ["beranda", "alur", "jadwal", "status", "bantuan"];
 
-const IkonMenu = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true" focusable="false">
-    <path d="M4 8h16M4 16h16" />
-  </svg>
-);
-const IkonTutup = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true" focusable="false">
-    <path d="M6 6l12 12M18 6L6 18" />
-  </svg>
-);
-
+/* Nav publik. Di puncak halaman bilahnya menyatu dengan latar; setelah digulir ia menjadi bilah melayang
+   dengan penanda emas di bawah tautan yang aktif dan garis kemajuan baca. Di layar sempit tautan pindah
+   ke lembar menu yang turun dari bilah. */
 export default function NavPublik() {
   const pathname = usePathname();
   const diBeranda = pathname === "/" || pathname === "/kgb";
@@ -44,7 +36,6 @@ export default function NavPublik() {
   const barisRef = useRef<HTMLDivElement>(null);
   const tandaRef = useRef<HTMLSpanElement>(null);
   const tombolMenuRef = useRef<HTMLButtonElement>(null);
-  const lembarRef = useRef<HTMLDivElement>(null);
 
   const hrefAktif = diBeranda
     ? TAUTAN.find((t) => t.bagian === bagianAktif)?.href
@@ -55,7 +46,7 @@ export default function NavPublik() {
     let bingkai = 0;
     const periksa = () => {
       bingkai = 0;
-      setPadat(window.scrollY > 12);
+      setPadat(window.scrollY > 16);
     };
     const saatGulir = () => {
       if (!bingkai) bingkai = requestAnimationFrame(periksa);
@@ -84,7 +75,7 @@ export default function NavPublik() {
     return () => pengamat.disconnect();
   }, [diBeranda, pathname]);
 
-  // Penanda aktif bergeser ke tautan yang aktif.
+  // Penanda emas bergeser ke tautan yang aktif.
   const posisikanTanda = useCallback(() => {
     const baris = barisRef.current;
     const tanda = tandaRef.current;
@@ -94,8 +85,8 @@ export default function NavPublik() {
       tanda.style.setProperty("--tampil", "0");
       return;
     }
-    tanda.style.setProperty("--x", `${aktif.offsetLeft}px`);
-    tanda.style.setProperty("--w", `${aktif.offsetWidth}px`);
+    tanda.style.setProperty("--x", `${aktif.offsetLeft + 12}px`);
+    tanda.style.setProperty("--w", `${Math.max(0, aktif.offsetWidth - 24)}`);
     tanda.style.setProperty("--tampil", "1");
   }, []);
 
@@ -111,10 +102,14 @@ export default function NavPublik() {
     return () => pengamat.disconnect();
   }, [posisikanTanda]);
 
-  // Menu ponsel: Escape menutup dan fokus kembali ke tombol; fokus pertama masuk ke daftar.
+  /* Lembar menu mengikuti pola disclosure: fokus tetap di tombol yang membukanya, dan lembar berada tepat
+     sesudahnya dalam urutan DOM sehingga Tab langsung masuk ke daftar tautan. Selama terbuka halaman di
+     belakang tidak bergulir dan Escape menutup lembar. */
   useEffect(() => {
     if (!menuBuka) return;
-    lembarRef.current?.querySelector<HTMLElement>("a")?.focus();
+    const html = document.documentElement;
+    const overflowSebelumnya = html.style.overflow;
+    html.style.overflow = "hidden";
     const saatTombol = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setMenuBuka(false);
@@ -127,6 +122,7 @@ export default function NavPublik() {
     document.addEventListener("keydown", saatTombol);
     window.addEventListener("resize", saatLebar);
     return () => {
+      html.style.overflow = overflowSebelumnya;
       document.removeEventListener("keydown", saatTombol);
       window.removeEventListener("resize", saatLebar);
     };
@@ -141,83 +137,84 @@ export default function NavPublik() {
   const masukAktif = pathname === "/login";
 
   return (
-    <header className="nv" data-padat={padat || menuBuka ? "1" : "0"}>
-      <div className="nv-dalam">
-        <Link href="/kgb#beranda" className="nv-merek" onClick={() => setBagianAktif("beranda")}>
-          <span className="nv-merek-logo">
-            <Image src="/icons.svg" alt="" width={36} height={29} loading="eager" />
-          </span>
-          <span className="nv-merek-teks">
-            <span className="nv-merek-nama">SIM-KGB</span>
-            <span className="nv-merek-sub">Kenaikan gaji berkala</span>
-          </span>
-        </Link>
+    <header className="nv" data-padat={padat || menuBuka ? "1" : "0"} data-menu={menuBuka ? "1" : "0"}>
+      <div className="nv-bingkai">
+        <div className="nv-dalam">
+          <Link href="/kgb#beranda" className="nv-merek" onClick={() => setBagianAktif("beranda")}>
+            <Image src="/icons.svg" alt="" width={30} height={24} loading="eager" />
+            <span className="nv-merek-teks">
+              <span className="nv-merek-nama">SIM-KGB</span>
+              <span className="nv-merek-sub">Kanwil Ditjenpas Kalimantan Selatan</span>
+            </span>
+          </Link>
 
-        <nav aria-label="Utama" className="nv-utama">
-          <div className="nv-baris" ref={barisRef}>
-            <span className="nv-tanda" ref={tandaRef} aria-hidden="true" />
-            {TAUTAN.map((t) => (
-              <Link key={t.href} href={t.href} className="nv-tautan" aria-current={ariaCurrent(t)} onClick={() => tandaiAktif(t)}>
-                {t.label}
-              </Link>
-            ))}
-          </div>
-        </nav>
+          <nav aria-label="Utama" className="nv-utama">
+            <div className="nv-baris" ref={barisRef}>
+              {TAUTAN.map((t) => (
+                <Link key={t.href} href={t.href} className="nv-tautan" aria-current={ariaCurrent(t)} onClick={() => tandaiAktif(t)}>
+                  {t.label}
+                </Link>
+              ))}
+              <span className="nv-tanda" ref={tandaRef} aria-hidden="true" />
+            </div>
+          </nav>
 
-        <span className="nv-instansi">Kanwil Ditjenpas Kalimantan Selatan</span>
+          <Link href="/login" className="nv-masuk" aria-current={masukAktif ? "page" : undefined}>
+            Masuk
+          </Link>
 
-        <Link href="/login" className="nv-masuk" aria-current={masukAktif ? "page" : undefined}>
-          Masuk
-        </Link>
-
-        <button
-          ref={tombolMenuRef}
-          type="button"
-          className="nv-menu-tombol"
-          aria-expanded={menuBuka}
-          aria-controls="nv-lembar"
-          aria-label={menuBuka ? "Tutup menu" : "Buka menu"}
-          onClick={() => setMenuBuka((v) => !v)}
-        >
-          <span className="nv-menu-ikon">{menuBuka ? IkonTutup : IkonMenu}</span>
-        </button>
+          <button
+            ref={tombolMenuRef}
+            type="button"
+            className="nv-menu-tombol"
+            aria-expanded={menuBuka}
+            aria-controls="nv-lembar"
+            onClick={() => setMenuBuka((v) => !v)}
+          >
+            <span className="nv-menu-garis" aria-hidden="true">
+              <span />
+              <span />
+            </span>
+            {menuBuka ? "Tutup" : "Menu"}
+          </button>
+        </div>
+        <span className="nv-prog" aria-hidden="true" />
       </div>
 
-      <span className="nv-prog" aria-hidden="true" />
-
-      {menuBuka && (
-        <>
-          <button type="button" className="nv-tirai" aria-label="Tutup menu" tabIndex={-1} onClick={tutupMenu} />
-          <div className="nv-lembar" id="nv-lembar" ref={lembarRef}>
-            <nav aria-label="Menu">
-              {TAUTAN.map((t, i) => (
+      <button type="button" className="nv-tirai" aria-hidden="true" tabIndex={-1} onClick={tutupMenu} />
+      <div className="nv-lembar" id="nv-lembar" inert={!menuBuka}>
+        <nav aria-label="Menu">
+          <ol className="nv-lembar-daftar">
+            {TAUTAN.map((t, i) => (
+              <li key={t.href} style={{ "--i": i } as React.CSSProperties}>
                 <Link
-                  key={t.href}
                   href={t.href}
                   className="nv-lembar-item"
-                  style={{ "--i": i } as React.CSSProperties}
                   aria-current={ariaCurrent(t)}
                   onClick={() => {
                     tandaiAktif(t);
                     tutupMenu();
                   }}
                 >
+                  <span className="nv-lembar-nomor" aria-hidden="true">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
                   {t.label}
                 </Link>
-              ))}
-              <Link
-                href="/login"
-                className="nv-lembar-item nv-lembar-masuk"
-                style={{ "--i": TAUTAN.length } as React.CSSProperties}
-                aria-current={masukAktif ? "page" : undefined}
-                onClick={tutupMenu}
-              >
-                Masuk ke SIM-KGB
-              </Link>
-            </nav>
-          </div>
-        </>
-      )}
+              </li>
+            ))}
+          </ol>
+          <Link
+            href="/login"
+            className="nv-lembar-masuk"
+            style={{ "--i": TAUTAN.length } as React.CSSProperties}
+            aria-current={masukAktif ? "page" : undefined}
+            onClick={tutupMenu}
+          >
+            Masuk ke SIM-KGB
+          </Link>
+        </nav>
+      </div>
     </header>
   );
 }

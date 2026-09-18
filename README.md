@@ -58,13 +58,21 @@ Worker utama adalah `worker-entry.js`, yang membungkus output OpenNext dan menam
 
 ## Halaman publik: `app/(publik)`
 
-Route group tanpa login dengan kerangka sendiri: `layout.tsx` memasang nav melayang (`NavPublik.tsx`), kaki halaman (`KakiPublik.tsx`), dok jam layanan dan tombol ke atas (`DokPublik.tsx`), serta gerak masuk saat digulir (`Muncul.tsx`). Bahasa visualnya mengikuti portal SDM Pas Kalsel dan hanya bertema terang. Semua gaya berada di bawah kelas `.pub`, sehingga tidak bercampur dengan dashboard; token dan kelas bersama didokumentasikan di awal `publik.css`, kerangka di `kerangka.css`, dan beranda di `kgb/beranda.css`. Beranda `/kgb` memuat lambang partikel three.js (`kgb/LogoPartikel.tsx`) secara lazy; tanpa WebGL atau saat pengguna memilih kurangi gerak, lambang tampil sebagai gambar diam. Kelas khusus halaman berawalan `pg-` (panduan) dan `lg-` (masuk).
+Route group tanpa login dengan kerangka sendiri: `layout.tsx` memasang nav melayang (`NavPublik.tsx`), kaki halaman (`KakiPublik.tsx`), tombol kembali ke atas (`DokPublik.tsx`), dan gerak masuk saat digulir (`Muncul.tsx`). Bahasa visualnya "tangga gaji": kertas hangat, tinta biru tua, judul serif, dan motif anak tangga (`GarisTangga.tsx`) yang digambar dari tabel gaji; hanya bertema terang. Alasan tiap keputusannya ada di [`docs/adr/ADR-001-halaman-publik-tangga-gaji.md`](docs/adr/ADR-001-halaman-publik-tangga-gaji.md). Semua gaya berada di bawah kelas `.pub`, sehingga tidak bercampur dengan dashboard; token dan kelas bersama didokumentasikan di awal `publik.css`, kerangka di `kerangka.css`, beranda di `kgb/beranda.css`, dan panggung dokumen di `kgb/perjalanan.css`. Kelas khusus halaman berawalan `tg-`/`cs-`/`jd-`/`st-` (beranda), `tb-` (tabel gaji), `pg-` (panduan), dan `lg-` (masuk).
 
 | Route | Isi |
 |-------|-----|
-| `/kgb` | Cek status KGB menurut NIP (`CekStatus.tsx`, `GET /api/public/cek-kgb`). Label status dari `lib/statusKgb.ts`. |
-| `/panduan` | Panduan KGB untuk admin UPT, Tata Usaha, Tim SDM, dan keuangan: kewenangan, jadwal, surat permohonan, langkah di SIM-KGB, konfirmasi keuangan, pengiriman SK dan KPPN mitra, contoh kasus, arti status, dan dasar hukum. |
+| `/kgb` | Cek status KGB menurut NIP (`CekStatus.tsx`, `GET /api/public/cek-kgb`), lanskap tangga gaji three.js (`kgb/tangga/`), perjalanan satu usulan (`PerjalananUsulan.tsx`), jadwal pengusulan, dan arti status. Label status dari `lib/statusKgb.ts`. |
+| `/tabel-gaji` | Lampiran PP Nomor 5 Tahun 2024 sebagai tabel digital: tab per golongan, pencarian masa kerja yang menandai gaji yang berlaku. Sumbernya `tanggaGaji()` di `lib/tabelGaji.ts`. |
+| `/panduan` | Panduan KGB untuk admin UPT, Tata Usaha, Tim SDM, dan keuangan: kewenangan, jadwal, surat permohonan, langkah di SIM-KGB, konfirmasi keuangan, pengiriman SK dan KPPN mitra, contoh kasus, arti status, dan dasar hukum. Pemilih tugas dan daftar isi yang mengikuti posisi baca ada di `NavigasiPanduan.tsx`. |
 | `/login` | Masuk untuk pengelola, dengan dialog Lupa password yang membuka WhatsApp admin (`GET /api/public/kontak`). |
+
+### Lanskap tangga gaji (`kgb/tangga/`)
+
+- `tata.ts` menyusun 272 anak tangga menjadi balok dan menguji potongan sinar, tanpa impor three.js, sehingga teruji di `tata.test.ts`.
+- `LanskapGaji.tsx` menggambar seluruh balok dalam satu draw call (`InstancedBufferGeometry` + shader sendiri) dan hanya merender bingkai saat ada yang bergerak.
+- `PenjelajahTangga.tsx` memegang pilihan golongan dan masa kerja; kendali `<select>` dan `<input type="range">` adalah jalur utama, lanskap hanya ilustrasi (`aria-hidden`).
+- `TanggaSvg.tsx` tampil lebih dulu selagi three.js dimuat, dan menggantikannya bila WebGL tidak tersedia. three.js dimuat lazy setelah halaman tenang dan dilewati saat mode hemat data.
 
 ### Memelihara `/panduan`
 
@@ -76,7 +84,8 @@ Route group tanpa login dengan kerangka sendiri: `layout.tsx` memasang nav melay
 ## Struktur
 
 ```
-app/(publik)/        Halaman publik: /kgb, /panduan, /login
+app/(publik)/        Halaman publik: /kgb, /tabel-gaji, /panduan, /login
+docs/adr/            Catatan keputusan arsitektur
 app/dashboard/       Halaman pengelola; komponen modal KGB bersama di components/kgb
 app/api/             Route API (kgb, pegawai, hukdis, keuangan, notifikasi, cron, public)
 lib/                 Logika domain murni dan teruji (tabelGaji, jadwalKgb, prosesKgb, waktu, satker, statusKgb, dsb.)

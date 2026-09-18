@@ -12,6 +12,7 @@ import {
   jendelaProsesKgb,
   kalkulasiKGB,
   tambahBulan,
+  tanggaGaji,
 } from "./tabelGaji";
 import { hariIniWita } from "./waktu";
 
@@ -140,4 +141,49 @@ test("jendela proses dari TMT tersimpan", () => {
   });
   assert.equal(jendelaProsesKgb(null), null);
   assert.equal(jendelaProsesKgb("bukan tanggal"), null);
+});
+
+// Nilai pertama dan terakhir tiap golongan dibaca langsung dari Lampiran PP 5/2024 (pindaian halaman 5).
+const UJUNG_PP_5_2024: Record<string, [number, number, number, number]> = {
+  "I/a": [0, 1685700, 26, 2522600],
+  "I/b": [3, 1840800, 27, 2670700],
+  "I/c": [3, 1918700, 27, 2783700],
+  "I/d": [3, 1999900, 27, 2901400],
+  "II/a": [0, 2184000, 33, 3643400],
+  "II/b": [3, 2385000, 33, 3797500],
+  "II/c": [3, 2485900, 33, 3958200],
+  "II/d": [3, 2591100, 33, 4125600],
+  "III/a": [0, 2785700, 32, 4575200],
+  "III/b": [0, 2903600, 32, 4768800],
+  "III/c": [0, 3026400, 32, 4970500],
+  "III/d": [0, 3154400, 32, 5180700],
+  "IV/a": [0, 3287800, 32, 5399900],
+  "IV/b": [0, 3426900, 32, 5628300],
+  "IV/c": [0, 3571900, 32, 5866400],
+  "IV/d": [0, 3723000, 32, 6114500],
+  "IV/e": [0, 3880400, 32, 6373200],
+};
+
+test("tangga gaji memuat 17 golongan dan 272 anak tangga sesuai lampiran PP 5/2024", () => {
+  const baris = tanggaGaji();
+  assert.deepEqual(
+    baris.map((b) => b.golongan),
+    Object.keys(UJUNG_PP_5_2024),
+  );
+  assert.equal(baris.reduce((n, b) => n + b.anak.length, 0), 272);
+  for (const b of baris) {
+    const [mkgAwal, gajiAwal, mkgAkhir, gajiAkhir] = UJUNG_PP_5_2024[b.golongan];
+    assert.deepEqual(b.anak[0], { mkg: mkgAwal, gaji: gajiAwal }, `${b.golongan} anak tangga pertama`);
+    assert.deepEqual(b.anak.at(-1), { mkg: mkgAkhir, gaji: gajiAkhir }, `${b.golongan} anak tangga terakhir`);
+    assert.ok(b.pangkat, `${b.golongan} punya nama pangkat`);
+    b.anak.slice(1).forEach((a, i) => {
+      assert.ok(a.mkg > b.anak[i].mkg, `${b.golongan} MKG menaik`);
+      assert.ok(a.gaji > b.anak[i].gaji, `${b.golongan} gaji menaik di MKG ${a.mkg}`);
+    });
+  }
+  assert.deepEqual(
+    baris.find((b) => b.golongan === "II/a")?.anak.slice(0, 3).map((a) => a.mkg),
+    [0, 1, 3],
+    "II/a naik di MKG 1, lalu MKG ganjil",
+  );
 });

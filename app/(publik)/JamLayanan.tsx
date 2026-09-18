@@ -1,7 +1,7 @@
 "use client";
 
-import { useId, useState, useSyncExternalStore } from "react";
-import { JAM_LAYANAN, statusJamLayanan, type StatusJamLayanan } from "@/lib/jamLayanan";
+import { useSyncExternalStore } from "react";
+import { statusJamLayanan, type StatusJamLayanan } from "@/lib/jamLayanan";
 
 /* Status jam layanan dibaca lewat useSyncExternalStore: server merender kosong, klien menampilkan status
    menurut jam WITA dan menyegarkannya tiap menit, tanpa selisih hidrasi. */
@@ -16,6 +16,8 @@ function snapshot(): StatusJamLayanan {
 
 function langganan(cb: () => void) {
   pendengar.add(cb);
+  // Setelah pendengar terakhir lepas, pewaktu berhenti dan cache bisa basi; segarkan saat berlangganan lagi.
+  cache = statusJamLayanan();
   if (!pewaktu) {
     pewaktu = setInterval(() => {
       const baru = statusJamLayanan();
@@ -40,7 +42,7 @@ function useJamLayanan() {
   return useSyncExternalStore(langganan, snapshot, snapshotServer);
 }
 
-/** Baris status untuk kaki halaman. Ruangnya dipesan agar tidak ada lompatan tata letak. */
+/** Baris status layanan (kaki halaman dan bagian bantuan). Ruangnya dipesan agar tidak ada lompatan tata letak. */
 export function StatusLayanan() {
   const status = useJamLayanan();
   if (!status) return <span className="jl-baris" aria-hidden="true" />;
@@ -53,47 +55,3 @@ export function StatusLayanan() {
   );
 }
 
-/** Pil jam layanan di sudut kanan bawah; ditekan untuk membuka jadwal sepekan. */
-export function PilJamLayanan() {
-  const status = useJamLayanan();
-  const [terbuka, setTerbuka] = useState(false);
-  const id = useId();
-  if (!status) return null;
-
-  const judul = status.buka ? "Buka sekarang" : "Di luar jam layanan";
-  return (
-    <div className="jl-apung">
-      {terbuka && (
-        <div className="jl-kartu" id={id}>
-          <p className="jl-kartu-judul">
-            <span className="jl-titik" data-buka={status.buka ? "1" : "0"} aria-hidden="true" />
-            {judul}
-          </p>
-          {JAM_LAYANAN.map((b) => (
-            <div key={b.hari} className="jl-kartu-baris">
-              <span>{b.hari}</span>
-              <b>{b.jam}</b>
-            </div>
-          ))}
-          <p className="jl-kartu-catatan">Waktu Indonesia Tengah (WITA).</p>
-        </div>
-      )}
-      <button
-        type="button"
-        className="jl-pil"
-        aria-expanded={terbuka}
-        aria-controls={id}
-        onClick={() => setTerbuka((v) => !v)}
-      >
-        <span className="jl-titik" data-buka={status.buka ? "1" : "0"} aria-hidden="true" />
-        <span className="jl-pil-judul">{judul}</span>
-        {status.jadwalHariIni && (
-          <span className="jl-pil-jam">
-            <span className="pub-visually-hidden">, jam layanan hari ini </span>
-            {status.jadwalHariIni}
-          </span>
-        )}
-      </button>
-    </div>
-  );
-}

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEve
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import "./login.css";
 
 const SELEKTOR_FOKUS =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -14,6 +13,7 @@ export default function LoginPage() {
   const [nip, setNip] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
@@ -138,10 +138,12 @@ export default function LoginPage() {
       )}`
     : "";
 
+  const keteranganSandi = [capsLock ? "login-caps" : "", error ? "login-galat" : ""].filter(Boolean).join(" ") || undefined;
+
   return (
-    <div className="pub-container">
+    <div className="lg-halaman">
       <div className="lg-kolom">
-        <h1 className="pub-h1">Masuk ke SIM-KGB</h1>
+        <h1 className="pub-h1 lg-judul">Masuk ke SIM-KGB</h1>
         <p className="pub-lead lg-lead">
           Khusus Tim SDM, keuangan, dan pengelola kepegawaian Kanwil Ditjenpas Kalimantan Selatan.
         </p>
@@ -193,7 +195,10 @@ export default function LoginPage() {
                   className="pub-input"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  aria-describedby={error ? "login-galat" : undefined}
+                  onKeyDown={(e) => setCapsLock(e.getModifierState("CapsLock"))}
+                  onKeyUp={(e) => setCapsLock(e.getModifierState("CapsLock"))}
+                  onBlur={() => setCapsLock(false)}
+                  aria-describedby={keteranganSandi}
                 />
                 <button
                   type="button"
@@ -206,6 +211,11 @@ export default function LoginPage() {
                   <span className="pub-visually-hidden"> password</span>
                 </button>
               </div>
+              {capsLock && (
+                <p id="login-caps" className="pub-hint lg-caps">
+                  Caps Lock sedang aktif.
+                </p>
+              )}
             </div>
 
             <div role="alert">
@@ -216,8 +226,9 @@ export default function LoginPage() {
               )}
             </div>
 
-            <button type="submit" className="pub-btn pub-btn-block lg-kirim" disabled={loading}>
-              {loading ? "Memproses..." : "Masuk"}
+            <button type="submit" className="pub-btn pub-btn-block lg-kirim" disabled={loading} aria-busy={loading}>
+              {loading && <span className="lg-putar" aria-hidden="true" />}
+              {loading ? "Memproses" : "Masuk"}
             </button>
           </form>
         </div>
