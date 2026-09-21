@@ -1,16 +1,160 @@
-/* Halaman masuk /login. Melengkapi publik.css; semua kelas berawalan lg-. */
+/* login.css: halaman masuk /login. Melengkapi publik.css; semua kelas berawalan lg-.
+
+   Dua kolom: panel tinta (identitas area petugas, garis tangga gaji yang tergores pelan) dan formulir di
+   kertas. Di layar sempit panel menjadi pita pendek di atas formulir. Formulir tetap satu-satunya fokus. */
+
+.pub .pub-main:has(.lg) {
+  padding-block: calc(var(--nav) + clamp(1rem, 3vw, 2rem)) clamp(2rem, 5vw, 3.5rem);
+}
+
+.pub .lg-kisi {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: calc(100svh - var(--nav) - 140px);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--kartu);
+  overflow: hidden;
+}
+
+
+/* ── Panel tinta ───────────────────────────────────────────────────────── */
+.pub .lg-sisi {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  padding: clamp(28px, 4vw, 48px);
+  background: var(--ink);
+  color: #c9d0da;
+}
+
+.pub .lg-sisi :focus-visible {
+  outline-color: #ffffff;
+}
+
+.pub .lg-sisi-atas {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.pub .lg-sisi-atas img {
+  width: 34px;
+  height: auto;
+}
+
+.pub .lg-sisi-atas b {
+  display: block;
+  font-size: 15px;
+  font-weight: 650;
+  color: #ffffff;
+}
+
+.pub .lg-tangga {
+  margin: 0;
+}
+
+.pub .lg-tangga svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.pub .lg-tangga-baris path {
+  fill: none;
+  stroke: #9aa6b6;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: lgGores 2200ms var(--ease-io) forwards;
+  animation-delay: calc(300ms + var(--i, 0) * 260ms);
+}
+
+.pub .lg-tangga-baris:last-child path {
+  stroke: #ffffff;
+}
+
+.pub .lg-tangga-baris text {
+  fill: #9aa6b6;
+  font-size: 13px;
+  opacity: 0;
+  animation: lgLabel 600ms var(--ease) forwards;
+  animation-delay: calc(1600ms + var(--i, 0) * 260ms);
+}
+
+@keyframes lgGores {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes lgLabel {
+  to {
+    opacity: 1;
+  }
+}
+
+.pub .lg-tangga figcaption {
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: #9aa6b6;
+}
+
+.pub .lg-sisi-teks {
+  max-width: 36ch;
+  margin: 0;
+  font-family: var(--huruf-judul);
+  font-size: clamp(1.3rem, 1rem + 0.8vw, 1.65rem);
+  font-weight: 420;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+
+/* ── Formulir ──────────────────────────────────────────────────────────── */
+.pub .lg-utama {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(28px, 5vw, 64px) clamp(20px, 5vw, 64px);
+}
+
+.pub .lg-halaman {
+  width: 100%;
+}
 
 .pub .lg-kolom {
-  max-width: 26rem;
+  max-width: 25rem;
+  margin-inline: auto;
+}
+
+.pub .lg-judul {
+  margin-bottom: 0.75rem;
+  font-size: clamp(2.2rem, 1.6rem + 1.8vw, 3rem);
 }
 
 .pub .pub-lead.lg-lead {
   margin-bottom: 0.5rem;
+  font-size: 1rem;
 }
 
 .pub .lg-publik {
-  margin: 0 0 1.5rem;
+  margin: 0 0 1.75rem;
+  font-size: 0.9375rem;
   color: var(--text);
+}
+
+/* Formulir duduk langsung di kertas panel; panel bersama tidak perlu bingkai kedua. */
+.pub .lg-kolom .pub-panel {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .pub .lg-form > .pub-field + .pub-field {
@@ -28,35 +172,76 @@
 }
 
 .pub .lg-lupa {
-  margin-right: -0.5rem;
-  font-size: 0.9375rem;
+  margin-right: -0.25rem;
+  font-size: 0.875rem;
 }
 
+/* Tombol tampilkan berada di dalam kotak isian */
 .pub .lg-sandi {
-  display: flex;
-  gap: 0.5rem;
+  position: relative;
 }
 
 .pub .lg-sandi .pub-input {
-  flex: 1 1 auto;
-  width: auto;
-  min-width: 0;
+  padding-right: 7.5rem;
 }
 
-/* Lebar tetap agar kolom tidak bergeser saat teks tombol berganti */
 .pub .lg-sandi .lg-toggle {
-  flex: 0 0 auto;
-  min-width: 8.75rem;
-  padding-inline: 0.75rem;
-  font-size: 0.9375rem;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  bottom: 5px;
+  min-height: 0;
+  min-width: 6.75rem;
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: 7px;
+  font-size: 0.875rem;
+}
+
+.pub .lg-sandi .lg-toggle:hover {
+  background: var(--sunken);
+  transform: none;
+}
+
+.pub .lg-caps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--warn-text);
+  animation: pubMasuk 400ms var(--ease-out) both;
+}
+
+.pub .lg-caps::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--warn-line);
 }
 
 .pub .lg-galat {
   margin-top: 1.25rem;
+  animation: pubMasuk 500ms var(--ease-out) both;
 }
 
 .pub .lg-kirim {
   margin-top: 1.5rem;
+  min-height: 52px;
+}
+
+.pub .lg-putar {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(15, 30, 51, 0.25);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: lgPutar 700ms linear infinite;
+}
+
+@keyframes lgPutar {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .pub .lg-dialog > * {
@@ -68,8 +253,10 @@
 }
 
 .pub .lg-dialog-judul {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-family: var(--huruf-judul);
+  font-size: 1.6rem;
+  font-weight: 450;
+  line-height: 1.15;
 }
 
 .pub .lg-dialog-aksi {
@@ -80,4 +267,29 @@
 
 .pub .lg-dialog > .lg-dialog-aksi {
   margin-top: 1.5rem;
+}
+
+@media (max-width: 860px) {
+  .pub .lg-kisi {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .pub .lg-sisi {
+    gap: 18px;
+    padding: 22px 22px 18px;
+  }
+
+  .pub .lg-tangga svg {
+    max-height: 120px;
+  }
+
+  .pub .lg-tangga figcaption,
+  .pub .lg-sisi-teks {
+    display: none;
+  }
+
+  .pub .lg-utama {
+    padding: 32px 20px 36px;
+  }
 }

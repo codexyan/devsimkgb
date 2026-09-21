@@ -1,276 +1,176 @@
 /* ══════════════════════════════════════════════════════════════════════
-   publik.css — gaya halaman publik SIM-KGB (/kgb, /panduan, /login)
-   Diimpor oleh app/(publik)/layout.tsx. Semua selektor berada di bawah
-   .pub sehingga tidak memengaruhi dashboard, dan token dashboard di
-   globals.css tidak ikut masuk.
+   publik.css: gaya bersama halaman publik SIM-KGB
+   (/kgb, /tabel-gaji, /panduan, /login)
 
-   PRINSIP
-   Dokumen resmi yang tenang: rata kiri, garis 1px, sudut paling besar 6px,
-   tanpa gradasi, blur, bayangan, glow, atau animasi (hanya transisi warna
-   paling lama 120ms). Warna tidak pernah menjadi satu-satunya penanda:
-   status, catatan, dan galat selalu memuat teks.
+   Diimpor app/(publik)/layout.tsx. Semua selektor di bawah .pub sehingga
+   dashboard tidak terpengaruh. Kerangka (nav, kaki, dok) ada di kerangka.css;
+   halaman masing-masing punya berkas CSS sendiri.
 
-   TEMA
-   Terang secara bawaan. Gelap bila <html data-pub-theme="dark"> (disetel
-   script bootstrap app/layout.tsx dan tombol tema HeaderPublik). Saat
-   dicetak selalu terang. Token (pakai lewat var(--nama)):
-     --bg --sunken              latar halaman, latar cekung (thead, footer)
-     --line --line-strong       garis pemisah, garis tegas
-     --field-line               garis kolom isian (kontras >= 3:1)
-     --ink --text --muted       judul, teks isi, teks sekunder
-     --accent --accent-hover    tautan, tombol utama, cincin fokus
-     --on-accent                teks di atas --accent
-     --info-bg                  latar catatan info / status proses
-     --warn-bg --warn-text --warn-line
-     --ok-bg --ok-text  --bad-bg --bad-text  --wait-bg --wait-text
-     --backdrop                 latar penutup dialog
-     --radius (6px) --radius-sm (4px)
+   ARAH: "Tangga gaji"
+   Layanan ini berurusan dengan surat, SK, dan tabel gaji. Bahasanya bahasa
+   arsip resmi: latar kertas hangat, tinta biru tua, judul serif (Newsreader)
+   yang bersuara seperti dokumen dinas, teks isi Inter yang sama dengan
+   dashboard. Motif anak tangga (garis yang naik bertahap) mewakili gaji
+   pokok yang naik setiap KGB. Hanya tema terang.
 
-   KERANGKA (sudah dipasang layout.tsx; halaman tidak perlu memasang ulang)
-     .pub                 akar; melukis latar sendiri, min-height 100dvh,
-                          kolom flex (header, main, footer)
-     .pub-skip            tautan "Lewati ke konten", tampil saat difokus
-     .pub-header          pita header, garis bawah 1px
-       .pub-header-row    baris dalam header (dipasang bersama .pub-container)
-       .pub-brand         tautan logo + nama
-         .pub-brand-text / .pub-brand-name / .pub-brand-sub
-                          .pub-brand-sub disembunyikan visual < 420px
-       .pub-nav           nav utama; <ul> berisi tautan; tautan aktif
-                          memakai aria-current="page" (tebal + garis bawah)
-       .pub-theme-btn     tombol tema 44x44; berisi svg .pub-theme-moon
-                          (tampil saat terang) dan .pub-theme-sun (saat gelap)
-     .pub-main            <main id="konten">; flex 1 dan padding vertikal.
-                          Tidak membatasi lebar: tiap halaman membungkus
-                          isinya dengan .pub-container.
-     .pub-footer          footer; .pub-footer-row, .pub-footer-org,
-                          .pub-footer-name, .pub-footer-nav
+   Dial: ENERGY 2, RHYTHM 2, MOTION 3 di beranda (lanskap 3D, panggung
+   dokumen yang menempel), MOTION 2 di halaman lain.
 
-   LEBAR
-     .pub-container       max-width 72rem, margin-inline auto,
-                          padding-inline clamp(16px, 4vw, 32px)
+   WARNA (2 inti + 1 aksen)
+     tinta biru tua   judul, tombol utama, garis fokus
+     biru arsip       tautan dan tangga golongan di lanskap
+     emas (aksen)     hanya untuk "posisi Anda / sekarang": anak tangga yang
+                      dipilih, tautan nav yang aktif, jadwal yang sedang dibuka
+     Warna status (hijau, ungu, merah, kuning) hanya untuk label status.
 
-   TIPOGRAFI (badan 16px, line-height 1.6)
-     .pub-h1              judul halaman
-     .pub-lead            paragraf pembuka, sedikit lebih besar, maks 65ch
-     .pub-h2              judul bagian dokumen panjang: jarak atas besar dan
-                          garis atas 1px. Tambahkan .pub-h2-flush untuk
-                          judul bagian pertama tanpa garis/jarak atas.
-     .pub-h3              subjudul
-     .pub-prose           wadah teks: ritme p/ul/ol/li, maks 70ch; ul dan ol
-                          kembali memakai penanda butir/nomor
-     .pub-meta            teks kecil abu-abu (tanggal, sumber, catatan kaki)
-     a                    tautan bawaan: warna aksen, bergaris bawah
-     code                 potongan teks teknis, misalnya ${ttd_pengirim}
-     Elemen ber-id (h1-h6, section, article) mendapat scroll-margin-top.
+   GERAK
+   Hanya transform dan opacity. --ease-out untuk gerak masuk, --ease untuk
+   warna, --ease-io untuk perpindahan keadaan. Semua gerak dipersingkat bila
+   pengguna memilih prefers-reduced-motion.
 
-   TOMBOL (tinggi minimum 44px; bisa dipakai pada <button> atau <a>)
-     .pub-btn             tombol utama (latar aksen)
-     .pub-btn-secondary   tombol bergaris; boleh berdiri sendiri atau
-                          digabung: class="pub-btn pub-btn-secondary"
-     .pub-btn-text        tombol serupa tautan
-     Nonaktif: atribut disabled atau aria-disabled="true".
-     .pub-btn-block       lebar penuh (pengubah)
+   TOKEN (var(--nama))
+     --bg --bg-atas --kartu --putih --sunken  kertas, lembar, isian, cekung
+     --line --line-soft --line-strong --field-line
+     --ink --tinta --text --muted             judul, teks kuat, isi, sekunder
+     --accent --accent-hover                  biru arsip (tautan)
+     --emas --emas-isi --emas-lembut          teks emas AA, isian, latar
+     --info-bg --warn-* --ok-* --bad-* --wait-*
+     --radius-sm (8px) --radius (12px) --radius-lg (18px)
+     --ease --ease-out --ease-io --ease-spring
+     --huruf-judul --huruf-isi
+     --kolom (1240px) --sisi --nav
 
-   FORMULIR
-     .pub-field           pembungkus satu isian (label, input, hint, galat)
-     .pub-label           <label>
-     .pub-input           input/select/textarea, font 16px, tinggi 44px;
-                          aria-invalid="true" memberi garis merah
-     .pub-hint            petunjuk di bawah isian (hubungkan aria-describedby)
-     .pub-field-error     pesan galat isian (teks, bukan hanya warna)
-
-   CATATAN (garis kiri 3px, latar berwarna, teks isi tetap --text)
-     .pub-note            info
-     .pub-note-warn       perhatian
-     .pub-note-bad        galat
-     .pub-note-title      judul catatan, berwarna sesuai jenis; selalu tulis
-                          judul berupa teks ("Perhatian", "Data tidak ditemukan")
-
-   STATUS KGB (label teks wajib; kelas dari lib/statusKgb.ts)
-     .pub-status          badge netral (juga untuk status tidak dikenal)
-     .pub-status-belum    Belum Diproses
-     .pub-status-proses   Sedang Diproses
-     .pub-status-keuangan Menunggu Keuangan
-     .pub-status-selesai  Selesai
-     .pub-status-batal    Dibatalkan
-     .pub-status-rapelan  tanda tambahan "Berpotensi rapelan" (bukan status),
-                          dipakai bersama di /kgb dan /panduan
-     Pakai: class="pub-status pub-status-selesai"
-
-   PANEL
-     .pub-panel           kotak bergaris 1px, sudut 6px, padding; untuk
-                          formulir masuk dan hasil cek status (bukan deret
-                          kartu fitur)
-
-   TABEL
-     .pub-table-wrap      pembungkus gulir horizontal bergaris; beri
-                          tabIndex={0} dan aria-label bila bisa bergulir
-     .pub-table           tabel: garis 1px, baris judul berlatar --sunken,
-                          <caption> rata kiri; th scope="row" ditebalkan
-     .pub-num             sel angka: rata kanan, tabular-nums, tidak patah
-
-   DAFTAR DEFINISI
-     .pub-dl              <dl> dengan baris <div><dt/><dd/></div>;
-                          label di atas nilai, dua kolom mulai 40rem
-
-   LANGKAH
-     .pub-steps           <ol> bernomor otomatis (kotak nomor bergaris dan
-                          garis penghubung vertikal tipis); tiap <li> satu langkah
-     .pub-step-title      judul langkah (pakai <h3> atau <p>)
-     .pub-step-who        pelaksana langkah, teks kecil abu-abu
-
-   DOKUMEN (tiruan surat; selalu kertas putih dan tinta gelap, juga di
-   tema gelap, karena token terang dipasang ulang di dalamnya)
-     .pub-doc             lembar surat: bergaris 1px, padding lega, teks
-                          sedikit lebih kecil. Bungkus dengan <figure>.
-     .pub-doc-kop         kop surat: baris rata tengah dengan garis ganda
-                          di bawah; baris pertama tebal, berikutnya lebih kecil
-     .pub-doc-table       tabel di dalam surat (garis hitam tipis)
-     .pub-doc-caption     <figcaption> di luar lembar, teks kecil abu-abu
-
-   PANDUAN
-     .pub-guide           grid: kolom daftar isi 15rem + kolom isi;
-                          satu kolom di bawah 60rem
-     .pub-toc             <nav> daftar isi, menempel (sticky) di layar lebar,
-                          disembunyikan di bawah 60rem
-       .pub-toc-title     judul kecil daftar isi
-       .pub-toc-list      <ol>/<ul> daftar tautan; tautan bagian aktif
-                          memakai aria-current="true" (garis kiri aksen)
-     .pub-toc-details     <details> berisi daftar isi untuk layar sempit;
-                          disembunyikan mulai 60rem. Di dalamnya boleh
-                          langsung .pub-toc-list atau sebuah .pub-toc.
-     .pub-faq             wadah daftar <details><summary>; penanda +/−
-                          berupa teks, keadaan terbuka ditebalkan
-
-   DIALOG
-     .pub-dialog-backdrop penutup layar tetap (fixed), warna semi-opak
-                          tanpa blur; render di dalam .pub agar token berlaku
-     .pub-dialog          kotak dialog (juga bisa <dialog class="pub-dialog">,
-                          ::backdrop sudah diberi warna)
-
-   UTILITAS
-     .pub-visually-hidden sembunyi visual, tetap dibaca pembaca layar
+   KELAS BERSAMA
+     .pub-container .pub-skip .pub-main .pub-transisi
+     .kt .kt-isi (judul per kata)  .masuk (gerak masuk sekali)
+     .pub-h1 .pub-lead .pub-h2(.pub-h2-flush) .pub-h3 .pub-prose .pub-meta
+     .pub-btn .pub-btn-secondary .pub-btn-text .pub-btn-block
+     .pub-field .pub-label .pub-input .pub-hint .pub-field-error
+     .pub-note .pub-note-warn .pub-note-bad .pub-note-title
+     .pub-status (+ -belum -proses -keuangan -selesai -batal -rapelan)
+     .pub-panel .pub-table-wrap .pub-table .pub-num .pub-dl
+     .pub-steps .pub-step-title .pub-step-who
+     .pub-doc .pub-doc-kop .pub-doc-table .pub-doc-caption
+     .pub-faq .pub-dialog-backdrop .pub-dialog .pub-visually-hidden
    ══════════════════════════════════════════════════════════════════════ */
 
 
 /* ── Token ─────────────────────────────────────────────────────────────── */
-.pub,
-.pub .pub-doc {
-  --bg: #ffffff;
-  --sunken: #f3f5f8;
-  --line: #d9dee6;
-  --line-strong: #b9c2cf;
-  --field-line: #7b8595;
-  --ink: #10233f;
-  --text: #27313f;
-  --muted: #5a6677;
-  --accent: #1c4a7e;
-  --accent-hover: #153a64;
+.pub {
+  --bg: #f4f1ea;
+  --bg-atas: #f7f5ef;
+  --kartu: #fbf9f4;
+  --putih: #ffffff;
+  --sunken: #ece7dd;
+  --line: #e0d9cc;
+  --line-soft: #e9e3d8;
+  --line-strong: #c7bdac;
+  --field-line: #857d6c;
+  --ink: #0f1e33;
+  --tinta: #16263d;
+  --text: #3a4250;
+  --muted: #5c6370;
+  --accent: #1f4e85;
+  --accent-hover: #163a64;
   --on-accent: #ffffff;
-  --info-bg: #eef3f9;
-  --warn-bg: #fdf6e7;
-  --warn-text: #7a4e0c;
-  --warn-line: #b7791f;
-  --ok-bg: #e9f6ef;
-  --ok-text: #176b43;
-  --bad-bg: #fdecea;
-  --bad-text: #b42318;
-  --wait-bg: #f1edfb;
-  --wait-text: #5b3fa8;
-  --backdrop: rgba(16, 35, 63, 0.6);
-  --radius: 6px;
-  --radius-sm: 4px;
+  --emas: #86580a;
+  --emas-isi: #e2a526;
+  --emas-garis: #b37c10;
+  --emas-lembut: #f5e8c8;
+  --info-bg: #e6ecf3;
+  --warn-bg: #f6ecd4;
+  --warn-text: #74520a;
+  --warn-line: #c99a3a;
+  --ok-bg: #e3efe6;
+  --ok-text: #1d6440;
+  --bad-bg: #f7e4e0;
+  --bad-text: #a4271b;
+  --wait-bg: #ebe7f3;
+  --wait-text: #56418f;
+  --backdrop: rgba(15, 30, 51, 0.34);
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.3, 0.6, 1);
+  --huruf-judul: var(--font-serif), "Iowan Old Style", Georgia, serif;
+  --huruf-isi: var(--font-inter), system-ui, sans-serif;
+  --kolom: 1240px;
+  --sisi: clamp(16px, 5vw, 56px);
+  --nav: 80px;
   color-scheme: light;
-}
-
-@media screen {
-  html[data-pub-theme="dark"] .pub {
-    --bg: #0e141d;
-    --sunken: #141c27;
-    --line: #2a3545;
-    --line-strong: #3b4859;
-    --field-line: #6b7a8f;
-    --ink: #eef2f7;
-    --text: #d3dae4;
-    --muted: #9ba7b7;
-    --accent: #8cb8f0;
-    --accent-hover: #a9cbf5;
-    --on-accent: #0e141d;
-    --info-bg: #152338;
-    --warn-bg: #2a2010;
-    --warn-text: #f0c46a;
-    --warn-line: #c99a3a;
-    --ok-bg: #12291f;
-    --ok-text: #6fd3a0;
-    --bad-bg: #2d1614;
-    --bad-text: #f59b92;
-    --wait-bg: #211a36;
-    --wait-text: #b9a5f2;
-    --backdrop: rgba(0, 0, 0, 0.72);
-    color-scheme: dark;
-  }
 }
 
 
 /* ── Dasar ─────────────────────────────────────────────────────────────── */
 .pub {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1 0 auto;
   min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--huruf-isi);
   font-size: 1rem;
-  line-height: 1.6;
-  letter-spacing: normal;
+  line-height: 1.7;
+  letter-spacing: -0.006em;
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 
 .pub :where(h1, h2, h3, h4, h5, h6) {
   color: var(--ink);
-  line-height: 1.3;
+  line-height: 1.25;
   text-wrap: balance;
 }
 
+.pub :where(p, li, dd) {
+  text-wrap: pretty;
+}
+
 .pub :where(h1, h2, h3, h4, h5, h6, section, article)[id] {
-  scroll-margin-top: 1.5rem;
+  scroll-margin-top: calc(var(--nav) + 24px);
 }
 
 .pub a {
   color: var(--accent);
   text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 32%, transparent);
   text-decoration-thickness: 1px;
-  text-underline-offset: 0.18em;
-  transition: color 120ms ease;
+  text-underline-offset: 0.24em;
+  transition: color 320ms var(--ease), text-decoration-color 320ms var(--ease);
 }
 
 .pub a:hover {
   color: var(--accent-hover);
-  text-decoration-thickness: 2px;
+  text-decoration-color: currentColor;
 }
 
-/* Menimpa *:focus-visible di globals.css (box-shadow) dengan outline jelas */
+/* Menimpa *:focus-visible di globals.css dengan garis tinta yang jelas di kertas */
 .pub :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
   box-shadow: none;
 }
 
 .pub strong {
   font-weight: 600;
-  color: var(--ink);
+  color: var(--tinta);
 }
 
 .pub code {
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
   font-size: 0.875em;
-  padding: 0.05em 0.3em;
+  padding: 0.05em 0.35em;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--sunken);
-  color: var(--ink);
+  border-radius: 6px;
+  background: var(--kartu);
+  color: var(--tinta);
   overflow-wrap: anywhere;
 }
 
@@ -285,284 +185,152 @@
   opacity: 1;
 }
 
+.pub ::selection {
+  background: var(--emas-lembut);
+  color: var(--ink);
+}
 
-/* ── Kerangka ──────────────────────────────────────────────────────────── */
+
+/* ── Kerangka isi ──────────────────────────────────────────────────────── */
 .pub .pub-container {
   width: 100%;
-  max-width: 72rem;
+  max-width: var(--kolom);
   margin-inline: auto;
-  padding-inline: clamp(16px, 4vw, 32px);
+  padding-inline: var(--sisi);
 }
 
 .pub .pub-skip {
   position: absolute;
-  top: 0.5rem;
-  left: 1rem;
-  z-index: 200;
-  padding: 0.625rem 1rem;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: var(--on-accent);
+  top: 0;
+  left: 0;
+  z-index: 300;
+  padding: 11px 18px;
+  border-radius: 0 0 var(--radius) 0;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.875rem;
   font-weight: 600;
   text-decoration: none;
-  transform: translateY(-200%);
+  transform: translateY(-120%);
+  transition: transform 420ms var(--ease-out);
 }
 
 .pub .pub-skip:focus,
 .pub .pub-skip:focus-visible {
   transform: none;
-  color: var(--on-accent);
-  outline-color: var(--ink);
-}
-
-.pub .pub-header {
-  border-bottom: 1px solid var(--line);
-  background: var(--bg);
-}
-
-.pub .pub-header-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem 1rem;
-  min-height: 4rem;
-  padding-block: 0.5rem;
-}
-
-.pub .pub-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.625rem;
-  min-height: 44px;
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.pub .pub-brand:hover {
-  color: var(--ink);
-}
-
-.pub .pub-brand img {
-  flex-shrink: 0;
-}
-
-.pub .pub-brand-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.25;
-}
-
-.pub .pub-brand-name {
-  font-weight: 700;
-  font-size: 1rem;
-}
-
-.pub .pub-brand-sub {
-  font-size: 0.8125rem;
-  color: var(--muted);
-}
-
-.pub .pub-nav {
-  margin-left: auto;
-}
-
-.pub .pub-nav ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.pub .pub-nav a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0.25rem 0.75rem;
-  border-bottom: 2px solid transparent;
-  color: var(--text);
-  text-decoration: none;
-  transition: color 120ms ease, border-color 120ms ease;
-}
-
-.pub .pub-nav a:hover {
-  color: var(--accent);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-}
-
-.pub .pub-nav a[aria-current="page"] {
-  color: var(--ink);
-  font-weight: 600;
-  border-bottom-color: var(--accent);
-}
-
-.pub .pub-theme-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease;
-}
-
-.pub .pub-theme-btn:hover {
-  background: var(--sunken);
-  border-color: var(--line-strong);
-}
-
-.pub .pub-theme-sun {
-  display: none;
-}
-
-html[data-pub-theme="dark"] .pub .pub-theme-sun {
-  display: block;
-}
-
-html[data-pub-theme="dark"] .pub .pub-theme-moon {
-  display: none;
-}
-
-/* Layar sempit: logo di baris pertama, menu dan tombol tema di baris kedua.
-   Grid menjaga urutan DOM (logo, menu, tombol) sama dengan urutan visual. */
-@media (max-width: 47.99rem) {
-  .pub .pub-header-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 0.5rem;
-  }
-
-  .pub .pub-brand {
-    grid-column: 1 / -1;
-    justify-self: start;
-  }
-
-  .pub .pub-nav {
-    margin-left: -0.5rem;
-  }
-
-  .pub .pub-nav a {
-    padding-inline: 0.5rem;
-  }
-}
-
-@media (max-width: 26.24rem) {
-  .pub .pub-brand-sub {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
-  }
+  color: #fff;
+  outline-color: var(--emas-isi);
 }
 
 .pub .pub-main {
   flex: 1 0 auto;
-  padding-block: clamp(2rem, 5vw, 3.5rem);
+  padding-block: calc(var(--nav) + clamp(2.5rem, 7vw, 5rem)) clamp(4.5rem, 10vw, 8rem);
+}
+
+.pub .pub-main:has(> .pub-transisi > .beranda) {
+  padding-block: 0;
 }
 
 .pub .pub-main:focus {
   outline: none;
 }
 
-.pub .pub-footer {
-  border-top: 1px solid var(--line);
-  background: var(--sunken);
-  color: var(--muted);
-  font-size: 0.875rem;
-  line-height: 1.5;
+/* Pergantian halaman: isi baru naik sedikit dan menjadi jelas; nav dan kaki tetap diam. */
+@keyframes pubMasuk {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
 }
 
-.pub .pub-footer-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem 2rem;
-  padding-block: 1.75rem;
+.pub .pub-transisi {
+  animation: pubMasuk 700ms var(--ease-out) both;
 }
 
-.pub .pub-footer-org p {
-  margin: 0;
+/* Gerak masuk sekali saat halaman dibuka, berjeda lewat --d (ms). Jeda dijaga pendek untuk isi di atas
+   lipatan supaya teks tidak menunggu lama sebelum terbaca penuh. */
+.pub .masuk {
+  animation: pubMasuk 820ms var(--ease-out) both;
+  animation-delay: calc(var(--d, 0) * 1ms);
 }
 
-.pub .pub-footer-name {
-  color: var(--text);
-  font-weight: 600;
+/* Judul per kata: tiap kata naik dari balik garis dasarnya. */
+.pub .kt {
+  display: inline-block;
+  overflow: clip;
+  vertical-align: top;
+  padding: 0.04em 0.06em 0.14em 0;
+  margin: -0.04em -0.06em -0.14em 0;
 }
 
-.pub .pub-footer-nav ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 1.25rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.pub .kt-isi {
+  display: inline-block;
+  animation: pubKata 1100ms var(--ease-out) both;
+  animation-delay: calc(80ms + var(--i, 0) * 70ms);
 }
 
-.pub .pub-footer-nav a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
+@keyframes pubKata {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 105%, 0);
+  }
+  35% {
+    opacity: 1;
+  }
+}
+
+/* Judul bagian baru bergerak saat masuk layar (Muncul.tsx memasang data-muncul="1"). */
+html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
+  animation: none;
+  opacity: 0;
+  transform: translate3d(0, 105%, 0);
 }
 
 
 /* ── Tipografi ─────────────────────────────────────────────────────────── */
 .pub .pub-h1 {
-  margin: 0 0 0.75rem;
-  font-size: clamp(1.75rem, 1.35rem + 1.6vw, 2.375rem);
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+  margin: 0 0 1.25rem;
+  font-family: var(--huruf-judul);
+  font-size: clamp(2.6rem, 1.5rem + 3.6vw, 4.6rem);
+  font-weight: 450;
+  line-height: 1.02;
+  letter-spacing: -0.024em;
   color: var(--ink);
 }
 
 .pub .pub-lead {
   margin: 0 0 1.5rem;
-  max-width: 65ch;
+  max-width: 58ch;
   font-size: 1.125rem;
-  line-height: 1.6;
+  line-height: 1.7;
   color: var(--text);
 }
 
 .pub .pub-h2 {
-  margin: 3rem 0 0.75rem;
-  padding-top: 2rem;
-  border-top: 1px solid var(--line);
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1.3;
+  margin: 5rem 0 1.1rem;
+  font-family: var(--huruf-judul);
+  font-size: clamp(1.9rem, 1.35rem + 1.7vw, 2.7rem);
+  font-weight: 450;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
   color: var(--ink);
 }
 
 .pub .pub-h2.pub-h2-flush {
   margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
 }
 
 .pub .pub-h3 {
-  margin: 2rem 0 0.5rem;
+  margin: 2.5rem 0 0.5rem;
   font-size: 1.125rem;
   font-weight: 600;
   line-height: 1.4;
-  color: var(--ink);
+  letter-spacing: -0.015em;
+  color: var(--tinta);
 }
 
 .pub .pub-prose {
-  max-width: 70ch;
+  max-width: 68ch;
 }
 
 /* :where menjaga ritme ini mudah ditimpa kelas komponen (.pub-h2, .pub-note) */
@@ -575,18 +343,18 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 }
 
 :where(.pub .pub-prose) ul {
-  padding-left: 1.5rem;
+  padding-left: 1.25rem;
   list-style: disc;
 }
 
 :where(.pub .pub-prose) ol {
-  padding-left: 1.5rem;
+  padding-left: 1.25rem;
   list-style: decimal;
 }
 
 :where(.pub .pub-prose) li + li,
 :where(.pub .pub-prose) li > :is(ul, ol, p) {
-  margin-top: 0.375rem;
+  margin-top: 0.45rem;
 }
 
 :where(.pub .pub-prose) li::marker {
@@ -595,7 +363,7 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 
 .pub .pub-meta {
   font-size: 0.875rem;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--muted);
 }
 
@@ -604,64 +372,74 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 .pub .pub-btn,
 .pub .pub-btn-secondary,
 .pub .pub-btn-text {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 44px;
-  padding: 0.5rem 1.125rem;
+  min-height: 48px;
+  padding: 0.625rem 1.3rem;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
   line-height: 1.25;
   text-align: center;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition:
+    background-color 360ms var(--ease),
+    border-color 360ms var(--ease),
+    color 360ms var(--ease),
+    transform 600ms var(--ease-out);
 }
 
 .pub .pub-btn {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
 }
 
 .pub .pub-btn:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-  color: var(--on-accent);
+  background: #20375a;
+  border-color: #20375a;
+  color: #fff;
+  transform: translate3d(0, -1px, 0);
 }
 
 .pub .pub-btn-secondary {
   background: transparent;
   border-color: var(--line-strong);
-  color: var(--accent);
+  color: var(--tinta);
 }
 
 .pub .pub-btn-secondary:hover {
-  background: var(--sunken);
-  border-color: var(--accent);
-  color: var(--accent-hover);
+  background: var(--kartu);
+  border-color: var(--field-line);
+  color: var(--ink);
+  transform: translate3d(0, -1px, 0);
+}
+
+.pub :is(.pub-btn, .pub-btn-secondary):active:not(:disabled) {
+  transform: scale(0.98);
+  transition-duration: 120ms;
 }
 
 .pub .pub-btn-text {
-  padding-inline: 0.5rem;
+  min-height: 44px;
+  padding-inline: 0.25rem;
   background: transparent;
-  border-color: transparent;
   color: var(--accent);
-  font-weight: 500;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.18em;
+  font-weight: 550;
 }
 
 .pub .pub-btn-text:hover {
-  background: transparent;
-  border-color: transparent;
   color: var(--accent-hover);
-  text-decoration-thickness: 2px;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.24em;
 }
 
 .pub .pub-btn-block {
@@ -675,6 +453,7 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
   border-color: var(--line);
   color: var(--muted);
   text-decoration: none;
+  transform: none;
   cursor: not-allowed;
 }
 
@@ -688,28 +467,28 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 .pub .pub-field {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.45rem;
 }
 
 .pub .pub-label {
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.4;
-  color: var(--ink);
+  color: var(--tinta);
 }
 
 .pub .pub-input {
   width: 100%;
-  min-height: 44px;
-  padding: 0.5rem 0.75rem;
+  min-height: 50px;
+  padding: 0.625rem 0.95rem;
   border: 1px solid var(--field-line);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--text);
+  border-radius: 10px;
+  background: var(--putih);
+  color: var(--ink);
   font-family: inherit;
   font-size: 16px;
   line-height: 1.5;
-  transition: border-color 120ms ease;
+  transition: border-color 320ms var(--ease), box-shadow 420ms var(--ease-out);
 }
 
 .pub textarea.pub-input {
@@ -718,12 +497,13 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 }
 
 .pub .pub-input:hover {
-  border-color: var(--text);
+  border-color: var(--tinta);
 }
 
 .pub .pub-input:focus-visible {
-  outline-offset: 1px;
-  border-color: var(--accent);
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink), 0 0 0 5px rgba(15, 30, 51, 0.1);
 }
 
 .pub .pub-input[aria-invalid="true"] {
@@ -739,14 +519,14 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 .pub .pub-hint {
   margin: 0;
   font-size: 0.875rem;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--muted);
 }
 
 .pub .pub-field-error {
   margin: 0;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 550;
   line-height: 1.5;
   color: var(--bad-text);
 }
@@ -756,32 +536,32 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 .pub .pub-note,
 .pub .pub-note-warn,
 .pub .pub-note-bad {
-  padding: 0.875rem 1rem;
-  border-left: 3px solid var(--accent);
-  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 1rem 1.2rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: var(--radius);
   background: var(--info-bg);
   color: var(--text);
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .pub .pub-note-warn {
-  border-left-color: var(--warn-line);
+  border-color: color-mix(in srgb, var(--warn-line) 40%, transparent);
   background: var(--warn-bg);
 }
 
 .pub .pub-note-bad {
-  border-left-color: var(--bad-text);
+  border-color: color-mix(in srgb, var(--bad-text) 22%, transparent);
   background: var(--bad-bg);
 }
 
 :where(.pub) :is(.pub-note, .pub-note-warn, .pub-note-bad) > * + * {
-  margin-top: 0.5rem;
+  margin-top: 0.4rem;
 }
 
 .pub .pub-note-title {
   display: block;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--tinta);
 }
 
 .pub .pub-note-warn .pub-note-title {
@@ -793,55 +573,65 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 }
 
 
-/* ── Status KGB ────────────────────────────────────────────────────────── */
+/* ── Status KGB (label teks selalu ada; warna hanya penguat) ───────────── */
 .pub .pub-status {
   display: inline-flex;
   align-items: center;
-  padding: 0.0625rem 0.5rem;
+  gap: 0.45rem;
+  padding: 0.12rem 0.55rem 0.12rem 0.5rem;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  background: var(--sunken);
+  border-radius: 6px;
+  background: var(--kartu);
   color: var(--text);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
+  letter-spacing: -0.005em;
   line-height: 1.5;
   white-space: nowrap;
 }
 
+.pub .pub-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.8;
+}
+
 .pub .pub-status-belum {
-  background: var(--sunken);
+  background: var(--kartu);
   border-color: var(--line-strong);
   color: var(--muted);
 }
 
 .pub .pub-status-proses {
   background: var(--info-bg);
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
   color: var(--accent);
 }
 
 .pub .pub-status-keuangan {
   background: var(--wait-bg);
-  border-color: color-mix(in srgb, var(--wait-text) 45%, transparent);
+  border-color: color-mix(in srgb, var(--wait-text) 30%, transparent);
   color: var(--wait-text);
 }
 
 .pub .pub-status-selesai {
   background: var(--ok-bg);
-  border-color: color-mix(in srgb, var(--ok-text) 45%, transparent);
+  border-color: color-mix(in srgb, var(--ok-text) 30%, transparent);
   color: var(--ok-text);
 }
 
 .pub .pub-status-batal {
   background: var(--bad-bg);
-  border-color: color-mix(in srgb, var(--bad-text) 45%, transparent);
+  border-color: color-mix(in srgb, var(--bad-text) 30%, transparent);
   color: var(--bad-text);
 }
 
-/* Tanda tambahan "Berpotensi rapelan", bukan status. Teks selalu tertulis. */
 .pub .pub-status-rapelan {
   background: var(--warn-bg);
-  border-color: color-mix(in srgb, var(--warn-line) 60%, transparent);
+  border-color: color-mix(in srgb, var(--warn-line) 50%, transparent);
   color: var(--warn-text);
 }
 
@@ -849,9 +639,9 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 /* ── Panel ─────────────────────────────────────────────────────────────── */
 .pub .pub-panel {
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--bg);
-  padding: clamp(1rem, 4vw, 1.5rem);
+  border-radius: var(--radius-lg);
+  background: var(--kartu);
+  padding: clamp(1.25rem, 4vw, 2rem);
 }
 
 
@@ -861,54 +651,54 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius);
+  background: var(--kartu);
 }
 
 .pub .pub-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.9375rem;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .pub .pub-table caption {
   caption-side: top;
-  padding: 0.75rem;
+  padding: 0.9rem 1rem 0.6rem;
   text-align: left;
   font-weight: 600;
-  color: var(--ink);
-}
-
-.pub .pub-table-wrap .pub-table caption {
-  border-bottom: 1px solid var(--line);
+  color: var(--tinta);
 }
 
 .pub .pub-table :is(th, td) {
-  padding: 0.625rem 0.75rem;
-  border-bottom: 1px solid var(--line);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line-soft);
   text-align: left;
   vertical-align: top;
 }
 
 .pub .pub-table thead th {
-  border-bottom-color: var(--line-strong);
-  background: var(--sunken);
-  color: var(--ink);
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-atas);
+  color: var(--muted);
+  font-size: 0.8125rem;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .pub .pub-table tbody th {
-  color: var(--ink);
+  color: var(--tinta);
   font-weight: 600;
 }
 
 .pub .pub-table tfoot :is(th, td) {
-  background: var(--sunken);
-  color: var(--ink);
+  background: var(--bg-atas);
+  color: var(--tinta);
   font-weight: 600;
 }
 
-.pub .pub-table-wrap .pub-table > :last-child > tr:last-child > :is(th, td) {
+.pub .pub-table > :last-child > tr:last-child > :is(th, td) {
   border-bottom: 0;
 }
 
@@ -923,12 +713,15 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 /* ── Daftar definisi ───────────────────────────────────────────────────── */
 .pub .pub-dl {
   margin: 0;
-  border-top: 1px solid var(--line);
 }
 
 .pub .pub-dl > div {
-  padding-block: 0.75rem;
-  border-bottom: 1px solid var(--line);
+  padding-block: 0.85rem;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.pub .pub-dl > div:last-child {
+  border-bottom: 0;
 }
 
 .pub .pub-dl dt {
@@ -939,20 +732,16 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 
 .pub .pub-dl dd {
   margin: 0.125rem 0 0;
-  color: var(--ink);
+  color: var(--tinta);
   overflow-wrap: anywhere;
 }
 
 @media (min-width: 40rem) {
   .pub .pub-dl > div {
     display: grid;
-    grid-template-columns: minmax(9rem, 15rem) minmax(0, 1fr);
+    grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr);
     gap: 1.5rem;
     align-items: baseline;
-  }
-
-  .pub .pub-dl dt {
-    font-size: 0.9375rem;
   }
 
   .pub .pub-dl dd {
@@ -961,7 +750,7 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 }
 
 
-/* ── Langkah ───────────────────────────────────────────────────────────── */
+/* ── Langkah: nomor serif pada rel tipis ───────────────────────────────── */
 .pub .pub-steps {
   margin: 0;
   padding: 0;
@@ -971,36 +760,32 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 
 .pub .pub-steps > li {
   position: relative;
-  padding: 0 0 1.75rem 3.25rem;
+  padding: 0 0 2rem 3.6rem;
   counter-increment: pub-langkah;
 }
 
 .pub .pub-steps > li::before {
-  content: counter(pub-langkah);
+  content: counter(pub-langkah, decimal-leading-zero);
   position: absolute;
-  top: 0;
+  top: 0.05rem;
   left: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
+  width: 2.4rem;
+  font-family: var(--huruf-judul);
+  font-size: 1.35rem;
+  font-weight: 450;
+  line-height: 1.3;
   color: var(--ink);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 .pub .pub-steps > li::after {
   content: "";
   position: absolute;
-  top: 2.75rem;
-  bottom: 0.5rem;
-  left: calc(1.125rem - 0.5px);
+  top: 2.4rem;
+  bottom: 0.6rem;
+  left: 0.72rem;
   width: 1px;
-  background: var(--line);
+  background: var(--line-strong);
 }
 
 .pub .pub-steps > li:last-child {
@@ -1016,33 +801,35 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
   padding-top: 0.25rem;
   font-size: 1.0625rem;
   font-weight: 600;
+  letter-spacing: -0.015em;
   line-height: 1.4;
-  color: var(--ink);
+  color: var(--tinta);
 }
 
 .pub .pub-step-who {
-  margin: 0.125rem 0 0.5rem;
+  margin: 0.15rem 0 0.5rem;
   font-size: 0.875rem;
   line-height: 1.5;
   color: var(--muted);
 }
 
 
-/* ── Dokumen (tiruan surat) ────────────────────────────────────────────── */
+/* ── Dokumen (tiruan surat; selalu kertas putih) ───────────────────────── */
 .pub figure:has(> .pub-doc) {
   margin: 0;
 }
 
 .pub .pub-doc {
   max-width: 100%;
-  padding: clamp(1.25rem, 5vw, 2.5rem);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  padding: clamp(1.25rem, 5vw, 2.75rem);
+  border: 1px solid var(--line);
+  border-radius: 4px;
   background: #ffffff;
   color: #1b2430;
   font-size: 0.9375rem;
   line-height: 1.55;
   overflow-x: auto;
+  box-shadow: 0 1px 0 var(--line-soft), 0 28px 50px -44px rgba(15, 30, 51, 0.55);
 }
 
 :where(.pub .pub-doc) > * + * {
@@ -1091,120 +878,16 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 }
 
 .pub .pub-doc-caption {
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
   font-size: 0.875rem;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--muted);
 }
 
 
-/* ── Panduan: daftar isi dan FAQ ───────────────────────────────────────── */
-.pub .pub-guide {
-  display: grid;
-  grid-template-columns: 15rem minmax(0, 1fr);
-  gap: 3rem;
-  align-items: start;
-}
-
-.pub .pub-guide > * {
-  min-width: 0;
-}
-
-.pub .pub-toc {
-  position: sticky;
-  top: 1.5rem;
-  align-self: start;
-  max-height: calc(100dvh - 3rem);
-  overflow-y: auto;
-  font-size: 0.9375rem;
-}
-
-.pub .pub-toc-title {
-  margin: 0 0 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.pub .pub-toc-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border-left: 1px solid var(--line);
-}
-
-.pub :is(.pub-toc, .pub-toc-details) .pub-toc-list a {
-  display: block;
-  margin-left: -1px;
-  padding: 0.375rem 0.75rem;
-  border-left: 2px solid transparent;
-  color: var(--text);
-  line-height: 1.4;
-  text-decoration: none;
-}
-
-.pub :is(.pub-toc, .pub-toc-details) .pub-toc-list a:hover {
-  color: var(--accent);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-}
-
-.pub :is(.pub-toc, .pub-toc-details) .pub-toc-list a[aria-current]:not([aria-current="false"]) {
-  border-left-color: var(--accent);
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.pub .pub-toc-details {
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--sunken);
-}
-
-.pub .pub-toc-details > summary {
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0.5rem 1rem;
-  color: var(--ink);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.pub .pub-toc-details[open] > summary {
-  border-bottom: 1px solid var(--line);
-}
-
-.pub .pub-toc-details > :not(summary) {
-  padding: 0.75rem 1rem;
-}
-
-@media (min-width: 60rem) {
-  .pub .pub-toc-details {
-    display: none;
-  }
-}
-
-@media (max-width: 59.99rem) {
-  .pub .pub-guide {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1.5rem;
-  }
-
-  .pub .pub-toc {
-    display: none;
-  }
-
-  .pub .pub-toc-details .pub-toc {
-    display: block;
-    position: static;
-    max-height: none;
-    overflow: visible;
-  }
-}
-
+/* ── Pertanyaan umum ───────────────────────────────────────────────────── */
 .pub .pub-faq {
-  max-width: 70ch;
+  max-width: 68ch;
   border-top: 1px solid var(--line);
 }
 
@@ -1215,49 +898,54 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
 .pub .pub-faq summary {
   position: relative;
   display: block;
-  min-height: 44px;
-  padding: 0.75rem 0.5rem 0.75rem 2rem;
-  color: var(--ink);
-  font-weight: 500;
+  min-height: 52px;
+  padding: 1rem 3rem 1rem 0;
+  color: var(--tinta);
+  font-weight: 550;
   line-height: 1.5;
   list-style: none;
   cursor: pointer;
+  transition: color 320ms var(--ease);
 }
 
 .pub .pub-faq summary::-webkit-details-marker {
   display: none;
 }
 
-.pub .pub-faq summary::before {
-  content: "+";
+/* Dua garis tipis: plus yang merebah menjadi minus saat terbuka */
+.pub .pub-faq summary::before,
+.pub .pub-faq summary::after {
+  content: "";
   position: absolute;
-  top: 0.75rem;
-  left: 0.25rem;
-  width: 1.25rem;
-  color: var(--accent);
-  font-weight: 700;
-  text-align: center;
+  top: 1.7rem;
+  right: 0.5rem;
+  width: 12px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--tinta);
+  transition: transform 520ms var(--ease-out), opacity 320ms var(--ease);
+}
+
+.pub .pub-faq summary::after {
+  transform: rotate(90deg);
+}
+
+.pub .pub-faq details[open] > summary::after {
+  transform: rotate(0deg);
+  opacity: 0;
 }
 
 .pub .pub-faq summary:hover {
-  color: var(--accent);
+  color: var(--accent-hover);
 }
 
 .pub .pub-faq summary:focus-visible {
   outline-offset: -2px;
 }
 
-.pub .pub-faq details[open] > summary {
-  font-weight: 600;
-}
-
-.pub .pub-faq details[open] > summary::before {
-  content: "\2212";
-}
-
 .pub .pub-faq details > :not(summary) {
   margin: 0;
-  padding: 0 0.5rem 1rem 2rem;
+  padding: 0 3rem 1.15rem 0;
 }
 
 .pub .pub-faq details > :not(summary) + :not(summary) {
@@ -1265,18 +953,54 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
   margin-top: -0.25rem;
 }
 
+/* Isi jawaban membuka dengan tinggi yang mengalir (Chromium 131+); peramban lain langsung terbuka. */
+@supports (interpolate-size: allow-keywords) {
+  .pub .pub-faq {
+    interpolate-size: allow-keywords;
+  }
+
+  .pub .pub-faq details::details-content {
+    height: 0;
+    overflow: clip;
+    opacity: 0;
+    transition:
+      height 560ms var(--ease-out),
+      opacity 420ms var(--ease),
+      content-visibility 560ms allow-discrete;
+  }
+
+  .pub .pub-faq details[open]::details-content {
+    height: auto;
+    opacity: 1;
+  }
+}
+
 
 /* ── Dialog ────────────────────────────────────────────────────────────── */
+@keyframes pubTirai {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pubDialog {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.985);
+  }
+}
+
 .pub .pub-dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
   background: var(--backdrop);
   overscroll-behavior: contain;
+  animation: pubTirai 360ms var(--ease) both;
 }
 
 .pub .pub-dialog {
@@ -1284,15 +1008,17 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
   max-width: 28rem;
   max-height: calc(100dvh - 32px);
   overflow-y: auto;
-  padding: 1.5rem;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  background: var(--bg);
+  padding: 1.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--kartu);
   color: var(--text);
+  box-shadow: 0 40px 80px -40px rgba(15, 30, 51, 0.55);
+  animation: pubDialog 600ms var(--ease-out) both;
 }
 
 .pub dialog.pub-dialog::backdrop {
-  background: rgba(16, 35, 63, 0.6);
+  background: var(--backdrop);
 }
 
 
@@ -1315,21 +1041,21 @@ html[data-pub-theme="dark"] .pub .pub-theme-moon {
   .pub *,
   .pub *::before,
   .pub *::after {
-    transition: none !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
 @media print {
-  .pub .pub-skip,
-  .pub .pub-nav,
-  .pub .pub-theme-btn,
-  .pub .pub-toc,
-  .pub .pub-toc-details,
-  .pub .pub-footer-nav {
+  .pub .pub-skip {
     display: none;
   }
 
-  .pub .pub-guide {
-    display: block;
+  .pub .pub-main {
+    padding-top: 0;
   }
 }

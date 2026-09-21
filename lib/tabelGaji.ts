@@ -418,6 +418,30 @@ export function getMKGOptions(
     .sort((a, b) => a.tahun * 12 + a.bulan - (b.tahun * 12 + b.bulan));
 }
 
+export interface AnakTangga {
+  /** Masa kerja golongan (tahun) saat gaji pokok ini mulai berlaku. */
+  mkg: number;
+  gaji: number;
+}
+
+export interface BarisTanggaGaji {
+  golongan: string;
+  pangkat: string;
+  anak: AnakTangga[];
+}
+
+/** Seluruh tabel gaji sebagai 17 baris anak tangga, urut I/a sampai IV/e dan MKG menaik.
+ *  Dipakai lanskap 3D beranda dan tabel gaji digital di halaman publik.
+ *  Mengasumsikan seluruh kunci TABEL_GAJI berakhir pada bulan 0 (PP 5/2024 hanya memakai MKG tahunan);
+ *  bila kelak ada langkah per bulan, `mkg` di sini harus memuat bulannya juga. */
+export function tanggaGaji(): BarisTanggaGaji[] {
+  return Object.keys(GOLONGAN_PANGKAT).map((golongan) => ({
+    golongan,
+    pangkat: GOLONGAN_PANGKAT[golongan],
+    anak: getMKGOptions(golongan).map(({ tahun, gaji }) => ({ mkg: tahun, gaji })),
+  }));
+}
+
 export interface HasilKalkulasiKGB {
   mkgTahunBaru: number;
   mkgBulanBaru: number;

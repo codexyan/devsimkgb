@@ -75,17 +75,10 @@ html[data-dash-theme="dark"] {
 html[data-dash-theme="dark"] .bg-white   { background-color: var(--card); }
 html[data-dash-theme="dark"] .bg-gray-50 { background-color: var(--sub); }
 
-/* ── Halaman publik gelap ────────────────────────────────────────
-   Latar kanvas (area overscroll/rubber-band di luar .pub) mengikuti
-   tema publik. Hanya berlaku bila halaman memuat .pub, sehingga
-   dashboard tidak terpengaruh; saat dicetak tetap terang.          */
-@media screen {
-  html[data-pub-theme="dark"]:has(.pub) {
-    --background: #0e141d;
-    --foreground: #d3dae4;
-    background-color: #0e141d;
-    color-scheme: dark;
-  }
+/* Halaman publik: latar kanvas (area overscroll di luar .pub) sama dengan
+   latar halaman publik. */
+html:has(.pub) {
+  background-color: #f6f8fb;
 }
 
 html { -webkit-font-smoothing: antialiased; }
