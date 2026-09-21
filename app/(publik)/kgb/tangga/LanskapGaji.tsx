@@ -154,7 +154,8 @@ export default function LanskapGaji({ baris, sorot, kurangiGerak, onArah, onPili
     const kanvas = renderer.domElement;
     kanvas.className = "tg-webgl";
     renderer.setClearColor(0x000000, 0);
-    wadah.prepend(kanvas);
+    // Bukan prepend(): saat cf:build, tipe Workers di cloudflare-env.d.ts menimpa Element.prepend milik DOM.
+    wadah.insertBefore(kanvas, wadah.firstChild);
 
     const tata = susunLanskap(baris);
     const n = tata.balok.length;
