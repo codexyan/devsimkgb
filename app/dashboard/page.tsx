@@ -7,6 +7,7 @@ import { ROLES, ROLE_LABEL } from "@/lib/auth";
 import DashboardHukdis from "@/app/dashboard/components/DashboardHukdis";
 import DashboardKeuangan from "@/app/dashboard/components/DashboardKeuangan";
 import PemantauanSatker from "@/app/dashboard/components/PemantauanSatker";
+import PapanAntrian, { type KartuPapan, type KolomPapan } from "@/app/dashboard/components/PapanAntrian";
 import {
   KerangkaDashboard,
   PanelNavy,
@@ -290,6 +291,15 @@ function StatusAntrian({ pos, dibatalkan, skDibuat, buka }: { pos: PosisiAntrian
   );
 }
 
+const KUNCI_TAMPILAN = "kgb-antrian-tampilan";
+
+/** Kolom papan untuk posisi antrian. */
+function kolomPapan(pos: PosisiAntrian): KolomPapan {
+  if (pos === "lewat" || pos === "siap") return "input";
+  if (pos === "diproses") return "proses";
+  return pos;
+}
+
 function pegawaiModal(p: PegawaiJatuhTempo): PegawaiModal {
   return { id: p.id, nama: p.nama, nip: p.nip, jabatan: p.jabatan, golonganRuang: p.golonganRuang };
 }
@@ -302,6 +312,9 @@ function DashboardMain() {
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [tahap, setTahap] = useState<Tahap>("perlu");
+  // Tampilan antrian: daftar (tabel) atau papan (kanban); pilihan diingat per peramban.
+  const [tampilan, setTampilan] = useState<"daftar" | "papan">("daftar");
+  const [cariAntrian, setCariAntrian] = useState("");
   const [filterMonth, setFilterMonth] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalAksi | null>(null);
   const [pesanBerhasil, setPesanBerhasil] = useState<string | null>(null);
@@ -344,6 +357,20 @@ function DashboardMain() {
     return () => { document.removeEventListener("visibilitychange", onVisible); clearInterval(interval); };
   }, []);
 
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        if (localStorage.getItem(KUNCI_TAMPILAN) === "papan") setTampilan("papan");
+      } catch { /* penyimpanan tidak tersedia */ }
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+
+  function pilihTampilan(v: "daftar" | "papan") {
+    setTampilan(v);
+    try { localStorage.setItem(KUNCI_TAMPILAN, v); } catch { /* penyimpanan tidak tersedia */ }
+  }
+
   // Pesan hasil aksi hilang sendiri setelah beberapa detik.
   useEffect(() => {
     if (!pesanBerhasil) return;
@@ -382,18 +409,18 @@ function DashboardMain() {
     .map((p) => ({ tmtKgbBerikutnya: p.tmtKgbBerikutnya }));
 
   /* -- Antrian kerja: satu daftar untuk semua tahap, menggantikan tabel deadline dan kanban -- */
-  const dalamBulan = filterMonth
-    ? pegawaiJatuhTempo.filter((p) => kunciBulan(p.tmtKgbBerikutnya) === filterMonth)
-    : pegawaiJatuhTempo;
-  const jumlahTahap = (t: Tahap) => dalamBulan.filter((p) => cocokTahap(posisiAntrian(p), t)).length;
-  const antrian = dalamBulan
-    .filter((p) => cocokTahap(posisiAntrian(p), tahap))
+  const qAntrian = cariAntrian.trim().toLowerCase();
+  const dalamBulan = pegawaiJatuhTempo
+    .filter((p) => !filterMonth || kunciBulan(p.tmtKgbBerikutnya) === filterMonth)
+    .filter((p) => !qAntrian || p.nama.toLowerCase().includes(qAntrian) || p.nip.includes(qAntrian) || (p.unitKerja ?? "").toLowerCase().includes(qAntrian))
     .sort(
       (a, b) =>
         URUTAN_POSISI[posisiAntrian(a)] - URUTAN_POSISI[posisiAntrian(b)] ||
         new Date(a.tmtKgbBerikutnya).getTime() - new Date(b.tmtKgbBerikutnya).getTime() ||
         a.nama.localeCompare(b.nama, "id"),
     );
+  const jumlahTahap = (t: Tahap) => dalamBulan.filter((p) => cocokTahap(posisiAntrian(p), t)).length;
+  const antrian = dalamBulan.filter((p) => cocokTahap(posisiAntrian(p), tahap));
   const pilihanTahap: { nilai: Tahap; label: string; nada?: "merah" }[] = [
     { nilai: "perlu", label: "Perlu diproses" },
     { nilai: "lewat", label: "Lewat batas", nada: "merah" },
@@ -410,6 +437,8 @@ function DashboardMain() {
 
   // Menyaring antrian lalu menggulir ke panelnya.
   const bukaAntrian = (t: Tahap, bulan: string | null = null) => () => {
+    setTampilan("daftar");
+    setCariAntrian("");
     setTahap(t);
     setFilterMonth(bulan);
     document.getElementById("antrian-kerja")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -503,6 +532,68 @@ function DashboardMain() {
       nomorSkBaru: p.suratNomorSurat,
       tanggalSkBaru: p.suratTanggalSurat ?? null,
     });
+  }
+
+  /** Kartu papan: isi yang sama dengan baris daftar, ditambah kolom tujuan yang boleh untuk diseret. */
+  function kartuPapan(p: PegawaiJatuhTempo): KartuPapan {
+    const pos = posisiAntrian(p);
+    const kolom = kolomPapan(pos);
+    const hari = daysDiff(p.deadlineSDM);
+    const satker = p.unitKerja?.trim() ? cariSatker(p.unitKerja) : SATKER_KANWIL;
+    const dibatalkan = p.statusKGB === "ditolak";
+    const buka = pos === "terkunci" ? jendelaProsesKgb(p.tmtKgbBerikutnya)?.unlockDate : null;
+    const tombol = aksiBaris(p, pos);
+    const pindah: Partial<Record<KolomPapan, string>> = {};
+    if (kolom === "input") {
+      pindah.proses = dibatalkan ? "Input ulang KGB" : "Input KGB";
+      if (pos === "lewat") pindah.selesai = "Arsip, SK sudah terbit di luar SIM-KGB";
+    }
+    if (kolom === "proses" && p.kgbId) {
+      pindah.keuangan = p.skSudahDibuat ? "Unggah SK TTE" : "Buat SK dulu";
+      pindah.input = "Batalkan proses";
+    }
+    const tanda: NonNullable<KartuPapan["tanda"]> = [];
+    if (kolom === "proses") tanda.push(p.skSudahDibuat ? { teks: "SK dibuat, tunggu TTE", nada: "navy" } : { teks: "Perlu buat SK" });
+    if (dibatalkan) tanda.push({ teks: "Dibatalkan", nada: "merah" });
+    if (p.flagRapelan && pos !== "selesai") tanda.push({ teks: "Berpotensi rapelan", nada: "kuning" });
+    if (p.statusHukdis) tanda.push({ teks: `Hukdis${p.tanggalHukdisBerakhir ? ` s.d. ${formatTanggalId(p.tanggalHukdisBerakhir, { day: "numeric", month: "short" })}` : ""}`, nada: "merah" });
+    const [catatan, catatanNada]: [string | undefined, Nada | undefined] =
+      pos === "terkunci" ? [buka ? `dibuka ${formatTanggalId(buka, { day: "numeric", month: "short" })}` : "belum dibuka", undefined]
+      : pos === "keuangan" || pos === "selesai" ? [undefined, undefined]
+      : hari < 0 ? [`lewat batas ${-hari} hari`, "merah"]
+      : hari <= 7 ? [hari === 0 ? "batas hari ini" : `batas ${hari} hari lagi`, "merah"]
+      : [`batas ${formatTanggalId(p.deadlineSDM, { day: "numeric", month: "short" })}`, undefined];
+    return {
+      id: p.id,
+      kolom,
+      nama: p.nama,
+      sub: `${p.golonganRuang} · ${satker ? namaSingkatSatker(satker) : p.unitKerja}`,
+      judulSub: p.unitKerja ?? undefined,
+      tmt: `TMT ${formatTanggalId(p.tmtKgbBerikutnya, { month: "short", year: "numeric" })}`,
+      catatan,
+      catatanNada,
+      nada: pos === "lewat" ? "merah" : undefined,
+      tanda,
+      aksi: tombol ? <div className="dsb-aksi" style={{ flexWrap: "wrap", justifyContent: "flex-start" }}>{tombol}</div> : undefined,
+      pindah,
+    };
+  }
+
+  /** Kartu dilepas di kolom lain: buka modal aksi yang sesuai; datanya baru berubah setelah modal dikonfirmasi. */
+  function pindahKartu(id: string, ke: KolomPapan) {
+    const p = pegawaiJatuhTempo.find((x) => x.id === id);
+    if (!p) return;
+    const dari = kolomPapan(posisiAntrian(p));
+    if (dari === "input" && ke === "proses") {
+      setModal({ jenis: "input", pegawai: pegawaiModal(p), ulang: p.statusKGB === "ditolak", dasarAwal: dasarAwalInputKgb(p) });
+    } else if (dari === "input" && ke === "selesai" && posisiAntrian(p) === "lewat") {
+      setModal({ jenis: "arsip", pegawai: pegawaiModal(p) });
+    } else if (dari === "proses" && ke === "keuangan" && p.kgbId) {
+      if (p.skSudahDibuat) setModal({ jenis: "unggah_sk", kgbId: p.kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) });
+      else bukaBuatSk(p);
+    } else if (dari === "proses" && ke === "input" && p.kgbId) {
+      setModal({ jenis: "batalkan", kgbId: p.kgbId, pegawai: pegawaiModal(p) });
+    }
   }
 
   /** Tombol aksi baris antrian menurut posisinya. */
@@ -613,7 +704,7 @@ function DashboardMain() {
         <section id="antrian-kerja" className="dsb-panel dsb-antrian dsb-tujuan dsb-muncul" style={{ "--i": 1 } as React.CSSProperties} aria-labelledby="judul-antrian">
           <div className="dsb-panel-kepala">
             <h2 id="judul-antrian" className="dsb-panel-judul">
-              Antrian kerja KGB <small>{antrian.length}</small>
+              Antrian kerja KGB <small>{tampilan === "papan" ? dalamBulan.length : antrian.length}</small>
             </h2>
             <div className="flex flex-wrap items-center gap-2">
               {filterMonth && (
@@ -622,6 +713,21 @@ function DashboardMain() {
                   <svg aria-hidden="true" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 </button>
               )}
+              <div className="dsb-segmen" role="group" aria-label="Tampilan antrian">
+                <button type="button" aria-pressed={tampilan === "daftar"} onClick={() => pilihTampilan("daftar")} title="Tampilan daftar">
+                  <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
+                  Daftar
+                </button>
+                <button type="button" aria-pressed={tampilan === "papan"} onClick={() => pilihTampilan("papan")} title="Tampilan papan (kanban)">
+                  <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="5" height="16" rx="1" /><rect x="10" y="4" width="5" height="10" rx="1" /><rect x="17" y="4" width="4" height="13" rx="1" /></svg>
+                  Papan
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="dsb-alat" style={{ padding: "10px 16px", borderBottom: "1px solid var(--ln2)" }}>
+            {tampilan === "daftar" ? (
               <div className="dsb-segmen" role="group" aria-label="Saring tahap">
                 {pilihanTahap.map((t) => (
                   <button key={t.nilai} type="button" aria-pressed={tahap === t.nilai} data-nada={t.nada} onClick={() => setTahap(t.nilai)}>
@@ -629,10 +735,34 @@ function DashboardMain() {
                   </button>
                 ))}
               </div>
-            </div>
+            ) : (
+              <span className="dsb-kecil" style={{ fontSize: "12.5px", color: "var(--dt4)" }}>
+                <span className="dsb-hanya-lebar">Seret kartu ke kolom lain untuk membuka aksinya. Klik judul kolom untuk menciutkan.</span>
+                <span className="dsb-hanya-sempit">Geser mendatar untuk kolom lain; aksi ada di tombol kartu.</span>
+              </span>
+            )}
+            <input
+              type="search"
+              className="dsb-cari"
+              style={{ flex: "0 1 220px", marginLeft: "auto" }}
+              aria-label="Cari di antrian"
+              placeholder="Cari nama, NIP, satker"
+              value={cariAntrian}
+              onChange={(e) => setCariAntrian(e.target.value)}
+            />
           </div>
 
-          {antrian.length === 0 ? (
+          {tampilan === "papan" ? (
+            <PapanAntrian
+              className="dsb-antrian-gulir"
+              kartu={dalamBulan.map(kartuPapan)}
+              keterangan={{
+                input: (() => { const n = dalamBulan.filter((p) => posisiAntrian(p) === "lewat").length; return n > 0 ? `${n} lewat batas` : undefined; })(),
+                proses: (() => { const n = dalamBulan.filter((p) => posisiAntrian(p) === "diproses" && p.skSudahDibuat).length; return n > 0 ? `${n} tunggu TTE` : undefined; })(),
+              }}
+              onPindah={pindahKartu}
+            />
+          ) : antrian.length === 0 ? (
             <p className="dsb-kosong" style={{ padding: "48px 16px" }}>
               {tahap === "perlu" || tahap === "lewat" ? "Tidak ada KGB yang perlu diproses untuk saringan ini." : "Tidak ada KGB untuk saringan ini."}
             </p>
@@ -689,7 +819,7 @@ function DashboardMain() {
             </div>
           )}
           <div className="dsb-kaki">
-            <span>Urut: lewat batas, sedang diproses, lalu TMT terdekat.</span>
+            <span>{tampilan === "papan" ? "Aksi tetap lewat konfirmasi di jendela aksi; tombol di kartu melakukan hal yang sama." : "Urut: lewat batas, sedang diproses, lalu TMT terdekat."}</span>
             <Link href={tahap === "lewat" ? "/dashboard/kgb?rapelan=1" : "/dashboard/kgb"} className="dsb-tautan">Buka Proses KGB →</Link>
           </div>
         </section>

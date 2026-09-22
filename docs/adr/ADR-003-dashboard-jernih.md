@@ -125,3 +125,7 @@ Pemilik meminta dashboard diselaraskan dengan tema baru, dimulai dari halaman ut
     - Kolom kanan: daftar bulan TMT (komponen `DaftarBulanRekon`, juga di dashboard Keuangan) dan umpan konfirmasi terakhir.
     - Halaman menerima `?bulan=yyyy-mm`.
 28. **Riwayat Aktivitas Keuangan**: log konfirmasi dikelompokkan per hari dengan saringan rapelan/konfirmasi cepat dan unduhan CSV; rekap dasar Gaji Web per bulan TMT dengan jendela rekon dan tautan ke bulan itu di halaman Keuangan; riwayat KGB per pegawai yang dapat dibuka. API log memuat sampai 500 entri. Halaman menerima `?tab=rekap|kgb`.
+29. **Antrian kerja punya tampilan Papan (kanban)** di samping Daftar; pilihannya diingat per peramban. Pencarian (nama, NIP, satker) berlaku untuk keduanya.
+    - Kolom mengikuti alur: Belum dibuka, Perlu diinput (keterangan jumlah lewat batas), Sedang diproses (jumlah tunggu TTE), Di keuangan, Selesai. Setiap kolom bisa diciutkan menjadi lajur sempit; bawaannya Belum dibuka dan Selesai diciutkan.
+    - Kartu yang diseret ke kolom lain membuka modal aksi yang sama dengan tombolnya: ke Sedang diproses = Input KGB; ke Di keuangan = Unggah SK TTE (atau Buat SK bila belum dibuat); kembali ke Perlu diinput = Batalkan; KGB lewat batas ke Selesai = Arsip. Kolom yang tidak sah diredupkan selama menyeret. Data baru berubah setelah modal dikonfirmasi.
+    - Setiap aksi juga ada sebagai tombol di kartu, untuk papan ketik dan layar sentuh. Di ponsel kolom digeser mendatar satu per satu.
