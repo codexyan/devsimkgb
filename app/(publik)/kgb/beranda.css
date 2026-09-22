@@ -892,9 +892,11 @@ html[data-muncul="siap"] .pub .beranda [data-muncul]:not([data-muncul="1"]) {
 }
 
 /* Kartu kedelapan: ajakan ke panduan, satu-satunya kartu tinta di kisi */
+/* .al-kartu memasang latar --kartu (di dalam .pub-navy bernilai kaca), jadi latar navy dipasang ulang di sini */
 .pub .al-ajak {
   justify-content: space-between;
   border-color: transparent;
+  background: var(--latar-navy);
   color: rgba(255, 255, 255, 0.72);
 }
 

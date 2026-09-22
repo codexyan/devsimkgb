@@ -77,6 +77,11 @@
   --accent-hover: #0c1a38;
   --navy: #102a63;
   --navy-hover: #1b3d86;
+  /* Latar permukaan navy; token tersendiri agar komponen yang punya latar sendiri (.al-kartu) bisa memakainya */
+  --latar-navy:
+    radial-gradient(110% 80% at 88% -12%, rgba(84, 132, 232, 0.5), transparent 58%),
+    radial-gradient(90% 70% at -8% 112%, rgba(38, 84, 196, 0.42), transparent 62%),
+    linear-gradient(158deg, #07132f 0%, #0c2050 46%, #14306f 100%);
   --on-accent: #ffffff;
   --emas: #765600;
   --emas-isi: #f3c63f;
@@ -131,10 +136,7 @@
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  background:
-    radial-gradient(110% 80% at 88% -12%, rgba(84, 132, 232, 0.5), transparent 58%),
-    radial-gradient(90% 70% at -8% 112%, rgba(38, 84, 196, 0.42), transparent 62%),
-    linear-gradient(158deg, #07132f 0%, #0c2050 46%, #14306f 100%);
+  background: var(--latar-navy);
   color: var(--text);
 }
 
