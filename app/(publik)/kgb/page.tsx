@@ -3,13 +3,11 @@ import Link from "next/link";
 import { JAM_LAYANAN } from "@/lib/jamLayanan";
 import { jadwalPengusulan } from "@/lib/jadwalPengusulan";
 import { STATUS_KGB, type StatusKgb } from "@/lib/statusKgb";
-import { getGajiPokok, getPangkat, kalkulasiKGB, tanggaGaji } from "@/lib/tabelGaji";
+import { tanggaGaji } from "@/lib/tabelGaji";
 import { formatTanggalId } from "@/lib/waktu";
-import GarisTangga from "../GarisTangga";
 import { StatusLayanan } from "../JamLayanan";
 import Kata from "../Kata";
 import CekStatus from "./CekStatus";
-import PerjalananUsulan, { type ContohUsulan } from "./PerjalananUsulan";
 import PenjelajahTangga from "./tangga/PenjelajahTangga";
 import "./beranda.css";
 
@@ -22,38 +20,75 @@ export const metadata: Metadata = {
 // Jadwal pengusulan dihitung dari tanggal hari ini (WITA), jadi halaman dirender per permintaan.
 export const dynamic = "force-dynamic";
 
-/* Contoh kasus yang sama dengan panduan: usulan Rutan Kelas IIB Rantau untuk eks CPNS golongan II/a. */
-const rupiah = (n: number) => "Rp" + new Intl.NumberFormat("id-ID").format(n);
-const KASUS = kalkulasiKGB({
-  golonganRuang: "II/a",
-  mkgTahun: 0,
-  mkgBulan: 0,
-  tmtKgbBerikutnya: new Date(2026, 5, 1),
-  tmtKgbTerakhir: new Date(2025, 5, 1),
-});
-const CONTOH: ContohUsulan = {
-  satker: "Rutan Kelas IIB Rantau",
-  golongan: `${getPangkat("II/a")} (II/a)`,
-  gajiLama: rupiah(getGajiPokok("II/a", 0, 0)),
-  gajiBaru: rupiah(KASUS.gajiPokokBaru),
-  masaKerjaBaru: `${KASUS.mkgTahunBaru} tahun ${KASUS.mkgBulanBaru} bulan`,
-  tmt: formatTanggalId(KASUS.tmtKgbBaru),
-  tmtBerikutnya: formatTanggalId(KASUS.tmtKgbBerikutnya),
-};
+/* Tujuh langkah satu usulan KGB, sama dengan alur singkat di panduan. */
+const LANGKAH: { judul: string; pelaksana: string; isi: string; status?: StatusKgb }[] = [
+  {
+    judul: "UPT mengirim surat permohonan",
+    pelaksana: "Admin kepegawaian dan Kepala UPT",
+    isi: "Surat berisi daftar pegawai yang diusulkan beserta lampirannya, ditandatangani elektronik dan dikirim lewat Srikandi kepada Kepala Kanwil.",
+  },
+  {
+    judul: "Agenda dan disposisi",
+    pelaksana: "Tata Usaha, Kepala Kanwil, Kabag TU dan Umum",
+    isi: "Tata Usaha mencatat surat pada Lembar Disposisi. Kepala Kanwil memberi disposisi yang diteruskan kepada Ketua Tim SDM.",
+  },
+  {
+    judul: "Input KGB dan buat SK",
+    pelaksana: "Tim SDM Kanwil",
+    isi: "Data dicocokkan dengan lampiran. Masa kerja dan gaji pokok baru dihitung dari tabel gaji, lalu SK dibuat di SIM-KGB.",
+    status: "sedang_diproses",
+  },
+  {
+    judul: "Tanda tangan elektronik",
+    pelaksana: "Kepala Kanwil, Plh, Plt, atau Dirjen",
+    isi: "SK versi Srikandi ditandatangani secara elektronik oleh pejabat yang berwenang pada tanggal SK.",
+  },
+  {
+    judul: "Pengiriman SK",
+    pelaksana: "Tim SDM Kanwil",
+    isi: "SK yang sudah ditandatangani dikirim kepada UPT pengusul, bagian keuangan UPT, dan KPPN mitra satker.",
+  },
+  {
+    judul: "Unggah SK ke SIM-KGB",
+    pelaksana: "Tim SDM Kanwil",
+    isi: "Berkas PDF SK yang sudah ditandatangani diunggah lewat tombol Unggah SK TTE.",
+    status: "menunggu_keuangan",
+  },
+  {
+    judul: "Konfirmasi keuangan",
+    pelaksana: "Bagian keuangan",
+    isi: "SK diperiksa dan dikonfirmasi, termasuk bila ada rapelan. SIM-KGB lalu menjadwalkan KGB berikutnya.",
+    status: "selesai",
+  },
+];
+
+const FAKTA = [
+  { nilai: "2 tahun", label: "Selang kenaikan gaji berkala" },
+  { nilai: "7 tahap", label: "Dari surat UPT sampai konfirmasi keuangan" },
+  { nilai: "PP 5/2024", label: "Dasar tabel gaji pokok yang dipakai" },
+];
 
 const URUTAN_STATUS: StatusKgb[] = ["belum_diproses", "sedang_diproses", "menunggu_keuangan", "selesai"];
 
 const bulanTahun = (d: Date) => formatTanggalId(d, { month: "long", year: "numeric" });
 const tanggalPendek = (d: Date) => formatTanggalId(d, { day: "numeric", month: "short", year: "numeric" });
 const tanggalBulan = (d: Date) => formatTanggalId(d, { day: "numeric", month: "short" });
+const dua = (n: number) => String(n).padStart(2, "0");
+
+const Panah = (
+  <svg className="pub-btn-panah" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <path d="M3 8h10M9 4l4 4-4 4" />
+  </svg>
+);
 
 function Status({ status }: { status: StatusKgb }) {
   const info = STATUS_KGB[status];
   return <span className={`pub-status ${info.kelas}`}>{info.label}</span>;
 }
 
-function KepalaBagian({ nomor, id, judul, keterangan, aksi }: {
+function KepalaBagian({ nomor, label, id, judul, keterangan, aksi }: {
   nomor: number;
+  label: string;
   id: string;
   judul: string;
   keterangan: string;
@@ -62,9 +97,9 @@ function KepalaBagian({ nomor, id, judul, keterangan, aksi }: {
   return (
     <div className="sx-kepala" data-muncul="">
       <div className="sx-kiri">
-        <p className="sx-nomor" aria-hidden="true">
-          <GarisTangga anak={nomor} className="sx-nomor-garis" />
-          {String(nomor).padStart(2, "0")}
+        <p className="pub-eyebrow">
+          <span className="pub-eyebrow-nomor">{dua(nomor)}</span>
+          {label}
         </p>
         <h2 id={id} className="sx-judul">
           <Kata teks={judul} />
@@ -72,7 +107,7 @@ function KepalaBagian({ nomor, id, judul, keterangan, aksi }: {
       </div>
       <div className="sx-kanan">
         <p className="sx-ket">{keterangan}</p>
-        {aksi && <div className="sx-aksi">{aksi}</div>}
+        {aksi}
       </div>
     </div>
   );
@@ -84,31 +119,47 @@ export default function HalamanBeranda() {
 
   return (
     <div className="beranda">
-      {/* ── Panggung: cek status dan tangga gaji ─────────────────────────── */}
-      <section id="beranda" className="tg" aria-labelledby="tg-judul">
-        <div className="pub-container tg-kisi">
-          <div className="tg-teks">
-            <p className="tg-atas masuk" style={{ "--d": 0 } as React.CSSProperties}>
-              Kenaikan gaji berkala, Kanwil Ditjenpas Kalsel
-            </p>
-            <h1 id="tg-judul" className="tg-judul">
-              <Kata teks="Setiap dua tahun, satu anak tangga." jeda={1} />
-            </h1>
-            <p className="tg-lead masuk" style={{ "--d": 220 } as React.CSSProperties}>
-              Cek status KGB dengan NIP, lalu lihat kapan anak tangga berikutnya tiba. Untuk pegawai Kanwil Ditjenpas
-              Kalimantan Selatan dan UPT di wilayahnya.
-            </p>
-            <div className="tg-cari masuk" style={{ "--d": 300 } as React.CSSProperties}>
-              <CekStatus />
+      {/* ── Pembuka: cek status dan tangga gaji ──────────────────────────── */}
+      <section id="beranda" className="hr" aria-labelledby="hr-judul">
+        <div className="pub-container">
+          <div className="hr-kisi">
+            <div className="hr-teks">
+              <p className="pub-eyebrow masuk" style={{ "--d": 0 } as React.CSSProperties}>
+                Kenaikan gaji berkala · Kanwil Ditjenpas Kalsel
+              </p>
+              <h1 id="hr-judul" className="hr-judul">
+                <span className="hr-judul-a">
+                  <Kata teks="Setiap dua tahun," jeda={1} />
+                </span>{" "}
+                <span className="hr-judul-b">
+                  <Kata teks="satu anak tangga." jeda={4} />
+                </span>
+              </h1>
+              <p className="hr-lead masuk" style={{ "--d": 220 } as React.CSSProperties}>
+                Cek status KGB dengan NIP, lalu lihat kapan anak tangga berikutnya tiba. Untuk pegawai Kanwil Ditjenpas
+                Kalimantan Selatan dan UPT di wilayahnya.
+              </p>
+              <div className="hr-cari masuk" style={{ "--d": 300 } as React.CSSProperties}>
+                <CekStatus />
+              </div>
+              <p className="hr-bantu masuk" style={{ "--d": 380 } as React.CSSProperties}>
+                Admin UPT yang akan mengusulkan? <Link href="/panduan#untuk-upt">Baca panduan menyiapkan surat</Link>
+              </p>
             </div>
-            <p className="tg-bantu masuk" style={{ "--d": 380 } as React.CSSProperties}>
-              Admin UPT yang akan mengusulkan? <Link href="/panduan#untuk-upt">Baca panduan menyiapkan surat</Link>
-            </p>
+
+            <div className="hr-visual masuk" style={{ "--d": 160 } as React.CSSProperties}>
+              <PenjelajahTangga baris={tangga} />
+            </div>
           </div>
 
-          <div className="tg-visual masuk" style={{ "--d": 140 } as React.CSSProperties}>
-            <PenjelajahTangga baris={tangga} />
-          </div>
+          <dl className="hr-fakta">
+            {FAKTA.map((f, i) => (
+              <div key={f.nilai} className="masuk" style={{ "--d": 460 + i * 70 } as React.CSSProperties}>
+                <dt>{f.label}</dt>
+                <dd>{f.nilai}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
@@ -117,39 +168,65 @@ export default function HalamanBeranda() {
         <div className="pub-container">
           <KepalaBagian
             nomor={1}
+            label="Alur"
             id="judul-alur"
             judul="Perjalanan satu usulan"
-            keterangan="Ikuti satu surat usulan KGB dari UPT sampai SK dikonfirmasi keuangan. Dokumennya berubah seiring langkah yang sedang dibaca."
-            aksi={
-              <Link href="/panduan#ringkasan" className="sx-tautan">
-                Alur lengkap di panduan
-              </Link>
-            }
+            keterangan="Dari surat UPT sampai SK dikonfirmasi keuangan. Status KGB berubah di tiga titik sepanjang jalan."
           />
-          <PerjalananUsulan contoh={CONTOH} />
+
+          <ol className="al">
+            {LANGKAH.map((l, i) => (
+              <li key={l.judul} className="al-kartu" data-muncul="" style={{ "--i": i } as React.CSSProperties}>
+                <span className="al-nomor" aria-hidden="true">
+                  {dua(i + 1)}
+                </span>
+                <h3 className="al-judul">
+                  <span className="pub-visually-hidden">Langkah {i + 1}: </span>
+                  {l.judul}
+                </h3>
+                <p className="al-pelaksana">{l.pelaksana}</p>
+                <p className="al-isi">{l.isi}</p>
+                {l.status && (
+                  <p className="al-status">
+                    <span>Status menjadi</span> <Status status={l.status} />
+                  </p>
+                )}
+              </li>
+            ))}
+            <li className="al-kartu al-ajak" data-muncul="" style={{ "--i": LANGKAH.length } as React.CSSProperties}>
+              <p className="al-ajak-judul">Tujuh langkah, satu SK.</p>
+              <p className="al-ajak-isi">Rincian tiap langkah, contoh surat, dan lembar disposisi ada di panduan.</p>
+              <Link href="/panduan#ringkasan" className="al-ajak-tautan">
+                Alur lengkap di panduan
+                {Panah}
+              </Link>
+            </li>
+          </ol>
         </div>
       </section>
 
       {/* ── Jadwal ───────────────────────────────────────────────────────── */}
-      <section id="jadwal" className="sx sx-jadwal" aria-labelledby="judul-jadwal">
+      <section id="jadwal" className="sx" aria-labelledby="judul-jadwal">
         <div className="pub-container">
           <KepalaBagian
             nomor={2}
+            label="Jadwal"
             id="judul-jadwal"
             judul="Jadwal pengusulan"
             keterangan="Dihitung dari hari ini. Kirim surat permohonan sebelum input untuk TMT itu dibuka, agar SK terbit tepat waktu."
             aksi={
               <Link href="/panduan#jadwal" className="sx-tautan">
                 Aturan jadwal
+                {Panah}
               </Link>
             }
           />
 
-          <ol className="jd-tangga" aria-label="Jadwal pengusulan untuk enam TMT KGB berikutnya">
+          <ol className="jd" aria-label="Jadwal pengusulan untuk enam TMT KGB berikutnya">
             {jadwal.map((b, i) => (
               <li
                 key={b.tmt.getTime()}
-                className="jd-anak"
+                className="jd-kartu"
                 data-keadaan={b.keadaan}
                 data-muncul=""
                 style={{ "--i": i } as React.CSSProperties}
@@ -196,24 +273,28 @@ export default function HalamanBeranda() {
       </section>
 
       {/* ── Arti status ──────────────────────────────────────────────────── */}
-      <section id="status" className="sx sx-status" aria-labelledby="judul-status">
+      <section id="status" className="sx" aria-labelledby="judul-status">
         <div className="pub-container">
           <KepalaBagian
             nomor={3}
+            label="Status"
             id="judul-status"
             judul="Arti status"
             keterangan="Status yang tampil saat NIP dicek, berurutan sesuai tahap usulan yang sedang berjalan."
             aksi={
               <Link href="/panduan#pertanyaan" className="sx-tautan">
                 Pertanyaan umum
+                {Panah}
               </Link>
             }
           />
 
-          <ol className="st-alur">
+          <ol className="st">
             {URUTAN_STATUS.map((s, i) => (
-              <li key={s} className="st-tahap" data-muncul="" style={{ "--i": i } as React.CSSProperties}>
-                <span className="st-titik" aria-hidden="true" />
+              <li key={s} className="st-kartu" data-muncul="" style={{ "--i": i } as React.CSSProperties}>
+                <span className="st-urut" aria-hidden="true">
+                  {i + 1}
+                </span>
                 <Status status={s} />
                 <p>{STATUS_KGB[s].keterangan}</p>
               </li>
@@ -243,7 +324,7 @@ export default function HalamanBeranda() {
       {/* ── Bantuan ──────────────────────────────────────────────────────── */}
       <section id="bantuan" className="bt" aria-labelledby="judul-bantuan">
         <div className="pub-container">
-          <div className="bt-kisi" data-muncul="">
+          <div className="bt-kartu" data-muncul="">
             <div className="bt-teks">
               <h2 id="judul-bantuan" className="bt-judul">
                 Butuh bantuan?
@@ -253,10 +334,11 @@ export default function HalamanBeranda() {
                 membaca panduan sebelum mengirim surat permohonan.
               </p>
               <div className="bt-aksi">
-                <Link href="/panduan" className="pub-btn">
+                <Link href="/panduan" className="bt-btn">
                   Baca panduan KGB
+                  {Panah}
                 </Link>
-                <Link href="/login" className="pub-btn-secondary">
+                <Link href="/login" className="bt-btn-kedua">
                   Masuk ke SIM-KGB
                 </Link>
               </div>

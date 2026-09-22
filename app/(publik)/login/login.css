@@ -1,36 +1,35 @@
 /* login.css: halaman masuk /login. Melengkapi publik.css; semua kelas berawalan lg-.
 
-   Dua kolom: panel tinta (identitas area petugas, garis tangga gaji yang tergores pelan) dan formulir di
-   kertas. Di layar sempit panel menjadi pita pendek di atas formulir. Formulir tetap satu-satunya fokus. */
+   Satu kartu dua kolom: panel pasir (identitas area petugas, garis tangga gaji yang tergores pelan) dan
+   formulir di kartu putih. Di layar sempit panel menjadi pita pendek di atas formulir. Formulir tetap
+   satu-satunya fokus. */
 
 .pub .pub-main:has(.lg) {
-  padding-block: calc(var(--nav) + clamp(1rem, 3vw, 2rem)) clamp(2rem, 5vw, 3.5rem);
+  padding-block: calc(var(--nav) + clamp(0.5rem, 2vw, 1.5rem)) clamp(2rem, 5vw, 3.5rem);
 }
 
 .pub .lg-kisi {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   min-height: calc(100svh - var(--nav) - 140px);
-  border: 1px solid var(--line);
-  border-radius: 22px;
+  padding: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-xl);
   background: var(--kartu);
-  overflow: hidden;
+  box-shadow: var(--bayang);
 }
 
 
-/* ── Panel tinta ───────────────────────────────────────────────────────── */
+/* ── Panel pasir ───────────────────────────────────────────────────────── */
 .pub .lg-sisi {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 32px;
   padding: clamp(28px, 4vw, 48px);
-  background: var(--ink);
-  color: #c9d0da;
-}
-
-.pub .lg-sisi :focus-visible {
-  outline-color: #ffffff;
+  border-radius: calc(var(--radius-xl) - 8px);
+  background: var(--pasir);
+  color: var(--text);
 }
 
 .pub .lg-sisi-atas {
@@ -39,6 +38,7 @@
   gap: 12px;
   font-size: 13px;
   line-height: 1.35;
+  color: var(--muted);
 }
 
 .pub .lg-sisi-atas img {
@@ -48,9 +48,11 @@
 
 .pub .lg-sisi-atas b {
   display: block;
-  font-size: 15px;
-  font-weight: 650;
-  color: #ffffff;
+  font-family: var(--huruf-judul);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 .pub .lg-tangga {
@@ -64,9 +66,10 @@
   overflow: visible;
 }
 
+/* Tiap golongan tergores dari kiri, berurutan; golongan tertinggi paling tegas */
 .pub .lg-tangga-baris path {
   fill: none;
-  stroke: #9aa6b6;
+  stroke: rgba(20, 21, 25, 0.28);
   stroke-width: 1.5;
   stroke-linejoin: round;
   stroke-dasharray: 1;
@@ -76,15 +79,21 @@
 }
 
 .pub .lg-tangga-baris:last-child path {
-  stroke: #ffffff;
+  stroke: var(--ink);
+  stroke-width: 2;
 }
 
 .pub .lg-tangga-baris text {
-  fill: #9aa6b6;
-  font-size: 13px;
+  fill: var(--muted);
+  font-size: 12px;
   opacity: 0;
   animation: lgLabel 600ms var(--ease) forwards;
   animation-delay: calc(1600ms + var(--i, 0) * 260ms);
+}
+
+.pub .lg-tangga-baris:last-child text {
+  fill: var(--ink);
+  font-weight: 500;
 }
 
 @keyframes lgGores {
@@ -101,19 +110,20 @@
 
 .pub .lg-tangga figcaption {
   margin-top: 14px;
-  font-size: 12.5px;
-  color: #9aa6b6;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
 }
 
 .pub .lg-sisi-teks {
-  max-width: 36ch;
+  max-width: 26ch;
   margin: 0;
   font-family: var(--huruf-judul);
-  font-size: clamp(1.3rem, 1rem + 0.8vw, 1.65rem);
-  font-weight: 420;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
-  color: #ffffff;
+  font-size: clamp(1.375rem, 1.1rem + 0.8vw, 1.75rem);
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+  color: var(--ink);
 }
 
 
@@ -122,7 +132,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(28px, 5vw, 64px) clamp(20px, 5vw, 64px);
+  padding: clamp(32px, 5vw, 64px) clamp(20px, 5vw, 64px);
 }
 
 .pub .lg-halaman {
@@ -130,31 +140,33 @@
 }
 
 .pub .lg-kolom {
-  max-width: 25rem;
+  width: 100%;
+  max-width: 26rem;
   margin-inline: auto;
 }
 
 .pub .lg-judul {
-  margin-bottom: 0.75rem;
-  font-size: clamp(2.2rem, 1.6rem + 1.8vw, 3rem);
+  margin-bottom: 0.9rem;
+  font-size: clamp(2.25rem, 1.5rem + 2vw, 3rem);
 }
 
 .pub .pub-lead.lg-lead {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.6rem;
   font-size: 1rem;
 }
 
 .pub .lg-publik {
   margin: 0 0 1.75rem;
   font-size: 0.9375rem;
-  color: var(--text);
+  color: var(--muted);
 }
 
-/* Formulir duduk langsung di kertas panel; panel bersama tidak perlu bingkai kedua. */
+/* Formulir sudah berada di kartu putih; panel bersama tidak perlu bingkai kedua */
 .pub .lg-kolom .pub-panel {
   padding: 0;
   border: 0;
   background: transparent;
+  box-shadow: none;
 }
 
 .pub .lg-form > .pub-field + .pub-field {
@@ -187,19 +199,20 @@
 
 .pub .lg-sandi .lg-toggle {
   position: absolute;
-  top: 5px;
-  right: 5px;
-  bottom: 5px;
+  top: 6px;
+  right: 6px;
+  bottom: 6px;
   min-height: 0;
   min-width: 6.75rem;
-  padding: 0 0.75rem;
+  padding: 0 0.85rem;
   border: 0;
-  border-radius: 7px;
+  border-radius: 10px;
+  background: var(--sunken);
   font-size: 0.875rem;
 }
 
 .pub .lg-sandi .lg-toggle:hover {
-  background: var(--sunken);
+  background: var(--pasir);
   transform: none;
 }
 
@@ -215,7 +228,7 @@
   content: "";
   width: 7px;
   height: 7px;
-  border-radius: 2px;
+  border-radius: 50%;
   background: var(--warn-line);
 }
 
@@ -225,14 +238,14 @@
 }
 
 .pub .lg-kirim {
-  margin-top: 1.5rem;
-  min-height: 52px;
+  margin-top: 1.75rem;
+  min-height: 54px;
 }
 
 .pub .lg-putar {
   width: 15px;
   height: 15px;
-  border: 2px solid rgba(15, 30, 51, 0.25);
+  border: 2px solid rgba(20, 21, 25, 0.25);
   border-top-color: var(--ink);
   border-radius: 50%;
   animation: lgPutar 700ms linear infinite;
@@ -254,9 +267,10 @@
 
 .pub .lg-dialog-judul {
   font-family: var(--huruf-judul);
-  font-size: 1.6rem;
-  font-weight: 450;
+  font-size: 1.75rem;
+  font-weight: 400;
   line-height: 1.15;
+  letter-spacing: -0.035em;
 }
 
 .pub .lg-dialog-aksi {
@@ -273,11 +287,13 @@
   .pub .lg-kisi {
     grid-template-columns: minmax(0, 1fr);
     min-height: 0;
+    border-radius: var(--radius-lg);
   }
 
   .pub .lg-sisi {
     gap: 18px;
     padding: 22px 22px 18px;
+    border-radius: calc(var(--radius-lg) - 8px);
   }
 
   .pub .lg-tangga svg {
@@ -290,6 +306,6 @@
   }
 
   .pub .lg-utama {
-    padding: 32px 20px 36px;
+    padding: 32px 14px 28px;
   }
 }

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Newsreader } from "next/font/google";
+import { Inter_Tight } from "next/font/google";
 import NavPublik from "./NavPublik";
 import KakiPublik from "./KakiPublik";
 import DokPublik from "./DokPublik";
@@ -7,13 +7,11 @@ import Muncul from "./Muncul";
 import "./publik.css";
 import "./kerangka.css";
 
-// Serif untuk judul: suara dokumen dinas (surat, SK) yang menjadi inti layanan KGB. Teks isi tetap Inter,
-// huruf yang sama dengan dashboard SIM-KGB.
-const hurufJudul = Newsreader({
+// Judul memakai sans rapat berbobot ringan: tenang dan jelas, sepasang dengan Inter (teks isi dan dashboard).
+const hurufJudul = Inter_Tight({
   subsets: ["latin"],
-  variable: "--font-serif",
-  style: ["normal", "italic"],
-  axes: ["opsz"],
+  variable: "--font-judul",
+  weight: ["300", "400", "500", "600"],
   display: "swap",
 });
 

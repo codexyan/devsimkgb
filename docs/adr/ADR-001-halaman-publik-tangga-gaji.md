@@ -1,6 +1,6 @@
 # ADR-001: Bahasa visual dan arsitektur halaman publik "Tangga gaji"
 
-**Status:** Diterima
+**Status:** Diterima, sebagian digantikan [ADR-002](ADR-002-halaman-publik-jernih.md) (tipografi, three.js, panggung alur)
 **Tanggal:** 18 September 2026
 **Penentu:** Pemilik SIM-KGB (Tim SDM Kanwil Ditjenpas Kalimantan Selatan)
 **Cakupan:** `/kgb`, `/tabel-gaji`, `/panduan`, `/login`

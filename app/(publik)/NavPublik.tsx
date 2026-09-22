@@ -22,9 +22,15 @@ const TAUTAN: Tautan[] = [
 
 const BAGIAN_BERANDA = ["beranda", "alur", "jadwal", "status", "bantuan"];
 
-/* Nav publik. Di puncak halaman bilahnya menyatu dengan latar; setelah digulir ia menjadi bilah melayang
-   dengan penanda emas di bawah tautan yang aktif dan garis kemajuan baca. Di layar sempit tautan pindah
-   ke lembar menu yang turun dari bilah. */
+/* Nav publik. Di puncak halaman bilahnya menyatu dengan latar; setelah digulir ia mendapat latar kaca dan
+   garis kemajuan baca. Titik kecil di bawah tautan menandai halaman atau bagian yang aktif. Di layar
+   sempit tautan pindah ke lembar menu yang turun dari bilah. */
+
+const Panah = (
+  <svg className="pub-btn-panah" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <path d="M3 8h10M9 4l4 4-4 4" />
+  </svg>
+);
 export default function NavPublik() {
   const pathname = usePathname();
   const diBeranda = pathname === "/" || pathname === "/kgb";
@@ -75,7 +81,7 @@ export default function NavPublik() {
     return () => pengamat.disconnect();
   }, [diBeranda, pathname]);
 
-  // Penanda emas bergeser ke tautan yang aktif.
+  // Titik penanda bergeser ke tengah tautan yang aktif.
   const posisikanTanda = useCallback(() => {
     const baris = barisRef.current;
     const tanda = tandaRef.current;
@@ -85,8 +91,7 @@ export default function NavPublik() {
       tanda.style.setProperty("--tampil", "0");
       return;
     }
-    tanda.style.setProperty("--x", `${aktif.offsetLeft + 12}px`);
-    tanda.style.setProperty("--w", `${Math.max(0, aktif.offsetWidth - 24)}`);
+    tanda.style.setProperty("--x", `${aktif.offsetLeft + aktif.offsetWidth / 2}px`);
     tanda.style.setProperty("--tampil", "1");
   }, []);
 
@@ -161,6 +166,7 @@ export default function NavPublik() {
 
           <Link href="/login" className="nv-masuk" aria-current={masukAktif ? "page" : undefined}>
             Masuk
+            {!masukAktif && Panah}
           </Link>
 
           <button
@@ -212,6 +218,7 @@ export default function NavPublik() {
             onClick={tutupMenu}
           >
             Masuk ke SIM-KGB
+            {Panah}
           </Link>
         </nav>
       </div>

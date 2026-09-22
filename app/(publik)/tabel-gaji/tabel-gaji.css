@@ -1,32 +1,19 @@
 /* tabel-gaji.css: halaman /tabel-gaji. Token dari ../publik.css. Semua kelas berawalan tb-.
 
-   Tabel adalah isi utamanya, jadi dekorasi dijaga minim: kertas, garis rambut, angka tabular. Emas
+   Tabel adalah isi utamanya, jadi dekorasi dijaga minim: kartu putih, garis rambut, angka tabular. Kuning
    hanya menandai sel yang berlaku untuk masa kerja yang diisi (posisi "Anda di sini"). */
 
 .pub .tb-kepala {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
   align-items: end;
-  gap: 18px clamp(32px, 6vw, 96px);
-  margin-bottom: clamp(36px, 5vw, 56px);
+  gap: 22px clamp(32px, 6vw, 96px);
+  margin-bottom: clamp(40px, 5vw, 64px);
 }
 
 .pub .tb-atas {
-  display: flex;
   grid-column: 1 / -1;
-  align-items: flex-end;
-  gap: 10px;
-  margin: 0;
-  font-size: 13.5px;
-  font-weight: 500;
-  line-height: 1;
-  color: var(--muted);
-}
-
-.pub .tb-atas-garis {
-  width: 30px;
-  height: 11px;
-  color: var(--ink);
+  justify-self: start;
 }
 
 .pub .tb-judul {
@@ -56,29 +43,27 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--line);
 }
 
+/* Tab golongan: kontrol segmen berbentuk pil, sorotan putih bergeser di antara empat kolom */
 .pub .tb-tab {
   position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--kartu);
+  border-radius: 999px;
+  background: var(--sunken);
 }
 
 .pub .tb-tab-tombol {
   position: relative;
   z-index: 1;
   min-height: 44px;
-  padding: 0 16px;
+  padding: 0 20px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 999px;
   background: transparent;
-  color: var(--text);
+  color: var(--muted);
   font: inherit;
   font-size: 14.5px;
   font-weight: 500;
@@ -87,38 +72,33 @@
   transition: color 300ms var(--ease);
 }
 
-.pub .tb-tab-tombol:hover {
-  color: var(--ink);
-}
-
-/* Teks menunggu latar tinta tiba dulu; kalau tidak, teks putih sempat berada di atas kertas terang. */
+.pub .tb-tab-tombol:hover,
 .pub .tb-tab-tombol[aria-selected="true"] {
-  color: #ffffff;
-  transition-delay: 360ms;
+  color: var(--ink);
 }
 
 .pub .tb-tab-tombol:focus-visible {
   outline-offset: 2px;
 }
 
-/* Latar tab aktif bergeser di antara empat kolom yang sama lebar */
 .pub .tb-tab-tanda {
   position: absolute;
   top: 4px;
   bottom: 4px;
   left: 4px;
   width: calc((100% - 8px) / 4);
-  border-radius: 9px;
-  background: var(--ink);
+  border-radius: 999px;
+  background: var(--kartu);
+  box-shadow: 0 1px 2px rgba(20, 21, 25, 0.08), 0 4px 12px -6px rgba(20, 21, 25, 0.2);
   transform: translate3d(calc(var(--k, 0) * 100%), 0, 0);
   transition: transform 600ms var(--ease-out);
 }
 
 .pub .tb-cari label {
   display: block;
-  margin-bottom: 6px;
+  margin: 0 0 8px 4px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink);
 }
 
@@ -126,10 +106,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 46px;
-  padding: 0 6px 0 12px;
+  min-height: 52px;
+  padding: 0 18px;
   border: 1px solid var(--field-line);
-  border-radius: 10px;
+  border-radius: 999px;
   background: var(--putih);
   color: var(--muted);
   font-size: 14px;
@@ -138,12 +118,12 @@
 
 .pub .tb-cari-bidang:focus-within {
   border-color: var(--ink);
-  box-shadow: 0 0 0 1px var(--ink);
+  box-shadow: 0 0 0 1px var(--ink), 0 0 0 5px rgba(20, 21, 25, 0.07);
 }
 
 .pub .tb-cari-bidang input {
   width: 5.5rem;
-  min-height: 44px;
+  min-height: 48px;
   border: 0;
   background: transparent;
   color: var(--ink);
@@ -157,25 +137,26 @@
 }
 
 .pub .tb-cari-hapus {
-  min-height: 36px;
-  padding: 0 10px;
+  min-height: 38px;
+  margin-right: -12px;
+  padding: 0 14px;
   border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--tinta);
+  border-radius: 999px;
+  background: var(--sunken);
+  color: var(--ink);
   font: inherit;
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .pub .tb-cari-hapus:hover {
-  background: var(--sunken);
+  background: var(--pasir);
 }
 
 .pub .tb-hasil {
   min-height: 3.2em;
-  margin: 14px 0 18px;
+  margin: 20px 0 18px;
   font-size: 14.5px;
   line-height: 1.7;
   color: var(--text);
@@ -190,7 +171,7 @@
 
 .pub .tb-hasil-butir b {
   margin-right: 4px;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--ink);
 }
 
@@ -205,9 +186,10 @@
 }
 
 .pub .tb-wadah {
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
   background: var(--kartu);
+  box-shadow: var(--bayang);
 }
 
 .pub .tb-wadah:focus-visible {
@@ -227,35 +209,36 @@
   position: sticky;
   top: calc(var(--nav) + 4px);
   z-index: 2;
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--line-strong);
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--line);
   background: var(--kartu);
   text-align: right;
   vertical-align: bottom;
 }
 
 .pub .tb-tabel thead th:first-child {
-  border-top-left-radius: 14px;
+  border-top-left-radius: var(--radius-lg);
 }
 
 .pub .tb-tabel thead th:last-child {
-  border-top-right-radius: 14px;
+  border-top-right-radius: var(--radius-lg);
 }
 
 .pub .tb-kode {
   display: block;
   font-family: var(--huruf-judul);
-  font-size: 1.35rem;
-  font-weight: 450;
+  font-size: 1.5rem;
+  font-weight: 400;
   line-height: 1.1;
+  letter-spacing: -0.035em;
   color: var(--ink);
 }
 
 .pub .tb-pangkat {
   display: block;
-  margin-top: 2px;
+  margin-top: 3px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.3;
   color: var(--muted);
 }
@@ -266,13 +249,15 @@
 }
 
 .pub .tb-tabel thead .tb-mkg {
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--muted);
 }
 
 .pub .tb-tabel tbody :is(th, td) {
-  padding: 9px 16px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--line-soft);
   text-align: right;
   white-space: nowrap;
@@ -287,8 +272,16 @@
   border-bottom: 0;
 }
 
+.pub .tb-tabel tbody tr:last-child th {
+  border-bottom-left-radius: var(--radius-lg);
+}
+
+.pub .tb-tabel tbody tr:last-child td:last-child {
+  border-bottom-right-radius: var(--radius-lg);
+}
+
 .pub .tb-tabel tbody th {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink);
   text-align: left;
 }
@@ -303,7 +296,7 @@
 
 /* Silang sorot: baris dan kolom di bawah kursor */
 .pub .tb-tabel tbody tr:hover :is(th, td) {
-  background: rgba(15, 30, 51, 0.035);
+  background: rgba(20, 21, 25, 0.028);
 }
 
 .pub .tb-tabel:has(td[data-k="0"]:hover) td[data-k="0"],
@@ -311,11 +304,11 @@
 .pub .tb-tabel:has(td[data-k="2"]:hover) td[data-k="2"],
 .pub .tb-tabel:has(td[data-k="3"]:hover) td[data-k="3"],
 .pub .tb-tabel:has(td[data-k="4"]:hover) td[data-k="4"] {
-  background: rgba(15, 30, 51, 0.035);
+  background: rgba(20, 21, 25, 0.028);
 }
 
 .pub .tb-tabel tbody td[data-gaji]:hover {
-  background: rgba(15, 30, 51, 0.08);
+  background: rgba(20, 21, 25, 0.07);
   color: var(--ink);
 }
 
@@ -366,11 +359,11 @@
 
   .pub .tb-tabel thead th {
     top: 0;
-    padding: 12px 10px 10px;
+    padding: 14px 12px 10px;
   }
 
   .pub .tb-tabel tbody :is(th, td) {
-    padding: 8px 10px;
+    padding: 9px 12px;
   }
 
   .pub .tb-tabel .tb-mkg {
@@ -386,54 +379,59 @@
   }
 
   .pub .tb-kode {
-    font-size: 1.15rem;
+    font-size: 1.25rem;
   }
 }
 
 
 /* ── Cara membaca ──────────────────────────────────────────────────────── */
 .pub .tb-catatan {
-  display: grid;
-  grid-template-columns: minmax(0, 11rem) minmax(0, 1fr);
-  gap: 16px clamp(28px, 5vw, 72px);
-  margin-top: clamp(56px, 8vw, 96px);
-  padding-top: 26px;
-  border-top: 1px solid var(--line);
+  margin-top: clamp(64px, 9vw, 112px);
 }
 
 .pub .tb-catatan-judul {
-  margin: 0;
+  margin: 0 0 22px;
   font-family: var(--huruf-judul);
-  font-size: 1.6rem;
-  font-weight: 450;
-  line-height: 1.15;
+  font-size: clamp(1.75rem, 1.3rem + 1.3vw, 2.375rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
 }
 
 .pub .tb-catatan ul {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px clamp(24px, 4vw, 48px);
+  gap: 14px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.pub .tb-catatan li {
+  padding: 24px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--kartu);
+}
+
 .pub .tb-catatan h3 {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
+  font-family: var(--huruf-judul);
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
   color: var(--ink);
 }
 
 .pub .tb-catatan p {
-  margin: 6px 0 0;
-  font-size: 15px;
+  margin: 8px 0 0;
+  font-size: 14.5px;
   line-height: 1.65;
 }
 
 @media (max-width: 960px) {
-  .pub .tb-catatan,
   .pub .tb-catatan ul {
     grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
   }
 }

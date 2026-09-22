@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { tanggaGaji } from "@/lib/tabelGaji";
-import GarisTangga from "../GarisTangga";
 import Kata from "../Kata";
 import TabelGaji from "./TabelGaji";
 import "./tabel-gaji.css";
@@ -16,10 +15,7 @@ export default function HalamanTabelGaji() {
   return (
     <div className="pub-container tb">
       <header className="tb-kepala">
-        <p className="tb-atas masuk">
-          <GarisTangga anak={3} className="tb-atas-garis" />
-          Lampiran PP Nomor 5 Tahun 2024
-        </p>
+        <p className="pub-eyebrow tb-atas masuk">Lampiran PP Nomor 5 Tahun 2024</p>
         <h1 className="pub-h1 tb-judul">
           <Kata teks="Daftar gaji pokok PNS" />
         </h1>

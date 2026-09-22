@@ -6,22 +6,18 @@
    dashboard tidak terpengaruh. Kerangka (nav, kaki, dok) ada di kerangka.css;
    halaman masing-masing punya berkas CSS sendiri.
 
-   ARAH: "Tangga gaji"
-   Layanan ini berurusan dengan surat, SK, dan tabel gaji. Bahasanya bahasa
-   arsip resmi: latar kertas hangat, tinta biru tua, judul serif (Newsreader)
-   yang bersuara seperti dokumen dinas, teks isi Inter yang sama dengan
-   dashboard. Motif anak tangga (garis yang naik bertahap) mewakili gaji
-   pokok yang naik setiap KGB. Hanya tema terang.
+   ARAH: "Jernih" (lihat docs/adr/ADR-002-halaman-publik-jernih.md)
+   Tenang, profesional, dan lapang: kanvas netral hangat, kartu putih
+   bersudut lembut, tinta hampir hitam, judul sans rapat berbobot ringan
+   (Inter Tight), teks isi Inter yang sama dengan dashboard. Tombol berbentuk
+   pil. Dekorasi hanya dari data (tangga gaji) dan ruang kosong. Hanya tema
+   terang.
 
-   Dial: ENERGY 2, RHYTHM 2, MOTION 3 di beranda (lanskap 3D, panggung
-   dokumen yang menempel), MOTION 2 di halaman lain.
-
-   WARNA (2 inti + 1 aksen)
-     tinta biru tua   judul, tombol utama, garis fokus
-     biru arsip       tautan dan tangga golongan di lanskap
-     emas (aksen)     hanya untuk "posisi Anda / sekarang": anak tangga yang
-                      dipilih, tautan nav yang aktif, jadwal yang sedang dibuka
-     Warna status (hijau, ungu, merah, kuning) hanya untuk label status.
+   WARNA (1 inti + 1 aksen)
+     tinta            judul, teks kuat, tombol utama, tautan, garis fokus
+     kuning (aksen)   hanya untuk "posisi Anda / sekarang": anak tangga yang
+                      dipilih, jadwal yang sedang dibuka, sel yang berlaku
+     Warna status (biru, ungu, hijau, merah, kuning) hanya untuk label status.
 
    GERAK
    Hanya transform dan opacity. --ease-out untuk gerak masuk, --ease untuk
@@ -29,22 +25,24 @@
    pengguna memilih prefers-reduced-motion.
 
    TOKEN (var(--nama))
-     --bg --bg-atas --kartu --putih --sunken  kertas, lembar, isian, cekung
+     --bg --bg-atas --kartu --putih --sunken --pasir  kanvas, permukaan, isian
      --line --line-soft --line-strong --field-line
      --ink --tinta --text --muted             judul, teks kuat, isi, sekunder
-     --accent --accent-hover                  biru arsip (tautan)
-     --emas --emas-isi --emas-lembut          teks emas AA, isian, latar
-     --info-bg --warn-* --ok-* --bad-* --wait-*
-     --radius-sm (8px) --radius (12px) --radius-lg (18px)
+     --accent --accent-hover                  tautan
+     --emas --emas-isi --emas-garis --emas-lembut  teks aksen AA, isian, garis, latar
+     --biru --info-bg --warn-* --ok-* --bad-* --wait-*
+     --radius-sm (10px) --radius (16px) --radius-lg (24px) --radius-xl (32px)
+     --bayang --bayang-angkat
      --ease --ease-out --ease-io --ease-spring
      --huruf-judul --huruf-isi
-     --kolom (1240px) --sisi --nav
+     --kolom (1200px) --sisi --nav
 
    KELAS BERSAMA
      .pub-container .pub-skip .pub-main .pub-transisi
      .kt .kt-isi (judul per kata)  .masuk (gerak masuk sekali)
+     .pub-eyebrow .pub-eyebrow-nomor (label kecil di atas judul)
      .pub-h1 .pub-lead .pub-h2(.pub-h2-flush) .pub-h3 .pub-prose .pub-meta
-     .pub-btn .pub-btn-secondary .pub-btn-text .pub-btn-block
+     .pub-btn .pub-btn-secondary .pub-btn-text .pub-btn-block .pub-btn-panah
      .pub-field .pub-label .pub-input .pub-hint .pub-field-error
      .pub-note .pub-note-warn .pub-note-bad .pub-note-title
      .pub-status (+ -belum -proses -keuangan -selesai -batal -rapelan)
@@ -57,49 +55,54 @@
 
 /* ── Token ─────────────────────────────────────────────────────────────── */
 .pub {
-  --bg: #f4f1ea;
-  --bg-atas: #f7f5ef;
-  --kartu: #fbf9f4;
+  --bg: #f5f3ee;
+  --bg-atas: #faf9f6;
+  --kartu: #ffffff;
   --putih: #ffffff;
-  --sunken: #ece7dd;
-  --line: #e0d9cc;
-  --line-soft: #e9e3d8;
-  --line-strong: #c7bdac;
-  --field-line: #857d6c;
-  --ink: #0f1e33;
-  --tinta: #16263d;
-  --text: #3a4250;
-  --muted: #5c6370;
-  --accent: #1f4e85;
-  --accent-hover: #163a64;
+  --sunken: #efece6;
+  --pasir: #e9e5dc;
+  --line: #e1ddd4;
+  --line-soft: #ebe8e1;
+  --line-strong: #cbc6bb;
+  --field-line: #8c877d;
+  --ink: #141519;
+  --tinta: #1d1f24;
+  --text: #45474e;
+  --muted: #696b72;
+  --accent: #141519;
+  --accent-hover: #45474e;
   --on-accent: #ffffff;
-  --emas: #86580a;
-  --emas-isi: #e2a526;
-  --emas-garis: #b37c10;
-  --emas-lembut: #f5e8c8;
-  --info-bg: #e6ecf3;
-  --warn-bg: #f6ecd4;
-  --warn-text: #74520a;
+  --emas: #765600;
+  --emas-isi: #f3c63f;
+  --emas-garis: #a37900;
+  --emas-lembut: #fbf0c9;
+  --biru: #2c4c84;
+  --info-bg: #e8edf7;
+  --warn-bg: #f9efd0;
+  --warn-text: #6f520a;
   --warn-line: #c99a3a;
-  --ok-bg: #e3efe6;
-  --ok-text: #1d6440;
-  --bad-bg: #f7e4e0;
-  --bad-text: #a4271b;
-  --wait-bg: #ebe7f3;
+  --ok-bg: #e2f0e5;
+  --ok-text: #1e673d;
+  --bad-bg: #f9e5e1;
+  --bad-text: #a2291e;
+  --wait-bg: #ece8f7;
   --wait-text: #56418f;
-  --backdrop: rgba(15, 30, 51, 0.34);
-  --radius-sm: 8px;
-  --radius: 12px;
-  --radius-lg: 18px;
+  --backdrop: rgba(20, 21, 25, 0.36);
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --bayang: 0 1px 2px rgba(20, 21, 25, 0.04), 0 10px 30px -18px rgba(20, 21, 25, 0.16);
+  --bayang-angkat: 0 1px 2px rgba(20, 21, 25, 0.05), 0 30px 60px -32px rgba(20, 21, 25, 0.28);
   --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-io: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-spring: cubic-bezier(0.34, 1.3, 0.6, 1);
-  --huruf-judul: var(--font-serif), "Iowan Old Style", Georgia, serif;
+  --huruf-judul: var(--font-judul), var(--font-inter), system-ui, sans-serif;
   --huruf-isi: var(--font-inter), system-ui, sans-serif;
-  --kolom: 1240px;
-  --sisi: clamp(16px, 5vw, 56px);
-  --nav: 80px;
+  --kolom: 1200px;
+  --sisi: clamp(20px, 5vw, 56px);
+  --nav: 76px;
   color-scheme: light;
 }
 
@@ -115,7 +118,7 @@
   color: var(--text);
   font-family: var(--huruf-isi);
   font-size: 1rem;
-  line-height: 1.7;
+  line-height: 1.65;
   letter-spacing: -0.006em;
   overflow-x: clip;
   -webkit-font-smoothing: antialiased;
@@ -125,7 +128,7 @@
 
 .pub :where(h1, h2, h3, h4, h5, h6) {
   color: var(--ink);
-  line-height: 1.25;
+  line-height: 1.2;
   text-wrap: balance;
 }
 
@@ -140,7 +143,7 @@
 .pub a {
   color: var(--accent);
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, currentColor 32%, transparent);
+  text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.24em;
   transition: color 320ms var(--ease), text-decoration-color 320ms var(--ease);
@@ -151,7 +154,7 @@
   text-decoration-color: currentColor;
 }
 
-/* Menimpa *:focus-visible di globals.css dengan garis tinta yang jelas di kertas */
+/* Menimpa *:focus-visible di globals.css dengan garis tinta yang jelas di kanvas */
 .pub :focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 3px;
@@ -166,10 +169,9 @@
 .pub code {
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
   font-size: 0.875em;
-  padding: 0.05em 0.35em;
-  border: 1px solid var(--line);
+  padding: 0.1em 0.4em;
   border-radius: 6px;
-  background: var(--kartu);
+  background: var(--sunken);
   color: var(--tinta);
   overflow-wrap: anywhere;
 }
@@ -194,7 +196,7 @@
 /* ── Kerangka isi ──────────────────────────────────────────────────────── */
 .pub .pub-container {
   width: 100%;
-  max-width: var(--kolom);
+  max-width: calc(var(--kolom) + var(--sisi) * 2);
   margin-inline: auto;
   padding-inline: var(--sisi);
 }
@@ -224,7 +226,7 @@
 
 .pub .pub-main {
   flex: 1 0 auto;
-  padding-block: calc(var(--nav) + clamp(2.5rem, 7vw, 5rem)) clamp(4.5rem, 10vw, 8rem);
+  padding-block: calc(var(--nav) + clamp(2.5rem, 7vw, 5.5rem)) clamp(5rem, 11vw, 9rem);
 }
 
 .pub .pub-main:has(> .pub-transisi > .beranda) {
@@ -239,7 +241,7 @@
 @keyframes pubMasuk {
   from {
     opacity: 0;
-    transform: translate3d(0, 14px, 0);
+    transform: translate3d(0, 12px, 0);
   }
 }
 
@@ -259,22 +261,22 @@
   display: inline-block;
   overflow: clip;
   vertical-align: top;
-  padding: 0.04em 0.06em 0.14em 0;
-  margin: -0.04em -0.06em -0.14em 0;
+  padding: 0.04em 0.06em 0.12em 0;
+  margin: -0.04em -0.06em -0.12em 0;
 }
 
 .pub .kt-isi {
   display: inline-block;
-  animation: pubKata 1100ms var(--ease-out) both;
-  animation-delay: calc(80ms + var(--i, 0) * 70ms);
+  animation: pubKata 1000ms var(--ease-out) both;
+  animation-delay: calc(60ms + var(--i, 0) * 55ms);
 }
 
 @keyframes pubKata {
   from {
     opacity: 0;
-    transform: translate3d(0, 105%, 0);
+    transform: translate3d(0, 100%, 0);
   }
-  35% {
+  40% {
     opacity: 1;
   }
 }
@@ -283,7 +285,53 @@
 html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   animation: none;
   opacity: 0;
-  transform: translate3d(0, 105%, 0);
+  transform: translate3d(0, 100%, 0);
+}
+
+
+/* ── Label kecil di atas judul ─────────────────────────────────────────── */
+.pub .pub-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 14px 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--kartu);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+}
+
+/* Tanpa nomor: titik kecil sebagai pengganti */
+.pub .pub-eyebrow:not(:has(.pub-eyebrow-nomor))::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--emas-isi);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--emas-isi) 28%, transparent);
+}
+
+.pub .pub-eyebrow-nomor {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 
@@ -291,10 +339,10 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 .pub .pub-h1 {
   margin: 0 0 1.25rem;
   font-family: var(--huruf-judul);
-  font-size: clamp(2.6rem, 1.5rem + 3.6vw, 4.6rem);
-  font-weight: 450;
+  font-size: clamp(2.5rem, 1.4rem + 3.6vw, 4.5rem);
+  font-weight: 400;
   line-height: 1.02;
-  letter-spacing: -0.024em;
+  letter-spacing: -0.04em;
   color: var(--ink);
 }
 
@@ -302,17 +350,17 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   margin: 0 0 1.5rem;
   max-width: 58ch;
   font-size: 1.125rem;
-  line-height: 1.7;
+  line-height: 1.6;
   color: var(--text);
 }
 
 .pub .pub-h2 {
   margin: 5rem 0 1.1rem;
   font-family: var(--huruf-judul);
-  font-size: clamp(1.9rem, 1.35rem + 1.7vw, 2.7rem);
-  font-weight: 450;
+  font-size: clamp(1.875rem, 1.3rem + 1.8vw, 2.75rem);
+  font-weight: 400;
   line-height: 1.08;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.035em;
   color: var(--ink);
 }
 
@@ -322,11 +370,12 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 
 .pub .pub-h3 {
   margin: 2.5rem 0 0.5rem;
-  font-size: 1.125rem;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: -0.015em;
-  color: var(--tinta);
+  font-family: var(--huruf-judul);
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 .pub .pub-prose {
@@ -376,14 +425,14 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   min-height: 48px;
-  padding: 0.625rem 1.3rem;
+  padding: 0.625rem 1.5rem;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 999px;
   font-family: inherit;
   font-size: 0.9375rem;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.01em;
   line-height: 1.25;
   text-align: center;
@@ -393,6 +442,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
     background-color 360ms var(--ease),
     border-color 360ms var(--ease),
     color 360ms var(--ease),
+    box-shadow 360ms var(--ease),
     transform 600ms var(--ease-out);
 }
 
@@ -403,23 +453,21 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 }
 
 .pub .pub-btn:hover {
-  background: #20375a;
-  border-color: #20375a;
+  background: #2c2e34;
+  border-color: #2c2e34;
   color: #fff;
-  transform: translate3d(0, -1px, 0);
 }
 
 .pub .pub-btn-secondary {
   background: transparent;
   border-color: var(--line-strong);
-  color: var(--tinta);
+  color: var(--ink);
 }
 
 .pub .pub-btn-secondary:hover {
   background: var(--kartu);
-  border-color: var(--field-line);
+  border-color: var(--ink);
   color: var(--ink);
-  transform: translate3d(0, -1px, 0);
 }
 
 .pub :is(.pub-btn, .pub-btn-secondary):active:not(:disabled) {
@@ -427,19 +475,35 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   transition-duration: 120ms;
 }
 
+/* Panah kecil di ujung tombol yang bergeser saat disorot */
+.pub .pub-btn-panah {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  transition: transform 600ms var(--ease-out);
+}
+
+.pub :is(.pub-btn, .pub-btn-secondary, a):hover > .pub-btn-panah {
+  transform: translate3d(3px, 0, 0);
+}
+
 .pub .pub-btn-text {
   min-height: 44px;
   padding-inline: 0.25rem;
+  border-radius: 8px;
   background: transparent;
-  color: var(--accent);
-  font-weight: 550;
+  color: var(--ink);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.24em;
 }
 
 .pub .pub-btn-text:hover {
   color: var(--accent-hover);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.24em;
+  text-decoration-color: currentColor;
 }
 
 .pub .pub-btn-block {
@@ -467,22 +531,22 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 .pub .pub-field {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.5rem;
 }
 
 .pub .pub-label {
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.4;
-  color: var(--tinta);
+  color: var(--ink);
 }
 
 .pub .pub-input {
   width: 100%;
-  min-height: 50px;
-  padding: 0.625rem 0.95rem;
+  min-height: 52px;
+  padding: 0.625rem 1rem;
   border: 1px solid var(--field-line);
-  border-radius: 10px;
+  border-radius: 14px;
   background: var(--putih);
   color: var(--ink);
   font-family: inherit;
@@ -503,7 +567,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 .pub .pub-input:focus-visible {
   outline: none;
   border-color: var(--ink);
-  box-shadow: 0 0 0 1px var(--ink), 0 0 0 5px rgba(15, 30, 51, 0.1);
+  box-shadow: 0 0 0 1px var(--ink), 0 0 0 5px rgba(20, 21, 25, 0.08);
 }
 
 .pub .pub-input[aria-invalid="true"] {
@@ -526,7 +590,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 .pub .pub-field-error {
   margin: 0;
   font-size: 0.875rem;
-  font-weight: 550;
+  font-weight: 500;
   line-height: 1.5;
   color: var(--bad-text);
 }
@@ -536,8 +600,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 .pub .pub-note,
 .pub .pub-note-warn,
 .pub .pub-note-bad {
-  padding: 1rem 1.2rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+  padding: 1.1rem 1.3rem;
   border-radius: var(--radius);
   background: var(--info-bg);
   color: var(--text);
@@ -545,12 +608,10 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 }
 
 .pub .pub-note-warn {
-  border-color: color-mix(in srgb, var(--warn-line) 40%, transparent);
   background: var(--warn-bg);
 }
 
 .pub .pub-note-bad {
-  border-color: color-mix(in srgb, var(--bad-text) 22%, transparent);
   background: var(--bad-bg);
 }
 
@@ -561,7 +622,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 .pub .pub-note-title {
   display: block;
   font-weight: 600;
-  color: var(--tinta);
+  color: var(--ink);
 }
 
 .pub .pub-note-warn .pub-note-title {
@@ -578,13 +639,13 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.12rem 0.55rem 0.12rem 0.5rem;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
+  padding: 0.18rem 0.7rem 0.18rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
   background: var(--kartu);
   color: var(--text);
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.005em;
   line-height: 1.5;
   white-space: nowrap;
@@ -594,54 +655,54 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   content: "";
   width: 6px;
   height: 6px;
-  border-radius: 2px;
+  border-radius: 50%;
   background: currentColor;
-  opacity: 0.8;
 }
 
 .pub .pub-status-belum {
   background: var(--kartu);
-  border-color: var(--line-strong);
+  border-color: var(--line);
   color: var(--muted);
 }
 
 .pub .pub-status-proses {
   background: var(--info-bg);
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-  color: var(--accent);
+  border-color: transparent;
+  color: var(--biru);
 }
 
 .pub .pub-status-keuangan {
   background: var(--wait-bg);
-  border-color: color-mix(in srgb, var(--wait-text) 30%, transparent);
+  border-color: transparent;
   color: var(--wait-text);
 }
 
 .pub .pub-status-selesai {
   background: var(--ok-bg);
-  border-color: color-mix(in srgb, var(--ok-text) 30%, transparent);
+  border-color: transparent;
   color: var(--ok-text);
 }
 
 .pub .pub-status-batal {
   background: var(--bad-bg);
-  border-color: color-mix(in srgb, var(--bad-text) 30%, transparent);
+  border-color: transparent;
   color: var(--bad-text);
 }
 
 .pub .pub-status-rapelan {
   background: var(--warn-bg);
-  border-color: color-mix(in srgb, var(--warn-line) 50%, transparent);
+  border-color: transparent;
   color: var(--warn-text);
 }
 
 
 /* ── Panel ─────────────────────────────────────────────────────────────── */
 .pub .pub-panel {
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background: var(--kartu);
-  padding: clamp(1.25rem, 4vw, 2rem);
+  padding: clamp(1.5rem, 4vw, 2.25rem);
+  box-shadow: var(--bayang);
 }
 
 
@@ -649,7 +710,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 .pub .pub-table-wrap {
   max-width: 100%;
   overflow-x: auto;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius);
   background: var(--kartu);
 }
@@ -664,14 +725,14 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 
 .pub .pub-table caption {
   caption-side: top;
-  padding: 0.9rem 1rem 0.6rem;
+  padding: 1rem 1.15rem 0.7rem;
   text-align: left;
-  font-weight: 600;
-  color: var(--tinta);
+  font-weight: 500;
+  color: var(--ink);
 }
 
 .pub .pub-table :is(th, td) {
-  padding: 0.75rem 1rem;
+  padding: 0.8rem 1.15rem;
   border-bottom: 1px solid var(--line-soft);
   text-align: left;
   vertical-align: top;
@@ -683,19 +744,19 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   background: var(--bg-atas);
   color: var(--muted);
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
 }
 
 .pub .pub-table tbody th {
-  color: var(--tinta);
-  font-weight: 600;
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .pub .pub-table tfoot :is(th, td) {
   background: var(--bg-atas);
-  color: var(--tinta);
-  font-weight: 600;
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .pub .pub-table > :last-child > tr:last-child > :is(th, td) {
@@ -732,7 +793,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 
 .pub .pub-dl dd {
   margin: 0.125rem 0 0;
-  color: var(--tinta);
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 
@@ -750,7 +811,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 }
 
 
-/* ── Langkah: nomor serif pada rel tipis ───────────────────────────────── */
+/* ── Langkah: nomor dalam pil pada rel tipis ───────────────────────────── */
 .pub .pub-steps {
   margin: 0;
   padding: 0;
@@ -760,30 +821,36 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 
 .pub .pub-steps > li {
   position: relative;
-  padding: 0 0 2rem 3.6rem;
+  padding: 0 0 2rem 3.25rem;
   counter-increment: pub-langkah;
 }
 
 .pub .pub-steps > li::before {
   content: counter(pub-langkah, decimal-leading-zero);
   position: absolute;
-  top: 0.05rem;
+  top: 0.15rem;
   left: 0;
-  width: 2.4rem;
-  font-family: var(--huruf-judul);
-  font-size: 1.35rem;
-  font-weight: 450;
-  line-height: 1.3;
-  color: var(--ink);
-  font-variant-numeric: lining-nums tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .pub .pub-steps > li::after {
   content: "";
   position: absolute;
-  top: 2.4rem;
-  bottom: 0.6rem;
-  left: 0.72rem;
+  top: 2.2rem;
+  bottom: 0.5rem;
+  left: 1.05rem;
   width: 1px;
   background: var(--line-strong);
 }
@@ -798,12 +865,13 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 
 .pub .pub-step-title {
   margin: 0;
-  padding-top: 0.25rem;
-  font-size: 1.0625rem;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  line-height: 1.4;
-  color: var(--tinta);
+  padding-top: 0.2rem;
+  font-family: var(--huruf-judul);
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  color: var(--ink);
 }
 
 .pub .pub-step-who {
@@ -822,14 +890,14 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 .pub .pub-doc {
   max-width: 100%;
   padding: clamp(1.25rem, 5vw, 2.75rem);
-  border: 1px solid var(--line);
-  border-radius: 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
   background: #ffffff;
-  color: #1b2430;
+  color: #1b1d22;
   font-size: 0.9375rem;
   line-height: 1.55;
   overflow-x: auto;
-  box-shadow: 0 1px 0 var(--line-soft), 0 28px 50px -44px rgba(15, 30, 51, 0.55);
+  box-shadow: var(--bayang-angkat);
 }
 
 :where(.pub .pub-doc) > * + * {
@@ -837,13 +905,13 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 }
 
 .pub .pub-doc :where(h1, h2, h3, h4, strong) {
-  color: #1b2430;
+  color: #1b1d22;
 }
 
 .pub .pub-doc-kop {
   padding-bottom: 0.625rem;
   margin-bottom: 1.25rem;
-  border-bottom: 3px double #1b2430;
+  border-bottom: 3px double #1b1d22;
   text-align: center;
   line-height: 1.35;
 }
@@ -867,7 +935,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 
 .pub .pub-doc-table :is(th, td) {
   padding: 0.3125rem 0.5rem;
-  border: 1px solid #1b2430;
+  border: 1px solid #1b1d22;
   text-align: left;
   vertical-align: top;
 }
@@ -878,7 +946,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 }
 
 .pub .pub-doc-caption {
-  margin-top: 0.75rem;
+  margin-top: 0.85rem;
   font-size: 0.875rem;
   line-height: 1.55;
   color: var(--muted);
@@ -898,10 +966,10 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 .pub .pub-faq summary {
   position: relative;
   display: block;
-  min-height: 52px;
-  padding: 1rem 3rem 1rem 0;
-  color: var(--tinta);
-  font-weight: 550;
+  min-height: 56px;
+  padding: 1.1rem 3.25rem 1.1rem 0;
+  color: var(--ink);
+  font-weight: 500;
   line-height: 1.5;
   list-style: none;
   cursor: pointer;
@@ -912,17 +980,17 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   display: none;
 }
 
-/* Dua garis tipis: plus yang merebah menjadi minus saat terbuka */
+/* Tanda plus dalam lingkaran yang merebah menjadi minus saat terbuka */
 .pub .pub-faq summary::before,
 .pub .pub-faq summary::after {
   content: "";
   position: absolute;
-  top: 1.7rem;
-  right: 0.5rem;
+  top: calc(1.1rem + 0.75em - 0.75px);
+  right: calc(0.5rem + 7px);
   width: 12px;
   height: 1.5px;
   border-radius: 1px;
-  background: var(--tinta);
+  background: var(--ink);
   transition: transform 520ms var(--ease-out), opacity 320ms var(--ease);
 }
 
@@ -945,7 +1013,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 
 .pub .pub-faq details > :not(summary) {
   margin: 0;
-  padding: 0 3rem 1.15rem 0;
+  padding: 0 3.25rem 1.2rem 0;
 }
 
 .pub .pub-faq details > :not(summary) + :not(summary) {
@@ -999,6 +1067,8 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   justify-content: center;
   padding: 16px;
   background: var(--backdrop);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   overscroll-behavior: contain;
   animation: pubTirai 360ms var(--ease) both;
 }
@@ -1008,12 +1078,12 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   max-width: 28rem;
   max-height: calc(100dvh - 32px);
   overflow-y: auto;
-  padding: 1.9rem;
-  border: 1px solid var(--line);
+  padding: 2rem;
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background: var(--kartu);
   color: var(--text);
-  box-shadow: 0 40px 80px -40px rgba(15, 30, 51, 0.55);
+  box-shadow: 0 40px 80px -40px rgba(20, 21, 25, 0.5);
   animation: pubDialog 600ms var(--ease-out) both;
 }
 

@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 
 /* Judul yang katanya naik satu per satu dari balik garis dasar. Pemisahan per kata (bukan per huruf)
-   menjaga kerning huruf serif, dan teksnya tetap utuh untuk pembaca layar serta pencarian di halaman. */
+   menjaga kerning huruf judul, dan teksnya tetap utuh untuk pembaca layar serta pencarian di halaman. */
 export default function Kata({ teks, jeda = 0 }: { teks: string; jeda?: number }) {
   return (
     <>

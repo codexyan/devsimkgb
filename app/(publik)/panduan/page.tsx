@@ -4,7 +4,6 @@ import { getGajiPokok, getPangkat, kalkulasiKGB } from "@/lib/tabelGaji";
 import { satkerPerKppn } from "@/lib/satker";
 import { STATUS_KGB, type StatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId } from "@/lib/waktu";
-import GarisTangga from "../GarisTangga";
 import Kata from "../Kata";
 import { DaftarIsiPanduan, PilihPeran } from "./NavigasiPanduan";
 import "./panduan.css";
@@ -89,10 +88,7 @@ export default function PanduanPage() {
   return (
     <div className="pub-container pg">
       <header className="pg-kepala">
-        <p className="pg-atas masuk">
-          <GarisTangga anak={2} className="pg-atas-garis" />
-          Panduan untuk UPT dan Kanwil
-        </p>
+        <p className="pub-eyebrow pg-atas masuk">Panduan untuk UPT dan Kanwil</p>
         <h1 className="pub-h1 pg-judul">
           <Kata teks="Panduan kenaikan gaji berkala" />
         </h1>

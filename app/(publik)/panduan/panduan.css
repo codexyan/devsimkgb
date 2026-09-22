@@ -2,9 +2,9 @@
    ../publik.css.
 
    Panduan dibaca panjang, jadi halamannya disusun seperti dokumen: kolom baca sekitar 68ch, judul bagian
-   serif bernomor, daftar isi yang mengikuti posisi baca (rel di layar lebar, bilah lengket di ponsel), dan
-   pemilih tugas yang menandai bagian yang perlu dibaca lebih dulu. Emas hanya untuk "posisi Anda": bagian
-   yang sedang dibaca dan bagian yang disarankan untuk tugas yang dipilih. */
+   bernomor, daftar isi yang mengikuti posisi baca (rel di layar lebar, bilah lengket di ponsel), dan
+   pemilih tugas yang menandai bagian yang perlu dibaca lebih dulu. Kuning hanya untuk "posisi Anda":
+   bagian yang disarankan untuk tugas yang dipilih. */
 
 
 /* ── Kepala ────────────────────────────────────────────────────────────── */
@@ -12,25 +12,12 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
   align-items: end;
-  gap: 18px clamp(32px, 6vw, 96px);
+  gap: 22px clamp(32px, 6vw, 96px);
 }
 
 .pub .pg-atas {
-  display: flex;
   grid-column: 1 / -1;
-  align-items: flex-end;
-  gap: 10px;
-  margin: 0;
-  font-size: 13.5px;
-  font-weight: 500;
-  line-height: 1;
-  color: var(--muted);
-}
-
-.pub .pg-atas-garis {
-  width: 24px;
-  height: 9px;
-  color: var(--ink);
+  justify-self: start;
 }
 
 .pub .pg-judul {
@@ -57,20 +44,22 @@
 /* ── Pemilih tugas ─────────────────────────────────────────────────────── */
 .pub .pg-peran {
   display: grid;
-  grid-template-columns: minmax(0, 11rem) minmax(0, 1fr);
-  gap: 16px clamp(28px, 5vw, 72px);
-  margin: clamp(40px, 6vw, 64px) 0 clamp(48px, 7vw, 88px);
-  padding: 24px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+  gap: 18px clamp(28px, 5vw, 64px);
+  margin: clamp(40px, 6vw, 64px) 0 clamp(56px, 8vw, 104px);
+  padding: clamp(22px, 3vw, 32px);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--kartu);
 }
 
 .pub .pg-peran-judul {
   margin: 0;
   font-family: var(--huruf-judul);
   font-size: 1.5rem;
-  font-weight: 450;
+  font-weight: 400;
   line-height: 1.15;
+  letter-spacing: -0.035em;
   color: var(--ink);
 }
 
@@ -81,12 +70,12 @@
 }
 
 .pub .pg-peran-tombol {
-  min-height: 44px;
-  padding: 0 14px;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--tinta);
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-atas);
+  color: var(--ink);
   font: inherit;
   font-size: 14.5px;
   font-weight: 500;
@@ -99,8 +88,7 @@
 }
 
 .pub .pg-peran-tombol:hover {
-  border-color: var(--field-line);
-  background: var(--kartu);
+  border-color: var(--ink);
 }
 
 .pub .pg-peran-tombol:active {
@@ -146,9 +134,9 @@
   min-height: 40px;
   color: var(--ink);
   font-size: 15px;
-  font-weight: 550;
+  font-weight: 500;
   text-decoration: underline;
-  text-decoration-color: var(--emas-garis);
+  text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
   text-underline-offset: 0.35em;
 }
 
@@ -156,13 +144,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: 1.5px solid var(--ink);
-  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   background: var(--emas-isi);
+  color: var(--ink);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
@@ -190,7 +178,7 @@
   counter-reset: bagian;
 }
 
-/* Daftar isi: rel tipis dengan penanda emas pada bagian yang sedang dibaca */
+/* Daftar isi: rel tipis dengan penanda tinta pada bagian yang sedang dibaca */
 .pub .pg-daftar {
   position: sticky;
   top: calc(var(--nav) + 28px);
@@ -200,10 +188,12 @@
 }
 
 .pub .pg-daftar-judul {
-  margin: 0 0 12px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .pub .pg-daftar-rel {
@@ -226,7 +216,8 @@
   left: -0.5px;
   width: 2px;
   height: 1px;
-  background: var(--emas-garis);
+  border-radius: 2px;
+  background: var(--ink);
   transform: translate3d(0, var(--y, 0), 0) scaleY(var(--h, 0));
   transform-origin: 50% 0;
   transition: transform 650ms var(--ease-out);
@@ -260,23 +251,25 @@
 
 :is(.pub .pg-daftar, .pub .pg-bilah-daftar) a[aria-current="location"] {
   color: var(--ink);
+  font-weight: 500;
 }
 
 .pub .pg-daftar-nomor {
   font-size: 12px;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
-/* Bagian yang disarankan untuk tugas terpilih: titik emas kecil setelah judulnya */
+/* Bagian yang disarankan untuk tugas terpilih: titik kuning kecil setelah judulnya */
 :is(.pub .pg-daftar, .pub .pg-bilah-daftar) li[data-relevan] .pg-daftar-teks::after {
   content: "";
   display: inline-block;
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   margin: 0 0 1px 8px;
-  border: 1px solid var(--emas-garis);
-  border-radius: 2px;
+  border-radius: 50%;
   background: var(--emas-isi);
+  box-shadow: 0 0 0 1px var(--emas-garis);
   vertical-align: middle;
   animation: pubMasuk 500ms var(--ease-out) both;
 }
@@ -298,12 +291,13 @@
 
   .pub .pg-bilah {
     position: sticky;
-    top: calc(var(--nav) + 2px);
+    top: calc(var(--nav) + 4px);
     z-index: 20;
     display: block;
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: 18px;
     background: var(--kartu);
+    box-shadow: var(--bayang);
   }
 
   .pub .pg-bilah-tombol {
@@ -312,10 +306,10 @@
     align-items: center;
     gap: 12px;
     width: 100%;
-    min-height: 50px;
-    padding: 0 16px;
+    min-height: 52px;
+    padding: 0 18px;
     border: 0;
-    border-radius: 12px;
+    border-radius: 18px;
     background: transparent;
     color: var(--ink);
     font: inherit;
@@ -324,15 +318,17 @@
   }
 
   .pub .pg-bilah-label {
-    font-size: 12.5px;
-    font-weight: 600;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: var(--muted);
   }
 
   .pub .pg-bilah-aktif {
     overflow: hidden;
     font-size: 14.5px;
-    font-weight: 550;
+    font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -353,12 +349,12 @@
 
   .pub .pg-bilah-kemajuan {
     position: absolute;
-    left: 12px;
-    right: 12px;
+    left: 18px;
+    right: 18px;
     bottom: -1px;
     height: 2px;
     border-radius: 2px;
-    background: var(--emas-garis);
+    background: var(--ink);
     transform: scaleX(0);
     transform-origin: 0 50%;
   }
@@ -379,9 +375,9 @@
     overflow-y: auto;
     padding: 8px 12px 8px 0;
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: 18px;
     background: var(--kartu);
-    box-shadow: 0 30px 60px -40px rgba(15, 30, 51, 0.5);
+    box-shadow: var(--bayang-angkat);
     opacity: 0;
     visibility: hidden;
     transform: translate3d(0, -8px, 0);
@@ -419,21 +415,27 @@
   max-width: 52rem;
 }
 
-/* Setiap bagian dibuka garis rambut dan nomor, seperti bab dalam dokumen */
+/* Setiap bagian dibuka garis rambut dan nomor dalam pil, seperti bab dalam dokumen */
 .pub .pg-bagian + .pg-bagian > .pub-h2 {
-  padding-top: 2.25rem;
+  padding-top: 2.5rem;
   border-top: 1px solid var(--line);
 }
 
 .pub .pg-bagian > .pub-h2::before {
   content: counter(bagian, decimal-leading-zero);
-  display: block;
-  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 1.5rem;
+  margin-bottom: 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
   font-family: var(--huruf-isi);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0;
-  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -498,7 +500,7 @@
 .pub .pg-doc-ttd .pg-doc-ttd-ruang {
   margin-block: 1.25rem;
   font-style: italic;
-  color: #3d4757;
+  color: #45474e;
 }
 
 @media print {
