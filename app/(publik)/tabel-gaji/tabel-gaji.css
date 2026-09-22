@@ -8,7 +8,11 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
   align-items: end;
   gap: 22px clamp(32px, 6vw, 96px);
-  margin-bottom: clamp(40px, 5vw, 64px);
+}
+
+/* Isi di bawah panel navy */
+.pub .tb {
+  padding-top: clamp(40px, 5vw, 64px);
 }
 
 .pub .tb-atas {
@@ -89,7 +93,7 @@
   width: calc((100% - 8px) / 4);
   border-radius: 999px;
   background: var(--kartu);
-  box-shadow: 0 1px 2px rgba(20, 21, 25, 0.08), 0 4px 12px -6px rgba(20, 21, 25, 0.2);
+  box-shadow: 0 1px 2px rgba(12, 26, 56, 0.08), 0 4px 12px -6px rgba(12, 26, 56, 0.2);
   transform: translate3d(calc(var(--k, 0) * 100%), 0, 0);
   transition: transform 600ms var(--ease-out);
 }
@@ -118,7 +122,7 @@
 
 .pub .tb-cari-bidang:focus-within {
   border-color: var(--ink);
-  box-shadow: 0 0 0 1px var(--ink), 0 0 0 5px rgba(20, 21, 25, 0.07);
+  box-shadow: 0 0 0 1px var(--ink), 0 0 0 5px rgba(12, 26, 56, 0.07);
 }
 
 .pub .tb-cari-bidang input {
@@ -296,7 +300,7 @@
 
 /* Silang sorot: baris dan kolom di bawah kursor */
 .pub .tb-tabel tbody tr:hover :is(th, td) {
-  background: rgba(20, 21, 25, 0.028);
+  background: rgba(12, 26, 56, 0.028);
 }
 
 .pub .tb-tabel:has(td[data-k="0"]:hover) td[data-k="0"],
@@ -304,11 +308,11 @@
 .pub .tb-tabel:has(td[data-k="2"]:hover) td[data-k="2"],
 .pub .tb-tabel:has(td[data-k="3"]:hover) td[data-k="3"],
 .pub .tb-tabel:has(td[data-k="4"]:hover) td[data-k="4"] {
-  background: rgba(20, 21, 25, 0.028);
+  background: rgba(12, 26, 56, 0.028);
 }
 
 .pub .tb-tabel tbody td[data-gaji]:hover {
-  background: rgba(20, 21, 25, 0.07);
+  background: rgba(12, 26, 56, 0.07);
   color: var(--ink);
 }
 

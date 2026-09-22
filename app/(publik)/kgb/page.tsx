@@ -8,6 +8,7 @@ import { tanggaGaji } from "@/lib/tabelGaji";
 import { formatTanggalId } from "@/lib/waktu";
 import { StatusLayanan } from "../JamLayanan";
 import Kata from "../Kata";
+import LatarNavy from "../LatarNavy";
 import CekStatus from "./CekStatus";
 import PenjelajahTangga from "./tangga/PenjelajahTangga";
 import "./beranda.css";
@@ -122,7 +123,8 @@ export default async function HalamanBeranda() {
   return (
     <div className="beranda">
       {/* ── Pembuka: cek status dan tangga gaji ──────────────────────────── */}
-      <section id="beranda" className="hr" aria-labelledby="hr-judul">
+      <section id="beranda" className="pub-navy pub-hero hr" aria-labelledby="hr-judul">
+        <LatarNavy />
         <div className="pub-container">
           <div className="hr-kisi">
             <div className="hr-teks">
@@ -195,7 +197,8 @@ export default async function HalamanBeranda() {
                 )}
               </li>
             ))}
-            <li className="al-kartu al-ajak" data-muncul="" style={{ "--i": LANGKAH.length } as React.CSSProperties}>
+            <li className="al-kartu al-ajak pub-navy" data-muncul="" style={{ "--i": LANGKAH.length } as React.CSSProperties}>
+              <LatarNavy />
               <p className="al-ajak-judul">Tujuh langkah, satu SK.</p>
               <p className="al-ajak-isi">Rincian tiap langkah, contoh surat, dan lembar disposisi ada di panduan.</p>
               <Link href="/panduan#ringkasan" className="al-ajak-tautan">
@@ -332,7 +335,8 @@ export default async function HalamanBeranda() {
       {/* ── Bantuan ──────────────────────────────────────────────────────── */}
       <section id="bantuan" className="bt" aria-labelledby="judul-bantuan">
         <div className="pub-container">
-          <div className="bt-kartu" data-muncul="">
+          <div className="bt-kartu pub-navy" data-muncul="">
+            <LatarNavy />
             <div className="bt-teks">
               <h2 id="judul-bantuan" className="bt-judul">
                 Butuh bantuan?

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { tanggaGaji } from "@/lib/tabelGaji";
+import LatarNavy from "../LatarNavy";
 import TanggaMasuk from "./TanggaMasuk";
 import "./login.css";
 
@@ -18,8 +19,9 @@ export default async function LoginLayout({ children }: Readonly<{ children: Rea
   if (session) redirect("/dashboard");
 
   return (
-    <div className="pub-container lg">
-      <div className="lg-kisi">
+    <section className="pub-navy pub-hero lg">
+      <LatarNavy />
+      <div className="pub-container lg-kisi">
         <aside className="lg-sisi masuk" aria-label="Tentang SIM-KGB">
           <div className="lg-sisi-atas">
             <Image src="/icons.svg" alt="" width={34} height={27} loading="eager" />
@@ -34,8 +36,10 @@ export default async function LoginLayout({ children }: Readonly<{ children: Rea
             tahapnya tercatat di satu tempat.
           </p>
         </aside>
-        <div className="lg-utama">{children}</div>
+        <div className="lg-utama masuk" style={{ "--d": 120 } as React.CSSProperties}>
+          {children}
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

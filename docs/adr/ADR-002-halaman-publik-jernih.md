@@ -20,6 +20,13 @@ Bahasa "Tangga gaji" dari ADR-001 memakai judul serif, tinta biru tua dengan ema
 5. **Alur menjadi kisi.** Panggung dokumen yang menempel diganti tujuh kartu langkah dan satu kartu ajakan ke panduan (4 × 2 di layar lebar). Rincian surat dan disposisi tetap ada di panduan.
 6. **Motif tangga hanya dari data.** Garis tangga dekoratif (`GarisTangga`) dihapus. Motif tangga tersisa di grafik beranda dan ilustrasi halaman masuk, keduanya digambar dari tabel gaji.
 
+### Pembaruan 22 September 2026: tema navy dan panduan berperan
+
+Pemilik meminta tema navy gradient dengan latar beranimasi dan panduan yang dimulai dari pilihan peran.
+
+7. **Navy untuk pembuka, terang untuk isi.** Hero beranda, kepala tiap halaman, halaman masuk, serta kartu bantuan dan kartu ajakan alur memakai permukaan `.pub-navy`. Permukaan ini berupa gradient biru tua dengan tiga cahaya aurora dan kisi tipis yang bergerak pelan (`LatarNavy.tsx`), hanya memakai transform dan opacity, dan berhenti saat prefers-reduced-motion. Token di dalamnya dibalik agar teks terang. Isi panjang tetap di kanvas terang (`#f4f6fa`) supaya mudah dibaca. Tombol utama navy (`--navy`), dan menjadi putih di atas navy.
+8. **Panduan berperan.** `/panduan` dibuka dengan enam kartu peran. Setelah dipilih, hanya bagian untuk peran itu yang tampil (pemetaan di `panduan/peran.ts`, disaring lewat `html[data-peran]`), daftar isi tersaring, dan tiap bagian diakhiri tautan ke bagian berikutnya. Pilihan disimpan di `?peran=`. Tanpa JavaScript seluruh panduan tampil, dan cetakan selalu memuat semuanya.
+
 ## Konsekuensi
 
 - Beranda lebih pendek dan lebih ringan: tidak ada WebGL, tidak ada pustaka 3D, dan tidak ada komponen klien untuk alur.

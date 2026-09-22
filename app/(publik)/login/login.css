@@ -1,39 +1,38 @@
 /* login.css: halaman masuk /login. Melengkapi publik.css; semua kelas berawalan lg-.
 
-   Satu kartu dua kolom: panel pasir (identitas area petugas, garis tangga gaji yang tergores pelan) dan
-   formulir di kartu putih. Di layar sempit panel menjadi pita pendek di atas formulir. Formulir tetap
-   satu-satunya fokus. */
+   Panel navy selebar halaman dengan latar bergerak. Di kiri identitas area petugas dan garis tangga gaji
+   yang tergores pelan, langsung di atas navy; di kanan formulir dalam kartu putih yang melayang. Di layar
+   sempit sisi kiri menjadi pita pendek di atas formulir. Formulir tetap satu-satunya fokus. */
 
 .pub .pub-main:has(.lg) {
-  padding-block: calc(var(--nav) + clamp(0.5rem, 2vw, 1.5rem)) clamp(2rem, 5vw, 3.5rem);
+  padding-block: 0 clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.pub .lg {
+  padding-bottom: clamp(32px, 5vw, 64px);
 }
 
 .pub .lg-kisi {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  min-height: calc(100svh - var(--nav) - 140px);
-  padding: 8px;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-xl);
-  background: var(--kartu);
-  box-shadow: var(--bayang);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+  align-items: center;
+  gap: clamp(32px, 6vw, 96px);
+  min-height: calc(100svh - var(--nav) - 180px);
 }
 
 
-/* ── Panel pasir ───────────────────────────────────────────────────────── */
+/* ── Sisi navy ─────────────────────────────────────────────────────────── */
 .pub .lg-sisi {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 32px;
-  padding: clamp(28px, 4vw, 48px);
-  border-radius: calc(var(--radius-xl) - 8px);
-  background: var(--pasir);
+  gap: 40px;
   color: var(--text);
 }
 
+/* Merek sudah tampil di nav tepat di atasnya; di layar lebar baris ini disembunyikan agar tidak ganda */
 .pub .lg-sisi-atas {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 12px;
   font-size: 13px;
@@ -69,7 +68,7 @@
 /* Tiap golongan tergores dari kiri, berurutan; golongan tertinggi paling tegas */
 .pub .lg-tangga-baris path {
   fill: none;
-  stroke: rgba(20, 21, 25, 0.28);
+  stroke: rgba(255, 255, 255, 0.3);
   stroke-width: 1.5;
   stroke-linejoin: round;
   stroke-dasharray: 1;
@@ -79,7 +78,7 @@
 }
 
 .pub .lg-tangga-baris:last-child path {
-  stroke: var(--ink);
+  stroke: var(--emas-isi);
   stroke-width: 2;
 }
 
@@ -116,23 +115,27 @@
 }
 
 .pub .lg-sisi-teks {
-  max-width: 26ch;
+  max-width: 24ch;
   margin: 0;
   font-family: var(--huruf-judul);
-  font-size: clamp(1.375rem, 1.1rem + 0.8vw, 1.75rem);
+  font-size: clamp(1.625rem, 1.1rem + 1.4vw, 2.375rem);
   font-weight: 400;
-  line-height: 1.25;
-  letter-spacing: -0.035em;
+  line-height: 1.18;
+  letter-spacing: -0.04em;
   color: var(--ink);
 }
 
 
-/* ── Formulir ──────────────────────────────────────────────────────────── */
+/* ── Formulir (kartu putih, token terang dipasang ulang di publik.css) ─── */
 .pub .lg-utama {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(32px, 5vw, 64px) clamp(20px, 5vw, 64px);
+  padding: clamp(28px, 4vw, 48px) clamp(20px, 4vw, 48px);
+  border-radius: 28px;
+  background: var(--kartu);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 60px 100px -50px rgba(0, 0, 0, 0.65);
 }
 
 .pub .lg-halaman {
@@ -245,7 +248,7 @@
 .pub .lg-putar {
   width: 15px;
   height: 15px;
-  border: 2px solid rgba(20, 21, 25, 0.25);
+  border: 2px solid rgba(12, 26, 56, 0.25);
   border-top-color: var(--ink);
   border-radius: 50%;
   animation: lgPutar 700ms linear infinite;
@@ -286,18 +289,16 @@
 @media (max-width: 860px) {
   .pub .lg-kisi {
     grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
     min-height: 0;
-    border-radius: var(--radius-lg);
   }
 
   .pub .lg-sisi {
-    gap: 18px;
-    padding: 22px 22px 18px;
-    border-radius: calc(var(--radius-lg) - 8px);
+    gap: 16px;
   }
 
   .pub .lg-tangga svg {
-    max-height: 120px;
+    max-height: 110px;
   }
 
   .pub .lg-tangga figcaption,
@@ -306,6 +307,7 @@
   }
 
   .pub .lg-utama {
-    padding: 32px 14px 28px;
+    padding: 28px 18px 24px;
+    border-radius: var(--radius-lg);
   }
 }

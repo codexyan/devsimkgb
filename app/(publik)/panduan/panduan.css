@@ -1,167 +1,453 @@
 /* panduan.css: halaman /panduan. Semua kelas berawalan pg- dan berada di bawah .pub; kelas bersama ada di
    ../publik.css.
 
-   Panduan dibaca panjang, jadi halamannya disusun seperti dokumen: kolom baca sekitar 68ch, judul bagian
-   bernomor, daftar isi yang mengikuti posisi baca (rel di layar lebar, bilah lengket di ponsel), dan
-   pemilih tugas yang menandai bagian yang perlu dibaca lebih dulu. Kuning hanya untuk "posisi Anda":
-   bagian yang disarankan untuk tugas yang dipilih. */
+   Panduan berperan: pembaca memilih peran di panel navy, lalu hanya bagian untuk peran itu yang tampil,
+   berurutan dan diakhiri tautan ke bagian berikutnya (lihat NavigasiPanduan.tsx dan peran.ts). Isinya
+   tetap disusun seperti dokumen: kolom baca sekitar 68ch, judul bagian bernomor, dan daftar isi yang
+   mengikuti posisi baca (rel di layar lebar, bilah lengket di ponsel). */
 
 
-/* ── Kepala ────────────────────────────────────────────────────────────── */
+/* ── Kepala: panel navy berisi pilihan peran ───────────────────────────── */
+.pub .pg-hero {
+  padding-bottom: clamp(40px, 6vw, 80px);
+}
+
 .pub .pg-kepala {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
-  align-items: end;
-  gap: 22px clamp(32px, 6vw, 96px);
+  max-width: 44rem;
 }
 
 .pub .pg-atas {
-  grid-column: 1 / -1;
   justify-self: start;
 }
 
 .pub .pg-judul {
-  max-width: 13ch;
-  margin: 0;
+  margin: 22px 0 0;
 }
 
-.pub .pg-pengantar .pub-lead {
-  margin-bottom: 10px;
-  font-size: 1.0625rem;
-}
-
-.pub .pg-pengantar .pub-meta {
-  margin: 0;
-}
-
-@media (max-width: 860px) {
-  .pub .pg-kepala {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.pub .pub-lead.pg-lead {
+  max-width: 50ch;
+  margin: 18px 0 0;
 }
 
 
-/* ── Pemilih tugas ─────────────────────────────────────────────────────── */
-.pub .pg-peran {
+/* ── Kartu peran ───────────────────────────────────────────────────────── */
+.pub .pg-pilih {
+  margin-top: clamp(32px, 5vw, 52px);
+}
+
+.pub .pg-pilih-daftar {
   display: grid;
-  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
-  gap: 18px clamp(28px, 5vw, 64px);
-  margin: clamp(40px, 6vw, 64px) 0 clamp(56px, 8vw, 104px);
-  padding: clamp(22px, 3vw, 32px);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  background: var(--kartu);
-}
-
-.pub .pg-peran-judul {
-  margin: 0;
-  font-family: var(--huruf-judul);
-  font-size: 1.5rem;
-  font-weight: 400;
-  line-height: 1.15;
-  letter-spacing: -0.035em;
-  color: var(--ink);
-}
-
-.pub .pg-peran-pilihan {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.pub .pg-peran-tombol {
-  min-height: 42px;
-  padding: 0 18px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--bg-atas);
-  color: var(--ink);
-  font: inherit;
-  font-size: 14.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background-color 360ms var(--ease),
-    border-color 360ms var(--ease),
-    color 360ms var(--ease),
-    transform 500ms var(--ease-out);
-}
-
-.pub .pg-peran-tombol:hover {
-  border-color: var(--ink);
-}
-
-.pub .pg-peran-tombol:active {
-  transform: scale(0.97);
-  transition-duration: 120ms;
-}
-
-.pub .pg-peran-tombol[aria-pressed="true"] {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: #ffffff;
-}
-
-.pub .pg-peran-saran {
-  grid-column: 2;
-  min-height: 2.6rem;
-}
-
-.pub .pg-peran-saran p {
-  margin: 0;
-  font-size: 14.5px;
-  color: var(--muted);
-}
-
-.pub .pg-peran-saran ol {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 22px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.pub .pg-peran-saran li {
-  animation: pubMasuk 600ms var(--ease-out) both;
-  animation-delay: calc(var(--i, 0) * 70ms);
+.pub .pg-pilih-daftar li {
+  animation: pubMasuk 800ms var(--ease-out) both;
+  animation-delay: calc(320ms + var(--i, 0) * 70ms);
 }
 
-.pub .pg-peran-saran a {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 40px;
-  color: var(--ink);
-  font-size: 15px;
-  font-weight: 500;
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
-  text-underline-offset: 0.35em;
+/* Kartu kaca di atas navy; yang terpilih menjadi putih dengan tinta navy */
+.pub .pg-pilih-kartu {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "ikon label"
+    "ikon ringkas"
+    "ikon meta";
+  column-gap: 16px;
+  width: 100%;
+  height: 100%;
+  padding: 20px 20px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition:
+    background-color 420ms var(--ease),
+    border-color 420ms var(--ease),
+    color 420ms var(--ease),
+    box-shadow 500ms var(--ease),
+    transform 600ms var(--ease-out);
 }
 
-.pub .pg-peran-nomor {
-  display: inline-flex;
+.pub .pg-pilih-kartu:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.11);
+  transform: translate3d(0, -3px, 0);
+}
+
+.pub .pg-pilih-kartu:active {
+  transform: scale(0.985);
+  transition-duration: 120ms;
+}
+
+.pub .pg-pilih-kartu[aria-pressed="true"] {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #0c1a38;
+  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.55);
+}
+
+.pub .pg-pilih-ikon {
+  grid-area: ikon;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--emas-isi);
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #cfe0ff;
+  transition: background-color 420ms var(--ease), color 420ms var(--ease);
 }
 
-@media (max-width: 760px) {
-  .pub .pg-peran {
+.pub .pg-pilih-ikon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.pub .pg-pilih-kartu[aria-pressed="true"] .pg-pilih-ikon {
+  background: linear-gradient(135deg, #1b3d86, #0c2050);
+  color: #ffffff;
+}
+
+.pub .pg-pilih-label {
+  grid-area: label;
+  font-family: var(--huruf-judul);
+  font-size: 1.125rem;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.pub .pg-pilih-ringkas {
+  grid-area: ringkas;
+  margin-top: 4px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: rgba(222, 232, 255, 0.72);
+  transition: color 420ms var(--ease);
+}
+
+.pub .pg-pilih-kartu[aria-pressed="true"] .pg-pilih-ringkas {
+  color: #45506a;
+}
+
+.pub .pg-pilih-meta {
+  grid-area: meta;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: rgba(222, 232, 255, 0.6);
+  transition: color 420ms var(--ease);
+}
+
+.pub .pg-pilih-kartu[aria-pressed="true"] .pg-pilih-meta {
+  color: #1b3f8f;
+}
+
+.pub .pg-pilih-panah {
+  width: 13px;
+  height: 13px;
+  transition: transform 600ms var(--ease-out);
+}
+
+.pub .pg-pilih-kartu:hover .pg-pilih-panah {
+  transform: translate3d(3px, 0, 0);
+}
+
+.pub .pg-pilih-semua {
+  margin: 20px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.pub .pg-pilih-semua button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.4);
+  text-underline-offset: 0.3em;
+  cursor: pointer;
+}
+
+.pub .pg-pilih-semua button:hover,
+.pub .pg-pilih-semua button[aria-pressed="true"] {
+  text-decoration-color: var(--emas-isi);
+}
+
+@media (max-width: 960px) {
+  .pub .pg-pilih-daftar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .pub .pg-pilih-daftar {
     grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
   }
 
-  .pub .pg-peran-saran {
-    grid-column: 1;
+  .pub .pg-pilih-kartu {
+    padding: 16px;
+    border-radius: 18px;
   }
+}
+
+
+/* ── Tampil menurut peran ──────────────────────────────────────────────────
+   Skrip awal di halaman memasang <html data-panduan="siap">; NavigasiPanduan memasang data-peran saat
+   pembaca memilih. Tanpa pilihan hanya petunjuk yang tampil; dengan pilihan hanya bagian yang atribut
+   data-peran-nya memuat peran itu. Tanpa JavaScript tidak ada atribut, jadi seluruh panduan tampil. */
+.pub .pg {
+  padding-top: clamp(40px, 6vw, 72px);
+}
+
+.pub .pg-petunjuk {
+  display: none;
+}
+
+html[data-panduan="siap"]:not([data-peran]) .pub .pg-petunjuk {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 140px;
+  margin: 0;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  color: var(--muted);
+  font-size: 15px;
+  animation: pubMasuk 700ms var(--ease-out) both;
+}
+
+html[data-panduan="siap"]:not([data-peran]) .pub .pg-petunjuk::before {
+  content: "↑";
+  font-size: 18px;
+  color: var(--ink);
+  animation: pgNaik 1800ms var(--ease-io) infinite;
+}
+
+@keyframes pgNaik {
+  50% {
+    transform: translate3d(0, -5px, 0);
+  }
+}
+
+html[data-panduan="siap"]:not([data-peran]) .pub .pg-wadah {
+  display: none;
+}
+
+html[data-panduan="siap"] .pub .pg-bagian {
+  display: none;
+}
+
+html[data-panduan="siap"][data-peran="semua"] .pub .pg-bagian,
+html[data-panduan="siap"][data-peran="upt"] .pub .pg-bagian[data-peran~="upt"],
+html[data-panduan="siap"][data-peran="tu"] .pub .pg-bagian[data-peran~="tu"],
+html[data-panduan="siap"][data-peran="sdm"] .pub .pg-bagian[data-peran~="sdm"],
+html[data-panduan="siap"][data-peran="keuangan"] .pub .pg-bagian[data-peran~="keuangan"],
+html[data-panduan="siap"][data-peran="super"] .pub .pg-bagian[data-peran~="super"],
+html[data-panduan="siap"][data-peran="pegawai"] .pub .pg-bagian[data-peran~="pegawai"] {
+  display: block;
+  animation: pubMasuk 800ms var(--ease-out) both;
+}
+
+html[data-panduan="siap"][data-peran] .pub .pg-wadah {
+  animation: pubMasuk 700ms var(--ease-out) both;
+}
+
+
+/* ── Peran yang sedang dibaca ──────────────────────────────────────────── */
+.pub .pg-aktif {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-bottom: clamp(32px, 5vw, 56px);
+  padding: 14px 14px 14px 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  background: var(--kartu);
+  box-shadow: var(--bayang);
+}
+
+.pub .pg-aktif-ikon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #1b3d86, #0c2050);
+  color: #ffffff;
+}
+
+.pub .pg-aktif-ikon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.pub .pg-aktif-teks {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  margin-right: auto;
+  line-height: 1.3;
+}
+
+.pub .pg-aktif-teks span {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.pub .pg-aktif-teks b {
+  font-family: var(--huruf-judul);
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.pub .pg-aktif-jumlah {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--sunken);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.pub .pg-aktif-ganti {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 320ms var(--ease), background-color 320ms var(--ease);
+}
+
+.pub .pg-aktif-ganti:hover {
+  border-color: var(--ink);
+  background: var(--bg-atas);
+}
+
+
+/* ── Tautan bagian berikutnya ──────────────────────────────────────────── */
+.pub .pg-lanjut {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label panah"
+    "judul panah";
+  align-items: center;
+  column-gap: 16px;
+  max-width: 34rem;
+  margin-top: 2.5rem;
+  padding: 18px 20px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: var(--kartu);
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    border-color 320ms var(--ease),
+    box-shadow 420ms var(--ease),
+    transform 600ms var(--ease-out);
+}
+
+.pub .pg-lanjut:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--bayang);
+  color: var(--ink);
+  transform: translate3d(0, -2px, 0);
+}
+
+.pub .pg-lanjut-label {
+  grid-area: label;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pub .pg-lanjut-judul {
+  grid-area: judul;
+  margin-top: 2px;
+  font-family: var(--huruf-judul);
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.pub .pg-lanjut > svg {
+  grid-area: panah;
+  width: 18px;
+  height: 18px;
+  transition: transform 600ms var(--ease-out);
+}
+
+.pub .pg-lanjut:hover > svg {
+  transform: translate3d(4px, 0, 0);
+}
+
+.pub .pg-lanjut-selesai {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  max-width: none;
+  background: var(--sunken);
+  border-color: transparent;
+}
+
+.pub .pg-lanjut-selesai p {
+  margin: 0;
+  color: var(--text);
+}
+
+.pub .pg-lanjut-selesai b {
+  color: var(--ink);
+}
+
+.pub .pg-lanjut-selesai button {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--navy);
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.pub .pg-lanjut-selesai button:hover {
+  background: var(--navy-hover);
 }
 
 
@@ -258,20 +544,6 @@
   font-size: 12px;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
-}
-
-/* Bagian yang disarankan untuk tugas terpilih: titik kuning kecil setelah judulnya */
-:is(.pub .pg-daftar, .pub .pg-bilah-daftar) li[data-relevan] .pg-daftar-teks::after {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin: 0 0 1px 8px;
-  border-radius: 50%;
-  background: var(--emas-isi);
-  box-shadow: 0 0 0 1px var(--emas-garis);
-  vertical-align: middle;
-  animation: pubMasuk 500ms var(--ease-out) both;
 }
 
 /* Bilah daftar isi untuk layar sempit */
@@ -506,11 +778,19 @@
 @media print {
   .pub .pg-daftar,
   .pub .pg-bilah,
-  .pub .pg-peran {
-    display: none;
+  .pub .pg-pilih,
+  .pub .pg-aktif,
+  .pub .pg-lanjut,
+  .pub .pg-petunjuk {
+    display: none !important;
   }
 
   .pub .pg-kisi {
     display: block;
+  }
+
+  /* Cetakan selalu memuat seluruh panduan, apa pun peran yang dipilih */
+  html[data-panduan] .pub :is(.pg-wadah, .pg-bagian) {
+    display: block !important;
   }
 }

@@ -6,12 +6,13 @@
    dashboard tidak terpengaruh. Kerangka (nav, kaki, dok) ada di kerangka.css;
    halaman masing-masing punya berkas CSS sendiri.
 
-   ARAH: "Jernih" (lihat docs/adr/ADR-002-halaman-publik-jernih.md)
-   Tenang, profesional, dan lapang: kanvas netral hangat, kartu putih
-   bersudut lembut, tinta hampir hitam, judul sans rapat berbobot ringan
-   (Inter Tight), teks isi Inter yang sama dengan dashboard. Tombol berbentuk
-   pil. Dekorasi hanya dari data (tangga gaji) dan ruang kosong. Hanya tema
-   terang.
+   ARAH: "Jernih" bertema navy (lihat docs/adr/ADR-002-halaman-publik-jernih.md)
+   Tenang, profesional, dan lapang. Setiap halaman dibuka panel navy gradient
+   dengan latar bergerak halus (.pub-navy .pub-hero + LatarNavy.tsx); isi
+   panjang di kanvas terang bernuansa dingin dengan kartu putih bersudut
+   lembut. Judul sans rapat berbobot ringan (Inter Tight), teks isi Inter yang
+   sama dengan dashboard. Tombol berbentuk pil, navy di kanvas terang dan
+   putih di atas navy.
 
    WARNA (1 inti + 1 aksen)
      tinta            judul, teks kuat, tombol utama, tautan, garis fokus
@@ -54,23 +55,28 @@
 
 
 /* ── Token ─────────────────────────────────────────────────────────────── */
-.pub {
-  --bg: #f5f3ee;
-  --bg-atas: #faf9f6;
+/* Token terang. Komponen putih yang duduk di atas permukaan navy (kolom NIP, panel hasil, kartu tangga
+   gaji, formulir masuk, dialog) memasang ulang token ini lewat daftar selektor yang sama. */
+.pub,
+.pub :is(.pub-terang, .cs-bidang, .cs-panel, .tj, .lg-utama, .pub-dialog) {
+  --bg: #f4f6fa;
+  --bg-atas: #f9fafc;
   --kartu: #ffffff;
   --putih: #ffffff;
-  --sunken: #efece6;
-  --pasir: #e9e5dc;
-  --line: #e1ddd4;
-  --line-soft: #ebe8e1;
-  --line-strong: #cbc6bb;
-  --field-line: #8c877d;
-  --ink: #141519;
-  --tinta: #1d1f24;
-  --text: #45474e;
-  --muted: #696b72;
-  --accent: #141519;
-  --accent-hover: #45474e;
+  --sunken: #edf0f5;
+  --pasir: #e2e7f0;
+  --line: #dde3ec;
+  --line-soft: #e8ecf2;
+  --line-strong: #c4ccd9;
+  --field-line: #7d879b;
+  --ink: #0c1a38;
+  --tinta: #172647;
+  --text: #3a4459;
+  --muted: #616b80;
+  --accent: #1b3f8f;
+  --accent-hover: #0c1a38;
+  --navy: #102a63;
+  --navy-hover: #1b3d86;
   --on-accent: #ffffff;
   --emas: #765600;
   --emas-isi: #f3c63f;
@@ -87,13 +93,13 @@
   --bad-text: #a2291e;
   --wait-bg: #ece8f7;
   --wait-text: #56418f;
-  --backdrop: rgba(20, 21, 25, 0.36);
+  --backdrop: rgba(8, 18, 45, 0.45);
   --radius-sm: 10px;
   --radius: 16px;
   --radius-lg: 24px;
   --radius-xl: 32px;
-  --bayang: 0 1px 2px rgba(20, 21, 25, 0.04), 0 10px 30px -18px rgba(20, 21, 25, 0.16);
-  --bayang-angkat: 0 1px 2px rgba(20, 21, 25, 0.05), 0 30px 60px -32px rgba(20, 21, 25, 0.28);
+  --bayang: 0 1px 2px rgba(12, 26, 56, 0.05), 0 10px 30px -18px rgba(12, 26, 56, 0.18);
+  --bayang-angkat: 0 1px 2px rgba(12, 26, 56, 0.06), 0 30px 60px -30px rgba(12, 26, 56, 0.35);
   --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-io: cubic-bezier(0.77, 0, 0.175, 1);
@@ -104,6 +110,138 @@
   --sisi: clamp(20px, 5vw, 56px);
   --nav: 76px;
   color-scheme: light;
+}
+
+/* Permukaan navy: gradient biru tua dengan latar bergerak (LatarNavy.tsx). Token dibalik agar teks,
+   garis, dan label di dalamnya otomatis terang. */
+.pub .pub-navy {
+  --ink: #ffffff;
+  --tinta: #f2f6ff;
+  --text: rgba(232, 239, 255, 0.8);
+  --muted: rgba(208, 220, 250, 0.66);
+  --line: rgba(255, 255, 255, 0.16);
+  --line-soft: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.3);
+  --field-line: rgba(255, 255, 255, 0.55);
+  --kartu: rgba(255, 255, 255, 0.07);
+  --sunken: rgba(255, 255, 255, 0.09);
+  --accent: #ffffff;
+  --accent-hover: #cddcff;
+  --bayang: none;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(110% 80% at 88% -12%, rgba(84, 132, 232, 0.5), transparent 58%),
+    radial-gradient(90% 70% at -8% 112%, rgba(38, 84, 196, 0.42), transparent 62%),
+    linear-gradient(158deg, #07132f 0%, #0c2050 46%, #14306f 100%);
+  color: var(--text);
+}
+
+.pub .pub-navy :focus-visible {
+  outline-color: #ffffff;
+}
+
+.pub .pub-navy ::selection {
+  background: rgba(243, 198, 63, 0.35);
+  color: #ffffff;
+}
+
+/* Kepala halaman: panel navy yang terbenam sedikit dari tepi layar, nav mengapung di atasnya */
+.pub .pub-hero {
+  margin: 8px 8px 0;
+  padding: calc(var(--nav) + clamp(28px, 5vw, 76px)) 0 clamp(48px, 7vw, 96px);
+  border-radius: var(--radius-xl);
+}
+
+@media (max-width: 640px) {
+  .pub .pub-hero {
+    margin: 6px 6px 0;
+    border-radius: var(--radius-lg);
+  }
+}
+
+
+/* ── Latar bergerak ────────────────────────────────────────────────────── */
+.pub .ln {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pub .ln-cahaya {
+  position: absolute;
+  width: 62vmax;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0.55;
+  will-change: transform;
+}
+
+.pub .ln-a {
+  top: -34vmax;
+  right: -18vmax;
+  background: radial-gradient(circle, rgba(104, 156, 255, 0.55), transparent 62%);
+  animation: lnMelayang 22s var(--ease) infinite alternate;
+}
+
+.pub .ln-b {
+  bottom: -40vmax;
+  left: -22vmax;
+  background: radial-gradient(circle, rgba(64, 104, 230, 0.5), transparent 60%);
+  animation: lnMelayang 28s var(--ease) infinite alternate-reverse;
+}
+
+.pub .ln-c {
+  top: 10%;
+  left: 38%;
+  width: 34vmax;
+  background: radial-gradient(circle, rgba(126, 214, 255, 0.28), transparent 62%);
+  animation: lnBerdenyut 16s var(--ease) infinite alternate;
+}
+
+@keyframes lnMelayang {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-6vmax, 4vmax, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(4vmax, 8vmax, 0) scale(0.96);
+  }
+}
+
+@keyframes lnBerdenyut {
+  0% {
+    opacity: 0.25;
+    transform: translate3d(0, 0, 0) scale(0.9);
+  }
+  100% {
+    opacity: 0.6;
+    transform: translate3d(-8vmax, 3vmax, 0) scale(1.15);
+  }
+}
+
+/* Kisi tipis yang memudar ke tepi dan bergeser pelan satu petak */
+.pub .ln-kisi {
+  position: absolute;
+  inset: -56px 0 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, #000 20%, transparent 75%);
+  animation: lnKisi 14s linear infinite;
+}
+
+@keyframes lnKisi {
+  to {
+    transform: translate3d(0, 56px, 0);
+  }
 }
 
 
@@ -224,9 +362,10 @@
   outline-color: var(--emas-isi);
 }
 
+/* Setiap halaman dibuka panel navy (.pub-hero) yang memuat ruang untuk nav, jadi main tanpa padding atas. */
 .pub .pub-main {
   flex: 1 0 auto;
-  padding-block: calc(var(--nav) + clamp(2.5rem, 7vw, 5.5rem)) clamp(5rem, 11vw, 9rem);
+  padding-block: 0 clamp(5rem, 11vw, 9rem);
 }
 
 .pub .pub-main:has(> .pub-transisi > .beranda) {
@@ -261,8 +400,8 @@
   display: inline-block;
   overflow: clip;
   vertical-align: top;
-  padding: 0.04em 0.06em 0.12em 0;
-  margin: -0.04em -0.06em -0.12em 0;
+  padding: 0.04em 0.06em 0.2em 0;
+  margin: -0.04em -0.06em -0.2em 0;
 }
 
 .pub .kt-isi {
@@ -318,6 +457,11 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--emas-isi) 28%, transparent);
 }
 
+.pub .pub-navy .pub-eyebrow {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
 .pub .pub-eyebrow-nomor {
   display: inline-flex;
   align-items: center;
@@ -326,7 +470,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   height: 22px;
   padding: 0 6px;
   border-radius: 999px;
-  background: var(--ink);
+  background: var(--navy);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
@@ -447,15 +591,48 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 }
 
 .pub .pub-btn {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--navy);
+  border-color: var(--navy);
   color: #fff;
+  box-shadow: 0 8px 20px -12px rgba(16, 42, 99, 0.7);
 }
 
 .pub .pub-btn:hover {
-  background: #2c2e34;
-  border-color: #2c2e34;
+  background: var(--navy-hover);
+  border-color: var(--navy-hover);
   color: #fff;
+}
+
+/* Di atas permukaan navy tombol utama menjadi putih */
+.pub .pub-navy .pub-btn {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #0c1a38;
+  box-shadow: none;
+}
+
+.pub .pub-navy .pub-btn:hover {
+  background: #e6edff;
+  border-color: #e6edff;
+  color: #0c1a38;
+}
+
+/* ...kecuali di dalam komponen terang yang duduk di atas navy (formulir masuk, dialog, panel hasil) */
+.pub :is(.pub-terang, .cs-panel, .tj, .lg-utama, .pub-dialog) .pub-btn {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+  box-shadow: 0 8px 20px -12px rgba(16, 42, 99, 0.7);
+}
+
+.pub :is(.pub-terang, .cs-panel, .tj, .lg-utama, .pub-dialog) .pub-btn:hover {
+  background: var(--navy-hover);
+  border-color: var(--navy-hover);
+  color: #fff;
+}
+
+.pub :is(.pub-terang, .cs-panel, .tj, .lg-utama, .pub-dialog) :focus-visible {
+  outline-color: var(--ink);
 }
 
 .pub .pub-btn-secondary {
@@ -567,7 +744,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
 .pub .pub-input:focus-visible {
   outline: none;
   border-color: var(--ink);
-  box-shadow: 0 0 0 1px var(--ink), 0 0 0 5px rgba(20, 21, 25, 0.08);
+  box-shadow: 0 0 0 1px var(--ink), 0 0 0 5px rgba(12, 26, 56, 0.08);
 }
 
 .pub .pub-input[aria-invalid="true"] {
@@ -1083,7 +1260,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   border-radius: var(--radius-lg);
   background: var(--kartu);
   color: var(--text);
-  box-shadow: 0 40px 80px -40px rgba(20, 21, 25, 0.5);
+  box-shadow: 0 40px 80px -40px rgba(12, 26, 56, 0.5);
   animation: pubDialog 600ms var(--ease-out) both;
 }
 
