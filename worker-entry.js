@@ -10,7 +10,13 @@
 //
 // Wrapper ini juga membatasi permintaan cek status KGB publik (/api/public/cek-kgb)
 // per alamat IP, karena endpoint itu tanpa login dan dapat dipakai menebak NIP.
+//
+// Selain itu wrapper memasang WASM yoga-layout hasil deploy untuk @react-pdf (surat KGB),
+// karena Workers melarang kompilasi WASM dari bytes saat berjalan (lihat worker/yogaWasm.js).
 import openNextWorker from "./.open-next/worker.js";
+import { pasangYogaWasm } from "./worker/yogaWasm.js";
+
+pasangYogaWasm();
 
 export {
   DOQueueHandler,
