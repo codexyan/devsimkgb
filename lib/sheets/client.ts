@@ -5,6 +5,10 @@
 // dengan Cloudflare Workers maupun Node.
 
 import { getAccessToken } from "./auth";
+import * as lokal from "./klienLokal";
+
+// DATA_BACKEND=lokal: operasi yang sama atas berkas JSON untuk pengembangan (lib/sheets/klienLokal.ts).
+const pakaiLokal = () => process.env.DATA_BACKEND?.trim().toLowerCase() === "lokal";
 
 const API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
 
@@ -42,6 +46,7 @@ async function api(path: string, init?: RequestInit): Promise<Response> {
 
 /** Baca seluruh nilai pada sebuah range (mis. "Pegawai!A1:Z"). */
 export async function getValues(range: string): Promise<string[][]> {
+  if (pakaiLokal()) return lokal.getValues(range);
   const res = await api(`/values/${encodeURIComponent(range)}`);
   const data = (await res.json()) as { values?: string[][] };
   return data.values ?? [];
@@ -51,6 +56,7 @@ export async function getValues(range: string): Promise<string[][]> {
 export async function batchGetValues(
   ranges: string[],
 ): Promise<Record<string, string[][]>> {
+  if (pakaiLokal()) return lokal.batchGetValues(ranges);
   const qs = ranges.map((r) => `ranges=${encodeURIComponent(r)}`).join("&");
   const res = await api(`/values:batchGet?${qs}`);
   const data = (await res.json()) as {
@@ -65,6 +71,7 @@ export async function batchGetValues(
 
 /** Tambah satu/lebih baris di akhir tab (atomik per-append). */
 export async function appendRows(range: string, rows: string[][]): Promise<void> {
+  if (pakaiLokal()) return lokal.appendRows(range, rows);
   await api(
     `/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     { method: "POST", body: JSON.stringify({ values: rows }) },
@@ -73,6 +80,7 @@ export async function appendRows(range: string, rows: string[][]): Promise<void>
 
 /** Tulis-timpa nilai pada range spesifik (mis. update satu baris). */
 export async function updateValues(range: string, rows: string[][]): Promise<void> {
+  if (pakaiLokal()) return lokal.updateValues(range, rows);
   await api(`/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
     method: "PUT",
     body: JSON.stringify({ values: rows }),
@@ -81,11 +89,13 @@ export async function updateValues(range: string, rows: string[][]): Promise<voi
 
 /** Kosongkan nilai pada range (mis. saat "hapus" baris → dikosongkan). */
 export async function clearValues(range: string): Promise<void> {
+  if (pakaiLokal()) return lokal.clearValues(range);
   await api(`/values/${encodeURIComponent(range)}:clear`, { method: "POST" });
 }
 
 /** Metadata spreadsheet: daftar nama tab (dipakai health-check & setup). */
 export async function listSheetTitles(): Promise<string[]> {
+  if (pakaiLokal()) return lokal.listSheetTitles();
   const res = await api(`?fields=sheets.properties.title`);
   const data = (await res.json()) as {
     sheets?: { properties: { title: string } }[];
@@ -95,6 +105,7 @@ export async function listSheetTitles(): Promise<string[]> {
 
 /** Buat satu tab baru (service account harus punya akses Editor). */
 export async function addSheetTab(title: string): Promise<void> {
+  if (pakaiLokal()) return lokal.addSheetTab(title);
   await api(`:batchUpdate`, {
     method: "POST",
     body: JSON.stringify({

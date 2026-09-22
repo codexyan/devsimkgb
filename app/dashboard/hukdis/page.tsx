@@ -2,52 +2,80 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { canManageHukdis } from "@/lib/auth";
-import { formatTanggalId, isoTanggalLokal } from "@/lib/waktu";
+import { formatTanggalId, hariIniWita, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 import { tmtBerakhirOtomatis } from "@/lib/hukdisJenis";
+import { SATKER } from "@/lib/satker";
+import { KODE_SATKER_LAIN, kodeSatkerPegawai } from "@/lib/rekapSatker";
+import { namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Modul Hukuman Disiplin (mandiri). Daftar SEMUA catatan hukdis lintas
-   pegawai + statistik + input. Sumber: RiwayatHukdis (via /api/hukdis).
+   pegawai + ringkasan + input. Sumber: RiwayatHukdis (via /api/hukdis).
+   Yang dipantau: masa berlaku (kapan berakhir) dan dampaknya pada KGB.
    ───────────────────────────────────────────────────────────────────────── */
 
 interface Hukdis {
   id: string;
-  pegawai: { id: string; nama: string; nip: string; jabatan: string; golonganRuang: string; aktif: boolean };
+  pegawai: { id: string; nama: string; nip: string; jabatan: string; golonganRuang: string; unitKerja: string | null; aktif: boolean } | null;
   jenisHukdis: string; jenisLabel: string; kategori: string;
-  nomorSK: string; tanggalSK: string; tmtMulai: string; tmtBerakhir: string;
+  nomorSK: string; tanggalSK: string | null; tmtMulai: string | null; tmtBerakhir: string | null;
   berdampakKGB: boolean; durasiTunda: number | null; dasarHukum: string | null; keterangan: string | null;
   aktif: boolean;
 }
-interface Summary { aktif: number; ringan: number; sedang: number; berat: number; berdampakKGB: number; }
+interface Summary { total: number; aktif: number; ringan: number; sedang: number; berat: number; berdampakKGB: number; berakhir30: number; }
 interface Jenis { kode: string; label: string; kategori: string; durasiHukdis: number; berdampakKGB: boolean; durasiTunda: number | null; dasarHukum: string | null; aktif: boolean; }
 interface PegawaiOpt { id: string; nip: string; nama: string; jabatan: string; golonganRuang: string; statusHukdis: boolean; }
 interface RegulasiOpt { id: string; nomor: string; tahun: string; tentang: string; status: string; }
 const regText = (r: RegulasiOpt) => `${r.nomor} Tahun ${r.tahun}`;
 
-const KAT: Record<string, { label: string; bg: string; color: string; grad: string }> = {
-  ringan: { label: "Ringan", bg: "var(--tint-green-bg)", color: "var(--st-green)", grad: "linear-gradient(135deg,#17a37e,var(--green-solid))" },
-  sedang: { label: "Sedang", bg: "var(--tint-amber-bg)", color: "var(--st-amber2)", grad: "linear-gradient(135deg,#d99414,var(--amber-solid))" },
-  berat:  { label: "Berat",  bg: "var(--tint-red-bg)",   color: "var(--st-red)",   grad: "linear-gradient(135deg,#e35d5d,var(--red-solid))" },
+const KAT: Record<string, { label: string; nada: "hijau" | "kuning" | "merah" }> = {
+  ringan: { label: "Ringan", nada: "hijau" },
+  sedang: { label: "Sedang", nada: "kuning" },
+  berat:  { label: "Berat",  nada: "merah" },
 };
 const initials = (n: string) => n.split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase();
 // Tanggal tersimpan ditampilkan menurut kalender WITA.
-const fmt = (s: string) => formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" });
+const fmt = (s: string | null) => (s ? formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" }) : "-");
 // Tanggal hari ini menurut kalender perangkat (bukan UTC, yang mundur sehari sebelum pukul 08.00 WITA).
 const todayIso = () => isoTanggalLokal();
+
+/** Saringan utama: masa berlaku dan dampak KGB. */
+type Saringan = "aktif" | "segera" | "tunda" | "berakhir" | "";
+const SARINGAN: { v: Saringan; l: string; nada?: "merah" }[] = [
+  { v: "aktif", l: "Aktif" },
+  { v: "segera", l: "Berakhir ≤ 30 hari" },
+  { v: "tunda", l: "Menunda KGB", nada: "merah" },
+  { v: "berakhir", l: "Sudah berakhir" },
+  { v: "", l: "Semua" },
+];
+
+function namaSatker(kode: string): string {
+  if (kode === KODE_SATKER_LAIN) return "Unit belum sesuai daftar";
+  const s = SATKER.find((x) => x.kode === kode);
+  return s ? namaSingkatSatker(s) : kode;
+}
 
 export default function HukdisPage() {
   const role = useRole();
   const allowed = canManageHukdis(role);
+  const [hariIni] = useState(() => hariIniWita());
+  // Tautan dari dashboard membawa saringan awal: ?satker=<kode> dan ?saringan=segera|tunda|berakhir.
+  const params = useSearchParams();
 
   const [data, setData] = useState<Hukdis[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterKat, setFilterKat] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"aktif" | "berakhir" | "">("aktif");
+  const [filterSatker, setFilterSatker] = useState(() => params.get("satker") ?? "");
+  const [saringan, setSaringan] = useState<Saringan>(() => {
+    const awal = params.get("saringan");
+    return SARINGAN.some((s) => s.v === awal && awal !== "") ? (awal as Saringan) : "aktif";
+  });
 
   // Input modal
   const [showInput, setShowInput] = useState(false);
@@ -75,9 +103,9 @@ export default function HukdisPage() {
 
   function fetchData() {
     setLoading(true);
-    fetch("/api/hukdis").then((r) => r.json() as any).then((d) => {
-      if (d && Array.isArray(d.data)) { setData(d.data); setSummary(d.summary); }
-    }).finally(() => setLoading(false));
+    fetch("/api/hukdis").then((r) => r.json() as Promise<{ data?: Hukdis[]; summary?: Summary }>).then((d) => {
+      if (d && Array.isArray(d.data)) { setData(d.data); setSummary(d.summary ?? null); }
+    }).catch(() => {}).finally(() => setLoading(false));
   }
   useEffect(() => { if (allowed) fetchData(); else setLoading(false); }, [allowed]);
 
@@ -159,167 +187,244 @@ export default function HukdisPage() {
     finally { setDeleting(false); }
   }
 
-  const filtered = useMemo(() => {
+  /** Sisa hari sampai TMT berakhir (tanggal berakhir ikut dihitung); null bila tanggal tidak terbaca. */
+  const sisaHari = (h: Hukdis) => {
+    const akhir = tanggalKalender(h.tmtBerakhir);
+    return akhir ? Math.round((akhir.getTime() - hariIni.getTime()) / 86_400_000) : null;
+  };
+  const cocokSaringan = (h: Hukdis, s: Saringan) => {
+    if (s === "aktif") return h.aktif;
+    if (s === "berakhir") return !h.aktif;
+    if (s === "tunda") return h.aktif && h.berdampakKGB;
+    if (s === "segera") { const sisa = sisaHari(h); return h.aktif && sisa !== null && sisa <= 30; }
+    return true;
+  };
+
+  // Saringan kategori, satker, dan pencarian berlaku dulu; jumlah pada tiap segmen dihitung dari hasilnya.
+  const dasar = useMemo(() => {
     const q = search.trim().toLowerCase();
     return data.filter((h) =>
-      (filterStatus === "" || (filterStatus === "aktif" ? h.aktif : !h.aktif)) &&
       (filterKat === "" || h.kategori === filterKat) &&
-      (!q || h.pegawai.nama.toLowerCase().includes(q) || h.pegawai.nip.includes(q) || h.jenisLabel.toLowerCase().includes(q)),
+      (filterSatker === "" || kodeSatkerPegawai(h.pegawai?.unitKerja) === filterSatker) &&
+      (!q || (h.pegawai?.nama ?? "").toLowerCase().includes(q) || (h.pegawai?.nip ?? "").includes(q) ||
+        h.jenisLabel.toLowerCase().includes(q) || (h.nomorSK ?? "").toLowerCase().includes(q)),
     );
-  }, [data, search, filterKat, filterStatus]);
+  }, [data, search, filterKat, filterSatker]);
+
+  const filtered = useMemo(() => {
+    const hasil = dasar.filter((h) => cocokSaringan(h, saringan));
+    // Hukdis yang masih berjalan diurutkan dari yang paling dekat berakhir; riwayat tetap terbaru dulu.
+    if (saringan === "aktif" || saringan === "segera" || saringan === "tunda") {
+      hasil.sort((a, b) => (sisaHari(a) ?? Infinity) - (sisaHari(b) ?? Infinity));
+    }
+    return hasil;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dasar, saringan, hariIni]);
 
   if (!allowed) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-2">
-        <p className="text-sm font-semibold" style={{ color: "var(--dtn)" }}>Akses ditolak</p>
-        <p className="text-xs" style={{ color: "var(--dt4)" }}>Halaman ini hanya untuk SDM Hukdis dan Super Admin.</p>
+      <div className="dsb-kosong" style={{ padding: "96px 16px" }}>
+        <p className="dsb-nama" style={{ margin: 0 }}>Akses ditolak</p>
+        <p style={{ margin: 0 }}>Halaman ini hanya untuk SDM Hukdis dan Super Admin.</p>
       </div>
     );
   }
 
-  const stats = [
-    { key: "", label: "Total Aktif", value: summary?.aktif ?? 0, grad: "linear-gradient(135deg,#2d5d94,var(--navy-solid))" },
-    { key: "ringan", label: "Ringan", value: summary?.ringan ?? 0, grad: KAT.ringan.grad },
-    { key: "sedang", label: "Sedang", value: summary?.sedang ?? 0, grad: KAT.sedang.grad },
-    { key: "berat", label: "Berat", value: summary?.berat ?? 0, grad: KAT.berat.grad },
-  ];
+  const berakhirTotal = (summary?.total ?? 0) - (summary?.aktif ?? 0);
+  const adaSaringanLain = !!(filterKat || filterSatker || search);
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="adm-chip" style={{ background: "linear-gradient(135deg,#e35d5d,var(--red-solid))" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    <div className="dsb-halaman" data-muat-layar="">
+      {/* Kepala halaman */}
+      <header className="dsb-halaman-kepala dsb-muncul">
+        <div className="min-w-0">
+          <p className="dsb-label">Hukuman disiplin</p>
+          <h1 className="dsb-halaman-judul">Catatan hukuman disiplin</h1>
+          <p className="dsb-sub">Masa berlaku hukdis seluruh pegawai dan dampaknya pada KGB</p>
         </div>
-        <div className="flex-1 min-w-0">
-          <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--st-red)" }}>SDM Hukdis</p>
-          <h1 className="text-base font-semibold leading-tight" style={{ color: "var(--dtn)" }}>Hukuman Disiplin</h1>
-          <p className="text-xs" style={{ color: "var(--dt4)" }}>Seluruh catatan hukdis pegawai · pantau masa berlaku &amp; dampak KGB</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Link href="/dashboard/hukdis/regulasi" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition" style={{ background: "var(--sub)", color: "var(--dt3)", border: "0.5px solid var(--ln0)" }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/dashboard/hukdis/regulasi" className="dsb-tombol" data-jenis="garis">
+            <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
             Regulasi
           </Link>
-          <Link href="/dashboard/hukdis/konfigurasi" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition" style={{ background: "var(--sub)", color: "var(--dt3)", border: "0.5px solid var(--ln0)" }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Jenis Hukdis
+          <Link href="/dashboard/hukdis/konfigurasi" className="dsb-tombol" data-jenis="garis">
+            <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+            Jenis hukdis
           </Link>
-          <button onClick={openInput} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white transition" style={{ background: "var(--red-solid)" }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Input Hukdis
+          <button type="button" onClick={openInput} className="dsb-tombol">
+            <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Input hukdis
           </button>
         </div>
-      </div>
+      </header>
 
       {success && (
-        <div className="px-4 py-3 rounded-xl text-xs font-medium flex items-center gap-2" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", border: "1px solid var(--tint-green-ln)" }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>{success}
+        <div role="status" className="dsb-pesan" data-nada="hijau">
+          <span className="dsb-pesan-ikon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          <p>{success}</p>
         </div>
       )}
 
-      {/* Stat tiles (klik = filter kategori) */}
-      {!loading && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-          {stats.map((s) => {
-            const active = filterKat === s.key && s.key !== "";
-            return (
-              <button key={s.label} onClick={() => s.key !== "" && setFilterKat(active ? "" : s.key)} className={`adm-stat ${s.key ? "clickable" : ""} ${active ? "active" : ""}`} style={{ textAlign: "left", cursor: s.key ? "pointer" : "default" }}>
-                <span className="adm-stat-strip" style={{ background: s.grad }} />
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: s.grad }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                  </div>
-                  <div>
-                    <p className="font-bold leading-none" style={{ fontSize: "20px", color: "var(--dtn)" }}>{s.value}</p>
-                    <p style={{ fontSize: "10.5px", color: "var(--dt4)", marginTop: "2px" }}>{s.label}</p>
-                  </div>
-                </div>
+      {/* Ringkasan */}
+      {loading && !summary ? (
+        <div className="dsb-kerangka" style={{ height: 104 }} role="status" aria-label="Memuat ringkasan" />
+      ) : (
+        <div className="dsb-angka-kisi dsb-muncul" style={{ "--i": 1 } as React.CSSProperties}>
+          <div className="dsb-angka">
+            <span className="dsb-angka-label">Hukdis aktif</span>
+            <span className="dsb-angka-nilai">{summary?.aktif ?? 0}</span>
+            <span className="dsb-angka-meta" style={{ flexWrap: "wrap" }}>
+              {(["ringan", "sedang", "berat"] as const).map((k) => (
+                <span key={k} className="inline-flex items-center gap-1.5">
+                  <span className="dsb-titik" data-nada={KAT[k].nada} aria-hidden="true" />
+                  {KAT[k].label} {summary?.[k] ?? 0}
+                </span>
+              ))}
+            </span>
+          </div>
+          <div className="dsb-angka">
+            <span className="dsb-angka-label">Menunda KGB</span>
+            <span className="dsb-angka-nilai" style={{ color: (summary?.berdampakKGB ?? 0) > 0 ? "var(--st-red)" : undefined }}>{summary?.berdampakKGB ?? 0}</span>
+            <span className="dsb-angka-meta">{(summary?.berdampakKGB ?? 0) > 0 ? "TMT KGB pegawainya digeser" : "Tidak ada KGB yang tertunda"}</span>
+          </div>
+          <div className="dsb-angka">
+            <span className="dsb-angka-label">Berakhir ≤ 30 hari</span>
+            <span className="dsb-angka-nilai">{summary?.berakhir30 ?? 0}</span>
+            <span className="dsb-angka-meta">
+              {(summary?.berakhir30 ?? 0) > 0 && <span className="dsb-titik" data-nada="kuning" aria-hidden="true" />}
+              {(summary?.berakhir30 ?? 0) > 0 ? "Periksa KGB setelah berakhir" : "Tidak ada dalam 30 hari"}
+            </span>
+          </div>
+          <div className="dsb-angka">
+            <span className="dsb-angka-label">Sudah berakhir</span>
+            <span className="dsb-angka-nilai">{berakhirTotal}</span>
+            <span className="dsb-angka-meta">dari {summary?.total ?? 0} catatan</span>
+          </div>
+        </div>
+      )}
+
+      {/* Daftar */}
+      <section className="dsb-panel dsb-penuh overflow-hidden dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-label="Daftar catatan hukdis">
+        <div className="flex flex-col gap-3" style={{ padding: "14px 16px", borderBottom: "1px solid var(--ln2)" }}>
+          <div className="dsb-segmen" role="group" aria-label="Saring masa berlaku" style={{ alignSelf: "flex-start" }}>
+            {SARINGAN.map((s) => (
+              <button key={s.l} type="button" data-nada={s.nada} aria-pressed={saringan === s.v} onClick={() => setSaringan(s.v)}>
+                {s.l} {!loading && <span style={{ color: "var(--dt5)" }}>{dasar.filter((h) => cocokSaringan(h, s.v)).length}</span>}
               </button>
-            );
-          })}
+            ))}
+          </div>
+          <div className="dsb-alat">
+            <input
+              type="search"
+              className="dsb-cari"
+              aria-label="Cari catatan hukdis"
+              placeholder="Cari nama, NIP, jenis, atau nomor SK"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <select aria-label="Saring kategori" className="dsb-pilih" data-aktif={filterKat ? "" : undefined} value={filterKat} onChange={(e) => setFilterKat(e.target.value)}>
+              <option value="">Semua kategori</option>
+              {Object.entries(KAT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <select aria-label="Saring satker" className="dsb-pilih" data-aktif={filterSatker ? "" : undefined} value={filterSatker} onChange={(e) => setFilterSatker(e.target.value)}>
+              <option value="">Semua satker</option>
+              {SATKER.map((s) => <option key={s.kode} value={s.kode}>{namaSingkatSatker(s)}</option>)}
+              <option value={KODE_SATKER_LAIN}>Unit belum sesuai daftar</option>
+            </select>
+            {adaSaringanLain && (
+              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => { setFilterKat(""); setFilterSatker(""); setSearch(""); }}>
+                Atur ulang
+              </button>
+            )}
+          </div>
         </div>
-      )}
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-52">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--dt5)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari nama, NIP, atau jenis hukdis…" className="adm-input" style={{ paddingLeft: "34px" }} />
-        </div>
-        <div className="flex rounded-xl overflow-hidden" style={{ border: "1px solid var(--ln1)" }}>
-          {([{ v: "aktif", l: "Aktif" }, { v: "berakhir", l: "Berakhir" }, { v: "", l: "Semua" }] as { v: "aktif" | "berakhir" | ""; l: string }[]).map((t) => (
-            <button key={t.l} onClick={() => setFilterStatus(t.v)} className="px-3 py-2 text-xs font-medium transition" style={{ background: filterStatus === t.v ? "var(--navy-solid)" : "var(--card)", color: filterStatus === t.v ? "#fff" : "var(--dt4)" }}>{t.l}</button>
-          ))}
-        </div>
-        {filterKat && (
-          <button onClick={() => setFilterKat("")} className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl" style={{ background: KAT[filterKat]?.bg, color: KAT[filterKat]?.color }}>
-            {KAT[filterKat]?.label}<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        )}
-      </div>
-
-      {/* Tabel */}
-      <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
         {loading ? (
-          <div className="flex items-center justify-center py-16"><p className="text-xs" style={{ color: "var(--dt4)" }}>Memuat data hukdis…</p></div>
+          <div className="flex flex-col gap-2" style={{ padding: "16px" }} role="status" aria-label="Memuat data hukdis">
+            {[0, 1, 2].map((i) => <div key={i} className="dsb-kerangka" style={{ height: 44 }} />)}
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--dt6)" strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <p className="text-xs" style={{ color: "var(--dt5)" }}>{data.length === 0 ? "Belum ada catatan hukuman disiplin" : "Tidak ada yang cocok dengan filter"}</p>
-            {data.length === 0 && <button onClick={openInput} className="text-xs font-semibold px-4 py-2 rounded-xl text-white" style={{ background: "var(--red-solid)" }}>+ Input Hukdis Pertama</button>}
+          <div className="dsb-kosong" style={{ padding: "48px 16px" }}>
+            <p style={{ margin: 0 }}>
+              {data.length === 0
+                ? "Belum ada catatan hukuman disiplin."
+                : saringan === "aktif" && !adaSaringanLain
+                  ? "Tidak ada hukdis yang sedang berjalan."
+                  : "Tidak ada catatan yang cocok dengan saringan."}
+            </p>
+            {data.length === 0 && (
+              <button type="button" onClick={openInput} className="dsb-tombol dsb-tombol-kecil">Input hukdis pertama</button>
+            )}
           </div>
         ) : (
-          <div className="overflow-x-auto tbl-scroll">
-            <table className="w-full">
+          <div className="dsb-gulir-tabel tbl-scroll">
+            <table className="dsb-tabel" style={{ minWidth: "900px" }}>
               <thead>
-                <tr style={{ background: "var(--sub)", borderBottom: "0.5px solid var(--ln1)" }}>
-                  {["Pegawai", "Jenis Hukdis", "Nomor SK", "Masa Berlaku", "Status", "Dampak KGB", ""].map((h) => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--dt4)" }}>{h}</th>
-                  ))}
+                <tr>
+                  <th scope="col">Pegawai</th>
+                  <th scope="col">Jenis hukdis</th>
+                  <th scope="col">Nomor SK</th>
+                  <th scope="col">Masa berlaku</th>
+                  <th scope="col">Dampak KGB</th>
+                  <th scope="col"><span className="sr-only">Aksi</span></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((h, i) => {
+                {filtered.map((h) => {
                   const kat = KAT[h.kategori];
+                  const sisa = sisaHari(h);
+                  const kodeSatker = kodeSatkerPegawai(h.pegawai?.unitKerja);
+                  const segera = h.aktif && sisa !== null && sisa <= 30;
                   return (
-                    <tr key={h.id} style={{ borderBottom: i < filtered.length - 1 ? "0.5px solid var(--ln2)" : "none" }}>
-                      <td className="px-4 py-3">
+                    <tr key={h.id}>
+                      <td style={{ maxWidth: "280px" }}>
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>{initials(h.pegawai.nama)}</div>
-                          <div className="min-w-0"><p className="text-xs font-medium truncate" style={{ color: "var(--dtn)" }}>{h.pegawai.nama}</p><p className="text-xs" style={{ color: "var(--dt4)" }}>{h.pegawai.nip}</p></div>
+                          <span className="dsb-avatar" data-nada={h.aktif ? "merah" : undefined} aria-hidden="true">{initials(h.pegawai?.nama ?? "?")}</span>
+                          <div className="min-w-0">
+                            <p className="dsb-nama truncate" style={{ margin: 0 }} title={h.pegawai?.jabatan}>{h.pegawai?.nama ?? "Pegawai tidak ditemukan"}</p>
+                            <p className="dsb-kecil truncate" style={{ margin: 0 }} title={h.pegawai?.unitKerja ?? undefined}>
+                              {h.pegawai ? <>{h.pegawai.nip} · {namaSatker(kodeSatker)}</> : "-"}
+                              {h.pegawai && !h.pegawai.aktif && " · nonaktif"}
+                            </p>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <p className="text-xs font-medium" style={{ color: "var(--dtn)" }}>{h.jenisLabel}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          {kat && <span className="inline-block text-xs px-1.5 py-0.5 rounded-md font-medium" style={{ background: kat.bg, color: kat.color, fontSize: "10px" }}>{kat.label}</span>}
-                          {h.dasarHukum && <span className="text-xs truncate" style={{ color: "var(--dt5)", fontSize: "10px", maxWidth: "160px" }} title={h.dasarHukum}>{h.dasarHukum}</span>}
-                        </div>
+                      <td style={{ maxWidth: "260px" }}>
+                        <p className="truncate" style={{ margin: 0, color: "var(--dtn)" }} title={h.jenisLabel}>{h.jenisLabel}</p>
+                        <p className="dsb-kecil flex items-center gap-1.5 min-w-0" style={{ margin: 0 }}>
+                          {kat && <><span className="dsb-titik" data-nada={kat.nada} aria-hidden="true" />{kat.label}</>}
+                          {h.dasarHukum && <span className="truncate" title={h.dasarHukum}>· {h.dasarHukum}</span>}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: "var(--dt3)" }}>{h.nomorSK || "-"}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <p className="text-xs" style={{ color: "var(--dtn)" }}>{fmt(h.tmtMulai)} – {fmt(h.tmtBerakhir)}</p>
+                      <td className="whitespace-nowrap">
+                        <p style={{ margin: 0 }}>{h.nomorSK || "-"}</p>
+                        {h.tanggalSK && <p className="dsb-kecil" style={{ margin: 0 }}>{fmt(h.tanggalSK)}</p>}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap" style={{ background: h.aktif ? "var(--tint-red-bg)" : "var(--ln2)", color: h.aktif ? "var(--st-red)" : "var(--dt5)" }}>
-                          {h.aktif ? "Aktif" : "Berakhir"}
-                        </span>
+                      <td className="whitespace-nowrap">
+                        <p style={{ margin: 0 }}>{fmt(h.tmtMulai)} – {fmt(h.tmtBerakhir)}</p>
+                        <p className="dsb-status" style={{ margin: 0, fontSize: "12px", color: segera ? "var(--st-amber)" : "var(--dt4)" }}>
+                          <span className="dsb-titik" data-nada={h.aktif ? (segera ? "kuning" : "merah") : undefined} aria-hidden="true" />
+                          {!h.aktif ? "Sudah berakhir" : sisa === null ? "Aktif" : sisa === 0 ? "Aktif · berakhir hari ini" : `Aktif · ${sisa} hari lagi`}
+                        </p>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="whitespace-nowrap">
                         {h.berdampakKGB
-                          ? <span className="text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)" }}>Tunda {h.durasiTunda ?? "-"} bln</span>
-                          : <span className="text-xs" style={{ color: "var(--dt5)" }}>Tidak</span>}
+                          ? <span style={{ color: h.aktif ? "var(--st-red)" : "var(--dt3)" }}>Tunda {h.durasiTunda ?? "-"} bulan</span>
+                          : <span className="dsb-kecil">Tidak menunda</span>}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Link href={`/dashboard/pegawai/${h.pegawai.id}/riwayat`} title="Lihat riwayat pegawai" aria-label={`Lihat riwayat ${h.pegawai.nama}`} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--tint-navy)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}>
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                          </Link>
-                          <button onClick={() => { setDelError(""); setDelTarget(h); }} title="Hapus catatan hukdis" aria-label={`Hapus catatan hukdis ${h.pegawai.nama}`} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", border: "0.5px solid var(--tint-red-ln)" }}>
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                      <td className="kanan">
+                        <span className="dsb-aksi">
+                          {h.pegawai && (
+                            <Link href={`/dashboard/pegawai/${h.pegawai.id}/riwayat`} className="dsb-ikon-tombol" title="Lihat riwayat pegawai" aria-label={`Lihat riwayat ${h.pegawai.nama}`}>
+                              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            </Link>
+                          )}
+                          <button type="button" onClick={() => { setDelError(""); setDelTarget(h); }} className="dsb-ikon-tombol" data-nada="merah" title="Hapus catatan hukdis" aria-label={`Hapus catatan hukdis ${h.pegawai?.nama ?? ""}`}>
+                            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                           </button>
-                        </div>
+                        </span>
                       </td>
                     </tr>
                   );
@@ -328,14 +433,20 @@ export default function HukdisPage() {
             </table>
           </div>
         )}
-      </div>
+        {!loading && filtered.length > 0 && (
+          <div className="dsb-kaki">
+            <span>{filtered.length} catatan ditampilkan</span>
+            <span>Tanggal berakhir ikut dihitung sebagai masa hukdis</span>
+          </div>
+        )}
+      </section>
 
       {/* Modal Input Hukdis */}
       {showInput && (
         <div className="adm-overlay" onClick={() => !submitting && setShowInput(false)}>
           <div ref={refModalInput} role="dialog" aria-modal="true" aria-labelledby="judul-input-hukdis" tabIndex={-1} className="adm-modal outline-none" style={{ maxWidth: "30rem", maxHeight: "92dvh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 px-5 py-4 shrink-0" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg,#e35d5d,var(--red-solid))" }}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "var(--navy-solid)" }}>
                 <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               </div>
               <div className="flex-1"><h2 id="judul-input-hukdis" className="text-sm font-semibold leading-tight" style={{ color: "var(--dtn)" }}>Input Hukuman Disiplin</h2><p className="text-xs" style={{ color: "var(--dt4)" }}>Pilih pegawai lalu isi detail SK hukdis</p></div>
@@ -460,7 +571,7 @@ export default function HukdisPage() {
 
             <div className="flex gap-2 px-5 py-4 shrink-0" style={{ borderTop: "0.5px solid var(--ln2)" }}>
               <button onClick={() => setShowInput(false)} className="flex-1 text-xs py-2.5 rounded-xl" style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}>Batal</button>
-              <button onClick={handleSubmit} disabled={submitting || !selPeg} className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white disabled:opacity-50" style={{ background: "var(--red-solid)" }}>{submitting ? "Menyimpan…" : "Simpan Hukdis"}</button>
+              <button onClick={handleSubmit} disabled={submitting || !selPeg} className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white disabled:opacity-50" style={{ background: "var(--navy-solid)" }}>{submitting ? "Menyimpan…" : "Simpan Hukdis"}</button>
             </div>
           </div>
         </div>
@@ -473,7 +584,7 @@ export default function HukdisPage() {
             <div className="p-6">
               <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: "var(--tint-red-bg)" }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--st-red)" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div>
               <h2 id="judul-hapus-hukdis" className="text-sm font-semibold mb-1" style={{ color: "var(--dtn)" }}>Hapus Catatan Hukdis?</h2>
-              <p className="text-xs mb-5 leading-relaxed" style={{ color: "var(--dt4)" }}>Hapus hukdis <strong style={{ color: "var(--dtn)" }}>{delTarget.jenisLabel}</strong> milik <strong style={{ color: "var(--dtn)" }}>{delTarget.pegawai.nama}</strong>? Tindakan ini tidak bisa dibatalkan.</p>
+              <p className="text-xs mb-5 leading-relaxed" style={{ color: "var(--dt4)" }}>Hapus hukdis <strong style={{ color: "var(--dtn)" }}>{delTarget.jenisLabel}</strong> milik <strong style={{ color: "var(--dtn)" }}>{delTarget.pegawai?.nama ?? "pegawai ini"}</strong>? Tindakan ini tidak bisa dibatalkan.</p>
               {delError && <p role="alert" className="text-xs rounded-lg px-3 py-2 mb-3" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>{delError}</p>}
               <div className="flex gap-2">
                 <button onClick={() => setDelTarget(null)} disabled={deleting} className="flex-1 text-xs py-2.5 rounded-xl" style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}>Batal</button>

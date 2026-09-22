@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
 import { useDashUser } from "@/app/dashboard/components/RoleContext";
-import { KepalaKartu, KisiKpi, Kpi, PanelNavy, namaDepan, sapaanWita, tanggalPanjangWita } from "@/app/dashboard/components/PanelNavy";
+import { PanelBulanRekon } from "@/app/dashboard/components/DaftarBulanRekon";
+import { PanelNavy, PanelTindakan, Stat, StripStat, namaSapaan, sapaanWita, tanggalPanjangWita, type Tindakan } from "@/app/dashboard/components/PanelNavy";
 
 interface KGBKeuangan {
   id: string;
@@ -60,79 +60,73 @@ export default function DashboardKeuangan() {
   }, []);
 
   const tahun = hariIniWita().getFullYear();
-  const nama = namaDepan(dashUser.nama);
+  const nama = namaSapaan(dashUser.nama, "Keuangan");
   const pctSelesai = stats && stats.kgbTahunIni > 0 ? Math.round((stats.selesai / stats.kgbTahunIni) * 100) : 0;
+  const antrianRapelan = antrian.filter((k) => k.flagRapelan).length;
+  const tindakan: Tindakan[] = [];
+  if (antrian.length > 0)
+    tindakan.push({
+      id: "antrian",
+      nada: "ungu",
+      isi: <>
+        <strong>{antrian.length} SK</strong> menunggu konfirmasi keuangan
+        {antrianRapelan > 0 ? <>, {antrianRapelan} di antaranya berpotensi rapelan</> : null}.
+      </>,
+      aksi: { label: "Tinjau dan konfirmasi", href: "/dashboard/keuangan" },
+    });
 
   return (
-    <div className="dsb-halaman">
+    <div className="dsb-halaman" data-muat-layar="">
 
       <PanelNavy
-        label="Dashboard · Keuangan"
+        label="Dashboard Keuangan"
         judul={`${sapaanWita()}${nama ? `, ${nama}` : ""}`}
         sub={<>{tanggalPanjangWita()} · Konfirmasi SK KGB dan rekon Gaji Web</>}
-        chips={loading && !stats ? [] : [
-          antrian.length > 0
-            ? { teks: `${antrian.length} SK menunggu konfirmasi`, nada: "ungu" }
-            : { teks: "Tidak ada SK yang menunggu", nada: "hijau" },
-          ...(stats && stats.rapelanKonfirmasi > 0
-            ? [{ teks: `${stats.rapelanKonfirmasi} KGB TMT ${tahun} dikonfirmasi rapelan`, nada: "kuning" as const }]
-            : []),
-        ]}
         diperbarui={lastRefresh}
         onMuatUlang={fetchData}
         memuat={loading}
       >
         {stats && (
-          <KisiKpi>
-            <Kpi
+          <StripStat>
+            <Stat
               href="/dashboard/keuangan"
-              label="Antrian masuk"
+              label="Menunggu konfirmasi"
               angka={antrian.length}
-              meta={antrian.length > 0 ? "Menunggu konfirmasi" : "Tidak ada antrian"}
-              metaNada={antrian.length > 0 ? "ungu" : "hijau"}
+              meta={antrian.length === 0 ? "Antrian kosong" : antrianRapelan > 0 ? `${antrianRapelan} berpotensi rapelan` : "Tanpa potensi rapelan"}
+              metaNada={antrian.length === 0 ? "hijau" : antrianRapelan > 0 ? "kuning" : "ungu"}
             />
-            <Kpi
-              label="KGB selesai"
+            <Stat
+              href="/dashboard/keuangan/riwayat"
+              label="Selesai dikonfirmasi"
               angka={stats.selesai}
-              satuan={tahun}
+              satuan={`/ ${stats.kgbTahunIni} · ${pctSelesai}%`}
               progres={pctSelesai}
-              meta={`${pctSelesai}% dari KGB tahun ini`}
-              metaNada="hijau"
             />
-            <Kpi label="KGB tahun ini" angka={stats.kgbTahunIni} satuan={tahun} meta="Semua status" />
-            <Kpi
-              label="Rapelan"
-              angka={stats.rapelanKonfirmasi}
-              satuan={tahun}
-              meta={stats.rapelanBerisiko > 0 ? `${stats.rapelanBerisiko} berpotensi rapelan` : "Tidak ada potensi rapelan"}
-              metaNada={stats.rapelanBerisiko > 0 ? "kuning" : undefined}
+            <Stat label="Rapelan ditetapkan" angka={stats.rapelanKonfirmasi} satuan={`TMT ${tahun}`} />
+            <Stat
+              label="Berpotensi rapelan"
+              angka={stats.rapelanBerisiko}
+              meta={stats.rapelanBerisiko > 0 ? "Belum selesai, lewat batas input SDM" : "Tidak ada potensi rapelan"}
+              metaNada={stats.rapelanBerisiko > 0 ? "kuning" : "hijau"}
             />
-          </KisiKpi>
+          </StripStat>
         )}
       </PanelNavy>
 
+      <div className="dsb-dasbor-isi">
       {/* Antrian KGB masuk */}
-      <section className="dsb-kartu overflow-hidden dsb-muncul" style={{ "--i": 1 } as React.CSSProperties} aria-labelledby="judul-antrian">
-        <div className="dsb-kartu-isi">
-          <KepalaKartu
-            idJudul="judul-antrian"
-            label="Antrian"
-            judul="KGB menunggu konfirmasi keuangan"
-            sub={`${antrian.length} KGB masuk, perlu ditindaklanjuti`}
-            aksi={antrian.length > 0 && (
-              <Link href="/dashboard/keuangan" className="dsb-tombol">
-                Tinjau dan konfirmasi
-              </Link>
-            )}
-          />
+      <section className="dsb-panel dsb-antrian overflow-hidden dsb-muncul" style={{ "--i": 1 } as React.CSSProperties} aria-labelledby="judul-antrian">
+        <div className="dsb-panel-kepala">
+          <h2 id="judul-antrian" className="dsb-panel-judul">KGB menunggu konfirmasi <small>{antrian.length}</small></h2>
+          <Link href="/dashboard/keuangan" className="dsb-tautan">Buka halaman Keuangan →</Link>
         </div>
 
         {loading && antrian.length === 0 ? (
-          <div className="px-5 pb-5 flex flex-col gap-2">
-            {[1, 2, 3].map((i) => <div key={i} className="dsb-kerangka" style={{ height: 72, borderRadius: 14 }} />)}
+          <div className="flex flex-col gap-2" style={{ padding: "16px" }}>
+            {[1, 2, 3].map((i) => <div key={i} className="dsb-kerangka" style={{ height: 72, borderRadius: 8 }} />)}
           </div>
         ) : antrian.length === 0 ? (
-          <div className="dsb-kosong" style={{ borderTop: "1px solid var(--ln2)", padding: "44px 16px" }}>
+          <div className="dsb-kosong" style={{ padding: "44px 16px" }}>
             <span className="dsb-pesan-ikon" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", width: 36, height: 36 }} aria-hidden="true">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </span>
@@ -140,9 +134,8 @@ export default function DashboardKeuangan() {
             <p style={{ margin: 0 }}>Semua KGB sudah diproses oleh keuangan</p>
           </div>
         ) : (
-          <ul style={{ borderTop: "1px solid var(--ln2)" }}>
+          <ul className="dsb-antrian-gulir">
             {antrian.map((k, i) => {
-              const st = { label: infoStatusKgb(k.status).label, ...warnaStatusKgb(k.status) };
               const selisih = k.gajiPokokBaru - k.gajiPokokLama;
               const namaPegawai = k.pegawai?.nama ?? "-";
               return (
@@ -156,9 +149,10 @@ export default function DashboardKeuangan() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="dsb-nama" style={{ margin: 0 }}>{namaPegawai}</p>
                         {k.pegawai?.golonganRuang && <span className="dsb-tag" data-garis="">{k.pegawai.golonganRuang}</span>}
-                        <span className="dsb-tag" style={{ background: st.bg, color: st.color }}>{st.label}</span>
                         {k.flagRapelan && (
-                          <span className="dsb-tag" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)" }}>Berpotensi rapelan</span>
+                          <span className="dsb-status" style={{ fontSize: "12.5px", color: "var(--st-amber)" }}>
+                            <span className="dsb-titik" data-nada="kuning" aria-hidden="true" />Berpotensi rapelan
+                          </span>
                         )}
                       </div>
                       <p className="dsb-kecil" style={{ margin: "3px 0 0" }}>{k.pegawai?.nip ?? "-"} · {k.pegawai?.jabatan ?? "-"}</p>
@@ -205,6 +199,12 @@ export default function DashboardKeuangan() {
           </ul>
         )}
       </section>
+
+      <aside className="dsb-samping dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-label="Ringkasan pendamping">
+        <PanelTindakan daftar={loading && !stats ? [] : tindakan} kosong="Tidak ada SK yang menunggu konfirmasi." />
+        <PanelBulanRekon versi={lastRefresh?.getTime()} />
+      </aside>
+      </div>
     </div>
   );
 }

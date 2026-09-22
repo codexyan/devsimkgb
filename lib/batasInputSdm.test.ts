@@ -64,6 +64,7 @@ const BERGANTUNG: Record<string, string[]> = {
   "@/lib/rekapKgb": ["statusRapelan", "rapelanSiklus", "hitungRekapStatus", "rekapPerBulanTmt", "pilihKgbSiklus"],
   "@/lib/generateNotifikasi": ["rencanaNotifikasi", "generateNotifikasi"],
   "@/lib/jadwalPengusulan": ["jadwalPengusulan"],
+  "@/lib/rekapSatker": ["rekapPerSatker"],
 };
 
 function semuaBerkas(folder: string): string[] {

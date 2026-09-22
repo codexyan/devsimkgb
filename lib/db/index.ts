@@ -1,6 +1,7 @@
 // Pintu tunggal lapisan data untuk route. Penyimpanan dipilih lewat environment:
 //   DATA_BACKEND=supabase atau DATA_BACKEND=sheets. Tanpa DATA_BACKEND, Supabase dipakai bila
-//   SUPABASE_URL di-set, selain itu Google Sheets.
+//   SUPABASE_URL di-set, selain itu Google Sheets. DATA_BACKEND=lokal memakai repository Sheets di atas
+//   berkas JSON lokal (lib/sheets/klienLokal.ts), khusus pengembangan di komputer sendiri.
 // Pilihan dibaca setiap kali repository diakses, karena di Cloudflare Workers secret baru
 // tersedia di process.env saat request berjalan.
 
@@ -11,13 +12,13 @@ import { supabase } from "./supabase/tables";
 
 export type { OrderBy, Repo, Where } from "./repo";
 
-export type BackendData = "sheets" | "supabase";
+export type BackendData = "sheets" | "supabase" | "lokal";
 
 export function backendData(): BackendData {
   const pilihan = process.env.DATA_BACKEND?.trim().toLowerCase();
-  if (pilihan === "sheets" || pilihan === "supabase") return pilihan;
+  if (pilihan === "sheets" || pilihan === "supabase" || pilihan === "lokal") return pilihan;
   if (pilihan) {
-    throw new Error(`DATA_BACKEND "${process.env.DATA_BACKEND}" tidak dikenal; pakai "sheets" atau "supabase".`);
+    throw new Error(`DATA_BACKEND "${process.env.DATA_BACKEND}" tidak dikenal; pakai "sheets", "supabase", atau "lokal".`);
   }
   return process.env.SUPABASE_URL?.trim() ? "supabase" : "sheets";
 }

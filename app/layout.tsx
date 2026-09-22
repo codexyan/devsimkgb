@@ -44,7 +44,7 @@ export default function RootLayout({
             DashboardShell. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{if(location.pathname.indexOf("/dashboard")===0){var t=localStorage.getItem("kgb-theme");if(t!=="dark"&&t!=="light"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.setAttribute("data-dash-theme",t)}}catch(e){}`,
+            __html: `try{if(location.pathname.indexOf("/dashboard")===0){document.documentElement.setAttribute("data-dash-theme",localStorage.getItem("kgb-theme")==="dark"?"dark":"light")}}catch(e){}`,
           }}
         />
         {children}

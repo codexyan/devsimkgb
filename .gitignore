@@ -55,3 +55,6 @@ uploads/
 .dev.vars
 cloudflare-env.d.ts
 .wrangler/
+
+# Basis data lokal untuk npm run dev (DATA_BACKEND=lokal, scripts/seed-lokal.ts)
+/.data-lokal/

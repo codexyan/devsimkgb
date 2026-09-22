@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { canProcessKGB } from "@/lib/auth";
 import { hariIniWita } from "@/lib/waktu";
-import { entriRekapKgb, hitungRekapStatus } from "@/lib/rekapKgb";
+import { entriRekapKgb, hitungRekapStatus, satuPerSiklus } from "@/lib/rekapKgb";
+import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
@@ -23,11 +24,18 @@ export async function GET() {
     db.riwayatKGB.findMany(),
     db.pegawai.findMany(),
   ]);
-  const rekap = hitungRekapStatus(entriRekapKgb(allKgb, pegawaiList), hariIniWita());
+  const hariIni = hariIniWita();
+  const entri = entriRekapKgb(allKgb, pegawaiList);
+  const rekap = hitungRekapStatus(entri, hariIni);
+  // Belum diproses yang masa inputnya belum dibuka (tanggal 1 bulan ke-2 sebelum TMT): belum bisa dikerjakan.
+  const belumDibuka = satuPerSiklus(entri).filter(
+    (k) => k.status === "belum_diproses" && jendelaProsesKgb(k.tmtKgbBaru, hariIni)?.isLocked,
+  ).length;
 
   return NextResponse.json({
     total: rekap.total,
     belum_diproses: rekap.belumDiproses,
+    belum_dibuka: belumDibuka,
     sedang_diproses: rekap.sedangDiproses,
     menunggu_keuangan: rekap.menungguKeuangan,
     selesai: rekap.selesai,

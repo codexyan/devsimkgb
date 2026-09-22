@@ -4,7 +4,10 @@ import { auth } from "@/auth";
 
 export const runtime = "nodejs";
 
-/* GET, riwayat aktivitas khusus keuangan (audit log) */
+const BATAS_LOG = 500;
+
+/* GET, riwayat aktivitas khusus keuangan (audit log), terbaru dulu. Dibatasi 500 entri, cukup untuk
+   beberapa tahun konfirmasi di satu kanwil; halaman Riwayat Aktivitas menyaring dan mengelompokkannya. */
 export async function GET() {
   const session = await auth();
   if (!session)
@@ -20,7 +23,7 @@ export async function GET() {
 
   const logs = all
     .filter((l) => ["konfirmasi_keuangan", "rekon_keuangan"].includes(l.aksi))
-    .slice(0, 100)
+    .slice(0, BATAS_LOG)
     .map((l) => {
       const u = l.userId ? userById.get(l.userId) : null;
       return { ...l, user: u ? { nama: u.nama, nip: u.nip } : null };

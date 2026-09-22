@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   GOLONGAN_PANGKAT,
   getMKGOptions,
@@ -12,7 +13,7 @@ import {
 } from "@/lib/tabelGaji";
 import { ROLES } from "@/lib/auth";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
-import { infoStatusKgb, isStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
+import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
@@ -145,7 +146,10 @@ export default function PegawaiPage() {
   const [filterAktif, setFilterAktif] = useState(true);
   const [filterGolongan, setFilterGolongan] = useState("");
   const [filterHukdis, setFilterHukdis] = useState("");
-  const [filterSatker, setFilterSatker] = useState("");
+  const [filterLewat, setFilterLewat] = useState(false);
+  // ?satker= dari modul Satker & UPT membuka daftar yang sudah tersaring.
+  const searchParams = useSearchParams();
+  const [filterSatker, setFilterSatker] = useState(() => searchParams.get("satker") ?? "");
   const [sortBy, setSortBy] = useState("nama_asc");
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState<Pegawai | null>(null);
@@ -398,7 +402,30 @@ export default function PegawaiPage() {
 
   // Stat global (dari aktifList, tidak terpengaruh filter). Batas SDM dihitung menurut hari ini WITA.
   const hukdisCount   = aktifList.filter((p) => p.statusHukdis).length;
-  const terlambatCount = aktifList.filter((p) => jendelaProsesKgb(p.tmtKgbBerikutnya)?.flagRapelan).length;
+  // Lewat batas input: KGB berikutnya belum diinput (tidak sedang diproses atau menunggu keuangan) padahal batas
+  // input Tim SDM sudah lewat. Definisinya sama dengan dashboard (rapelanSiklus di lib/rekapKgb.ts).
+  const lewatBatas = (p: Pegawai) =>
+    !!jendelaProsesKgb(p.tmtKgbBerikutnya)?.flagRapelan && p.statusKGB !== "sedang_diproses" && p.statusKGB !== "menunggu_keuangan";
+  const lewatBatasCount = aktifList.filter(lewatBatas).length;
+
+  /** Status KGB berikutnya untuk kolom Status: proses berjalan, lewat batas, siap diinput, atau terjadwal. */
+  function statusKgbBerikutnya(p: Pegawai): { label: string; gaya: React.CSSProperties; nada?: "merah"; batas: string | null } {
+    const jendela = jendelaProsesKgb(p.tmtKgbBerikutnya);
+    const batas = jendela ? jendela.deadlineSDM.toLocaleDateString("id-ID", FORMAT_TANGGAL_PENDEK) : null;
+    if (p.statusKGB === "sedang_diproses" || p.statusKGB === "menunggu_keuangan") {
+      const warna = warnaStatusKgb(p.statusKGB);
+      return { label: infoStatusKgb(p.statusKGB).label, gaya: { background: warna.bg, color: warna.color }, batas };
+    }
+    if (jendela?.flagRapelan)
+      return { label: "Lewat batas input", gaya: { background: "var(--tint-red-bg)", color: "var(--st-red)" }, nada: "merah", batas };
+    if (jendela && !jendela.isLocked)
+      return { label: "Siap diinput", gaya: { background: "var(--tint-amber-bg)", color: "var(--st-amber)" }, batas };
+    return {
+      label: jendela ? `Dibuka ${formatTanggalId(jendela.unlockDate, { day: "numeric", month: "short", year: "numeric" })}` : "Belum terjadwal",
+      gaya: { background: "var(--sub)", color: "var(--dt4)" },
+      batas,
+    };
+  }
 
   // Golongan unik dari data yang sudah di-load
   const golonganOptions = Array.from(
@@ -420,6 +447,7 @@ export default function PegawaiPage() {
       if (filterGolongan && p.golonganRuang !== filterGolongan) return false;
       if (filterHukdis === "hukdis" && !p.statusHukdis) return false;
       if (filterHukdis === "normal" && p.statusHukdis) return false;
+      if (filterLewat && !lewatBatas(p)) return false;
       if (filterSatker) {
         const kode = (p.unitKerja?.trim() ? cariSatker(p.unitKerja)?.kode : SATKER_KANWIL.kode) ?? "__lain__";
         if (kode !== filterSatker) return false;
@@ -441,7 +469,7 @@ export default function PegawaiPage() {
   const f = (key: string, val: string | boolean) =>
     setForm((p) => ({ ...p, [key]: val }));
   const satkerTerpilih = cariSatker(form.unitKerja);
-  const adaFilter = !!(filterGolongan || filterHukdis || filterSatker);
+  const adaFilter = !!(filterGolongan || filterHukdis || filterSatker || filterLewat);
 
   const overlayStyle = {
     position: "fixed" as const,
@@ -452,690 +480,360 @@ export default function PegawaiPage() {
   };
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <div>
-          {!isHukdisOnly && (
-            <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--st-amber)", marginBottom: "3px" }}>
-              Data
-            </p>
-          )}
-          <h1 className="text-base font-semibold" style={{ color: "var(--dtn)" }}>
-            {isHukdisOnly ? "Hukuman Disiplin Pegawai" : "Data Pegawai"}
-          </h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--dt4)" }}>
+    <div className="dsb-halaman">
+      {/* Kepala halaman */}
+      <header className="dsb-halaman-kepala dsb-muncul">
+        <div className="min-w-0">
+          <p className="dsb-label">{isHukdisOnly ? "Hukuman disiplin" : "Data"}</p>
+          <h1 className="dsb-halaman-judul">{isHukdisOnly ? "Hukuman disiplin pegawai" : "Data pegawai"}</h1>
+          <p className="dsb-sub">
             {loading
               ? "Memuat…"
               : isHukdisOnly
-                ? `${hukdisCount} hukdis aktif · ${aktifList.length} pegawai aktif`
-                : `${aktifList.length} aktif · ${nonaktifList.length} nonaktif`}
+                ? `${hukdisCount} hukdis aktif dari ${aktifList.length} pegawai aktif`
+                : `${aktifList.length} pegawai aktif · ${nonaktifList.length} nonaktif`}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Toggle Aktif/Nonaktif dengan count */}
-          <div className="flex rounded-xl overflow-hidden" style={{ border: "1px solid var(--ln1)" }}>
-            <button
-              onClick={() => { setFilterAktif(true); setSelected(new Set()); }}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition"
-              style={{ background: filterAktif ? "var(--navy-solid)" : "var(--card)", color: filterAktif ? "#fff" : "var(--dt4)" }}
-            >
-              Aktif
-              {!loading && (
-                <span className="px-1.5 py-px rounded-md font-bold"
-                  style={{ background: filterAktif ? "rgba(255,255,255,0.2)" : "var(--ln1)", color: filterAktif ? "#fff" : "#6a8aaa", fontSize: "10px" }}>
-                  {aktifList.length}
-                </span>
-              )}
+        {filterAktif && canEdit && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={handleExport} className="dsb-tombol" data-jenis="garis">
+              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+              Ekspor CSV
             </button>
-            <button
-              onClick={() => { setFilterAktif(false); setSelected(new Set()); }}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition"
-              style={{ background: !filterAktif ? "var(--amber-solid)" : "var(--card)", color: !filterAktif ? "#fff" : "var(--dt4)" }}
-            >
-              Nonaktif
-              {!loading && nonaktifList.length > 0 && (
-                <span className="px-1.5 py-px rounded-md font-bold"
-                  style={{ background: !filterAktif ? "rgba(255,255,255,0.2)" : "var(--tint-amber-bg2)", color: !filterAktif ? "#fff" : "var(--st-amber)", fontSize: "10px" }}>
-                  {nonaktifList.length}
-                </span>
-              )}
+            <Link href="/dashboard/pegawai/import" className="dsb-tombol" data-jenis="garis">
+              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+              Impor CSV
+            </Link>
+            <button type="button" onClick={openTambah} className="dsb-tombol">
+              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+              Tambah pegawai
             </button>
           </div>
-          {filterAktif && canEdit && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition"
-                style={{
-                  background: "var(--tint-green-bg)",
-                  color: "var(--st-green)",
-                  border: "1px solid var(--tint-green-ln)",
-                }}
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                Ekspor CSV
-              </button>
-              <Link
-                href="/dashboard/pegawai/import"
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition"
-                style={{
-                  background: "var(--sub)",
-                  color: "var(--dtn)",
-                  border: "1px solid var(--ln1)",
-                }}
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                Impor CSV
-              </Link>
-              <button
-                onClick={openTambah}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white transition"
-                style={{ background: "var(--navy-solid)" }}
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Tambah Pegawai
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Stat chips */}
-      {!loading && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {isHukdisOnly ? (
-            <>
-              <button
-                onClick={() => { setFilterAktif(true); setFilterHukdis("hukdis"); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition"
-                style={{ background: hukdisCount > 0 ? "var(--tint-red-bg)" : "var(--sub)", color: hukdisCount > 0 ? "var(--st-red)" : "var(--dt4)", border: `1px solid ${hukdisCount > 0 ? "var(--tint-red-ln)" : "var(--ln1)"}` }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-                {hukdisCount} Hukdis Aktif
-              </button>
-              <button
-                onClick={() => { setFilterAktif(true); setFilterHukdis("normal"); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition"
-                style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", border: "1px solid var(--tint-green-ln)" }}>
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--green-solid)" }} />
-                {aktifList.length - hukdisCount} Tanpa Hukdis
-              </button>
-              <button
-                onClick={() => { setFilterAktif(true); setFilterHukdis(""); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition"
-                style={{ background: "var(--tint-navy)", color: "var(--dtn)", border: "1px solid var(--ln0)" }}>
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#3b82f6" }} />
-                {aktifList.length} Total Pegawai
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
-                style={{ background: "var(--tint-navy)", color: "var(--dtn)", border: "1px solid var(--ln0)" }}>
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#3b82f6" }} />
-                {aktifList.length} Pegawai Aktif
-              </div>
-              {hukdisCount > 0 && (
-                <button
-                  onClick={() => { setFilterAktif(true); setFilterHukdis("hukdis"); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition"
-                  style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", border: "1px solid var(--tint-red-ln)" }}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                  {hukdisCount} Hukdis Aktif
-                </button>
-              )}
-              {terlambatCount > 0 && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
-                  style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)", border: "1px solid var(--tint-amber-ln)" }}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                  </svg>
-                  {terlambatCount} KGB Terlambat
-                </div>
-              )}
-              {nonaktifList.length > 0 && (
-                <button
-                  onClick={() => { setFilterAktif(false); setSelected(new Set()); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition"
-                  style={{ background: "var(--sub)", color: "var(--dt4)", border: "1px solid var(--ln1)" }}>
-                  {nonaktifList.length} Nonaktif
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      )}
+        )}
+      </header>
 
       {success && (
-        <div
-          role="status"
-          className="mb-4 px-4 py-3 rounded-xl text-xs font-medium"
-          style={{
-            background: "var(--tint-green-bg)",
-            color: "var(--st-green)",
-            border: "1px solid var(--tint-green-ln)",
-          }}
-        >
-          {success}
+        <div role="status" className="dsb-pesan" data-nada="hijau">
+          <span className="dsb-pesan-ikon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          </span>
+          <p>{success}</p>
         </div>
       )}
 
       {peringatan && (
-        <div
-          role="status"
-          className="mb-4 px-4 py-3 rounded-xl text-xs font-medium flex items-center justify-between gap-3"
-          style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber2)", border: "1px solid var(--tint-amber-ln)" }}
-        >
-          {peringatan}
-          <button onClick={() => setPeringatan("")} className="text-xs underline shrink-0" style={{ color: "var(--st-amber2)" }}>
-            Tutup
+        <div role="status" className="dsb-pesan" data-nada="kuning">
+          <span className="dsb-pesan-ikon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+          </span>
+          <p>{peringatan}</p>
+          <button type="button" className="dsb-ikon-tombol" aria-label="Tutup peringatan" onClick={() => setPeringatan("")}>
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
       )}
 
-      {/* Search + Filter + Sort */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {/* Search */}
-        <div className="relative flex-1 min-w-48">
-          <svg aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a0b4c8" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            type="text"
-            aria-label="Cari pegawai"
-            placeholder="Cari nama, NIP, jabatan, unit kerja..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl text-xs outline-none"
-            style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: "var(--dtn)" }}
-          />
-        </div>
-
-        {/* Filter Golongan */}
-        <select
-          aria-label="Filter golongan"
-          value={filterGolongan}
-          onChange={(e) => setFilterGolongan(e.target.value)}
-          className="rounded-xl px-3 py-2 text-xs outline-none"
-          style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: filterGolongan ? "var(--dtn)" : "var(--dt5)", minWidth: "110px" }}
-        >
-          <option value="">Semua Gol.</option>
-          {golonganOptions.map((g) => (
-            <option key={g} value={g}>{g}</option>
-          ))}
-        </select>
-
-        {/* Filter Hukdis */}
-        <select
-          aria-label="Filter status hukdis"
-          value={filterHukdis}
-          onChange={(e) => setFilterHukdis(e.target.value)}
-          className="rounded-xl px-3 py-2 text-xs outline-none"
-          style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: filterHukdis ? "var(--dtn)" : "var(--dt5)", minWidth: "120px" }}
-        >
-          <option value="">Semua Status</option>
-          <option value="normal">Tanpa Hukdis</option>
-          <option value="hukdis">Hukdis Aktif</option>
-        </select>
-
-        {/* Filter Unit Kerja */}
-        <select
-          aria-label="Filter unit kerja"
-          value={filterSatker}
-          onChange={(e) => setFilterSatker(e.target.value)}
-          className="rounded-xl px-3 py-2 text-xs outline-none"
-          style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: filterSatker ? "var(--dtn)" : "var(--dt5)", minWidth: "150px", maxWidth: "240px" }}
-        >
-          <option value="">Semua Unit Kerja</option>
-          {SATKER.map((s) => (
-            <option key={s.kode} value={s.kode}>{labelUnitKerja(s.nama).teks}</option>
-          ))}
-          <option value="__lain__">Belum sesuai daftar satker</option>
-        </select>
-
-        {/* Sort */}
-        <select
-          aria-label="Urutkan"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="rounded-xl px-3 py-2 text-xs outline-none"
-          style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: "var(--dtn)", minWidth: "150px" }}
-        >
-          <option value="nama_asc">Nama A–Z</option>
-          <option value="nama_desc">Nama Z–A</option>
-          <option value="tmt_asc">TMT KGB Terdekat</option>
-          <option value="tmt_desc">TMT KGB Terjauh</option>
-          <option value="golongan_asc">Golongan I–IV</option>
-          <option value="golongan_desc">Golongan IV–I</option>
-        </select>
-
-        {/* Reset filter */}
-        {(adaFilter || sortBy !== "nama_asc") && (
-          <button
-            onClick={() => { setFilterGolongan(""); setFilterHukdis(""); setFilterSatker(""); setSortBy("nama_asc"); }}
-            className="px-3 py-2 rounded-xl text-xs transition"
-            style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", border: "1px solid var(--tint-red-ln)" }}
-          >
-            Atur Ulang
-          </button>
-        )}
-      </div>
-
-      {/* Bulk action bar */}
-      {selected.size > 0 && canEdit && (
-        <div
-          className="flex items-center justify-between rounded-xl px-4 py-2.5 mb-3"
-          style={{ background: "var(--tint-navy)", border: "1px solid var(--ln0)" }}
-        >
-          <p className="text-xs font-medium" style={{ color: "var(--dtn)" }}>
-            {selected.size} pegawai dipilih
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSelected(new Set())}
-              className="text-xs px-3 py-1.5 rounded-lg transition"
-              style={{ color: "var(--dt4)" }}
-            >
-              Batal
-            </button>
-            {filterAktif ? (
-              <button
-                onClick={() => setShowBulkNonaktif(true)}
-                className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white transition"
-                style={{ background: "var(--amber-solid)" }}
-              >
-                Nonaktifkan Terpilih
+      <section className="dsb-kartu overflow-hidden dsb-muncul" style={{ "--i": 1 } as React.CSSProperties} aria-label="Daftar pegawai">
+        <div className="dsb-kartu-isi flex flex-col gap-3" style={{ paddingBottom: "14px" }}>
+          {/* Saringan cepat: aktif/nonaktif, lalu keadaan yang perlu perhatian */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="dsb-segmen" role="group" aria-label="Status pegawai">
+              <button type="button" aria-pressed={filterAktif} onClick={() => { setFilterAktif(true); setSelected(new Set()); }}>
+                Aktif {!loading && <span style={{ color: "var(--dt5)" }}>{aktifList.length}</span>}
               </button>
-            ) : (
+              <button type="button" aria-pressed={!filterAktif} onClick={() => { setFilterAktif(false); setSelected(new Set()); }}>
+                Nonaktif {!loading && <span style={{ color: "var(--dt5)" }}>{nonaktifList.length}</span>}
+              </button>
+            </div>
+            {filterAktif && !loading && (
+              <div className="dsb-segmen" role="group" aria-label="Saringan cepat">
+                <button type="button" aria-pressed={!filterLewat && !filterHukdis} onClick={() => { setFilterLewat(false); setFilterHukdis(""); }}>
+                  Semua
+                </button>
+                {!isHukdisOnly && (
+                  <button type="button" data-nada="merah" aria-pressed={filterLewat} onClick={() => { setFilterLewat(true); setFilterHukdis(""); }}>
+                    Lewat batas input <span style={{ color: "var(--dt5)" }}>{lewatBatasCount}</span>
+                  </button>
+                )}
+                <button type="button" data-nada="merah" aria-pressed={filterHukdis === "hukdis"} onClick={() => { setFilterLewat(false); setFilterHukdis("hukdis"); }}>
+                  Hukdis aktif <span style={{ color: "var(--dt5)" }}>{hukdisCount}</span>
+                </button>
+                {isHukdisOnly && (
+                  <button type="button" aria-pressed={filterHukdis === "normal"} onClick={() => { setFilterLewat(false); setFilterHukdis("normal"); }}>
+                    Tanpa hukdis <span style={{ color: "var(--dt5)" }}>{aktifList.length - hukdisCount}</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Pencarian, saringan, dan urutan */}
+          <div className="dsb-alat">
+            <input
+              type="search"
+              className="dsb-cari"
+              aria-label="Cari pegawai"
+              placeholder="Cari nama, NIP, jabatan, atau unit kerja"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <select aria-label="Saring golongan" className="dsb-pilih" data-aktif={filterGolongan ? "" : undefined} value={filterGolongan} onChange={(e) => setFilterGolongan(e.target.value)}>
+              <option value="">Semua golongan</option>
+              {golonganOptions.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+            <select aria-label="Saring unit kerja" className="dsb-pilih" data-aktif={filterSatker ? "" : undefined} value={filterSatker} onChange={(e) => setFilterSatker(e.target.value)}>
+              <option value="">Semua unit kerja</option>
+              {SATKER.map((s) => (
+                <option key={s.kode} value={s.kode}>{labelUnitKerja(s.nama).teks}</option>
+              ))}
+              <option value="__lain__">Belum sesuai daftar satker</option>
+            </select>
+            <select aria-label="Urutkan" className="dsb-pilih" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              <option value="nama_asc">Nama A–Z</option>
+              <option value="nama_desc">Nama Z–A</option>
+              <option value="tmt_asc">TMT KGB terdekat</option>
+              <option value="tmt_desc">TMT KGB terjauh</option>
+              <option value="golongan_asc">Golongan I–IV</option>
+              <option value="golongan_desc">Golongan IV–I</option>
+            </select>
+            {(adaFilter || sortBy !== "nama_asc" || search) && (
               <button
-                onClick={() => setShowBulkHapus(true)}
-                className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white transition"
-                style={{ background: "var(--red-solid)" }}
+                type="button"
+                className="dsb-tombol dsb-tombol-kecil"
+                data-jenis="garis"
+                onClick={() => { setSearch(""); setFilterGolongan(""); setFilterHukdis(""); setFilterSatker(""); setFilterLewat(false); setSortBy("nama_asc"); }}
               >
-                Hapus Permanen Terpilih
+                Atur ulang
               </button>
             )}
           </div>
-        </div>
-      )}
 
-      {/* Info jumlah hasil */}
-      {adaFilter && !loading && (
-        <p className="text-xs mb-3" style={{ color: "var(--dt4)" }}>
-          Menampilkan <span className="font-semibold" style={{ color: "var(--dtn)" }}>{displayList.length}</span> dari {pegawaiList.length} pegawai
-        </p>
-      )}
+          {(adaFilter || search) && !loading && (
+            <p className="dsb-hasil" style={{ margin: 0 }}>
+              Menampilkan <strong>{displayList.length}</strong> dari {pegawaiList.length} pegawai
+            </p>
+          )}
 
-      {/* Loading / Empty */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16 bg-white rounded-2xl" style={{ border: "0.5px solid var(--ln1)" }}>
-          <p className="text-xs" style={{ color: "var(--dt4)" }}>Memuat data...</p>
-        </div>
-      ) : displayList.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-2 bg-white rounded-2xl" style={{ border: "0.5px solid var(--ln1)" }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d0dce8" strokeWidth="1.5">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-          </svg>
-          <p className="text-xs" style={{ color: "var(--dt5)" }}>
-            {adaFilter
-              ? "Tidak ada pegawai yang cocok dengan filter"
-              : filterAktif
-                ? isHukdisOnly
-                  ? "Tidak ada pegawai dengan hukdis aktif"
-                  : "Belum ada data pegawai aktif"
-                : "Tidak ada pegawai nonaktif"}
-          </p>
-          {filterAktif && canEdit && (
-            <button onClick={openTambah} className="text-xs underline" style={{ color: "var(--dtn)" }}>Tambah pegawai pertama</button>
+          {/* Aksi massal */}
+          {selected.size > 0 && canEdit && (
+            <div className="dsb-catatan">
+              <span><strong style={{ fontSize: "inherit" }}>{selected.size} pegawai</strong> dipilih</span>
+              <span className="flex items-center gap-2">
+                <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setSelected(new Set())}>Batal</button>
+                {filterAktif ? (
+                  <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="merah" onClick={() => setShowBulkNonaktif(true)}>Nonaktifkan terpilih</button>
+                ) : (
+                  <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="merah" onClick={() => setShowBulkHapus(true)}>Hapus permanen terpilih</button>
+                )}
+              </span>
+            </div>
           )}
         </div>
-      ) : (
-        <>
-        {/* ── Desktop table ── */}
-        <div className="hidden md:block bg-white rounded-2xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
-          <div className="overflow-x-auto tbl-scroll">
-            <table className="w-full">
+
+        {loading ? (
+          <div className="px-5 pb-5 flex flex-col gap-2" role="status" aria-label="Memuat data pegawai">
+            {[1, 2, 3, 4].map((i) => <div key={i} className="dsb-kerangka" style={{ height: 56, borderRadius: 12 }} />)}
+          </div>
+        ) : displayList.length === 0 ? (
+          <div className="dsb-kosong" style={{ borderTop: "1px solid var(--ln2)", padding: "48px 16px" }}>
+            <p style={{ margin: 0 }}>
+              {adaFilter || search
+                ? "Tidak ada pegawai yang cocok dengan saringan."
+                : filterAktif
+                  ? isHukdisOnly ? "Tidak ada pegawai dengan hukdis aktif." : "Belum ada data pegawai aktif."
+                  : "Tidak ada pegawai nonaktif."}
+            </p>
+            {filterAktif && canEdit && !adaFilter && !search && (
+              <button type="button" onClick={openTambah} className="dsb-tombol dsb-tombol-kecil" style={{ marginTop: "6px" }}>Tambah pegawai pertama</button>
+            )}
+          </div>
+        ) : (
+          <>
+          {/* ── Tabel layar lebar ── */}
+          <div className="hidden md:block overflow-x-auto tbl-scroll" style={{ borderTop: "1px solid var(--ln2)" }}>
+            <table className="dsb-tabel">
               <thead>
-                <tr
-                  style={{
-                    background: "var(--sub)",
-                    borderBottom: "0.5px solid var(--ln1)",
-                  }}
-                >
-                  <th className="px-4 py-3 w-9">
+                <tr>
+                  <th scope="col" style={{ width: "36px" }}>
                     <input
                       type="checkbox"
+                      className="dsb-cek"
                       aria-label="Pilih semua pegawai yang tampil"
-                      className="w-4 h-4 rounded"
                       checked={selected.size === displayList.length && displayList.length > 0}
                       onChange={toggleSelectAll}
                     />
                   </th>
-                  {["Pegawai", "Jabatan · Golongan", "Unit Kerja", "Gaji · MKG", "TMT KGB · Deadline", "Status", isHukdisOnly ? "Hukdis" : "Aksi"].map((h) => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--dt4)" }}>{h}</th>
-                  ))}
+                  <th scope="col">Pegawai</th>
+                  <th scope="col">Jabatan dan unit kerja</th>
+                  <th scope="col">Gaji pokok</th>
+                  <th scope="col">{isHukdisOnly ? "Hukdis" : "KGB berikutnya"}</th>
+                  <th scope="col"><span className="sr-only">Aksi</span></th>
                 </tr>
               </thead>
               <tbody>
-                {displayList.map((p, i) => {
-                  const jendela = jendelaProsesKgb(p.tmtKgbBerikutnya);
-                  const isOverdue = p.aktif && !p.statusHukdis && !!jendela?.flagRapelan;
+                {displayList.map((p) => {
+                  const kgb = statusKgbBerikutnya(p);
                   const uk = labelUnitKerja(p.unitKerja);
                   return (
-                  <tr
-                    key={p.id}
-                    style={{
-                      borderBottom:
-                        i < displayList.length - 1
-                          ? "0.5px solid var(--ln2)"
-                          : "none",
-                      background: selected.has(p.id) ? "var(--sub)" : undefined,
-                    }}
-                  >
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        aria-label={`Pilih ${p.nama}`}
-                        className="w-4 h-4 rounded"
-                        checked={selected.has(p.id)}
-                        onChange={() => toggleSelect(p.id)}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: filterAktif ? "var(--tint-navy)" : "var(--ln2)", color: filterAktif ? "var(--dtn)" : "var(--dt5)" }}>
-                          {p.nama.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+                    <tr key={p.id} className={[selected.has(p.id) ? "dsb-baris-pilih" : "", !filterAktif ? "dsb-redup" : ""].join(" ").trim() || undefined}>
+                      <td>
+                        <input type="checkbox" className="dsb-cek" aria-label={`Pilih ${p.nama}`} checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} />
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-2.5">
+                          <span className="dsb-avatar" data-nada={p.statusHukdis ? "merah" : undefined} aria-hidden="true">
+                            {p.nama.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+                          </span>
+                          <div className="min-w-0" style={{ lineHeight: 1.35 }}>
+                            <p className="dsb-nama" style={{ margin: 0 }}>{p.nama}</p>
+                            <p className="dsb-kecil" style={{ margin: 0 }}>{p.nip}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-medium" style={{ color: filterAktif ? "var(--dtn)" : "var(--dt5)" }}>{p.nama}</p>
-                          <p className="text-xs" style={{ color: "var(--dt4)" }}>{p.nip}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-xs font-medium" style={{ color: filterAktif ? "var(--dtn)" : "var(--dt5)" }}>{p.jabatan}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="inline-block text-xs px-1.5 py-0.5 rounded-md font-medium" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>{p.golonganRuang}</span>
-                        <span className="text-xs" style={{ color: "var(--dt5)" }}>{p.pangkat}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-xs" style={{ color: filterAktif ? "var(--dt2)" : "var(--dt5)", maxWidth: "200px" }} title={p.unitKerja || undefined}>{uk.teks}</p>
-                      {!uk.dikenal && (
-                        <p className="text-xs mt-0.5" style={{ color: "var(--st-amber)", fontSize: "10px" }}>Belum sesuai daftar satker</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="text-xs font-semibold" style={{ color: filterAktif ? "var(--dtn)" : "var(--dt5)" }}>Rp {p.gajiPokok.toLocaleString("id-ID")}</p>
-                      <p className="text-xs" style={{ color: "var(--dt5)" }}>{p.mkgTahun} thn {p.mkgBulan > 0 ? `${p.mkgBulan} bln` : ""} MKG</p>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="text-xs font-medium" style={{ color: "var(--dt3)" }}>
-                        {formatTanggalId(p.tmtKgbBerikutnya, FORMAT_TANGGAL_PENDEK)}
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: isOverdue ? "var(--st-red)" : "var(--dt5)" }}>
-                        Deadline: {jendela ? jendela.deadlineSDM.toLocaleDateString("id-ID", FORMAT_TANGGAL_PENDEK) : "-"}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1 items-start">
+                      </td>
+                      <td style={{ maxWidth: "280px" }}>
+                        <p style={{ margin: 0, color: "var(--dtn)" }}>{p.jabatan}</p>
+                        <p className="dsb-kecil" style={{ margin: "2px 0 0" }} title={p.unitKerja || undefined}>
+                          {p.golonganRuang} {p.pangkat} · {uk.teks}
+                        </p>
+                        {!uk.dikenal && <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-amber)" }}>Unit kerja belum sesuai daftar satker</p>}
+                      </td>
+                      <td className="whitespace-nowrap">
+                        <p style={{ margin: 0, color: "var(--dtn)", fontVariantNumeric: "tabular-nums" }}>Rp {p.gajiPokok.toLocaleString("id-ID")}</p>
+                        <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>MKG {p.mkgTahun} thn{p.mkgBulan > 0 ? ` ${p.mkgBulan} bln` : ""}</p>
+                      </td>
+                      <td className="whitespace-nowrap">
                         {!filterAktif ? (
-                          <span
-                            className="text-xs px-2 py-1 rounded-full font-medium"
-                            style={{ background: "var(--ln2)", color: "var(--dt5)" }}
-                          >
-                            Nonaktif
-                          </span>
-                        ) : p.statusHukdis ? (
-                          <span
-                            className="text-xs px-2 py-1 rounded-full font-medium"
-                            style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}
-                          >
-                            Hukdis
-                          </span>
+                          <span className="dsb-tag" data-garis="">Nonaktif</span>
+                        ) : isHukdisOnly ? (
+                          p.statusHukdis
+                            ? <span className="dsb-tag" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>Hukdis aktif</span>
+                            : <span className="dsb-kecil">Tanpa hukdis</span>
                         ) : (
-                          <span
-                            className="text-xs px-2 py-1 rounded-full font-medium"
-                            style={{ background: "var(--tint-green-bg)", color: "var(--st-green)" }}
-                          >
-                            Aktif
-                          </span>
+                          <>
+                            <p style={{ margin: 0, color: "var(--dtn)" }}>{formatTanggalId(p.tmtKgbBerikutnya, FORMAT_TANGGAL_PENDEK)}</p>
+                            <div className="flex flex-wrap gap-1" style={{ marginTop: "4px" }}>
+                              <span className="dsb-tag" style={kgb.gaya}>{kgb.label}</span>
+                              {p.statusHukdis && <span className="dsb-tag" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>Hukdis</span>}
+                            </div>
+                            {kgb.batas && !kgb.label.startsWith("Dibuka") && (
+                              <p className="dsb-kecil" style={{ margin: "3px 0 0", color: kgb.nada === "merah" ? "var(--st-red)" : undefined }}>
+                                Batas input {kgb.batas}
+                              </p>
+                            )}
+                          </>
                         )}
-                        {isOverdue && (
-                          <span
-                            className="text-xs px-2 py-0.5 rounded-full font-bold"
-                            style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)", border: "1px solid var(--tint-amber-ln)", fontSize: "10px" }}
-                          >
-                            Terlambat
-                          </span>
-                        )}
-                        {/* Status KGB terkini (peran KGB, pegawai aktif) */}
-                        {filterAktif && !isHukdisOnly && p.statusKGB && isStatusKgb(p.statusKGB) && (
-                          <span
-                            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
-                            style={{ background: warnaStatusKgb(p.statusKGB).bg, color: warnaStatusKgb(p.statusKGB).color, fontSize: "10px" }}
-                          >
-                            <span aria-hidden="true" style={{ width: "5px", height: "5px", borderRadius: "50%", background: "currentColor", display: "inline-block" }} />
-                            KGB: {infoStatusKgb(p.statusKGB).label}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        {/* Proses KGB langsung (buka detail proses pegawai ini) */}
-                        {filterAktif && !isHukdisOnly && (
+                      </td>
+                      <td className="kanan whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5">
+                          {filterAktif && !isHukdisOnly && (
+                            <Link href={`/dashboard/kgb?pegawaiId=${p.id}`} className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" aria-label={`Proses KGB ${p.nama}`}>
+                              Proses KGB
+                            </Link>
+                          )}
                           <Link
-                            href={`/dashboard/kgb?pegawaiId=${p.id}`}
-                            title="Proses KGB pegawai ini"
-                            aria-label={`Proses KGB ${p.nama}`}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition"
-                            style={{ background: "var(--tint-amber-bg)", border: "0.5px solid var(--tint-amber-ln)", color: "var(--st-amber)" }}
+                            href={`/dashboard/pegawai/${p.id}/riwayat`}
+                            className={isHukdisOnly ? "dsb-tombol dsb-tombol-kecil" : "dsb-ikon-tombol"}
+                            data-jenis={isHukdisOnly ? "garis" : undefined}
+                            title={isHukdisOnly ? undefined : "Riwayat dan hukdis"}
+                            aria-label={isHukdisOnly ? undefined : `Riwayat dan hukdis ${p.nama}`}
                           >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
+                            {isHukdisOnly ? "Kelola hukdis" : (
+                              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+                            )}
                           </Link>
-                        )}
-                        <Link
-                          href={`/dashboard/pegawai/${p.id}/riwayat`}
-                          title={isHukdisOnly ? "Kelola Hukdis" : "Riwayat dan Hukdis"}
-                          aria-label={isHukdisOnly ? undefined : `Riwayat dan hukdis ${p.nama}`}
-                          className={isHukdisOnly ? "flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-semibold transition whitespace-nowrap" : "w-8 h-8 rounded-lg flex items-center justify-center transition"}
-                          style={{ background: "var(--tint-green-bg)", border: "0.5px solid var(--tint-green-ln)", color: "var(--st-green)" }}
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                          {isHukdisOnly && <span>Kelola Hukdis</span>}
-                        </Link>
-                        {canEdit && filterAktif && (
-                          <>
-                            <button
-                              onClick={() => openEdit(p)}
-                              title="Ubah data pegawai"
-                              aria-label={`Ubah data ${p.nama}`}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center transition"
-                              style={{ background: "var(--tint-navy)", border: "0.5px solid var(--ln0)", color: "var(--dtn)" }}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                            </button>
-                            <button
-                              onClick={() => setShowHapus(p)}
-                              title="Nonaktifkan pegawai"
-                              aria-label={`Nonaktifkan ${p.nama}`}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center transition"
-                              style={{ background: "var(--tint-red-bg)", border: "0.5px solid var(--tint-red-ln)", color: "var(--st-red)" }}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
-                            </button>
-                          </>
-                        )}
-                        {canEdit && !filterAktif && (
-                          <>
-                            <button
-                              onClick={() => handleAktifkan(p)}
-                              title="Aktifkan kembali"
-                              aria-label={`Aktifkan kembali ${p.nama}`}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center transition"
-                              style={{ background: "var(--tint-green-bg)", border: "0.5px solid var(--tint-green-ln)", color: "var(--st-green)" }}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
-                            </button>
-                            <button
-                              onClick={() => setShowHapusPermanent(p)}
-                              title="Hapus permanen"
-                              aria-label={`Hapus permanen ${p.nama}`}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center transition"
-                              style={{ background: "var(--tint-red-bg)", border: "0.5px solid var(--tint-red-ln)", color: "var(--st-red)" }}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                          {canEdit && filterAktif && (
+                            <>
+                              <button type="button" onClick={() => openEdit(p)} className="dsb-ikon-tombol" title="Ubah data pegawai" aria-label={`Ubah data ${p.nama}`}>
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>
+                              </button>
+                              <button type="button" onClick={() => setShowHapus(p)} className="dsb-ikon-tombol" data-nada="merah" title="Nonaktifkan pegawai" aria-label={`Nonaktifkan ${p.nama}`}>
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="17" y1="11" x2="23" y2="11" /></svg>
+                              </button>
+                            </>
+                          )}
+                          {canEdit && !filterAktif && (
+                            <>
+                              <button type="button" onClick={() => handleAktifkan(p)} className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" aria-label={`Aktifkan kembali ${p.nama}`}>
+                                Aktifkan
+                              </button>
+                              <button type="button" onClick={() => setShowHapusPermanent(p)} className="dsb-ikon-tombol" data-nada="merah" title="Hapus permanen" aria-label={`Hapus permanen ${p.nama}`}>
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-        </div>
 
-        {/* ── Mobile cards ── */}
-        <div className="md:hidden space-y-2">
-          {displayList.map((p) => {
-            const mJendela = jendelaProsesKgb(p.tmtKgbBerikutnya);
-            const mOverdue = p.aktif && !p.statusHukdis && !!mJendela?.flagRapelan;
-            const mUk = labelUnitKerja(p.unitKerja);
-            return (
-              <div
-                key={p.id}
-                className="bg-white rounded-2xl overflow-hidden"
-                style={{ border: `0.5px solid ${selected.has(p.id) ? "#a0c4e0" : "var(--ln1)"}` }}
-              >
-                {/* Card header */}
-                <div className="flex items-start gap-3 p-4">
-                  <input type="checkbox" aria-label={`Pilih ${p.nama}`} className="w-4 h-4 rounded mt-0.5 shrink-0" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} />
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: filterAktif ? "var(--tint-navy)" : "var(--ln2)", color: filterAktif ? "var(--dtn)" : "var(--dt5)" }}>
-                    {p.nama.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold leading-tight" style={{ color: filterAktif ? "var(--dtn)" : "var(--dt5)" }}>{p.nama}</p>
-                    <p className="text-xs mt-0.5" style={{ color: "var(--dt4)" }}>{p.nip}</p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                      <span className="text-xs px-1.5 py-0.5 rounded-md font-medium" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>{p.golonganRuang}</span>
-                      <span className="text-xs" style={{ color: "var(--dt3)" }}>{p.jabatan}</span>
+          {/* ── Kartu layar sempit ── */}
+          <ul className="md:hidden" style={{ borderTop: "1px solid var(--ln2)" }}>
+            {displayList.map((p, i) => {
+              const kgb = statusKgbBerikutnya(p);
+              const uk = labelUnitKerja(p.unitKerja);
+              return (
+                <li key={p.id} className="px-4 py-3.5 flex flex-col gap-2.5" style={{ borderTop: i > 0 ? "1px solid var(--ln2)" : undefined, background: selected.has(p.id) ? "var(--tint-navy)" : undefined, fontSize: "13px" }}>
+                  <div className="flex items-start gap-3">
+                    <input type="checkbox" className="dsb-cek" style={{ marginTop: "8px" }} aria-label={`Pilih ${p.nama}`} checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} />
+                    <span className="dsb-avatar" data-nada={p.statusHukdis ? "merah" : undefined} aria-hidden="true">
+                      {p.nama.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="dsb-nama" style={{ margin: 0 }}>{p.nama}</p>
+                      <p className="dsb-kecil" style={{ margin: 0 }}>{p.nip}</p>
+                      <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>{p.golonganRuang} · {p.jabatan}</p>
+                      <p className="dsb-kecil" style={{ margin: "2px 0 0", color: uk.dikenal ? undefined : "var(--st-amber)" }}>
+                        {uk.teks}{uk.dikenal ? "" : " (belum sesuai daftar satker)"}
+                      </p>
                     </div>
-                    <p className="text-xs mt-1" style={{ color: mUk.dikenal ? "var(--dt4)" : "var(--st-amber)" }}>
-                      {mUk.teks}{mUk.dikenal ? "" : " (belum sesuai daftar satker)"}
-                    </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    {!filterAktif
-                      ? <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--ln2)", color: "var(--dt5)" }}>Nonaktif</span>
-                      : p.statusHukdis
-                      ? <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>Hukdis</span>
-                      : <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)" }}>Aktif</span>
-                    }
-                    {mOverdue && (
-                      <span className="rounded-full font-bold" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)", border: "1px solid var(--tint-amber-ln)", fontSize: "10px", padding: "1px 6px" }}>Terlambat</span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {!filterAktif ? (
+                      <span className="dsb-tag" data-garis="">Nonaktif</span>
+                    ) : (
+                      <>
+                        {!isHukdisOnly && <span className="dsb-tag" style={kgb.gaya}>{kgb.label}</span>}
+                        {p.statusHukdis && <span className="dsb-tag" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>Hukdis</span>}
+                      </>
                     )}
-                    {filterAktif && !isHukdisOnly && p.statusKGB && isStatusKgb(p.statusKGB) && (
-                      <span className="rounded-full font-medium" style={{ background: warnaStatusKgb(p.statusKGB).bg, color: warnaStatusKgb(p.statusKGB).color, fontSize: "10px", padding: "1px 6px" }}>
-                        KGB: {infoStatusKgb(p.statusKGB).label}
-                      </span>
+                    <span className="dsb-kecil">
+                      TMT {formatTanggalId(p.tmtKgbBerikutnya, { day: "numeric", month: "short", year: "numeric" })}
+                      {kgb.batas ? ` · batas ${kgb.batas}` : ""}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {filterAktif && !isHukdisOnly && (
+                      <Link href={`/dashboard/kgb?pegawaiId=${p.id}`} className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">Proses KGB</Link>
                     )}
-                  </div>
-                </div>
-                {/* Card stats */}
-                <div className="grid grid-cols-3" style={{ borderTop: "0.5px solid var(--ln2)" }}>
-                  <div className="px-4 py-2.5" style={{ borderRight: "0.5px solid var(--ln2)" }}>
-                    <p className="text-xs font-semibold" style={{ color: filterAktif ? "var(--dtn)" : "var(--dt5)" }}>Rp {(p.gajiPokok / 1000).toFixed(0)}rb</p>
-                    <p style={{ fontSize: "10px", color: "var(--dt5)" }}>Gaji Pokok</p>
-                  </div>
-                  <div className="px-4 py-2.5" style={{ borderRight: "0.5px solid var(--ln2)" }}>
-                    <p className="text-xs font-semibold" style={{ color: "var(--dt3)" }}>{formatTanggalId(p.tmtKgbBerikutnya, { day: "numeric", month: "short", year: "2-digit" })}</p>
-                    <p style={{ fontSize: "10px", color: "var(--dt5)" }}>TMT KGB</p>
-                  </div>
-                  <div className="px-4 py-2.5">
-                    <p className="text-xs font-semibold" style={{ color: mOverdue ? "var(--st-red)" : "var(--dt3)" }}>{mJendela ? mJendela.deadlineSDM.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" }) : "-"}</p>
-                    <p style={{ fontSize: "10px", color: mOverdue ? "#f87171" : "var(--dt5)" }}>Deadline SDM</p>
-                  </div>
-                </div>
-                {/* Card actions */}
-                <div className="flex items-center gap-2 px-4 py-3" style={{ borderTop: "0.5px solid var(--ln2)" }}>
-                  {filterAktif && !isHukdisOnly && (
-                    <Link href={`/dashboard/kgb?pegawaiId=${p.id}`} title="Proses KGB pegawai ini" className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)", border: "0.5px solid var(--tint-amber-ln)" }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
-                      Proses KGB
+                    <Link href={`/dashboard/pegawai/${p.id}/riwayat`} className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">
+                      {isHukdisOnly ? "Kelola hukdis" : "Riwayat"}
                     </Link>
-                  )}
-                  <Link href={`/dashboard/pegawai/${p.id}/riwayat`} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", border: "0.5px solid var(--tint-green-ln)" }}>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
-                    {isHukdisOnly ? "Kelola Hukdis" : "Riwayat"}
-                  </Link>
-                  {canEdit && filterAktif && (
-                    <>
-                      <button onClick={() => openEdit(p)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition" style={{ background: "var(--tint-navy)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        Ubah
-                      </button>
-                      <button onClick={() => setShowHapus(p)} title="Nonaktifkan" aria-label={`Nonaktifkan ${p.nama}`} className="w-9 h-9 flex items-center justify-center rounded-xl transition shrink-0" style={{ background: "var(--tint-red-bg)", border: "0.5px solid var(--tint-red-ln)", color: "var(--st-red)" }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
-                      </button>
-                    </>
-                  )}
-                  {canEdit && !filterAktif && (
-                    <>
-                      <button onClick={() => handleAktifkan(p)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", border: "0.5px solid var(--tint-green-ln)" }}>
-                        Aktifkan Kembali
-                      </button>
-                      <button onClick={() => setShowHapusPermanent(p)} title="Hapus permanen" aria-label={`Hapus permanen ${p.nama}`} className="w-9 h-9 flex items-center justify-center rounded-xl transition shrink-0" style={{ background: "var(--tint-red-bg)", border: "0.5px solid var(--tint-red-ln)", color: "var(--st-red)" }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </>
-      )}
+                    {canEdit && filterAktif && (
+                      <>
+                        <button type="button" onClick={() => openEdit(p)} className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">Ubah</button>
+                        <button type="button" onClick={() => setShowHapus(p)} className="dsb-tombol dsb-tombol-kecil" data-nada="merah" aria-label={`Nonaktifkan ${p.nama}`}>Nonaktifkan</button>
+                      </>
+                    )}
+                    {canEdit && !filterAktif && (
+                      <>
+                        <button type="button" onClick={() => handleAktifkan(p)} className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">Aktifkan kembali</button>
+                        <button type="button" onClick={() => setShowHapusPermanent(p)} className="dsb-tombol dsb-tombol-kecil" data-nada="merah" aria-label={`Hapus permanen ${p.nama}`}>Hapus permanen</button>
+                      </>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          </>
+        )}
+      </section>
 
       {/* ===================== MODAL TAMBAH / EDIT ===================== */}
       {showModal && (

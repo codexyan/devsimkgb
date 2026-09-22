@@ -42,9 +42,6 @@ export async function GET() {
     const bulan = hariIni.getMonth();
     const tahunAwal = new Date(tahun, 0, 1);
     const tahunAkhir = new Date(tahun + 1, 0, 1);
-    const awalBulanDepan = new Date(tahun, bulan + 1, 1);
-    const bulan3Lalu = new Date(tahun, bulan - 3, 1);
-    const bulan3Depan = new Date(tahun, bulan + 4, 1);
     // Pipeline memuat TMT tahun ini dan TMT yang masa inputnya sudah dibuka (sebelum awal bulan ke-3 dari sekarang).
     const batasPipeline = new Date(Math.max(tahunAkhir.getTime(), new Date(tahun, bulan + 3, 1).getTime()));
 
@@ -106,29 +103,6 @@ export async function GET() {
       .slice(0, 10)
       .map((n) => ({ id: n.id, pesan: n.pesan, createdAt: n.createdAt ? n.createdAt.toISOString() : "" }));
 
-    // Tren bulanan (-3 s.d. +3 bulan) menurut bulan TMT.
-    const kunciTren = (d: Date) => d.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
-    const trenMap: Record<string, { selesai: number; diproses: number; terlambat: number; mendatang: number; isFuture: boolean }> = {};
-    for (let i = -3; i <= 3; i++) {
-      trenMap[kunciTren(new Date(tahun, bulan + i, 1))] = { selesai: 0, diproses: 0, terlambat: 0, mendatang: 0, isFuture: i > 0 };
-    }
-    for (const k of siklusSemua) {
-      const tmt = tanggalKalender(k.tmtKgbBaru);
-      if (!tmt || !dalam(tmt, bulan3Lalu, awalBulanDepan)) continue;
-      const tren = trenMap[kunciTren(tmt)];
-      if (!tren) continue;
-      if (k.status === "selesai") tren.selesai++;
-      else if (k.status === "sedang_diproses" || k.status === "menunggu_keuangan") tren.diproses++;
-      if (rapelanSiklus(k, hariIni).rapelan) tren.terlambat++;
-    }
-    for (const p of pegawaiAktif) {
-      const tmt = tanggalKalender(p.tmtKgbBerikutnya);
-      if (!tmt || !dalam(tmt, awalBulanDepan, bulan3Depan)) continue;
-      const tren = trenMap[kunciTren(tmt)];
-      if (tren) tren.mendatang++;
-    }
-    const trenBulanan = Object.entries(trenMap).map(([bulanLabel, val]) => ({ bulan: bulanLabel, ...val }));
-
     const result = pegawaiJatuhTempo.map(({ p, kgbBerjalan: k, selesaiSebelumnya: prev, effectiveTmt }) => {
       const statusKGB = k?.status ?? null;
       const jendela = jendelaProsesKgb(effectiveTmt, hariIni)!;
@@ -150,6 +124,7 @@ export async function GET() {
         nip: p.nip,
         jabatan: p.jabatan,
         golonganRuang: p.golonganRuang,
+        unitKerja: p.unitKerja,
         tmtKgbBerikutnya: isoTanggalKalender(effectiveTmt),
         deadlineSDM: isoTanggalKalender(jendela.deadlineSDM),
         statusHukdis: p.statusHukdis,
@@ -199,7 +174,6 @@ export async function GET() {
       },
       // Beranda keuangan hanya memakai statistik; data per pegawai, termasuk hukdis, tidak dikirim.
       pegawaiJatuhTempo: canProcessKGB(role) ? result : [],
-      trenBulanan,
       followupNotifs,
     });
   } catch (err) {

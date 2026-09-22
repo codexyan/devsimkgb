@@ -3,15 +3,17 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { canProcessKGB } from "@/lib/auth";
 import { hariIniWita, tanggalKalender } from "@/lib/waktu";
-import { hitungRekapStatus, satuPerSiklus, tanpaBatalYangDiganti, tanpaEntriPegawaiNonaktif } from "@/lib/rekapKgb";
+import { entriVirtual, hitungRekapStatus, satuPerSiklus, tanpaBatalYangDiganti, tanpaEntriPegawaiNonaktif } from "@/lib/rekapKgb";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
 // Laporan KGB per tahun TMT (opsional bulan dan status). Hitungan memakai definisi bersama
-// lib/rekapKgb.ts; daftar tetap memuat entri yang dibatalkan dan belum diganti. Pembatalan yang sudah
-// diganti dibuang dari data lengkap sebelum periode disaring, karena penggantinya bisa di periode lain.
+// lib/rekapKgb.ts, sama dengan dashboard: pegawai aktif yang KGB-nya jatuh tempo di periode ini tetapi belum
+// diinput ikut sebagai Belum Diproses (entri virtual). Daftar tetap memuat entri yang dibatalkan dan belum
+// diganti. Pembatalan yang sudah diganti dibuang dari data lengkap sebelum periode disaring, karena
+// penggantinya bisa di periode lain.
 export async function GET(req: Request) {
   await muatBatasInputSdm();
   const session = await auth();
@@ -36,7 +38,29 @@ export async function GET(req: Request) {
   const pegawaiById = new Map(pegawaiList.map((p) => [p.id, p]));
   const suratByKgbId = new Map(suratList.map((sRow) => [sRow.kgbId, sRow]));
 
-  const dalamPeriode = tanpaBatalYangDiganti(tanpaEntriPegawaiNonaktif(allKgb, pegawaiList))
+  // Pegawai aktif tanpa KGB berjalan: TMT berikutnya dari data pegawai, gaji baru dihitung saat diinput.
+  const belumDiinput = entriVirtual(pegawaiList, allKgb).map((v) => {
+    const p = pegawaiById.get(v.pegawaiId)!;
+    return {
+      id: `virtual-${v.pegawaiId}`,
+      isVirtual: true as const,
+      pegawaiId: v.pegawaiId,
+      status: "belum_diproses",
+      tmtKgbBaru: v.tmtKgbBaru as Date,
+      golonganLama: p.golonganRuang,
+      golonganBaru: p.golonganRuang,
+      gajiPokokLama: p.gajiPokok,
+      gajiPokokBaru: null,
+      mkgTahunBaru: null,
+      mkgBulanBaru: null,
+      flagRapelan: false,
+      rapelanDitetapkan: null,
+      isArsip: false,
+      createdAt: null,
+    };
+  });
+
+  const dalamPeriode = [...tanpaBatalYangDiganti(tanpaEntriPegawaiNonaktif(allKgb, pegawaiList)), ...belumDiinput]
     .map((k) => ({ k, tmt: tanggalKalender(k.tmtKgbBaru) }))
     .filter(({ k, tmt }) => !k.isArsip && !!tmt && tmt.getFullYear() === tahun && (!bulan || tmt.getMonth() + 1 === bulan))
     .sort((a, b) => a.tmt!.getTime() - b.tmt!.getTime())
@@ -46,7 +70,7 @@ export async function GET(req: Request) {
     .filter((k) => (status ? k.status === status : true))
     .map((k) => {
       const p = pegawaiById.get(k.pegawaiId);
-      const sRow = suratByKgbId.get(k.id);
+      const sRow = "isVirtual" in k ? undefined : suratByKgbId.get(k.id);
       return {
         ...k,
         pegawai: p

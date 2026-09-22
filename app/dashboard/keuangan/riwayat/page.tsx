@@ -1,15 +1,28 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
-import { formatTanggalId, hariIniWita } from "@/lib/waktu";
-import { tahunTmt } from "@/lib/rekapKgb";
+import { formatTanggalId, hariIniWita, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
+import { kunciTanggal, tahunTmt } from "@/lib/rekapKgb";
+import { bulanFokusRekon, jendelaRekonGaji, statusRekonGaji, type StatusRekon } from "@/lib/rekonGaji";
+import { cariSatker } from "@/lib/satker";
+import { namaBulan, namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
 
-/* ─── interfaces ─── */
+/* Riwayat Aktivitas Keuangan: jejak konfirmasi (siapa, kapan, rapelan atau tidak), rekap dasar Gaji Web per
+   bulan TMT, dan riwayat KGB per pegawai. Rekap memakai /api/keuangan/rekon (lib/rekapKgb.ts), jadi angkanya
+   sama dengan halaman Keuangan dan Laporan. */
+
 interface LogEntry {
-  id: string; waktu: string; aksi: string; detail: string;
+  id: string;
+  waktu: string;
+  aksi: string;
+  detail: string;
+  targetNama?: string | null;
   user: { nama: string; nip: string } | null;
 }
+
 /** Rekap per bulan TMT dari GET /api/keuangan/rekon (lib/rekapKgb.ts rekapPerBulanTmt). */
 interface RekapBulan {
   bulanTmt: string;
@@ -22,36 +35,40 @@ interface RekapBulan {
   berpotensiRapelan: number;
   konfirmasiTerakhir: string | null;
 }
+
 interface KGBItem {
-  id: string; status: string; nomorSK: string;
+  id: string;
+  status: string;
+  nomorSK: string;
   isVirtual?: boolean;
-  tmtKgbBaru: string; golonganLama: string; golonganBaru: string;
-  gajiPokokLama: number; gajiPokokBaru: number | null;
-  mkgTahunBaru: number | null; mkgBulanBaru: number | null;
+  isArsip?: boolean;
+  tmtKgbBaru: string;
+  golonganLama: string;
+  golonganBaru: string;
+  gajiPokokLama: number;
+  gajiPokokBaru: number | null;
+  mkgTahunBaru: number | null;
+  mkgBulanBaru: number | null;
   rapelanDitetapkan: boolean | null;
+  konfirmasiKeuanganAt?: string | null;
   pegawai: { nama: string; nip: string; jabatan: string; unitKerja: string } | null;
-  surat: { nomorSurat: string; pathFile?: string | null } | null;
+  surat: { nomorSurat: string; tanggalSurat?: string; pathFile?: string | null } | null;
 }
 type KGBRiwayat = KGBItem & { pegawai: NonNullable<KGBItem["pegawai"]> };
 
-/* ─── helpers ─── */
-function fmtTgl(s: string) {
-  return formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" });
-}
-function fmtWaktu(s: string) {
-  return formatTanggalId(s, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-function bulanLabel(key: string) {
-  const [y, m] = key.split("-");
-  return new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-}
-function fmtRp(n: number | null) { return typeof n === "number" ? "Rp " + n.toLocaleString("id-ID") : "-"; }
+type Tab = "log" | "rekap" | "kgb";
+type SaringLog = "semua" | "rapelan" | "cepat";
+type SaringKgb = "semua" | "tahunIni" | "rapelan";
 
-const badgeStatus = (status: string) => ({ label: infoStatusKgb(status).label, ...warnaStatusKgb(status) });
+/* ─── pembantu ─── */
 
-// Baris yang dapat diklik juga dapat dibuka dengan Enter atau spasi.
-function tekanBuka(e: React.KeyboardEvent, buka: () => void) {
-  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); buka(); }
+const fmtTgl = (s: string | null | undefined) => (s ? formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" }) : "-");
+const fmtJam = (s: string) => formatTanggalId(s, { hour: "2-digit", minute: "2-digit" });
+const fmtRp = (n: number | null | undefined) => (typeof n === "number" ? "Rp " + n.toLocaleString("id-ID") : "-");
+
+function satkerPendek(unitKerja: string | null | undefined): string {
+  const s = cariSatker(unitKerja);
+  return s ? namaSingkatSatker(s) : unitKerja?.trim() || "-";
 }
 
 async function bacaJson<T>(res: Response, bawaan: T): Promise<T> {
@@ -62,663 +79,481 @@ async function bacaJson<T>(res: Response, bawaan: T): Promise<T> {
   }
 }
 
-/* ─── PegawaiRow ─── */
-function PegawaiRow({
-  nama, nip, jabatan, unitKerja, kgbs, expanded, onToggle,
-}: {
-  nama: string; nip: string; jabatan: string; unitKerja: string;
-  kgbs: KGBRiwayat[]; expanded: boolean; onToggle: () => void;
-}) {
-  const latest   = kgbs[0];
-  const st       = badgeStatus(latest?.status ?? "");
-  const thisYear = hariIniWita().getFullYear();
-  const hasThisYear = kgbs.some((k) => tahunTmt(k) === thisYear);
-  const initials = nama.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
+interface IsiLog {
+  nama: string;
+  nip: string;
+  golongan: string;
+  gaji: string;
+  rapelan: boolean;
+  cepat: boolean;
+}
 
+/** Urai detail log konfirmasi dari /api/kgb/[id]/konfirmasi-keuangan; null bila formatnya lain (log lama). */
+function uraiLog(detail: string): IsiLog | null {
+  const m = /^Konfirmasi KGB (.+) \((\d+)\), Gol\. ([^,]+), Gaji (Rp [\d.]+), Rapelan: (Ya|Tidak)(, melalui Konfirmasi cepat)?/.exec(detail);
+  return m ? { nama: m[1], nip: m[2], golongan: m[3], gaji: m[4], rapelan: m[5] === "Ya", cepat: !!m[6] } : null;
+}
+
+function labelHari(kunci: string, hariIni: Date): string {
+  const t = tanggalKalender(kunci);
+  if (!t) return kunci;
+  const selisih = Math.round((hariIni.getTime() - t.getTime()) / 86_400_000);
+  const tanggal = formatTanggalId(t, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  return selisih === 0 ? `Hari ini, ${tanggal}` : selisih === 1 ? `Kemarin, ${tanggal}` : tanggal;
+}
+
+function selCsv(v: string | number | null | undefined): string {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function unduhCsv(namaBerkas: string, kepala: string[], baris: (string | number | null | undefined)[][]) {
+  const isi = [kepala, ...baris].map((b) => b.map(selCsv).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["\uFEFF" + isi], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = namaBerkas;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const LABEL_STATUS_REKON: Record<StatusRekon, string> = {
+  akan_datang: "belum dimulai",
+  berjalan: "sedang berjalan",
+  lewat: "sudah lewat",
+};
+
+function StatusKgb({ status }: { status: string }) {
   return (
-    <>
-      <tr
-        onClick={onToggle}
-        tabIndex={0}
-        aria-expanded={expanded}
-        aria-label={`Riwayat KGB ${nama}`}
-        onKeyDown={(e) => tekanBuka(e, onToggle)}
-        className="cursor-pointer transition-colors"
-        style={{ borderBottom: expanded ? "none" : "1px solid var(--ln2)" }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--sub)"; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = expanded ? "var(--sub)" : ""; }}
-      >
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold"
-              style={{ background: hasThisYear ? "var(--tint-navy)" : "var(--ln2)", color: hasThisYear ? "var(--dtn)" : "var(--dt5)" }}>
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>{nama}</p>
-                {hasThisYear && (
-                  <span className="px-1 py-px rounded text-xs font-bold"
-                    style={{ background: "var(--tint-navy)", color: "var(--dtn)", fontSize: "9px" }}>
-                    {thisYear}
-                  </span>
-                )}
-              </div>
-              <p style={{ fontSize: "10px", color: "var(--dt5)" }}>{nip}</p>
-            </div>
-          </div>
-        </td>
-        <td className="px-4 py-3" style={{ maxWidth: "180px" }}>
-          <p className="text-xs truncate" style={{ color: "var(--dt3)" }}>{jabatan}</p>
-          <p className="truncate" style={{ fontSize: "10px", color: "var(--dt6)" }}>{unitKerja}</p>
-        </td>
-        <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: "var(--dt3)" }}>
-          {latest ? `${latest.golonganLama} → ${latest.golonganBaru}` : "-"}
-        </td>
-        <td className="px-4 py-3 whitespace-nowrap text-xs font-semibold" style={{ color: "var(--st-green)" }}>
-          {latest ? fmtRp(latest.gajiPokokBaru) : "-"}
-        </td>
-        <td className="px-4 py-3 whitespace-nowrap" style={{ fontSize: "11px", color: "var(--dt4)" }}>
-          {latest ? fmtTgl(latest.tmtKgbBaru) : "-"}
-        </td>
-        <td className="px-4 py-3">
-          {latest && (
-            <span className="px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
-              style={{ background: st.bg, color: st.color, fontSize: "10px" }}>
-              {st.label}
-            </span>
-          )}
-        </td>
-        <td className="px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <span style={{ fontSize: "10px", color: "var(--dt5)" }}>{kgbs.length} riwayat</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a0b4c8" strokeWidth="2.5"
-              style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </div>
-        </td>
-      </tr>
-
-      {/* ── Expanded: perjalanan KGB ── */}
-      {expanded && (
-        <tr>
-          <td colSpan={7} style={{ padding: "0 0 4px 0", borderBottom: "1px solid var(--ln1)" }}>
-            <div className="mx-4 mb-3 rounded-xl overflow-hidden"
-              style={{ background: "var(--sub)", border: "1px solid var(--ln1)" }}>
-              <div className="px-4 py-2 flex items-center gap-2"
-                style={{ borderBottom: "1px solid var(--ln1)", background: "var(--sub)" }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#5a7a9a" strokeWidth="2">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                </svg>
-                <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--dtn)" }}>
-                  Perjalanan KGB: {nama}
-                </p>
-                <span style={{ fontSize: "10px", color: "var(--dt5)" }}>({kgbs.length} siklus)</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full" style={{ borderCollapse: "collapse", fontSize: "11px" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid var(--ln1)" }}>
-                      {["TMT KGB","Golongan","Gaji Lama","Gaji Baru","MKG","Status","Nomor SK","SK"].map(h => (
-                        <th key={h} className="px-3 py-2 text-left"
-                          style={{ color: "var(--dt5)", fontWeight: 600, fontSize: "10px", whiteSpace: "nowrap" }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {kgbs.map((k, idx) => {
-                      const s = badgeStatus(k.status);
-                      const isLatest = idx === 0;
-                      return (
-                        <tr key={k.id} style={{ borderBottom: "1px solid var(--ln2)" }}>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            <div className="flex items-center gap-1">
-                              {isLatest && (
-                                <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                                  style={{ background: "var(--navy-solid)" }} />
-                              )}
-                              <span style={{ color: isLatest ? "var(--dtn)" : "var(--dt3)", fontWeight: isLatest ? 600 : 400 }}>
-                                {fmtTgl(k.tmtKgbBaru)}
-                              </span>
-                              {k.rapelanDitetapkan && (
-                                <span className="px-1 rounded" style={{ background: "var(--tint-amber-bg2)", color: "var(--st-amber)", fontSize: "9px", fontWeight: 700 }}>
-                                  RAPELAN
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--dt3)" }}>
-                            <span style={{ color: "var(--dt5)" }}>{k.golonganLama}</span>
-                            <span style={{ color: "var(--dt6)", margin: "0 3px" }}>→</span>
-                            <span style={{ color: "var(--st-green)", fontWeight: 600 }}>{k.golonganBaru}</span>
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--dt5)" }}>
-                            {fmtRp(k.gajiPokokLama)}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--st-green)" }}>
-                            {fmtRp(k.gajiPokokBaru)}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--dt4)" }}>
-                            {k.mkgTahunBaru === null ? "-" : `${k.mkgTahunBaru} Thn ${k.mkgBulanBaru ?? 0} Bln`}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className="px-1.5 py-px rounded-full font-semibold whitespace-nowrap"
-                              style={{ background: s.bg, color: s.color, fontSize: "9px" }}>
-                              {s.label}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--dt5)" }}>
-                            {k.nomorSK || k.surat?.nomorSurat || "-"}
-                          </td>
-                          <td className="px-3 py-2">
-                            {k.surat?.pathFile ? (
-                              <a href={`/api/blob/download?url=${encodeURIComponent(k.surat.pathFile)}`} download
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg font-medium"
-                                style={{ background: "var(--tint-navy)", color: "var(--dtn)", textDecoration: "none", fontSize: "10px" }}>
-                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                  <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                                </svg>
-                                Unduh
-                              </a>
-                            ) : (
-                              <span style={{ color: "var(--dt6)", fontSize: "10px" }}>-</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
+    <span className="dsb-status">
+      <span className="dsb-titik" style={{ background: warnaStatusKgb(status).color }} aria-hidden="true" />
+      {status === "selesai" ? "Dikonfirmasi" : infoStatusKgb(status).label}
+    </span>
   );
 }
 
-/* ─── page ─── */
-export default function RiwayatKeuanganPage() {
-  const [logs,      setLogs]      = useState<LogEntry[]>([]);
-  const [rekonList, setRekonList] = useState<RekapBulan[]>([]);
-  const [kgbList,   setKgbList]   = useState<KGBRiwayat[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [tab,       setTab]       = useState<"kgb" | "log" | "rekon">("kgb");
-  const [kgbSearch, setKgbSearch] = useState("");
-  const [expanded,  setExpanded]  = useState<string | null>(null);
+/* ─── halaman ─── */
 
-  const fetchAll = useCallback(async () => {
+export default function RiwayatKeuanganPage() {
+  const params = useSearchParams();
+  const [hariIni] = useState(() => hariIniWita());
+  const tahun = hariIni.getFullYear();
+  const bulanFokus = bulanFokusRekon(hariIni);
+
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = params.get("tab");
+    return t === "rekap" || t === "kgb" ? t : "log";
+  });
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [rekap, setRekap] = useState<RekapBulan[]>([]);
+  const [kgbList, setKgbList] = useState<KGBRiwayat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [galat, setGalat] = useState(false);
+
+  const [cariLog, setCariLog] = useState("");
+  const [saringLog, setSaringLog] = useState<SaringLog>("semua");
+  const [cariKgb, setCariKgb] = useState("");
+  const [saringKgb, setSaringKgb] = useState<SaringKgb>("semua");
+  const [terbuka, setTerbuka] = useState<string | null>(null);
+
+  const muat = useCallback(async () => {
     setLoading(true);
+    setGalat(false);
     try {
-      const [r1, r2, r3] = await Promise.all([
-        fetch("/api/keuangan/log"),
-        fetch("/api/keuangan/rekon"),
-        fetch("/api/kgb"),
-      ]);
+      const [r1, r2, r3] = await Promise.all([fetch("/api/keuangan/log"), fetch("/api/keuangan/rekon"), fetch("/api/kgb")]);
+      if (!r1.ok || !r2.ok || !r3.ok) setGalat(true);
       if (r1.ok) { const d = await bacaJson<unknown>(r1, []); setLogs(Array.isArray(d) ? (d as LogEntry[]) : []); }
-      if (r2.ok) { const d = await bacaJson<unknown>(r2, []); setRekonList(Array.isArray(d) ? (d as RekapBulan[]) : []); }
+      if (r2.ok) { const d = await bacaJson<unknown>(r2, []); setRekap(Array.isArray(d) ? (d as RekapBulan[]) : []); }
       if (r3.ok) {
         const d = await bacaJson<unknown>(r3, []);
         // Entri virtual (belum punya record KGB) bukan riwayat.
         const daftar = Array.isArray(d) ? (d as KGBItem[]) : [];
         setKgbList(daftar.filter((k): k is KGBRiwayat => !k.isVirtual && !!k.id && !!k.pegawai));
       }
-    } finally { setLoading(false); }
+    } catch {
+      setGalat(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(fetchAll, 0);
+    const t = setTimeout(() => void muat(), 0);
     return () => clearTimeout(t);
-  }, [fetchAll]);
+  }, [muat]);
 
-  /* ── Group KGBs by pegawai, sorted: current year first ── */
-  const thisYear = hariIniWita().getFullYear();
+  /* ── Log konfirmasi ── */
+  const logDiurai = useMemo(() => logs.map((l) => ({ ...l, isi: l.aksi === "konfirmasi_keuangan" ? uraiLog(l.detail) : null })), [logs]);
+  const qLog = cariLog.trim().toLowerCase();
+  const logTampil = logDiurai.filter((l) => {
+    if (saringLog === "rapelan" && !l.isi?.rapelan) return false;
+    if (saringLog === "cepat" && !l.isi?.cepat) return false;
+    if (!qLog) return true;
+    return l.detail.toLowerCase().includes(qLog) || (l.user?.nama ?? "").toLowerCase().includes(qLog);
+  });
+  const logPerHari = useMemo(() => {
+    const peta = new Map<string, typeof logTampil>();
+    for (const l of logTampil) {
+      const k = kunciTanggal(l.waktu) ?? "";
+      if (!peta.has(k)) peta.set(k, []);
+      peta.get(k)!.push(l);
+    }
+    return [...peta.entries()];
+  }, [logTampil]);
+  const batas30 = hariIni.getTime() - 30 * 86_400_000;
+  const log30 = logDiurai.filter((l) => l.aksi === "konfirmasi_keuangan" && new Date(l.waktu).getTime() >= batas30);
 
-  const pegawaiMap = new Map<string, KGBRiwayat[]>();
-  for (const k of kgbList) {
-    const key = k.pegawai.nip;
-    if (!pegawaiMap.has(key)) pegawaiMap.set(key, []);
-    pegawaiMap.get(key)!.push(k);
+  function unduhLog() {
+    unduhCsv(
+      `log-konfirmasi-keuangan_${isoTanggalLokal(hariIni)}.csv`,
+      ["Waktu", "Aksi", "Nama", "NIP", "Golongan", "Gaji pokok baru", "Rapelan", "Konfirmasi cepat", "Oleh", "Detail"],
+      logTampil.map((l) => [
+        formatTanggalId(l.waktu, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+        l.aksi === "konfirmasi_keuangan" ? "Konfirmasi KGB" : "Rekon keuangan (lama)",
+        l.isi?.nama ?? l.targetNama ?? "", l.isi?.nip ?? "", l.isi?.golongan ?? "", l.isi?.gaji ?? "",
+        l.isi ? (l.isi.rapelan ? "Ya" : "Tidak") : "", l.isi ? (l.isi.cepat ? "Ya" : "Tidak") : "",
+        l.user?.nama ?? "", l.detail,
+      ]),
+    );
   }
 
-  const employees = [...pegawaiMap.entries()].map(([nip, kgbs]) => {
-    const sorted = [...kgbs].sort(
-      (a, b) => new Date(b.tmtKgbBaru).getTime() - new Date(a.tmtKgbBaru).getTime()
-    );
-    return {
-      nip,
-      nama:         sorted[0].pegawai.nama,
-      jabatan:      sorted[0].pegawai.jabatan,
-      unitKerja:    sorted[0].pegawai.unitKerja,
-      kgbs:         sorted,
-      hasThisYear:  kgbs.some((k) => tahunTmt(k) === thisYear),
-    };
-  });
-
-  employees.sort((a, b) => {
-    if (a.hasThisYear !== b.hasThisYear) return a.hasThisYear ? -1 : 1;
-    return a.nama.localeCompare(b.nama, "id");
-  });
-
-  const filteredEmployees = employees.filter((e) => {
-    if (!kgbSearch.trim()) return true;
-    const q = kgbSearch.toLowerCase();
+  /* ── Riwayat KGB per pegawai ── */
+  const pegawaiList = useMemo(() => {
+    const peta = new Map<string, KGBRiwayat[]>();
+    for (const k of kgbList) {
+      if (!peta.has(k.pegawai.nip)) peta.set(k.pegawai.nip, []);
+      peta.get(k.pegawai.nip)!.push(k);
+    }
+    return [...peta.entries()]
+      .map(([nip, daftar]) => {
+        const urut = [...daftar].sort((a, b) => (tanggalKalender(b.tmtKgbBaru)?.getTime() ?? 0) - (tanggalKalender(a.tmtKgbBaru)?.getTime() ?? 0));
+        return {
+          nip,
+          pegawai: urut[0].pegawai,
+          kgbs: urut,
+          adaTahunIni: urut.some((k) => tahunTmt(k) === tahun),
+          adaRapelan: urut.some((k) => k.rapelanDitetapkan === true),
+        };
+      })
+      .sort((a, b) => Number(b.adaTahunIni) - Number(a.adaTahunIni) || a.pegawai.nama.localeCompare(b.pegawai.nama, "id"));
+  }, [kgbList, tahun]);
+  const qKgb = cariKgb.trim().toLowerCase();
+  const pegawaiTampil = pegawaiList.filter((e) => {
+    if (saringKgb === "tahunIni" && !e.adaTahunIni) return false;
+    if (saringKgb === "rapelan" && !e.adaRapelan) return false;
+    if (!qKgb) return true;
     return (
-      e.nama.toLowerCase().includes(q) ||
-      e.nip.includes(q) ||
-      e.kgbs.some((k) => k.nomorSK?.toLowerCase().includes(q))
+      e.pegawai.nama.toLowerCase().includes(qKgb) ||
+      e.nip.includes(qKgb) ||
+      e.kgbs.some((k) => (k.nomorSK ?? "").toLowerCase().includes(qKgb) || (k.surat?.nomorSurat ?? "").toLowerCase().includes(qKgb))
     );
   });
 
-  const TAB = [
-    { key: "kgb",   label: "Riwayat KGB",    count: employees.length,  countBg: "var(--tint-navy)",  countColor: "var(--dtn)" },
-    { key: "log",   label: "Log Aktivitas",   count: logs.length,       countBg: "var(--tint-navy)",  countColor: "var(--dtn)" },
-    { key: "rekon", label: "Rekap Gaji Web",  count: rekonList.length,  countBg: "var(--tint-green-bg)",  countColor: "var(--st-green)" },
-  ] as const;
+  const TAB: { v: Tab; l: string; n: number }[] = [
+    { v: "log", l: "Log konfirmasi", n: logs.length },
+    { v: "rekap", l: "Rekap Gaji Web", n: rekap.length },
+    { v: "kgb", l: "Riwayat KGB pegawai", n: pegawaiList.length },
+  ];
 
   return (
-    <div className="space-y-4">
-
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="adm-chip" style={{ background: "linear-gradient(135deg,#9b7ae0,var(--violet-solid))" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <div className="dsb-halaman" data-muat-layar="">
+      <header className="dsb-halaman-kepala dsb-muncul">
+        <div className="min-w-0">
+          <p className="dsb-label">Keuangan</p>
+          <h1 className="dsb-halaman-judul">Riwayat aktivitas</h1>
+          <p className="dsb-sub">Jejak konfirmasi SK, rekap dasar input Gaji Web per bulan TMT, dan riwayat KGB setiap pegawai.</p>
         </div>
-        <div>
-          <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--st-violet)" }}>Keuangan</p>
-          <h1 className="text-base font-bold leading-tight" style={{ color: "var(--dtn)" }}>Riwayat Aktivitas Keuangan</h1>
-          <p className="text-xs" style={{ color: "var(--dt4)" }}>
-            Seluruh riwayat KGB pegawai · Log konfirmasi · Rekap dasar input Gaji Web
-          </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="dsb-ikon-tombol" onClick={() => void muat()} title="Muat ulang" aria-label="Muat ulang data">
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={loading ? "dsb-putar" : undefined}><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg>
+          </button>
+          <Link href="/dashboard/keuangan" className="dsb-tombol" data-jenis="garis">Ke halaman Keuangan</Link>
         </div>
-      </div>
+      </header>
 
-      {/* Tab switcher */}
-      <div className="flex gap-1 p-1 rounded-xl overflow-x-auto" style={{ background: "var(--ln2)", width: "fit-content", maxWidth: "100%" }}>
+      <div className="dsb-segmen dsb-muncul" role="group" aria-label="Bagian riwayat" style={{ alignSelf: "flex-start", "--i": 1 } as React.CSSProperties}>
         {TAB.map((t) => (
-          <button key={t.key} type="button" onClick={() => setTab(t.key)} aria-pressed={tab === t.key}
-            className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
-            style={{
-              background: tab === t.key ? "var(--card)" : "transparent",
-              color:      tab === t.key ? "var(--dtn)" : "var(--dt4)",
-              boxShadow:  tab === t.key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-            }}>
-            {t.label}
-            {!loading && t.count > 0 && (
-              <span className="px-1.5 py-px rounded-full"
-                style={{ background: t.countBg, color: t.countColor, fontWeight: 700, fontSize: "10px" }}>
-                {t.count}
-              </span>
-            )}
+          <button key={t.v} type="button" aria-pressed={tab === t.v} onClick={() => setTab(t.v)}>
+            {t.l} {!loading && <span style={{ color: "var(--dt5)" }}>{t.n}</span>}
           </button>
         ))}
       </div>
 
-      {/* Content */}
-      {loading ? (
-        <div className="space-y-2">
-          {[1,2,3,4,5].map(i => (
-            <div key={i} className="h-12 rounded-xl animate-pulse" style={{ background: "var(--ln2)" }} />
-          ))}
+      {galat && (
+        <div role="alert" className="dsb-pesan" data-nada="merah">
+          <span className="dsb-pesan-ikon" aria-hidden="true">!</span>
+          <p>Sebagian data gagal dimuat. <button type="button" className="dsb-tautan" onClick={() => void muat()}>Muat ulang</button></p>
         </div>
+      )}
 
-      ) : tab === "kgb" ? (
-        /* ════ Riwayat KGB per Pegawai ════ */
-        <div className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "1px solid var(--ln1)" }}>
-          {/* sub-header */}
-          <div className="px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center gap-2"
-            style={{ borderBottom: "1px solid var(--ln2)", background: "var(--sub)" }}>
-            <p className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>
-              {filteredEmployees.length} pegawai
-              <span className="ml-1.5 px-1.5 py-px rounded font-medium"
-                style={{ background: "var(--tint-navy)", color: "var(--dt3)", fontSize: "10px" }}>
-                {employees.filter(e => e.hasThisYear).length} aktif {thisYear}
-              </span>
-            </p>
-            <div className="relative">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a0b4c8" strokeWidth="2"
-                className="absolute" style={{ left: "9px", top: "50%", transform: "translateY(-50%)" }}>
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input value={kgbSearch} onChange={(e) => setKgbSearch(e.target.value)}
-                placeholder="Cari nama / NIP…"
-                className="text-xs rounded-lg pl-8 pr-3 py-1.5 outline-none"
-                style={{ background: "var(--sub)", border: "1px solid var(--ln1)", color: "var(--dtn)", width: "min(220px, 100%)" }}
-              />
+      {loading && logs.length === 0 && rekap.length === 0 ? (
+        <div className="dsb-penuh flex flex-col gap-2" role="status" aria-label="Memuat riwayat">
+          {[1, 2, 3, 4].map((i) => <div key={i} className="dsb-kerangka" style={{ height: 52 }} />)}
+        </div>
+      ) : tab === "log" ? (
+        /* ════ Log konfirmasi ════ */
+        <section className="dsb-panel dsb-penuh overflow-hidden dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-labelledby="judul-log">
+          <div className="dsb-panel-kepala">
+            <h2 id="judul-log" className="dsb-panel-judul">
+              Log konfirmasi <small>{log30.length} dalam 30 hari terakhir · {log30.filter((l) => l.isi?.rapelan).length} rapelan</small>
+            </h2>
+            <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" disabled={logTampil.length === 0} onClick={unduhLog}>
+              Unduh CSV ({logTampil.length})
+            </button>
+          </div>
+          <div className="dsb-alat" style={{ padding: "12px 16px", borderBottom: "1px solid var(--ln2)" }}>
+            <div className="dsb-segmen" role="group" aria-label="Saring jenis konfirmasi">
+              {([["semua", "Semua"], ["rapelan", "Rapelan"], ["cepat", "Konfirmasi cepat"]] as [SaringLog, string][]).map(([v, l]) => (
+                <button key={v} type="button" aria-pressed={saringLog === v} onClick={() => setSaringLog(v)}>{l}</button>
+              ))}
             </div>
+            <input type="search" className="dsb-cari" aria-label="Cari di log" placeholder="Cari nama, NIP, atau petugas" value={cariLog} onChange={(e) => setCariLog(e.target.value)} />
           </div>
 
-          {filteredEmployees.length === 0 ? (
-            <div className="text-center py-12 text-xs" style={{ color: "var(--dt5)" }}>
-              {kgbSearch ? "Tidak ada hasil pencarian" : "Belum ada data KGB"}
-            </div>
+          {logTampil.length === 0 ? (
+            <p className="dsb-kosong" style={{ padding: "44px 16px" }}>{logs.length === 0 ? "Belum ada konfirmasi yang tercatat." : "Tidak ada log yang cocok dengan saringan."}</p>
           ) : (
-            <>
-              {/* ── Mobile: employee cards ── */}
-              <div className="md:hidden divide-y" style={{ borderColor: "var(--ln2)" }}>
-                {filteredEmployees.map((e) => {
-                  const latest = e.kgbs[0];
-                  const st = latest ? badgeStatus(latest.status) : null;
-                  const isExp = expanded === e.nip;
-                  const initials = e.nama.split(" ").map((n: string) => n[0]).slice(0,2).join("").toUpperCase();
-                  const toggle = () => setExpanded(isExp ? null : e.nip);
-                  return (
-                    <div key={e.nip}>
-                      <div onClick={toggle}
-                        role="button" tabIndex={0} aria-expanded={isExp} aria-label={`Riwayat KGB ${e.nama}`}
-                        onKeyDown={(ev) => tekanBuka(ev, toggle)}
-                        className="px-4 py-3 flex items-center gap-3 cursor-pointer"
-                        style={{ borderBottom: isExp ? "none" : "1px solid var(--ln2)", background: isExp ? "var(--sub)" : "var(--card)" }}>
-                        <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold"
-                          style={{ background: e.hasThisYear ? "var(--tint-navy)" : "var(--ln2)", color: e.hasThisYear ? "var(--dtn)" : "var(--dt5)" }}>
-                          {initials}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="text-xs font-semibold truncate" style={{ color: "var(--dtn)" }}>{e.nama}</p>
-                            {e.hasThisYear && <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: 999, background: "var(--tint-navy)", color: "var(--dtn)" }}>{thisYear}</span>}
-                          </div>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <p style={{ fontSize: "10px", color: "var(--dt5)" }}>{e.nip}</p>
-                            {st && <span style={{ fontSize: "9px", fontWeight: 600, padding: "1px 5px", borderRadius: 999, background: st.bg, color: st.color }}>{st.label}</span>}
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-1 shrink-0">
-                          {latest && <p className="text-xs font-semibold" style={{ color: "var(--st-green)" }}>{latest.golonganBaru}</p>}
-                          <p style={{ fontSize: "10px", color: "var(--dt5)" }}>{e.kgbs.length} KGB</p>
-                        </div>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a0b4c8" strokeWidth="2.5"
-                          style={{ transform: isExp ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>
-                          <polyline points="6 9 12 15 18 9"/>
-                        </svg>
-                      </div>
-                      {isExp && (
-                        <div className="px-4 pb-3 pt-2" style={{ background: "var(--sub)", borderBottom: "1px solid var(--ln1)" }}>
-                          <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--dtn)", marginBottom: "8px" }}>
-                            Perjalanan KGB: {e.nama}
-                          </p>
-                          <div className="flex flex-col gap-2">
-                            {e.kgbs.map((k, idx) => {
-                              const s = badgeStatus(k.status);
-                              return (
-                                <div key={k.id} className="rounded-xl p-3" style={{ background: "var(--card)", border: `1px solid ${idx === 0 ? "var(--ln0)" : "var(--ln2)"}` }}>
-                                  <div className="flex items-start justify-between gap-2 mb-2">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      {idx === 0 && <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--navy-solid)" }} />}
-                                      <p className="text-xs font-semibold" style={{ color: idx === 0 ? "var(--dtn)" : "var(--dt3)" }}>{fmtTgl(k.tmtKgbBaru)}</p>
-                                      {k.rapelanDitetapkan && <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: 999, background: "var(--tint-amber-bg2)", color: "var(--st-amber)" }}>RAPELAN</span>}
-                                    </div>
-                                    <span style={{ fontSize: "9px", fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: s.bg, color: s.color, whiteSpace: "nowrap" }}>{s.label}</span>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                                    <div>
-                                      <p style={{ fontSize: "9px", color: "var(--dt5)" }}>Golongan</p>
-                                      <p style={{ fontSize: "11px", color: "var(--dt3)" }}>
-                                        <span>{k.golonganLama}</span>
-                                        <span style={{ color: "var(--dt6)", margin: "0 3px" }}>→</span>
-                                        <span style={{ color: "var(--st-green)", fontWeight: 600 }}>{k.golonganBaru}</span>
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <p style={{ fontSize: "9px", color: "var(--dt5)" }}>Gaji Baru</p>
-                                      <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--st-green)" }}>{fmtRp(k.gajiPokokBaru)}</p>
-                                    </div>
-                                    <div>
-                                      <p style={{ fontSize: "9px", color: "var(--dt5)" }}>MKG</p>
-                                      <p style={{ fontSize: "11px", color: "var(--dt3)" }}>{k.mkgTahunBaru === null ? "-" : `${k.mkgTahunBaru} Thn ${k.mkgBulanBaru ?? 0} Bln`}</p>
-                                    </div>
-                                    {k.surat?.pathFile && (
-                                      <div className="flex items-end">
-                                        <a href={`/api/blob/download?url=${encodeURIComponent(k.surat.pathFile)}`} download
-                                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg"
-                                          style={{ background: "var(--tint-navy)", color: "var(--dtn)", textDecoration: "none", fontSize: "10px", fontWeight: 600 }}>
-                                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                                          </svg>
-                                          Unduh SK
-                                        </a>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* ── Desktop: table ── */}
-              <div className="hidden md:block overflow-x-auto tbl-scroll">
-                <table className="w-full" style={{ borderCollapse: "collapse", fontSize: "12px" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid var(--ln2)", background: "var(--sub)" }}>
-                      {["Pegawai","Jabatan / Unit","Golongan Terkini","Gaji Terkini","TMT Terakhir","Status","Riwayat"].map(h => (
-                        <th key={h} className="px-4 py-2.5 text-left"
-                          style={{ color: "var(--dt5)", fontWeight: 600, fontSize: "11px", whiteSpace: "nowrap" }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredEmployees.map((e) => (
-                      <PegawaiRow
-                        key={e.nip}
-                        nama={e.nama}
-                        nip={e.nip}
-                        jabatan={e.jabatan}
-                        unitKerja={e.unitKerja}
-                        kgbs={e.kgbs}
-                        expanded={expanded === e.nip}
-                        onToggle={() => setExpanded(expanded === e.nip ? null : e.nip)}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
-
-      ) : tab === "log" ? (
-        /* ════ Log Aktivitas ════ */
-        <div className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "1px solid var(--ln1)" }}>
-          {logs.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-10 h-10 rounded-full mx-auto flex items-center justify-center mb-2" style={{ background: "var(--ln2)" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a0b4c8" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                </svg>
-              </div>
-              <p className="text-xs" style={{ color: "var(--dt5)" }}>Belum ada aktivitas tercatat</p>
-            </div>
-          ) : (
-            <>
-              {/* ── Mobile: log cards ── */}
-              <div className="md:hidden divide-y" style={{ borderColor: "var(--ln2)" }}>
-                {logs.map((log, i) => {
-                  const isRekon = log.aksi === "rekon_keuangan";
-                  return (
-                    <div key={log.id} className="px-4 py-3" style={{ background: i % 2 === 0 ? "var(--card)" : "var(--sub)" }}>
-                      <div className="flex items-start gap-2.5">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                          style={{ background: isRekon ? "var(--tint-amber-bg2)" : "var(--tint-green-bg)" }}>
-                          {isRekon
-                            ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-                            : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0f6e56" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                          }
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                            <p className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>
-                              {isRekon ? "Rekap Dasar Gaji Web" : "Konfirmasi KGB"}
-                            </p>
-                            {!isRekon && log.detail.includes("Rapelan: Ya") && (
-                              <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: 999, background: "var(--tint-amber-bg2)", color: "var(--st-amber)" }}>RAPELAN</span>
-                            )}
-                          </div>
-                          <p className="text-xs leading-relaxed mb-1.5" style={{ color: "var(--dt3)" }}>{log.detail}</p>
-                          <p style={{ fontSize: "10px", color: "var(--dt5)" }}>
-                            {log.user?.nama ?? "-"} {fmtWaktu(log.waktu)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* ── Desktop: table ── */}
-              <div className="hidden md:block overflow-x-auto tbl-scroll">
-                <table className="w-full" style={{ borderCollapse: "collapse", fontSize: "12px" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid var(--ln2)", background: "var(--sub)" }}>
-                      {["Tipe","Detail","Oleh","Waktu"].map(h => (
-                        <th key={h} className="px-4 py-2.5 text-left"
-                          style={{ color: "var(--dt5)", fontWeight: 600, fontSize: "11px", whiteSpace: "nowrap" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logs.map((log, i) => {
-                      const isRekon = log.aksi === "rekon_keuangan";
-                      return (
-                        <tr key={log.id} style={{ borderBottom: "1px solid var(--ln2)", background: i % 2 === 0 ? "var(--card)" : "var(--sub)" }}>
-                          <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-                                style={{ background: isRekon ? "var(--tint-amber-bg2)" : "var(--tint-green-bg)" }}>
-                                {isRekon
-                                  ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-                                  : <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0f6e56" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                                }
-                              </div>
-                              <div>
-                                <p className="font-semibold whitespace-nowrap" style={{ color: "var(--dtn)", fontSize: "11px" }}>
-                                  {isRekon ? "Rekap Gaji Web" : "Konfirmasi KGB"}
-                                </p>
-                                {!isRekon && log.detail.includes("Rapelan: Ya") && (
-                                  <span className="px-1 py-px rounded font-semibold" style={{ background: "var(--tint-amber-bg2)", color: "var(--st-amber)", fontSize: "9px" }}>RAPELAN</span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5" style={{ color: "var(--dt3)", maxWidth: "320px" }}>
-                            <p className="text-xs leading-relaxed">{log.detail}</p>
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: "var(--dt4)", fontSize: "11px" }}>
-                            {log.user?.nama ?? "-"}
-                            {log.user && <p style={{ color: "var(--dt6)", fontSize: "10px" }}>{log.user.nip}</p>}
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: "var(--dt5)", fontSize: "11px" }}>
-                            {fmtWaktu(log.waktu)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
-
-      ) : (
-        /* ════ Rekap Gaji Web ════ */
-        <div className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "1px solid var(--ln1)" }}>
-          {rekonList.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-10 h-10 rounded-full mx-auto flex items-center justify-center mb-2" style={{ background: "var(--ln2)" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a0b4c8" strokeWidth="2">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                </svg>
-              </div>
-              <p className="text-xs font-medium" style={{ color: "var(--dt5)" }}>Belum ada KGB untuk direkap</p>
-              <p className="text-xs mt-1" style={{ color: "var(--dt6)" }}>Rekap dihitung dari data KGB per bulan TMT setiap kali halaman dibuka.</p>
-            </div>
-          ) : (
-            <>
-              <p className="px-4 py-2.5 text-xs" style={{ color: "var(--dt4)", borderBottom: "1px solid var(--ln2)", background: "var(--sub)" }}>
-                Dasar input Sistem Gaji Web per bulan TMT, dihitung dari data KGB saat halaman dibuka. KGB arsip tidak dihitung; KGB yang dibatalkan lalu diinput ulang dihitung satu kali.
-              </p>
-              {/* ── Mobile: rekap cards ── */}
-              <div className="md:hidden divide-y" style={{ borderColor: "var(--ln2)" }}>
-                {rekonList.map((r, i) => {
-                  const lengkap = r.total > 0 && r.dikonfirmasi === r.total;
-                  return (
-                    <div key={r.bulanTmt} className="px-4 py-3.5" style={{ background: i % 2 === 0 ? "var(--card)" : "var(--sub)" }}>
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <p className="text-sm font-bold" style={{ color: "var(--dtn)" }}>KGB TMT {bulanLabel(r.bulanTmt)}</p>
-                        <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 9px", borderRadius: 999, background: lengkap ? "var(--tint-green-bg)" : "var(--tint-violet-bg)", color: lengkap ? "var(--st-green)" : "var(--st-violet)", whiteSpace: "nowrap" }}>
-                          {lengkap ? "Lengkap" : `${r.dikonfirmasi} dari ${r.total} dikonfirmasi`}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: "11px", color: "var(--dt3)" }}>
-                        {r.menungguKeuangan} menunggu keuangan · {r.belumSampaiKeuangan} belum sampai keuangan{r.dibatalkan > 0 ? ` (${r.dibatalkan} dibatalkan)` : ""}
-                      </p>
-                      <p style={{ fontSize: "10px", color: "var(--dt5)", marginTop: "2px" }}>
-                        Rapelan: {r.rapelanDitetapkan} ditetapkan, {r.berpotensiRapelan} berpotensi
-                        {r.konfirmasiTerakhir ? ` · Konfirmasi terakhir ${fmtWaktu(r.konfirmasiTerakhir)}` : ""}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* ── Desktop: table ── */}
-              <div className="hidden md:block overflow-x-auto tbl-scroll">
-                <table className="w-full" style={{ borderCollapse: "collapse", fontSize: "12px" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid var(--ln2)", background: "var(--sub)" }}>
-                      {["Bulan TMT","Total KGB","Dikonfirmasi","Menunggu Keuangan","Belum Sampai Keuangan","Rapelan","Konfirmasi Terakhir"].map(h => (
-                        <th key={h} className="px-4 py-2.5 text-left"
-                          style={{ color: "var(--dt5)", fontWeight: 600, fontSize: "11px", whiteSpace: "nowrap" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rekonList.map((r, i) => {
-                      const lengkap = r.total > 0 && r.dikonfirmasi === r.total;
-                      return (
-                        <tr key={r.bulanTmt} style={{ borderBottom: "1px solid var(--ln2)", background: i % 2 === 0 ? "var(--card)" : "var(--sub)" }}>
-                          <td className="px-4 py-2.5">
-                            <span className="font-semibold whitespace-nowrap" style={{ color: "var(--dtn)" }}>KGB TMT {bulanLabel(r.bulanTmt)}</span>
-                          </td>
-                          <td className="px-4 py-2.5" style={{ color: "var(--dtn)", fontWeight: 700 }}>{r.total}</td>
-                          <td className="px-4 py-2.5 whitespace-nowrap">
-                            <span className="px-2 py-0.5 rounded-full font-bold" style={{ background: lengkap ? "var(--tint-green-bg)" : "var(--sub)", color: lengkap ? "var(--st-green)" : "var(--dtn)", fontSize: "11px" }}>
-                              {r.dikonfirmasi}{lengkap ? " (lengkap)" : ""}
+            <div className="dsb-gulir-tabel">
+              <ol className="dsb-log">
+                {logPerHari.map(([hari, isi]) => (
+                  <li key={hari}>
+                    <p className="dsb-log-hari">
+                      <span>{labelHari(hari, hariIni)}</span>
+                      <span>{isi.length} aktivitas</span>
+                    </p>
+                    <ol>
+                      {isi.map((l) => (
+                        <li key={l.id} className="dsb-log-baris">
+                          <span className="dsb-log-jam">{fmtJam(l.waktu)}</span>
+                          <span className="dsb-titik" data-nada={l.isi?.rapelan ? "merah" : l.isi ? "hijau" : undefined} aria-hidden="true" />
+                          {l.isi ? (
+                            <span className="min-w-0">
+                              <span className="dsb-nama">{l.isi.nama}</span>
+                              <span className="dsb-kecil" style={{ display: "block" }}>
+                                {l.isi.nip} · Gol. {l.isi.golongan} · {l.isi.gaji}
+                              </span>
                             </span>
+                          ) : (
+                            <span className="min-w-0">
+                              <span className="dsb-nama">{l.aksi === "rekon_keuangan" ? "Rekon keuangan (fitur lama)" : l.aksi}</span>
+                              <span className="dsb-kecil" style={{ display: "block" }}>{l.detail}</span>
+                            </span>
+                          )}
+                          <span className="dsb-log-tanda">
+                            {l.isi && (
+                              <span style={{ color: l.isi.rapelan ? "var(--st-red)" : "var(--dt5)", fontWeight: l.isi.rapelan ? 600 : 400 }}>{l.isi.rapelan ? "Rapelan" : "Tidak rapelan"}</span>
+                            )}
+                            {l.isi?.cepat && <span className="dsb-tag" data-garis="">Konfirmasi cepat</span>}
+                          </span>
+                          <span className="dsb-kecil dsb-log-oleh">{l.user?.nama ?? "-"}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+          {logs.length >= 500 && <p className="dsb-kaki" style={{ margin: 0 }}>Menampilkan 500 aktivitas terakhir.</p>}
+        </section>
+      ) : tab === "rekap" ? (
+        /* ════ Rekap Gaji Web ════ */
+        <section className="dsb-panel dsb-penuh overflow-hidden dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-labelledby="judul-rekap">
+          <div className="dsb-panel-kepala">
+            <h2 id="judul-rekap" className="dsb-panel-judul">Rekap dasar Gaji Web per bulan TMT <small>{rekap.length} bulan</small></h2>
+          </div>
+          <p className="dsb-kecil" style={{ margin: 0, padding: "10px 16px", borderBottom: "1px solid var(--ln2)", fontSize: "12.5px", color: "var(--dt4)" }}>
+            SK bulan TMT harus dikonfirmasi sebelum rekon Gaji Web tanggal 1–15 bulan sebelumnya. Dihitung dari data KGB saat dibuka; arsip tidak dihitung dan KGB yang dibatalkan lalu diinput ulang dihitung sekali.
+          </p>
+          {rekap.length === 0 ? (
+            <p className="dsb-kosong" style={{ padding: "44px 16px" }}>Belum ada KGB untuk direkap.</p>
+          ) : (
+            <div className="dsb-gulir-tabel tbl-scroll">
+              <table className="dsb-tabel" style={{ minWidth: "940px" }}>
+                <thead>
+                  <tr>
+                    <th scope="col">Bulan TMT</th>
+                    <th scope="col">Dikonfirmasi</th>
+                    <th scope="col" className="kanan">Menunggu</th>
+                    <th scope="col" className="kanan">Belum sampai</th>
+                    <th scope="col">Rapelan</th>
+                    <th scope="col">Rekon Gaji Web</th>
+                    <th scope="col">Konfirmasi terakhir</th>
+                    <th scope="col" className="kanan"><span className="sr-only">Aksi</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rekap.map((r) => {
+                    const lengkap = r.total > 0 && r.dikonfirmasi === r.total;
+                    const pct = r.total > 0 ? (r.dikonfirmasi / r.total) * 100 : 0;
+                    const status = statusRekonGaji(r.bulanTmt, hariIni);
+                    const { mulai, batas } = jendelaRekonGaji(r.bulanTmt);
+                    const tertinggal = status === "lewat" && !lengkap;
+                    return (
+                      <tr key={r.bulanTmt} style={{ background: r.bulanTmt === bulanFokus ? "var(--tint-navy)" : undefined }}>
+                        <td className="whitespace-nowrap">
+                          <span className="dsb-nama">{namaBulan(r.bulanTmt, true)}</span>
+                          {r.bulanTmt === bulanFokus && <span className="dsb-tag" data-garis="" style={{ marginLeft: 8 }}>fokus rekon</span>}
+                        </td>
+                        <td className="whitespace-nowrap">
+                          <span className="dsb-bar-mini" style={{ width: 88, marginRight: 10 }} aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>
+                          <span style={{ fontVariantNumeric: "tabular-nums", color: lengkap ? "var(--st-green)" : "var(--dtn)", fontWeight: 500 }}>{r.dikonfirmasi}/{r.total}</span>
+                          {lengkap && <span className="dsb-kecil" style={{ marginLeft: 6, color: "var(--st-green)" }}>lengkap</span>}
+                        </td>
+                        <td className="kanan" style={{ color: r.menungguKeuangan > 0 ? "var(--st-violet)" : undefined }}>{r.menungguKeuangan}</td>
+                        <td className="kanan" style={{ color: r.belumSampaiKeuangan > 0 ? "var(--st-amber)" : undefined }}>
+                          {r.belumSampaiKeuangan}
+                          {r.dibatalkan > 0 && <span className="dsb-kecil" style={{ display: "block" }}>{r.dibatalkan} dibatalkan</span>}
+                        </td>
+                        <td className="whitespace-nowrap">
+                          {r.rapelanDitetapkan + r.berpotensiRapelan === 0 ? (
+                            <span className="dsb-kecil">-</span>
+                          ) : (
+                            <>
+                              {r.rapelanDitetapkan > 0 && <span style={{ color: "var(--st-red)" }}>{r.rapelanDitetapkan} ditetapkan</span>}
+                              {r.berpotensiRapelan > 0 && <span className="dsb-kecil" style={{ display: "block", color: "var(--st-amber)" }}>{r.berpotensiRapelan} berpotensi</span>}
+                            </>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap">
+                          {mulai.getDate()}–{formatTanggalId(batas, { day: "numeric", month: "short", year: "numeric" })}
+                          <span className="dsb-kecil" style={{ display: "block", color: tertinggal ? "var(--st-red)" : status === "berjalan" ? "var(--st-violet)" : undefined }}>
+                            {LABEL_STATUS_REKON[status]}{tertinggal ? `, ${r.total - r.dikonfirmasi} belum dikonfirmasi` : ""}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap">{r.konfirmasiTerakhir ? fmtTgl(r.konfirmasiTerakhir) : <span className="dsb-kecil">-</span>}</td>
+                        <td className="kanan">
+                          <Link href={`/dashboard/keuangan?bulan=${r.bulanTmt}`} className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">Buka</Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : (
+        /* ════ Riwayat KGB per pegawai ════ */
+        <section className="dsb-panel dsb-penuh overflow-hidden dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-labelledby="judul-riwayat-kgb">
+          <div className="dsb-panel-kepala">
+            <h2 id="judul-riwayat-kgb" className="dsb-panel-judul">Riwayat KGB pegawai <small>{pegawaiTampil.length} pegawai</small></h2>
+          </div>
+          <div className="dsb-alat" style={{ padding: "12px 16px", borderBottom: "1px solid var(--ln2)" }}>
+            <div className="dsb-segmen" role="group" aria-label="Saring pegawai">
+              {([["semua", "Semua"], ["tahunIni", `Ada KGB ${tahun}`], ["rapelan", "Pernah rapelan"]] as [SaringKgb, string][]).map(([v, l]) => (
+                <button key={v} type="button" aria-pressed={saringKgb === v} onClick={() => setSaringKgb(v)}>{l}</button>
+              ))}
+            </div>
+            <input type="search" className="dsb-cari" aria-label="Cari pegawai" placeholder="Cari nama, NIP, atau nomor SK" value={cariKgb} onChange={(e) => setCariKgb(e.target.value)} />
+          </div>
+
+          {pegawaiTampil.length === 0 ? (
+            <p className="dsb-kosong" style={{ padding: "44px 16px" }}>{pegawaiList.length === 0 ? "Belum ada riwayat KGB." : "Tidak ada pegawai yang cocok."}</p>
+          ) : (
+            <div className="dsb-gulir-tabel tbl-scroll">
+              <table className="dsb-tabel" style={{ minWidth: "860px" }}>
+                <thead>
+                  <tr>
+                    <th scope="col">Pegawai</th>
+                    <th scope="col">KGB terakhir</th>
+                    <th scope="col">Gaji pokok</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="kanan">Siklus</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pegawaiTampil.map((e) => {
+                    const akhir = e.kgbs[0];
+                    const buka = terbuka === e.nip;
+                    const alih = () => setTerbuka(buka ? null : e.nip);
+                    return (
+                      <Fragment key={e.nip}>
+                        <tr
+                          className="dsb-baris-klik"
+                          tabIndex={0}
+                          aria-expanded={buka}
+                          onClick={alih}
+                          onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); alih(); } }}
+                          style={{ background: buka ? "var(--sub)" : undefined }}
+                        >
+                          <td style={{ maxWidth: "280px" }}>
+                            <p className="dsb-nama truncate" style={{ margin: 0 }} title={e.pegawai.jabatan}>{e.pegawai.nama}</p>
+                            <p className="dsb-kecil truncate" style={{ margin: 0 }} title={e.pegawai.unitKerja}>{e.nip} · {satkerPendek(e.pegawai.unitKerja)}</p>
                           </td>
-                          <td className="px-4 py-2.5" style={{ color: r.menungguKeuangan > 0 ? "var(--st-violet)" : "var(--dt4)", fontSize: "11px" }}>{r.menungguKeuangan}</td>
-                          <td className="px-4 py-2.5" style={{ color: "var(--dt3)", fontSize: "11px" }}>
-                            {r.belumSampaiKeuangan}{r.dibatalkan > 0 ? ` (${r.dibatalkan} dibatalkan)` : ""}
+                          <td className="whitespace-nowrap">
+                            TMT {fmtTgl(akhir.tmtKgbBaru)}
+                            <p className="dsb-kecil" style={{ margin: 0 }}>{akhir.golonganLama !== akhir.golonganBaru ? `${akhir.golonganLama} → ${akhir.golonganBaru}` : akhir.golonganBaru}</p>
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: "var(--dt3)", fontSize: "11px" }}>
-                            {r.rapelanDitetapkan} ditetapkan · {r.berpotensiRapelan} berpotensi
+                          <td className="whitespace-nowrap" style={{ fontVariantNumeric: "tabular-nums" }}>
+                            <span style={{ color: "var(--dtn)", fontWeight: 500 }}>{fmtRp(akhir.gajiPokokBaru)}</span>
+                            <p className="dsb-kecil" style={{ margin: 0 }}>lama {fmtRp(akhir.gajiPokokLama)}</p>
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: "var(--dt4)", fontSize: "11px" }}>
-                            {r.konfirmasiTerakhir ? fmtWaktu(r.konfirmasiTerakhir) : "-"}
+                          <td>
+                            <StatusKgb status={akhir.status} />
+                            {akhir.rapelanDitetapkan && <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-red)" }}>Rapelan ditetapkan</p>}
+                          </td>
+                          <td className="kanan whitespace-nowrap">
+                            <span className="dsb-kecil" style={{ marginRight: 8 }}>{e.kgbs.length} siklus</span>
+                            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ display: "inline-block", color: "var(--dt5)", transform: buka ? "rotate(180deg)" : "none", transition: "transform 0.2s", verticalAlign: "middle" }}><polyline points="6 9 12 15 18 9" /></svg>
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                        {buka && (
+                          <tr>
+                            <td colSpan={5} style={{ padding: "0 16px 14px", background: "var(--sub)" }}>
+                              <table className="dsb-tabel dsb-tabel-sisip">
+                                <thead>
+                                  <tr>
+                                    <th scope="col">TMT KGB</th>
+                                    <th scope="col">Golongan dan MKG</th>
+                                    <th scope="col">Gaji pokok</th>
+                                    <th scope="col">Nomor SK</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col" className="kanan"><span className="sr-only">SK</span></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {e.kgbs.map((k) => (
+                                    <tr key={k.id}>
+                                      <td className="whitespace-nowrap">{fmtTgl(k.tmtKgbBaru)}</td>
+                                      <td className="whitespace-nowrap">
+                                        {k.golonganLama !== k.golonganBaru ? `${k.golonganLama} → ${k.golonganBaru}` : k.golonganBaru}
+                                        <span className="dsb-kecil"> · {k.mkgTahunBaru === null ? "-" : `${k.mkgTahunBaru} thn ${k.mkgBulanBaru ?? 0} bln`}</span>
+                                      </td>
+                                      <td className="whitespace-nowrap" style={{ fontVariantNumeric: "tabular-nums" }}>
+                                        {fmtRp(k.gajiPokokLama)} → <span style={{ color: "var(--dtn)", fontWeight: 500 }}>{fmtRp(k.gajiPokokBaru)}</span>
+                                      </td>
+                                      <td className="whitespace-nowrap">{k.surat?.nomorSurat || k.nomorSK || "-"}</td>
+                                      <td>
+                                        <StatusKgb status={k.status} />
+                                        {k.rapelanDitetapkan && <span className="dsb-kecil" style={{ display: "block", color: "var(--st-red)" }}>Rapelan ditetapkan</span>}
+                                        {k.status === "selesai" && k.konfirmasiKeuanganAt && <span className="dsb-kecil" style={{ display: "block" }}>{fmtTgl(k.konfirmasiKeuanganAt)}</span>}
+                                      </td>
+                                      <td className="kanan">
+                                        {k.surat?.pathFile ? (
+                                          <a href={`/api/blob/download?url=${encodeURIComponent(k.surat.pathFile)}`} target="_blank" rel="noopener noreferrer" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">SK</a>
+                                        ) : (
+                                          <span className="dsb-kecil">-</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
+        </section>
       )}
     </div>
   );

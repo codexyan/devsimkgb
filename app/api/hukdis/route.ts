@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { canManageHukdis } from "@/lib/auth";
 import { hukdisMasihBerlaku } from "@/lib/hukdisKedaluwarsa";
-import { hariIniWita } from "@/lib/waktu";
+import { hariIniWita, tanggalKalender } from "@/lib/waktu";
 
 export const runtime = "nodejs";
 
@@ -33,7 +33,7 @@ export async function GET() {
       return {
         id: r.id,
         pegawai: p
-          ? { id: p.id, nama: p.nama, nip: p.nip, jabatan: p.jabatan, golonganRuang: p.golonganRuang, aktif: p.aktif }
+          ? { id: p.id, nama: p.nama, nip: p.nip, jabatan: p.jabatan, golonganRuang: p.golonganRuang, unitKerja: p.unitKerja, aktif: p.aktif }
           : null,
         jenisHukdis: r.jenisHukdis,
         jenisLabel: j?.label ?? r.jenisHukdis,
@@ -52,6 +52,8 @@ export async function GET() {
     });
 
     const aktif = data.filter((d) => d.aktif);
+    // Hukdis aktif yang berakhir dalam 30 hari: KGB pegawainya perlu diperiksa setelah hukdis selesai.
+    const batas30 = new Date(hariIni.getFullYear(), hariIni.getMonth(), hariIni.getDate() + 30);
     const summary = {
       total: data.length,
       aktif: aktif.length,
@@ -59,6 +61,10 @@ export async function GET() {
       sedang: aktif.filter((d) => d.kategori === "sedang").length,
       berat: aktif.filter((d) => d.kategori === "berat").length,
       berdampakKGB: aktif.filter((d) => d.berdampakKGB).length,
+      berakhir30: aktif.filter((d) => {
+        const berakhir = tanggalKalender(d.tmtBerakhir);
+        return !!berakhir && berakhir <= batas30;
+      }).length,
     };
 
     return NextResponse.json({ data, summary });

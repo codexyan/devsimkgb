@@ -4,17 +4,25 @@ import { useEffect, useMemo, useState } from "react";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { hitungRekapStatus, rapelanSiklus, satuPerSiklus, type StatusRapelan } from "@/lib/rekapKgb";
+import { SATKER } from "@/lib/satker";
+import { KODE_SATKER_LAIN, kodeSatkerPegawai } from "@/lib/rekapSatker";
+import { namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
+
+/* Laporan dan rekap KGB per tahun TMT. Angkanya memakai definisi yang sama dengan dashboard: KGB yang jatuh
+   tempo tetapi belum diinput ikut dihitung sebagai Belum Diproses (baris "belum diinput"). Area bertanda
+   #laporan-print-area dicetak dengan kop surat. */
 
 interface KGBLaporan {
   id: string;
+  isVirtual?: boolean;
   pegawaiId: string;
-  pegawai: { nama: string; nip: string; jabatan: string; golonganRuang: string; unitKerja: string } | null;
+  pegawai: { nama: string; nip: string; jabatan: string; golonganRuang: string; unitKerja: string | null } | null;
   golonganLama: string;
   golonganBaru: string;
   gajiPokokLama: number;
-  gajiPokokBaru: number;
-  mkgTahunBaru: number;
-  mkgBulanBaru: number;
+  gajiPokokBaru: number | null;
+  mkgTahunBaru: number | null;
+  mkgBulanBaru: number | null;
   tmtKgbBaru: string;
   status: string;
   flagRapelan: boolean;
@@ -25,7 +33,7 @@ interface KGBLaporan {
 }
 
 const BULAN_LIST = [
-  { value: "", label: "Semua Bulan" },
+  { value: "", label: "Semua bulan" },
   { value: "1", label: "Januari" }, { value: "2", label: "Februari" },
   { value: "3", label: "Maret" }, { value: "4", label: "April" },
   { value: "5", label: "Mei" }, { value: "6", label: "Juni" },
@@ -35,13 +43,6 @@ const BULAN_LIST = [
 ];
 
 const STATUS_FILTER = ["belum_diproses", "sedang_diproses", "menunggu_keuangan", "selesai", "ditolak"] as const;
-
-const GOL_COLOR: Record<string, { bar: string; badge: string; text: string }> = {
-  I:   { bar: "#3b82f6", badge: "var(--tint-blue-bg)", text: "var(--st-blue)" },
-  II:  { bar: "#10b981", badge: "var(--tint-green-bg)", text: "var(--st-green)" },
-  III: { bar: "#f59e0b", badge: "var(--tint-amber-bg)", text: "var(--st-amber2)" },
-  IV:  { bar: "#ef4444", badge: "var(--tint-red-bg)", text: "var(--st-red)" },
-};
 
 const LABEL_RAPELAN: Record<StatusRapelan, string> = {
   ditetapkan: "Rapelan",
@@ -55,6 +56,13 @@ function fmtTgl(s: string) {
 function bulanTmt(k: KGBLaporan) {
   const tmt = tanggalKalender(k.tmtKgbBaru);
   return tmt ? tmt.getMonth() + 1 : 0;
+}
+
+/** Nama satker pendek dari unit kerja pegawai; unit di luar daftar ditandai. */
+function namaSatkerDari(kode: string): string {
+  if (kode === KODE_SATKER_LAIN) return "Belum sesuai daftar satker";
+  const s = SATKER.find((x) => x.kode === kode);
+  return s ? namaSingkatSatker(s) : kode;
 }
 
 interface RekapBulanLaporan {
@@ -78,6 +86,7 @@ export default function LaporanPage() {
   const [tahun, setTahun]   = useState(tahunIni.toString());
   const [bulan, setBulan]   = useState("");
   const [status, setStatus] = useState("");
+  const [satker, setSatker] = useState("");
 
   const tahunList = Array.from({ length: 5 }, (_, i) => (tahunIni - i).toString());
 
@@ -95,17 +104,19 @@ export default function LaporanPage() {
 
   // Daftar detail tetap memuat entri yang dibatalkan. Hitungan memakai definisi bersama lib/rekapKgb.ts:
   // satu KGB per pegawai per TMT, jadi KGB yang dibatalkan lalu diinput ulang dihitung satu kali.
-  const dalamBulan = useMemo(
-    () => rawList.filter(k => !bulan || bulanTmt(k) === parseInt(bulan)),
-    [rawList, bulan],
+  const dalamPeriode = useMemo(
+    () => rawList.filter(k =>
+      (!bulan || bulanTmt(k) === parseInt(bulan)) &&
+      (!satker || kodeSatkerPegawai(k.pegawai?.unitKerja) === satker)),
+    [rawList, bulan, satker],
   );
   const kgbList = useMemo(
-    () => dalamBulan.filter(k => !status || k.status === status),
-    [dalamBulan, status],
+    () => dalamPeriode.filter(k => !status || k.status === status),
+    [dalamPeriode, status],
   );
   const siklus = useMemo(
-    () => satuPerSiklus(dalamBulan).filter(k => !status || k.status === status),
-    [dalamBulan, status],
+    () => satuPerSiklus(dalamPeriode).filter(k => !status || k.status === status),
+    [dalamPeriode, status],
   );
 
   // Status rapelan hanya untuk entri yang mewakili siklusnya; entri batal yang sudah diinput ulang tidak.
@@ -120,7 +131,7 @@ export default function LaporanPage() {
   const perGolongan = useMemo(() => {
     const map: Record<string, number> = {};
     siklus.forEach(k => { map[k.golonganBaru] = (map[k.golonganBaru] || 0) + 1; });
-    return map;
+    return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]));
   }, [siklus]);
 
   const perBulan = useMemo(() => {
@@ -143,35 +154,39 @@ export default function LaporanPage() {
     return Object.entries(map).sort(([a], [b]) => Number(a) - Number(b)).map(([, v]) => v);
   }, [siklus, rapelanPerId]);
 
-  const perUnit = useMemo(() => {
-    const map: Record<string, { selesai: number; total: number }> = {};
+  // Per satker memakai daftar satker baku, sehingga ejaan unit kerja yang berbeda tidak memecah hitungan.
+  const perSatker = useMemo(() => {
+    const map: Record<string, { selesai: number; total: number; belum: number }> = {};
     siklus.forEach(k => {
-      const u = k.pegawai?.unitKerja || "Lainnya";
-      if (!map[u]) map[u] = { selesai: 0, total: 0 };
-      map[u].total++;
-      if (k.status === "selesai") map[u].selesai++;
+      const kode = kodeSatkerPegawai(k.pegawai?.unitKerja);
+      if (!map[kode]) map[kode] = { selesai: 0, total: 0, belum: 0 };
+      map[kode].total++;
+      if (k.status === "selesai") map[kode].selesai++;
+      if (k.status === "belum_diproses" || k.status === "ditolak") map[kode].belum++;
     });
     return Object.entries(map).sort((a, b) => b[1].total - a[1].total);
   }, [siklus]);
 
-  const golEntries = Object.entries(perGolongan).sort((a, b) => a[0].localeCompare(b[0]));
+  const maksGolongan = Math.max(1, ...perGolongan.map(([, n]) => n));
 
   const judulBulan = bulan ? (BULAN_LIST.find(b => b.value === bulan)?.label + " ") : "";
-  const judulLaporan = `Rekap KGB ${judulBulan}${tahun}`;
+  const judulSatker = satker ? ` · ${namaSatkerDari(satker)}` : "";
+  const judulLaporan = `Rekap KGB ${judulBulan}${tahun}${judulSatker}`;
   const selesaiPct = stats.total > 0 ? Math.round((stats.selesai / stats.total) * 100) : 0;
   const tanggalCetak = formatTanggalId(new Date());
+  const jumlahBelumDiinput = kgbList.filter(k => k.isVirtual).length;
 
-  const kolomStat = [
-    { label: "Total KGB",          value: stats.total,             color: "var(--dtn)",       bg: "var(--sub)" },
-    { label: infoStatusKgb("selesai").label,           value: stats.selesai,           color: "var(--st-green)",  bg: "var(--tint-green-bg)" },
-    { label: infoStatusKgb("menunggu_keuangan").label, value: stats.menungguKeuangan,  color: "var(--st-violet)", bg: stats.menungguKeuangan > 0 ? "var(--tint-violet-bg)" : "var(--sub)" },
-    { label: infoStatusKgb("sedang_diproses").label,   value: stats.sedangDiproses,    color: "var(--dtn)",       bg: "var(--sub)" },
-    { label: infoStatusKgb("belum_diproses").label,    value: stats.belumDiproses,     color: "var(--st-amber)",  bg: stats.belumDiproses > 0 ? "var(--tint-amber-bg)" : "var(--sub)" },
-    { label: infoStatusKgb("ditolak").label,           value: stats.ditolak,           color: "var(--st-red)",    bg: stats.ditolak > 0 ? "var(--tint-red-bg)" : "var(--sub)" },
-    { label: "Rapelan",            value: stats.rapelanDitetapkan, color: "var(--st-red)",    bg: stats.rapelanDitetapkan > 0 ? "var(--tint-red-bg)" : "var(--sub)" },
-    { label: "Berpotensi Rapelan", value: stats.berpotensiRapelan, color: "var(--st-amber)",  bg: stats.berpotensiRapelan > 0 ? "var(--tint-amber-bg)" : "var(--sub)" },
+  const kolomStat: { label: string; value: number; nada?: "hijau" | "ungu" | "kuning" | "merah" | "navy" }[] = [
+    { label: "Total KGB", value: stats.total },
+    { label: infoStatusKgb("selesai").label, value: stats.selesai, nada: "hijau" },
+    { label: infoStatusKgb("menunggu_keuangan").label, value: stats.menungguKeuangan, nada: "ungu" },
+    { label: infoStatusKgb("sedang_diproses").label, value: stats.sedangDiproses, nada: "navy" },
+    { label: infoStatusKgb("belum_diproses").label, value: stats.belumDiproses, nada: "kuning" },
+    { label: infoStatusKgb("ditolak").label, value: stats.ditolak, nada: "merah" },
+    { label: "Rapelan ditetapkan", value: stats.rapelanDitetapkan, nada: "merah" },
+    { label: "Berpotensi rapelan", value: stats.berpotensiRapelan, nada: "kuning" },
   ];
-  const catatanHitungan = "Total dihitung satu KGB per pegawai per TMT: KGB yang dibatalkan lalu diinput ulang dihitung satu kali, dan Dibatalkan hanya memuat yang belum diinput ulang. Rapelan = ditetapkan keuangan saat konfirmasi.";
+  const catatanHitungan = "Satu KGB per pegawai per TMT. KGB yang jatuh tempo tetapi belum diinput dihitung sebagai Belum Diproses; KGB yang dibatalkan lalu diinput ulang dihitung sekali, dan Dibatalkan hanya memuat yang belum diinput ulang. Rapelan ditetapkan = keputusan keuangan saat konfirmasi.";
 
   return (
     <>
@@ -184,62 +199,71 @@ export default function LaporanPage() {
           .no-print { display: none !important; }
           .no-print-screen { display: revert !important; }
           @page { margin: 1cm 1.5cm; size: A4 landscape; }
-          table { border-collapse: collapse; width: 100%; }
-          th, td { border: 0.5px solid #c0ccd8; padding: 3px 5px; font-size: 8px; }
-          th { background: var(--tint-navy) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; color: var(--dtn) !important; font-weight: 700; }
-          .print-kop-divider { border-top: 2px solid var(--dtn); border-bottom: 0.5px solid var(--dtn); margin: 5px 0; }
+          #laporan-print-area table { border-collapse: collapse; width: 100%; min-width: 0 !important; }
+          #laporan-print-area th, #laporan-print-area td { border: 0.5px solid #c0ccd8; padding: 3px 5px; font-size: 8px; }
+          #laporan-print-area th { background: #edf1f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; color: #13295a !important; font-weight: 700; }
+          #laporan-print-area .tbl-scroll { max-height: none !important; overflow: visible !important; }
+          #laporan-print-area .tbl-scroll td *, #laporan-print-area .tbl-scroll th * { font-size: inherit !important; line-height: 1.3 !important; }
+          #laporan-print-area .dsb-panel { border: 0 !important; border-radius: 0 !important; overflow: visible !important; }
+          #laporan-print-area .dsb-titik { width: 5px; height: 5px; }
+          .print-kop-divider { border-top: 2px solid #13295a; border-bottom: 0.5px solid #13295a; margin: 5px 0; }
           .print-meta-table td, .print-meta-table th { border: none !important; padding: 2px 4px !important; background: transparent !important; }
           .print-stat-row td { border: none !important; padding: 2px 8px !important; font-size: 9px !important; }
         }
       `}</style>
 
-      <div>
-        {/* ── Header + Filter ── */}
-        <div className="no-print flex flex-wrap items-center gap-2 mb-3">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-base font-semibold" style={{ color: "var(--dtn)" }}>Laporan & Rekap KGB</h1>
-            <p className="text-xs mt-px" style={{ color: "var(--dt4)" }}>
-              {loading ? "Memuat…" : `${stats.total} KGB · ${selesaiPct}% selesai · Tahun ${tahun}`}
+      <div className="dsb-halaman">
+        {/* ── Kepala halaman dan saringan ── */}
+        <header className="no-print dsb-halaman-kepala dsb-muncul">
+          <div className="min-w-0">
+            <p className="dsb-label">Laporan</p>
+            <h1 className="dsb-halaman-judul">Rekap KGB {tahun}</h1>
+            <p className="dsb-sub">
+              {loading ? "Memuat…" : `${stats.total} KGB · ${selesaiPct}% selesai${judulBulan ? ` · TMT ${judulBulan.trim()}` : ""}${judulSatker}`}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 items-center">
-            <select value={tahun} onChange={e => setTahun(e.target.value)} aria-label="Tahun TMT"
-              className="rounded-xl px-3 py-2 text-xs outline-none"
-              style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: "var(--dtn)", minWidth: "90px" }}>
-              {tahunList.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select value={bulan} onChange={e => setBulan(e.target.value)} aria-label="Bulan TMT"
-              className="rounded-xl px-3 py-2 text-xs outline-none"
-              style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: "var(--dtn)", minWidth: "125px" }}>
-              {BULAN_LIST.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
-            </select>
-            <select value={status} onChange={e => setStatus(e.target.value)} aria-label="Status KGB"
-              className="rounded-xl px-3 py-2 text-xs outline-none"
-              style={{ border: "1px solid var(--ln0)", background: "var(--card)", color: "var(--dtn)", minWidth: "145px" }}>
-              <option value="">Semua Status</option>
-              {STATUS_FILTER.map(s => <option key={s} value={s}>{infoStatusKgb(s).label}</option>)}
-            </select>
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white transition hover:opacity-90"
-              style={{ background: "var(--navy-solid)" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-                <rect x="6" y="14" width="12" height="8"/>
-              </svg>
-              Cetak / PDF
+          <button type="button" onClick={() => window.print()} className="dsb-tombol">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            Cetak / PDF
+          </button>
+        </header>
+
+        <div className="no-print dsb-alat dsb-muncul" style={{ "--i": 1 } as React.CSSProperties}>
+          <select value={tahun} onChange={e => setTahun(e.target.value)} aria-label="Tahun TMT" className="dsb-pilih">
+            {tahunList.map(t => <option key={t} value={t}>Tahun {t}</option>)}
+          </select>
+          <select value={bulan} onChange={e => setBulan(e.target.value)} aria-label="Bulan TMT" className="dsb-pilih" data-aktif={bulan ? "" : undefined}>
+            {BULAN_LIST.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+          </select>
+          <select value={status} onChange={e => setStatus(e.target.value)} aria-label="Status KGB" className="dsb-pilih" data-aktif={status ? "" : undefined}>
+            <option value="">Semua status</option>
+            {STATUS_FILTER.map(s => <option key={s} value={s}>{infoStatusKgb(s).label}</option>)}
+          </select>
+          <select value={satker} onChange={e => setSatker(e.target.value)} aria-label="Satker" className="dsb-pilih" data-aktif={satker ? "" : undefined}>
+            <option value="">Semua satker</option>
+            {SATKER.map(s => <option key={s.kode} value={s.kode}>{namaSingkatSatker(s)}</option>)}
+            <option value={KODE_SATKER_LAIN}>Belum sesuai daftar satker</option>
+          </select>
+          {(bulan || status || satker) && (
+            <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => { setBulan(""); setStatus(""); setSatker(""); }}>
+              Atur ulang
             </button>
-          </div>
+          )}
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <p className="text-xs" style={{ color: "var(--dt4)" }}>Memuat laporan...</p>
+          <div className="flex flex-col gap-3" role="status" aria-label="Memuat laporan">
+            <div className="dsb-kerangka" style={{ height: 150 }} />
+            <div className="dsb-kerangka" style={{ height: 220 }} />
+            <div className="dsb-kerangka" style={{ height: 360 }} />
           </div>
         ) : (
-        <div id="laporan-print-area">
+        <div id="laporan-print-area" className="flex flex-col gap-3.5">
 
-          {/* ════ KOP SURAT (print only) ════ */}
+          {/* ════ KOP SURAT (cetak saja) ════ */}
           <div className="no-print-screen" style={{ marginBottom: "8px" }}>
             <table className="print-meta-table" style={{ width: "100%", borderCollapse: "collapse", marginBottom: "5px" }}>
               <tbody>
@@ -249,13 +273,13 @@ export default function LaporanPage() {
                     <img src="/logo-imipas.png" alt="Logo Imipas" style={{ width: "58px", height: "58px", objectFit: "contain" }} />
                   </td>
                   <td style={{ textAlign: "center", verticalAlign: "middle", border: "none", padding: "0" }}>
-                    <p style={{ fontSize: "8px", fontWeight: 600, color: "var(--dtn)", letterSpacing: "0.5px", margin: 0 }}>
+                    <p style={{ fontSize: "8px", fontWeight: 600, color: "#13295a", letterSpacing: "0.5px", margin: 0 }}>
                       KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA
                     </p>
-                    <p style={{ fontSize: "13px", fontWeight: 800, color: "var(--dtn)", margin: "2px 0 0" }}>
+                    <p style={{ fontSize: "13px", fontWeight: 800, color: "#13295a", margin: "2px 0 0" }}>
                       KANTOR WILAYAH DIREKTORAT JENDERAL PEMASYARAKATAN
                     </p>
-                    <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--dtn)", margin: 0 }}>KALIMANTAN SELATAN</p>
+                    <p style={{ fontSize: "12px", fontWeight: 700, color: "#13295a", margin: 0 }}>KALIMANTAN SELATAN</p>
                   </td>
                   <td style={{ width: "70px", textAlign: "center", verticalAlign: "middle", border: "none", padding: "0" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -266,108 +290,77 @@ export default function LaporanPage() {
             </table>
             <div className="print-kop-divider" />
             <div style={{ textAlign: "center", margin: "5px 0 3px" }}>
-              <p style={{ fontSize: "12px", fontWeight: 800, color: "var(--dtn)", letterSpacing: "0.5px", margin: 0 }}>
+              <p style={{ fontSize: "12px", fontWeight: 800, color: "#13295a", letterSpacing: "0.5px", margin: 0 }}>
                 REKAP KENAIKAN GAJI BERKALA (KGB)
               </p>
-              <p style={{ fontSize: "8.5px", color: "var(--dt3)", margin: "2px 0 0" }}>
+              <p style={{ fontSize: "8.5px", color: "#4d586f", margin: "2px 0 0" }}>
                 {judulLaporan} &nbsp;·&nbsp; Dicetak: {tanggalCetak}
               </p>
             </div>
-            {/* Print stats row */}
             <table className="print-stat-row" style={{ width: "100%", borderCollapse: "collapse", marginTop: "4px", marginBottom: "2px" }}>
               <tbody>
                 <tr>
                   {[
-                    ...kolomStat.map(c => ({ l: c.label, v: c.value as number | string, c: c.color })),
-                    { l: "Selesai %", v: `${selesaiPct}%`, c: "var(--st-green)" },
-                  ].map(({ l, v, c }) => (
-                    <td key={l} style={{ textAlign: "center", border: "0.5px solid var(--ln0)", padding: "3px 8px", background: "var(--sub)" }}>
-                      <div style={{ fontSize: "7px", color: "var(--dt4)" }}>{l}</div>
-                      <div style={{ fontSize: "11px", fontWeight: 800, color: c }}>{v}</div>
+                    ...kolomStat.map(c => ({ l: c.label, v: c.value as number | string })),
+                    { l: "Selesai %", v: `${selesaiPct}%` },
+                  ].map(({ l, v }) => (
+                    <td key={l} style={{ textAlign: "center", border: "0.5px solid #d3dae5", padding: "3px 8px" }}>
+                      <div style={{ fontSize: "7px", color: "#677187" }}>{l}</div>
+                      <div style={{ fontSize: "11px", fontWeight: 800, color: "#13295a" }}>{v}</div>
                     </td>
                   ))}
                 </tr>
               </tbody>
             </table>
-            <p style={{ fontSize: "7px", color: "var(--dt4)", margin: "0 0 6px" }}>{catatanHitungan}</p>
+            <p style={{ fontSize: "7px", color: "#677187", margin: "0 0 6px" }}>{catatanHitungan}</p>
           </div>
 
-          {/* ════ STAT BAR (screen only) ════ */}
-          <div className="no-print mb-3 rounded-xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8" style={{ borderBottom: "0.5px solid var(--ln1)" }}>
-              {kolomStat.map((c) => (
-                <div key={c.label} className="px-3 py-2.5" style={{ background: c.bg, borderRight: "0.5px solid var(--ln2)", borderBottom: "0.5px solid var(--ln2)" }}>
-                  <p style={{ fontSize: "18px", fontWeight: 800, color: c.color, lineHeight: 1 }}>{c.value}</p>
-                  <p style={{ fontSize: "10px", color: "var(--dt4)", marginTop: "2px" }}>{c.label}</p>
-                </div>
-              ))}
-            </div>
-            {/* Progress bar */}
-            <div className="px-3 py-2 flex items-center gap-3" style={{ background: "var(--sub)" }}>
-              <span style={{ fontSize: "10px", color: "var(--dt4)", whiteSpace: "nowrap" }}>{selesaiPct}% selesai</span>
-              <div className="flex-1 rounded-full overflow-hidden" style={{ height: "5px", background: "var(--ln2)" }}>
-                <div style={{ height: "100%", width: `${selesaiPct}%`, background: "#10b981", transition: "width 0.5s", borderRadius: "999px" }} />
+          {/* ════ ANGKA (layar) ════ */}
+          <div className="no-print dsb-angka-kisi dsb-muncul" data-baris="2" style={{ "--i": 2 } as React.CSSProperties}>
+            {kolomStat.map((c, i) => (
+              <div key={c.label} className="dsb-angka">
+                <span className="dsb-angka-label">{c.label}</span>
+                <span className="dsb-angka-nilai">
+                  {c.value}
+                  {i === 0 && <small>{selesaiPct}% selesai</small>}
+                </span>
+                {i === 0 ? (
+                  <span className="dsb-angka-meta">
+                    <span className="dsb-bar-mini" style={{ width: "100%" }} aria-hidden="true"><span style={{ width: `${selesaiPct}%` }} /></span>
+                  </span>
+                ) : c.value > 0 && c.nada ? (
+                  <span className="dsb-angka-meta"><span className="dsb-titik" data-nada={c.nada} aria-hidden="true" />{Math.round((c.value / Math.max(stats.total, 1)) * 100)}% dari total</span>
+                ) : null}
               </div>
-              <span style={{ fontSize: "10px", color: "var(--st-green)", whiteSpace: "nowrap" }}>{stats.selesai}/{stats.total}</span>
-            </div>
-            <p className="px-3 pb-2" style={{ fontSize: "10px", color: "var(--dt5)", background: "var(--sub)" }}>{catatanHitungan}</p>
+            ))}
           </div>
+          <p className="no-print dsb-kecil" style={{ margin: "-4px 2px 0", lineHeight: 1.5 }}>{catatanHitungan}</p>
 
-          {/* ════ REKAP 3-KOLOM: Golongan | Bulan | Unit ════ */}
-          <div className="no-print grid grid-cols-1 lg:grid-cols-3 gap-2 mb-3">
-
-            {/* Per Golongan */}
-            <div className="rounded-xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
-              <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
-                <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--dtn)" }}>Per Golongan</p>
-                <p style={{ fontSize: "10px", color: "var(--dt5)" }}>{golEntries.length} ruang</p>
+          {/* ════ RINCIAN: bulan TMT | satker | golongan ════ */}
+          <div className="no-print dsb-rincian dsb-muncul" style={{ "--i": 3 } as React.CSSProperties}>
+            <section className="dsb-panel" aria-labelledby="judul-per-bulan">
+              <div className="dsb-panel-kepala">
+                <h2 id="judul-per-bulan" className="dsb-panel-judul">Per bulan TMT <small>{perBulan.length} bulan</small></h2>
               </div>
-              <div className="p-2.5 flex flex-wrap gap-1.5">
-                {golEntries.map(([ruang, count]) => {
-                  const grp = ruang.split("/")[0];
-                  const c = GOL_COLOR[grp] ?? { bar: "var(--dt4)", badge: "var(--ln2)", text: "#475569" };
-                  return (
-                    <span key={ruang} style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "2px 8px", borderRadius: "999px", background: c.badge, border: `1px solid ${c.bar}55`, fontSize: "11px", fontWeight: 600, color: c.text }}>
-                      {ruang}
-                      <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: c.bar, padding: "0 5px", borderRadius: "999px", lineHeight: "15px", minWidth: "17px", textAlign: "center" }}>{count}</span>
-                    </span>
-                  );
-                })}
-                {golEntries.length === 0 && <p style={{ fontSize: "11px", color: "var(--dt5)" }}>Tidak ada data</p>}
-              </div>
-            </div>
-
-            {/* Per Bulan */}
-            <div className="rounded-xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
-              <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
-                <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--dtn)" }}>Per Bulan TMT</p>
-                <p style={{ fontSize: "10px", color: "var(--dt5)" }}>{perBulan.length} bulan</p>
-              </div>
-              <div className="overflow-y-auto" style={{ maxHeight: "130px" }}>
+              <div className="dsb-rincian-isi">
                 {perBulan.length === 0 ? (
-                  <p className="px-3 py-2" style={{ fontSize: "11px", color: "var(--dt5)" }}>Tidak ada data</p>
+                  <p className="dsb-kosong" style={{ padding: "16px" }}>Tidak ada data</p>
                 ) : (
-                  <table className="w-full" style={{ borderCollapse: "collapse", fontSize: "11px" }}>
+                  <table className="dsb-tabel">
                     <tbody>
                       {perBulan.map(b => {
                         const pct = b.total > 0 ? (b.selesai / b.total) * 100 : 0;
                         const rapelan = b.rapelanDitetapkan + b.berpotensiRapelan;
                         return (
-                          <tr key={b.label} style={{ borderBottom: "0.5px solid var(--ln2)" }}>
-                            <td className="px-3 py-1.5 font-medium" style={{ color: "var(--dtn)", whiteSpace: "nowrap" }}>{b.label}</td>
-                            <td className="px-2 py-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <div style={{ flex: 1, height: "4px", background: "var(--ln2)", borderRadius: "99px", overflow: "hidden" }}>
-                                  <div style={{ height: "100%", width: `${pct}%`, background: "#10b981" }} />
-                                </div>
-                                <span style={{ fontSize: "10px", color: "var(--st-green)", whiteSpace: "nowrap" }}>{b.selesai}/{b.total}</span>
-                              </div>
+                          <tr key={b.label}>
+                            <td className="dsb-nama" style={{ whiteSpace: "nowrap" }}>{b.label}</td>
+                            <td style={{ width: "45%" }}>
+                              <span className="dsb-bar-mini" style={{ width: "100%" }} aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>
                             </td>
-                            {rapelan > 0 && (
-                              <td className="px-2 py-1.5 whitespace-nowrap">
-                                <span style={{ fontSize: "9px", color: "var(--st-red)", fontWeight: 700 }}>{rapelan} rapelan</span>
-                              </td>
-                            )}
+                            <td className="kanan whitespace-nowrap">
+                              {b.selesai}/{b.total}
+                              {rapelan > 0 && <span className="dsb-kecil" style={{ color: "var(--st-red)", marginLeft: "8px" }}>{rapelan} rapelan</span>}
+                            </td>
                           </tr>
                         );
                       })}
@@ -375,36 +368,30 @@ export default function LaporanPage() {
                   </table>
                 )}
               </div>
-            </div>
+            </section>
 
-            {/* Per Unit Kerja */}
-            <div className="rounded-xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
-              <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
-                <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--dtn)" }}>Per Unit Kerja</p>
-                <p style={{ fontSize: "10px", color: "var(--dt5)" }}>{perUnit.length} unit</p>
+            <section className="dsb-panel" aria-labelledby="judul-per-satker">
+              <div className="dsb-panel-kepala">
+                <h2 id="judul-per-satker" className="dsb-panel-judul">Per satker <small>{perSatker.length} satker</small></h2>
               </div>
-              <div className="overflow-y-auto" style={{ maxHeight: "130px" }}>
-                {perUnit.length === 0 ? (
-                  <p className="px-3 py-2" style={{ fontSize: "11px", color: "var(--dt5)" }}>Tidak ada data</p>
+              <div className="dsb-rincian-isi">
+                {perSatker.length === 0 ? (
+                  <p className="dsb-kosong" style={{ padding: "16px" }}>Tidak ada data</p>
                 ) : (
-                  <table className="w-full" style={{ borderCollapse: "collapse", fontSize: "11px" }}>
+                  <table className="dsb-tabel">
                     <tbody>
-                      {perUnit.map(([unit, { selesai, total }]) => {
+                      {perSatker.map(([kode, { selesai, total, belum }]) => {
                         const pct = total > 0 ? (selesai / total) * 100 : 0;
-                        const shortUnit = unit.length > 32 ? unit.slice(0, 32) + "…" : unit;
                         return (
-                          <tr key={unit} style={{ borderBottom: "0.5px solid var(--ln2)" }}>
-                            <td className="px-3 py-1.5" style={{ color: "var(--dt3)", maxWidth: "160px" }}>
-                              <p className="truncate" style={{ fontSize: "10px" }} title={unit}>{shortUnit}</p>
+                          <tr key={kode} className="dsb-baris-klik" onClick={() => setSatker(satker === kode ? "" : kode)} title="Saring laporan ke satker ini">
+                            <td style={{ maxWidth: "200px" }}>
+                              <p className="dsb-nama truncate" style={{ margin: 0, color: kode === KODE_SATKER_LAIN ? "var(--st-amber)" : undefined }}>{namaSatkerDari(kode)}</p>
+                              {belum > 0 && <p className="dsb-kecil" style={{ margin: 0 }}>{belum} belum diproses</p>}
                             </td>
-                            <td className="px-2 py-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <div style={{ flex: 1, height: "4px", background: "var(--ln2)", borderRadius: "99px", overflow: "hidden", minWidth: "40px" }}>
-                                  <div style={{ height: "100%", width: `${pct}%`, background: "#10b981" }} />
-                                </div>
-                                <span style={{ fontSize: "10px", color: "var(--st-green)", whiteSpace: "nowrap" }}>{selesai}/{total}</span>
-                              </div>
+                            <td style={{ width: "34%" }}>
+                              <span className="dsb-bar-mini" style={{ width: "100%" }} aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>
                             </td>
+                            <td className="kanan whitespace-nowrap">{selesai}/{total}</td>
                           </tr>
                         );
                       })}
@@ -412,13 +399,40 @@ export default function LaporanPage() {
                   </table>
                 )}
               </div>
-            </div>
+            </section>
+
+            <section className="dsb-panel" aria-labelledby="judul-per-golongan">
+              <div className="dsb-panel-kepala">
+                <h2 id="judul-per-golongan" className="dsb-panel-judul">Per golongan <small>{perGolongan.length} ruang</small></h2>
+              </div>
+              <div className="dsb-rincian-isi">
+                {perGolongan.length === 0 ? (
+                  <p className="dsb-kosong" style={{ padding: "16px" }}>Tidak ada data</p>
+                ) : (
+                  <table className="dsb-tabel">
+                    <tbody>
+                      {perGolongan.map(([ruang, jumlah]) => (
+                        <tr key={ruang}>
+                          <td className="dsb-nama" style={{ whiteSpace: "nowrap" }}>{ruang}</td>
+                          <td style={{ width: "55%" }}>
+                            <span className="dsb-bar-mini" style={{ width: "100%" }} aria-hidden="true">
+                              <span style={{ width: `${(jumlah / maksGolongan) * 100}%`, background: "var(--accent)" }} />
+                            </span>
+                          </td>
+                          <td className="kanan">{jumlah}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </section>
           </div>
 
-          {/* ════ REKAP PER BULAN (print only) ════ */}
+          {/* ════ REKAP PER BULAN (cetak saja) ════ */}
           {perBulan.length > 0 && (
             <div className="no-print-screen" style={{ marginBottom: "6px" }}>
-              <p style={{ fontSize: "9px", fontWeight: 700, color: "var(--dtn)", marginBottom: "3px" }}>REKAP PER BULAN</p>
+              <p style={{ fontSize: "9px", fontWeight: 700, color: "#13295a", marginBottom: "3px" }}>REKAP PER BULAN</p>
               <table style={{ width: "100%" }}>
                 <thead>
                   <tr>{["Bulan","Total","Selesai","Menunggu Keuangan","Sedang Diproses","Belum Diproses","Dibatalkan","Rapelan","Berpotensi Rapelan"].map(h => <th key={h} style={{ textAlign: "center" }}>{h}</th>)}</tr>
@@ -428,25 +442,25 @@ export default function LaporanPage() {
                     <tr key={b.label}>
                       <td style={{ fontWeight: 600 }}>{b.label}</td>
                       <td style={{ textAlign: "center", fontWeight: 700 }}>{b.total}</td>
-                      <td style={{ textAlign: "center", color: "var(--st-green)" }}>{b.selesai}</td>
-                      <td style={{ textAlign: "center", color: "var(--st-violet)" }}>{b.menungguKeuangan}</td>
-                      <td style={{ textAlign: "center", color: "var(--dtn)" }}>{b.sedangDiproses}</td>
-                      <td style={{ textAlign: "center", color: "var(--st-amber)" }}>{b.belumDiproses}</td>
-                      <td style={{ textAlign: "center", color: "var(--st-red)" }}>{b.ditolak}</td>
-                      <td style={{ textAlign: "center", color: "var(--st-red)", fontWeight: b.rapelanDitetapkan > 0 ? 700 : 400 }}>{b.rapelanDitetapkan}</td>
-                      <td style={{ textAlign: "center", color: "var(--st-amber)", fontWeight: b.berpotensiRapelan > 0 ? 700 : 400 }}>{b.berpotensiRapelan}</td>
+                      <td style={{ textAlign: "center" }}>{b.selesai}</td>
+                      <td style={{ textAlign: "center" }}>{b.menungguKeuangan}</td>
+                      <td style={{ textAlign: "center" }}>{b.sedangDiproses}</td>
+                      <td style={{ textAlign: "center" }}>{b.belumDiproses}</td>
+                      <td style={{ textAlign: "center" }}>{b.ditolak}</td>
+                      <td style={{ textAlign: "center", fontWeight: b.rapelanDitetapkan > 0 ? 700 : 400 }}>{b.rapelanDitetapkan}</td>
+                      <td style={{ textAlign: "center", fontWeight: b.berpotensiRapelan > 0 ? 700 : 400 }}>{b.berpotensiRapelan}</td>
                     </tr>
                   ))}
-                  <tr style={{ fontWeight: 700, borderTop: "1px solid var(--dtn)" }}>
+                  <tr style={{ fontWeight: 700 }}>
                     <td>Total</td>
                     <td style={{ textAlign: "center" }}>{stats.total}</td>
-                    <td style={{ textAlign: "center", color: "var(--st-green)" }}>{stats.selesai}</td>
-                    <td style={{ textAlign: "center", color: "var(--st-violet)" }}>{stats.menungguKeuangan}</td>
+                    <td style={{ textAlign: "center" }}>{stats.selesai}</td>
+                    <td style={{ textAlign: "center" }}>{stats.menungguKeuangan}</td>
                     <td style={{ textAlign: "center" }}>{stats.sedangDiproses}</td>
-                    <td style={{ textAlign: "center", color: "var(--st-amber)" }}>{stats.belumDiproses}</td>
-                    <td style={{ textAlign: "center", color: "var(--st-red)" }}>{stats.ditolak}</td>
-                    <td style={{ textAlign: "center", color: "var(--st-red)" }}>{stats.rapelanDitetapkan}</td>
-                    <td style={{ textAlign: "center", color: "var(--st-amber)" }}>{stats.berpotensiRapelan}</td>
+                    <td style={{ textAlign: "center" }}>{stats.belumDiproses}</td>
+                    <td style={{ textAlign: "center" }}>{stats.ditolak}</td>
+                    <td style={{ textAlign: "center" }}>{stats.rapelanDitetapkan}</td>
+                    <td style={{ textAlign: "center" }}>{stats.berpotensiRapelan}</td>
                   </tr>
                 </tbody>
               </table>
@@ -454,89 +468,87 @@ export default function LaporanPage() {
           )}
 
           {/* ════ TABEL DETAIL ════ */}
-          <div className="rounded-xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
-            <div className="no-print px-4 py-2 flex items-center justify-between" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
-              <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--dtn)" }}>Detail: {judulLaporan}</p>
-              <p style={{ fontSize: "10px", color: "var(--dt4)" }}>{kgbList.length} entri</p>
+          <section className="dsb-panel overflow-hidden dsb-muncul" style={{ "--i": 4 } as React.CSSProperties} aria-labelledby="judul-detail-laporan">
+            <div className="no-print dsb-panel-kepala">
+              <h2 id="judul-detail-laporan" className="dsb-panel-judul">Daftar KGB <small>{kgbList.length} entri</small></h2>
+              {jumlahBelumDiinput > 0 && <span className="dsb-kecil">{jumlahBelumDiinput} belum diinput Tim SDM</span>}
             </div>
             <div className="no-print-screen" style={{ marginBottom: "3px" }}>
-              <p style={{ fontSize: "9px", fontWeight: 700, color: "var(--dtn)" }}>DAFTAR PEGAWAI KGB: {judulLaporan.toUpperCase()}</p>
+              <p style={{ fontSize: "9px", fontWeight: 700, color: "#13295a" }}>DAFTAR PEGAWAI KGB: {judulLaporan.toUpperCase()}</p>
             </div>
 
             {kgbList.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <p className="text-xs" style={{ color: "var(--dt5)" }}>Tidak ada data KGB pada periode ini</p>
-              </div>
+              <p className="dsb-kosong" style={{ padding: "48px 16px" }}>Tidak ada data KGB pada periode ini.</p>
             ) : (
-              <div className="overflow-x-auto tbl-scroll">
-                <table className="w-full" style={{ fontSize: "12px", borderCollapse: "collapse" }}>
+              <div className="dsb-gulir-tabel tbl-scroll">
+                <table className="dsb-tabel" style={{ minWidth: "1040px" }}>
                   <thead>
-                    <tr style={{ background: "var(--sub)", borderBottom: "0.5px solid var(--ln1)" }}>
-                      {["No","Nama / NIP","Jabatan / Unit","Gol.","Gaji Baru","Selisih","MKG","TMT KGB","No. SK","Status"].map(h => (
-                        <th key={h} className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ fontSize: "10px", color: "var(--dt4)" }}>{h}</th>
+                    <tr>
+                      {["No", "Pegawai", "Jabatan dan satker", "Golongan", "Gaji pokok baru", "MKG", "TMT KGB", "Nomor SK", "Status"].map(h => (
+                        <th key={h} scope="col">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {kgbList.map((k, i) => {
-                      const selisih = (k.gajiPokokBaru ?? 0) - k.gajiPokokLama;
+                      const selisih = k.gajiPokokBaru !== null ? k.gajiPokokBaru - k.gajiPokokLama : null;
                       const rapelan = rapelanPerId.get(k.id) ?? null;
                       const warna = warnaStatusKgb(k.status);
-                      const grp = k.golonganBaru.split("/")[0];
-                      const gc = GOL_COLOR[grp] ?? { bar: "var(--dt4)", badge: "var(--ln2)", text: "#475569" };
                       return (
-                        <tr key={k.id} style={{ borderBottom: i < kgbList.length - 1 ? "0.5px solid var(--ln2)" : "none", background: rapelan === "berpotensi" ? "var(--tint-amber-bg)" : i % 2 === 0 ? "var(--card)" : "var(--sub)" }}>
-                          <td className="px-3 py-2" style={{ color: "var(--dt5)", fontSize: "10px", whiteSpace: "nowrap" }}>{i + 1}</td>
-                          <td className="px-3 py-2">
-                            <p className="font-semibold" style={{ fontSize: "11px", color: "var(--dtn)", whiteSpace: "nowrap" }}>{k.pegawai?.nama ?? "-"}</p>
-                            <p style={{ fontSize: "10px", color: "var(--dt5)", fontFamily: "monospace" }}>{k.pegawai?.nip ?? "-"}</p>
+                        <tr key={k.id} style={{ background: rapelan === "berpotensi" ? "var(--tint-amber-bg)" : undefined }}>
+                          <td className="dsb-kecil">{i + 1}</td>
+                          <td>
+                            <p className="dsb-nama" style={{ margin: 0, whiteSpace: "nowrap" }}>{k.pegawai?.nama ?? "-"}</p>
+                            <p className="dsb-kecil" style={{ margin: 0, fontVariantNumeric: "tabular-nums" }}>{k.pegawai?.nip ?? "-"}</p>
                           </td>
-                          <td className="px-3 py-2" style={{ maxWidth: "160px" }}>
-                            <p style={{ fontSize: "10px", color: "var(--dtn)" }} className="truncate">{k.pegawai?.jabatan ?? "-"}</p>
-                            <p style={{ fontSize: "9px", color: "var(--dt5)" }} className="truncate">{k.pegawai?.unitKerja ?? "-"}</p>
+                          <td style={{ maxWidth: "220px" }}>
+                            <p className="truncate" style={{ margin: 0 }}>{k.pegawai?.jabatan ?? "-"}</p>
+                            <p className="dsb-kecil truncate" style={{ margin: 0 }} title={k.pegawai?.unitKerja ?? undefined}>
+                              {namaSatkerDari(kodeSatkerPegawai(k.pegawai?.unitKerja))}
+                            </p>
                           </td>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                              <span style={{ fontSize: "9px", color: "var(--dt5)", textDecoration: "line-through" }}>{k.golonganLama}</span>
-                              <span style={{ fontSize: "10px", fontWeight: 700, padding: "1px 6px", borderRadius: "5px", background: gc.badge, color: gc.text, width: "fit-content" }}>{k.golonganBaru}</span>
-                            </div>
+                          <td className="whitespace-nowrap">
+                            {k.golonganLama !== k.golonganBaru ? `${k.golonganLama} → ${k.golonganBaru}` : k.golonganBaru}
                           </td>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--st-green)" }}>{fmtRp(k.gajiPokokBaru)}</p>
-                            <p style={{ fontSize: "9px", color: "var(--dt5)", textDecoration: "line-through" }}>{fmtRp(k.gajiPokokLama)}</p>
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            {selisih > 0 && (
-                              <span style={{ fontSize: "10px", color: "#10b981", fontWeight: 600 }}>+{fmtRp(selisih)}</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap" style={{ fontSize: "11px", color: "var(--dt3)" }}>
-                            {k.mkgTahunBaru} thn{k.mkgBulanBaru > 0 ? ` ${k.mkgBulanBaru} bln` : ""}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap" style={{ fontSize: "11px", color: "var(--dt3)" }}>
-                            {fmtTgl(k.tmtKgbBaru)}
-                          </td>
-                          <td className="px-3 py-2" style={{ minWidth: "110px" }}>
-                            {k.surat ? (
+                          <td className="whitespace-nowrap">
+                            {k.isVirtual ? (
                               <>
-                                <p style={{ fontSize: "10px", color: "var(--dtn)", fontWeight: 600 }}>{k.surat.nomorSurat}</p>
-                                <p style={{ fontSize: "9px", color: "var(--dt4)" }}>{fmtTgl(k.surat.tanggalSurat)}</p>
+                                <p style={{ margin: 0, color: "var(--dt4)" }}>Belum diinput</p>
+                                <p className="dsb-kecil" style={{ margin: 0 }}>lama {fmtRp(k.gajiPokokLama)}</p>
                               </>
                             ) : (
-                              <span style={{ fontSize: "10px", color: "var(--dt6)" }}>-</span>
+                              <>
+                                <p style={{ margin: 0, color: "var(--dtn)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{fmtRp(k.gajiPokokBaru)}</p>
+                                <p className="dsb-kecil" style={{ margin: 0 }}>
+                                  lama {fmtRp(k.gajiPokokLama)}{selisih !== null && selisih > 0 ? ` · +${selisih.toLocaleString("id-ID")}` : ""}
+                                </p>
+                              </>
                             )}
                           </td>
-                          <td className="px-3 py-2">
-                            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                              <span style={{ fontSize: "10px", fontWeight: 600, padding: "2px 7px", borderRadius: "999px", background: warna.bg, color: warna.color, border: `1px solid ${warna.color}`, whiteSpace: "nowrap", width: "fit-content" }}>
-                                {infoStatusKgb(k.status).label}
-                              </span>
-                              {rapelan && (
-                                <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: "999px", background: rapelan === "ditetapkan" ? "var(--tint-red-bg)" : "var(--tint-amber-bg)", color: rapelan === "ditetapkan" ? "var(--st-red)" : "var(--st-amber)", border: `1px solid ${rapelan === "ditetapkan" ? "var(--tint-red-ln)" : "var(--tint-amber-ln)"}`, whiteSpace: "nowrap", width: "fit-content" }}>
-                                  {LABEL_RAPELAN[rapelan]}
-                                </span>
-                              )}
-                            </div>
+                          <td className="whitespace-nowrap">
+                            {k.mkgTahunBaru === null ? <span className="dsb-kecil">–</span> : `${k.mkgTahunBaru} thn${k.mkgBulanBaru ? ` ${k.mkgBulanBaru} bln` : ""}`}
+                          </td>
+                          <td className="whitespace-nowrap">{fmtTgl(k.tmtKgbBaru)}</td>
+                          <td>
+                            {k.surat ? (
+                              <>
+                                <p style={{ margin: 0, color: "var(--dtn)", whiteSpace: "nowrap" }}>{k.surat.nomorSurat}</p>
+                                <p className="dsb-kecil" style={{ margin: 0 }}>{fmtTgl(k.surat.tanggalSurat)}</p>
+                              </>
+                            ) : (
+                              <span className="dsb-kecil">–</span>
+                            )}
+                          </td>
+                          <td>
+                            <span className="dsb-status">
+                              <span className="dsb-titik" style={{ background: warna.color }} aria-hidden="true" />
+                              {infoStatusKgb(k.status).label}
+                            </span>
+                            {rapelan && (
+                              <p className="dsb-kecil" style={{ margin: "2px 0 0", color: rapelan === "ditetapkan" ? "var(--st-red)" : "var(--st-amber)" }}>
+                                {LABEL_RAPELAN[rapelan]}
+                              </p>
+                            )}
                           </td>
                         </tr>
                       );
@@ -545,15 +557,15 @@ export default function LaporanPage() {
                 </table>
               </div>
             )}
-          </div>
+          </section>
 
-          {/* Print footer */}
+          {/* Kaki cetak */}
           <div className="no-print-screen" style={{ marginTop: "10px", borderTop: "0.5px solid #c0ccd8", paddingTop: "4px" }}>
             <table className="print-meta-table" style={{ width: "100%", borderCollapse: "collapse" }}>
               <tbody>
                 <tr>
-                  <td style={{ border: "none", fontSize: "7px", color: "var(--dt3)", padding: 0 }}>SIM-KGB · Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan · Berdasarkan PP No. 5 Tahun 2024</td>
-                  <td style={{ border: "none", fontSize: "7px", color: "var(--dt3)", padding: 0, textAlign: "right" }}>{judulLaporan} · Dicetak {tanggalCetak}</td>
+                  <td style={{ border: "none", fontSize: "7px", color: "#4d586f", padding: 0 }}>SIM-KGB · Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan · Berdasarkan PP No. 5 Tahun 2024</td>
+                  <td style={{ border: "none", fontSize: "7px", color: "#4d586f", padding: 0, textAlign: "right" }}>{judulLaporan} · Dicetak {tanggalCetak}</td>
                 </tr>
               </tbody>
             </table>

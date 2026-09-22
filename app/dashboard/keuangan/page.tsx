@@ -1,15 +1,24 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
-import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
-import { kunciBulanTmt, rekapPerBulanTmt, satuPerSiklus, tahunTmt, type RekapBulanTmt } from "@/lib/rekapKgb";
+import { formatTanggalId, hariIniWita, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
+import { kunciBulanTmt, rekapPerBulanTmt, satuPerSiklus, type RekapBulanTmt } from "@/lib/rekapKgb";
+import { bulanFokusRekon, jendelaRekonGaji, statusRekonGaji, type StatusRekon } from "@/lib/rekonGaji";
+import { cariSatker } from "@/lib/satker";
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 import { useRole } from "@/app/dashboard/components/RoleContext";
+import { KerangkaModal } from "@/app/dashboard/components/kgb";
+import { DaftarBulanRekon } from "@/app/dashboard/components/DaftarBulanRekon";
+import { geserBulan, namaBulan, namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
 import { canKonfirmasiKeuangan } from "@/lib/auth";
 
-/* ─────────────── interfaces ─────────────── */
+/* Modul Keuangan: tinjau SK KGB yang sudah ditandatangani, tetapkan rapelan, lalu siapkan dasar input
+   Gaji Web per bulan TMT. Alur kerjanya mengikuti jadwal rekon (lib/rekonGaji.ts): SK bulan TMT M harus
+   sudah dikonfirmasi sebelum keuangan merekon gaji tanggal 1 sampai 15 bulan M-1. Hitungan per bulan memakai
+   definisi bersama lib/rekapKgb.ts. Super Admin membuka halaman ini untuk memantau saja. */
 
 interface KGB {
   /** null untuk entri Belum Diproses virtual (pegawai belum punya record KGB aktif). */
@@ -27,51 +36,66 @@ interface KGB {
   mkgBulanBaru: number | null;
   flagRapelan: boolean;
   rapelanDitetapkan: boolean | null;
+  konfirmasiKeuanganAt?: string | null;
   createdAt: string;
   pegawai: { nip: string; nama: string; jabatan: string; unitKerja: string } | null;
   surat: { nomorSurat: string; tanggalSurat: string; pathFile?: string | null } | null;
 }
 
-/* ─────────────── helpers ─────────────── */
+type SaringStatus = "semua" | "menunggu" | "selesai" | "belum";
 
-const fmt     = (s: string) => formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" });
-const fmtFull = (s: string) => formatTanggalId(s);
-const fmtRp   = (n: number | null | undefined) => (typeof n === "number" ? "Rp " + n.toLocaleString("id-ID") : "-");
-const fmtMkg  = (k: KGB) => (k.mkgTahunBaru === null ? "-" : `${k.mkgTahunBaru} Thn ${k.mkgBulanBaru ?? 0} Bln`);
-
-function initials(nama: string) {
-  return nama.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
+interface LogKonfirmasi {
+  id: string;
+  waktu: string;
+  aksi: string;
+  detail: string;
+  targetNama?: string | null;
+  user: { nama: string } | null;
 }
 
+/** Nama, rapelan, dan konfirmasi cepat dari detail log /api/kgb/[id]/konfirmasi-keuangan. */
+function uraiLog(l: LogKonfirmasi) {
+  const m = /^Konfirmasi KGB (.+) \((\d+)\), Gol\. ([^,]+), Gaji (Rp [\d.]+), Rapelan: (Ya|Tidak)(, melalui Konfirmasi cepat)?/.exec(l.detail);
+  return m ? { nama: m[1], golongan: m[3], gaji: m[4], rapelan: m[5] === "Ya", cepat: !!m[6] } : null;
+}
+const STATUS_BELUM_SAMPAI = ["belum_diproses", "sedang_diproses", "ditolak"];
+
+/* ─── pembantu ─── */
+
+const fmt = (s: string | null | undefined) => (s ? formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" }) : "-");
+const fmtRp = (n: number | null | undefined) => (typeof n === "number" ? "Rp " + n.toLocaleString("id-ID") : "-");
+const fmtMkg = (k: KGB) => (k.mkgTahunBaru === null ? "-" : `${k.mkgTahunBaru} thn ${k.mkgBulanBaru ?? 0} bln`);
 const namaPegawai = (k: KGB) => k.pegawai?.nama ?? "-";
 const kunciKgb = (k: KGB) => k.id ?? `virtual-${k.pegawaiId}`;
-const badgeStatus = (status: string) => ({ label: infoStatusKgb(status).label, ...warnaStatusKgb(status) });
+const golongan = (k: KGB) => (k.golonganLama && k.golonganLama !== k.golonganBaru ? `${k.golonganLama} → ${k.golonganBaru}` : k.golonganBaru);
+const selisihGaji = (k: KGB) => (k.gajiPokokBaru === null ? 0 : k.gajiPokokBaru - k.gajiPokokLama);
+const tautanSk = (k: KGB) => (k.surat?.pathFile ? `/api/blob/download?url=${encodeURIComponent(k.surat.pathFile)}` : null);
+
+function satkerPendek(unitKerja: string | null | undefined): string {
+  const s = cariSatker(unitKerja);
+  return s ? namaSingkatSatker(s) : unitKerja?.trim() || "-";
+}
+
+function sisaHari(tanggal: string, hariIni: Date): number | null {
+  const t = tanggalKalender(tanggal);
+  return t ? Math.round((t.getTime() - hariIni.getTime()) / 86_400_000) : null;
+}
 
 const ALASAN_TMT_LEWAT = "TMT sudah lewat, tinjau satu per satu";
 
 /**
- * Alasan SK tidak dapat dipilih untuk Konfirmasi cepat; null bila dapat dipilih.
- * SK berpotensi rapelan tidak diberi kotak pilih sama sekali (null juga). SK yang TMT-nya (tanggal WITA)
- * hari ini atau sebelumnya ditinjau satu per satu; API menolak konfirmasi cepat untuk SK itu.
+ * Alasan SK tidak dapat dipilih untuk Konfirmasi cepat; null bila dapat dipilih. SK berpotensi rapelan dan SK
+ * yang TMT-nya (tanggal WITA) hari ini atau sebelumnya ditinjau satu per satu; API menolaknya dengan cepat: true.
  */
 function alasanTanpaKonfirmasiCepat(k: KGB, hariIni: Date): string | null {
-  if (!k.id || k.flagRapelan) return null;
+  if (!k.id) return "Belum ada SK";
+  if (k.flagRapelan) return "Berpotensi rapelan, tinjau satu per satu";
   const tmt = tanggalKalender(k.tmtKgbBaru);
   return !tmt || tmt.getTime() <= hariIni.getTime() ? ALASAN_TMT_LEWAT : null;
 }
 
 function bisaKonfirmasiCepat(k: KGB, hariIni: Date): k is KGB & { id: string } {
-  return !!k.id && !k.flagRapelan && alasanTanpaKonfirmasiCepat(k, hariIni) === null;
-}
-
-function kunciBulan(tahun: number, bulan0: number) {
-  const d = new Date(tahun, bulan0, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function bulanLabel(key: string) {
-  const [y, m] = key.split("-");
-  return new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+  return alasanTanpaKonfirmasiCepat(k, hariIni) === null;
 }
 
 /** Daftar KGB dari respons API; null bila isinya bukan daftar. */
@@ -80,227 +104,117 @@ async function bacaDaftarKgb(res: Response): Promise<KGB[] | null> {
   return Array.isArray(d) ? (d as KGB[]) : null;
 }
 
-// Pengganti daftar kosong saat data gagal dimuat, agar kegagalan tidak terbaca sebagai "tidak ada data".
-function GalatMuat({ pesan, onMuatUlang }: { pesan: string; onMuatUlang: () => void }) {
+async function pesanGalat(res: Response, bawaan: string) {
+  try {
+    const d = (await res.json()) as { error?: string };
+    return d.error ?? bawaan;
+  } catch {
+    return bawaan;
+  }
+}
+
+function selCsv(v: string | number | null | undefined): string {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Unduh berkas CSV (UTF-8 dengan BOM agar nama pegawai terbaca benar di Excel). */
+function unduhCsv(namaBerkas: string, kepala: string[], baris: (string | number | null | undefined)[][]) {
+  const isi = [kepala, ...baris].map((b) => b.map(selCsv).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["\uFEFF" + isi], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = namaBerkas;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const LABEL_STATUS_REKON: Record<StatusRekon, string> = {
+  akan_datang: "belum dimulai",
+  berjalan: "sedang berjalan",
+  lewat: "sudah lewat",
+};
+
+function teksJendelaRekon(bulanTmt: string): string {
+  const { mulai, batas } = jendelaRekonGaji(bulanTmt);
+  return `${mulai.getDate()}–${formatTanggalId(batas, { day: "numeric", month: "short", year: "numeric" })}`;
+}
+
+function StatusKgb({ k }: { k: KGB }) {
+  const warna = warnaStatusKgb(k.status);
   return (
-    <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
-      <p role="alert" className="text-xs font-semibold" style={{ color:"var(--st-red)" }}>{pesan}</p>
-      <button type="button" onClick={onMuatUlang}
-        className="ku-btn text-xs px-3 py-1.5 rounded-lg font-semibold"
-        style={{ background:"var(--tint-navy)", color:"var(--dtn)", border:"1px solid var(--ln0)" }}>
-        Muat ulang
-      </button>
-    </div>
+    <span className="dsb-status">
+      <span className="dsb-titik" style={{ background: warna.color }} aria-hidden="true" />
+      {k.status === "selesai" ? "Dikonfirmasi" : infoStatusKgb(k.status).label}
+      {k.isArsip ? " (arsip)" : ""}
+    </span>
   );
 }
 
-const BULAN_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agt","Sep","Okt","Nov","Des"];
+const IkonMata = () => (
+  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+);
+const IkonUnduh = () => (
+  <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+);
+const IkonCentang = () => (
+  <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+);
 
-/* ─────────────── MonthGrid ─────────────── */
+/* ─── halaman ─── */
 
-// Warna tingkat pada kalender; setiap ubin juga menulis keterangannya sebagai teks.
-const WARNA_TINGKAT = {
-  urgent:  "var(--st-violet)",
-  partial: "var(--dtn)",
-  done:    "var(--st-green)",
-} as const;
-
-function MonthGrid({
-  rekapBulan, filterMonth, onSelect,
-}: {
-  rekapBulan: Map<string, RekapBulanTmt>;
-  filterMonth: string | null;
-  onSelect: (key: string | null) => void;
-}) {
-  const today = hariIniWita();
-  const yr = today.getFullYear();
-
-  type Tier = "urgent"|"partial"|"done"|"empty";
-  const pal: Record<Tier,{accent:string;soft:string;text:string}> = {
-    urgent:  { accent:WARNA_TINGKAT.urgent, soft:"var(--tint-violet-bg)", text:"var(--st-violet)" },
-    partial: { accent:WARNA_TINGKAT.partial, soft:"var(--tint-navy)", text:"var(--dtn)" },
-    done:    { accent:WARNA_TINGKAT.done, soft:"var(--tint-green-bg)", text:"var(--st-green)" },
-    empty:   { accent:"var(--dt6)", soft:"var(--sub)", text:"var(--dt6)" },
-  };
-
-  return (
-    <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"5px" }}>
-      {Array.from({ length:12 }, (_,mo) => {
-        const key  = `${yr}-${String(mo+1).padStart(2,"0")}`;
-        const isNow = mo === today.getMonth();
-        const r    = rekapBulan.get(key);
-        const cnt  = r?.total ?? 0;
-        const done = r?.dikonfirmasi ?? 0;
-        const urg  = r?.menungguKeuangan ?? 0;
-        const isSel = filterMonth === key;
-        const tier: Tier = cnt===0?"empty": urg>0?"urgent": done===cnt?"done":"partial";
-        const { accent, soft, text } = pal[tier];
-        const pct = cnt > 0 ? (done/cnt)*100 : 0;
-        const keterangan = cnt === 0 ? "tidak ada KGB" : urg > 0 ? `${urg} SK menunggu konfirmasi` : done === cnt ? "seluruhnya dikonfirmasi" : `${done} dari ${cnt} dikonfirmasi`;
-
-        return (
-          <button key={key} type="button" onClick={() => onSelect(isSel ? null : key)}
-            aria-pressed={isSel}
-            aria-label={`${bulanLabel(key)}: ${cnt} KGB, ${keterangan}`}
-            className="relative flex flex-col items-center justify-center overflow-hidden transition-all"
-            style={{
-              height:"62px", borderRadius:"10px", border:"none", cursor:"pointer",
-              background: isSel ? accent : soft,
-              outline: isNow && !isSel ? `2px solid ${accent}` : "none",
-              boxShadow: isSel ? "0 3px 12px rgba(9,20,40,0.28)" : "none",
-            }}
-          >
-            <span style={{ fontSize:"9px", fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase", color: isSel?"rgba(255,255,255,0.7)": isNow?accent:"var(--dt5)", lineHeight:1 }}>
-              {BULAN_ID[mo]}
-            </span>
-            <span style={{ fontSize: cnt>=10?"15px":"18px", fontWeight:800, lineHeight:1.1, marginTop:"3px", color: isSel?"#fff": tier==="empty"?"var(--dt6)":text }}>
-              {cnt}
-            </span>
-            {cnt > 0 && (
-              <span style={{ fontSize:"9px", fontWeight:600, lineHeight:1, marginTop:"2px", color: isSel?"rgba(255,255,255,0.75)": urg>0?"var(--st-violet)": done===cnt?"var(--st-green)":"var(--dt5)" }}>
-                {urg > 0 ? `${urg} perlu aksi` : done===cnt ? "selesai" : `${done}/${cnt}`}
-              </span>
-            )}
-            <div style={{ position:"absolute", bottom:0, left:0, right:0, height:"3px", background: isSel?"rgba(255,255,255,0.2)":"var(--ln1)" }}>
-              {cnt > 0 && <div style={{ height:"100%", width:`${pct}%`, background: isSel?"rgba(255,255,255,0.7)":"#34d399", transition:"width 0.5s" }} />}
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ─────────────── KGBCard ─────────────── */
-
-function KGBCard({
-  k, onPreview, onKonfirmasi, selectable, selected, onToggleSelect, alasanTanpaPilih,
-}: {
-  k: KGB;
-  onPreview: (url: string) => void;
-  /** Tanpa handler (Super Admin), kartu tampil tanpa tombol konfirmasi. */
-  onKonfirmasi?: () => void;
-  selectable?: boolean;
-  selected?: boolean;
-  onToggleSelect?: () => void;
-  /** Bila diisi, kotak pilih dinonaktifkan dan alasannya ditampilkan. */
-  alasanTanpaPilih?: string | null;
-}) {
-  const selisih = (k.gajiPokokBaru ?? 0) - k.gajiPokokLama;
-  const nama = namaPegawai(k);
-  const idAlasan = `alasan-tanpa-pilih-${kunciKgb(k)}`;
-  return (
-    <div className="ku-card rounded-xl overflow-hidden"
-      style={{ background:"var(--card)", border:`1px solid ${k.flagRapelan ? "var(--tint-amber-ln)" : "var(--tint-violet-ln)"}`, position:"relative" }}>
-      {/* Strip aksen kiri */}
-      <span aria-hidden style={{ position:"absolute", top:0, bottom:0, left:0, width:"3px", background: k.flagRapelan ? "var(--st-amber)" : "var(--st-violet)" }} />
-      <div className="p-3 pl-3.5 space-y-2">
-        <div className="flex items-center gap-2">
-          {selectable && (
-            <input type="checkbox" checked={!!selected} onChange={onToggleSelect} className="w-4 h-4 rounded shrink-0" onClick={(e) => e.stopPropagation()} title="Pilih untuk konfirmasi cepat" aria-label={`Pilih SK ${nama} untuk konfirmasi cepat`} />
-          )}
-          {!selectable && alasanTanpaPilih && (
-            <input type="checkbox" checked={false} disabled className="w-4 h-4 rounded shrink-0 cursor-not-allowed" title={alasanTanpaPilih} aria-label={`Pilih SK ${nama} untuk konfirmasi cepat`} aria-describedby={idAlasan} />
-          )}
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" aria-hidden
-            style={{ background:"var(--tint-violet-bg)", color:"var(--st-violet)" }}>
-            {initials(nama)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold truncate" style={{ color:"var(--dtn)" }}>{nama}</p>
-            <p className="text-xs truncate" style={{ color:"var(--dt4)" }}>{k.pegawai?.nip ?? "-"}</p>
-          </div>
-          {k.flagRapelan && (
-            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold shrink-0" style={{ background:"var(--tint-amber-bg)", color:"var(--st-amber)", fontSize:"9px" }}>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12 2L1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></svg>
-              Berpotensi rapelan
-            </span>
-          )}
-        </div>
-
-        {/* Ringkasan finansial */}
-        <div className="rounded-lg p-2 flex items-center gap-3" style={{ background:"var(--sub)" }}>
-          <div className="flex-1 min-w-0">
-            <p style={{ fontSize:"9px", color:"var(--dt5)" }}>Gaji pokok baru</p>
-            <p className="text-sm font-bold leading-tight" style={{ color:"var(--st-green)" }}>{fmtRp(k.gajiPokokBaru)}</p>
-            {selisih > 0 && <p style={{ fontSize:"9.5px", color:"var(--dt4)" }}>naik <strong style={{ color:"var(--st-green)" }}>+{fmtRp(selisih)}</strong> dari {fmtRp(k.gajiPokokLama)}</p>}
-          </div>
-          <div className="text-right shrink-0" style={{ borderLeft:"1px solid var(--ln1)", paddingLeft:"10px" }}>
-            <p style={{ fontSize:"9px", color:"var(--dt5)" }}>Golongan</p>
-            <p className="text-xs font-semibold" style={{ color:"var(--dtn)" }}>{k.golonganLama}→{k.golonganBaru}</p>
-            <p style={{ fontSize:"9px", color:"var(--dt5)", marginTop:"2px" }}>TMT {fmt(k.tmtKgbBaru)}</p>
-          </div>
-        </div>
-
-        {k.surat?.nomorSurat && (
-          <p style={{ fontSize:"10px", color:"var(--dt5)" }} className="truncate">No. SK: {k.surat.nomorSurat}</p>
-        )}
-        {!selectable && alasanTanpaPilih && (
-          <p id={idAlasan} style={{ fontSize:"10px", color:"var(--st-amber2)" }}>{alasanTanpaPilih}</p>
-        )}
-
-        <div className="flex gap-1.5">
-          {k.surat?.pathFile && (
-            <button onClick={() => onPreview(`/api/blob/download?url=${encodeURIComponent(k.surat!.pathFile!)}`)}
-              className="ku-btn flex items-center justify-center gap-1 py-1.5 px-3 rounded-lg text-xs font-medium shrink-0"
-              style={{ background:"var(--tint-navy)", color:"var(--dtn)", border:"1px solid var(--ln0)" }} title="Lihat SK Tertandatangani" aria-label={`Lihat SK Tertandatangani, ${nama}`}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              SK
-            </button>
-          )}
-          {onKonfirmasi && (
-          <button onClick={onKonfirmasi}
-            className="ku-btn flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold text-white"
-            style={{ background: k.flagRapelan ? "var(--amber-solid)" : "var(--green-solid)" }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><polyline points="20 6 9 17 4 12"/></svg>
-            {k.flagRapelan ? "Tinjau dan Konfirmasi" : "Konfirmasi"}
-          </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────── page ─────────────── */
-
-export default function KeuanganDashboardPage() {
-  // Super Admin membuka halaman ini untuk memantau; konfirmasi dan follow up hanya oleh petugas Keuangan.
+export default function KeuanganPage() {
   const bolehKonfirmasi = canKonfirmasiKeuangan(useRole());
-  const [kgbList,    setKgbList]    = useState<KGB[]>([]);
-  const [allKgb,     setAllKgb]     = useState<KGB[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [loadingAll, setLoadingAll] = useState(true);
-  // Galat memuat; selama terisi, daftar ditampilkan sebagai galat, bukan sebagai daftar kosong.
+  const params = useSearchParams();
+  const [hariIni] = useState(() => hariIniWita());
+  const bulanFokus = bulanFokusRekon(hariIni);
+  const bulanIni = kunciBulanTmt(hariIni) ?? bulanFokus;
+
+  const [menunggu, setMenunggu] = useState<KGB[]>([]);
+  const [semua, setSemua] = useState<KGB[]>([]);
+  const [muatMenunggu, setMuatMenunggu] = useState(true);
+  const [muatSemua, setMuatSemua] = useState(true);
+  const [logTerakhir, setLogTerakhir] = useState<LogKonfirmasi[] | null>(null);
+  // Selama terisi, daftar ditampilkan sebagai galat, bukan sebagai daftar kosong.
   const [galatMenunggu, setGalatMenunggu] = useState(false);
-  const [galatSemua,    setGalatSemua]    = useState(false);
+  const [galatSemua, setGalatSemua] = useState(false);
 
-  const [filterMonth,       setFilterMonth]       = useState<string>(() => {
-    // Default = TMT bulan ini+2, yang deadline input SDM-nya jatuh pada bulan ini.
-    const d = hariIniWita();
-    return kunciBulan(d.getFullYear(), d.getMonth() + 2);
+  // ?bulan=yyyy-mm dari Riwayat Aktivitas membuka bulan TMT itu; bawaannya bulan fokus rekon.
+  const [bulan, setBulan] = useState(() => {
+    const b = params.get("bulan");
+    return b && /^\d{4}-\d{2}$/.test(b) ? b : bulanFokus;
   });
-  const [previewUrl,        setPreviewUrl]         = useState<string | null>(null);
-  const [previewKgbId,      setPreviewKgbId]       = useState<string | null>(null);
-  const [konfirmasiId,      setKonfirmasiId]       = useState<string | null>(null);
-  const [konfirmasiRapelan, setKonfirmasiRapelan]  = useState(false);
-  const [konfirmasiLoading, setKonfirmasiLoading]  = useState(false);
-  const [konfirmasiGalat,   setKonfirmasiGalat]    = useState<string | null>(null);
-  const [success,      setSuccess]      = useState("");
-  const [error,        setError]        = useState("");
-  const [followupSent,    setFollowupSent]    = useState<Set<string>>(new Set());
-  const [popup,           setPopup]           = useState<"total" | "selesai" | "rapelan" | null>(null);
-  const [rekonDismissed,  setRekonDismissed]  = useState(false);
-  // Konfirmasi cepat (bulk) untuk SK yang tidak berpotensi rapelan
-  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
-  const [showBulk,     setShowBulk]     = useState(false);
-  const [bulkLoading,  setBulkLoading]  = useState(false);
-  const [bulkProgress, setBulkProgress] = useState(0);
+  const [saring, setSaring] = useState<SaringStatus>("semua");
+  const [cari, setCari] = useState("");
 
-  /* fetchers */
-  // Bila pemuatan ulang gagal, daftar yang sudah ada tidak ditimpa.
-  const fetchMenunggu = useCallback(async () => {
-    setLoading(true);
+  const [pesan, setPesan] = useState<{ nada: "hijau" | "merah"; teks: string } | null>(null);
+  const [followupTerkirim, setFollowupTerkirim] = useState<Set<string>>(new Set());
+  const [followupMassal, setFollowupMassal] = useState(false);
+
+  // Tinjau SK: pratinjau berkas dan data berdampingan, konfirmasi dari tempat yang sama.
+  const [tinjauId, setTinjauId] = useState<string | null>(null);
+  const [pilihRapelan, setPilihRapelan] = useState(false);
+  const [lanjutOtomatis, setLanjutOtomatis] = useState(true);
+  const [konfirmasiSibuk, setKonfirmasiSibuk] = useState(false);
+  const [konfirmasiGalat, setKonfirmasiGalat] = useState<string | null>(null);
+
+  // Konfirmasi cepat untuk SK tanpa potensi rapelan dengan TMT yang belum lewat.
+  const [pilihan, setPilihan] = useState<Set<string>>(new Set());
+  const [bukaCepat, setBukaCepat] = useState(false);
+  const [cepatSibuk, setCepatSibuk] = useState(false);
+  const [cepatProgres, setCepatProgres] = useState(0);
+
+  const tampilkanPesan = useCallback((nada: "hijau" | "merah", teks: string, lama = 6000) => {
+    setPesan({ nada, teks });
+    setTimeout(() => setPesan((p) => (p?.teks === teks ? null : p)), lama);
+  }, []);
+
+  /* pemuat data; bila pemuatan ulang gagal, daftar yang sudah ada tidak ditimpa */
+  const muatDaftarMenunggu = useCallback(async () => {
+    setMuatMenunggu(true);
     setGalatMenunggu(false);
     try {
       const res = await fetch("/api/kgb?status=menunggu_keuangan");
@@ -309,726 +223,451 @@ export default function KeuanganDashboardPage() {
         setGalatMenunggu(true);
         return;
       }
-      setKgbList(daftar);
-      // Pilihan konfirmasi cepat hanya untuk SK yang masih menunggu, tidak berpotensi rapelan, dan TMT-nya belum lewat.
-      const hariIni = hariIniWita();
-      const layak = new Set(daftar.filter((k) => bisaKonfirmasiCepat(k, hariIni)).map((k) => k.id as string));
-      setBulkSelected((prev) => {
+      setMenunggu(daftar);
+      const layak = new Set(daftar.filter((k) => bisaKonfirmasiCepat(k, hariIniWita())).map((k) => k.id as string));
+      setPilihan((prev) => {
         const sisa = new Set([...prev].filter((id) => layak.has(id)));
         return sisa.size === prev.size ? prev : sisa;
       });
     } catch {
       setGalatMenunggu(true);
-    } finally { setLoading(false); }
+    } finally {
+      setMuatMenunggu(false);
+    }
   }, []);
 
-  const fetchAll = useCallback(async () => {
-    setLoadingAll(true);
+  const muatDaftarSemua = useCallback(async () => {
+    setMuatSemua(true);
     setGalatSemua(false);
     try {
       const res = await fetch("/api/kgb");
       const daftar = res.ok ? await bacaDaftarKgb(res) : null;
-      if (daftar) setAllKgb(daftar);
+      if (daftar) setSemua(daftar);
       else setGalatSemua(true);
     } catch {
       setGalatSemua(true);
-    } finally { setLoadingAll(false); }
+    } finally {
+      setMuatSemua(false);
+    }
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(() => { fetchMenunggu(); fetchAll(); }, 0);
-    return () => clearTimeout(t);
-  }, [fetchMenunggu, fetchAll]);
-
-  async function pesanGalat(res: Response, bawaan: string) {
+  const muatLog = useCallback(async () => {
     try {
-      const d = (await res.json()) as { error?: string };
-      return d.error ?? bawaan;
+      const res = await fetch("/api/keuangan/log");
+      const d = res.ok ? ((await res.json()) as unknown) : null;
+      setLogTerakhir(Array.isArray(d) ? (d as LogKonfirmasi[]).filter((l) => l.aksi === "konfirmasi_keuangan").slice(0, 30) : []);
     } catch {
-      return bawaan;
+      setLogTerakhir([]);
     }
-  }
+  }, []);
 
-  /* konfirmasi */
-  function bukaKonfirmasi(k: KGB) {
-    setKonfirmasiId(k.id);
-    setKonfirmasiRapelan(k.flagRapelan);
+  const muatUlang = useCallback(() => {
+    void muatDaftarMenunggu();
+    void muatDaftarSemua();
+    void muatLog();
+  }, [muatDaftarMenunggu, muatDaftarSemua, muatLog]);
+
+  useEffect(() => {
+    const t = setTimeout(muatUlang, 0);
+    return () => clearTimeout(t);
+  }, [muatUlang]);
+
+  /* ─── turunan ─── */
+
+  // Antrian: TMT terdekat dulu, karena itu yang paling dekat dengan rekon Gaji Web.
+  const antrian = useMemo(
+    () =>
+      [...menunggu].sort(
+        (a, b) =>
+          (tanggalKalender(a.tmtKgbBaru)?.getTime() ?? 0) - (tanggalKalender(b.tmtKgbBaru)?.getTime() ?? 0) ||
+          namaPegawai(a).localeCompare(namaPegawai(b), "id"),
+      ),
+    [menunggu],
+  );
+  const layakCepat = antrian.filter((k) => bisaKonfirmasiCepat(k, hariIni));
+  const antrianRapelan = antrian.filter((k) => k.flagRapelan).length;
+  const antrianTmtLewat = antrian.filter((k) => !k.flagRapelan && alasanTanpaKonfirmasiCepat(k, hariIni) === ALASAN_TMT_LEWAT).length;
+
+  const siklus = useMemo(() => satuPerSiklus(semua), [semua]);
+  const rekapBulan = useMemo(
+    () => new Map<string, RekapBulanTmt>(rekapPerBulanTmt(siklus, hariIni).map((r) => [r.bulanTmt, r])),
+    [siklus, hariIni],
+  );
+  const dataSiap = !muatSemua && !galatSemua;
+  const rekapFokus = rekapBulan.get(bulanFokus);
+  const pctFokus = rekapFokus && rekapFokus.total > 0 ? Math.round((rekapFokus.dikonfirmasi / rekapFokus.total) * 100) : 0;
+  const tahun = hariIni.getFullYear();
+  const rekapTahunIni = [...rekapBulan.values()].filter((r) => r.bulanTmt.startsWith(`${tahun}-`));
+  const rapelanDitetapkan = rekapTahunIni.reduce((s, r) => s + r.rapelanDitetapkan, 0);
+  const rapelanBerpotensi = rekapTahunIni.reduce((s, r) => s + r.berpotensiRapelan, 0);
+
+  // Tabel bulan: KGB siklus bulan itu, ditambah arsip (SK terbit di luar SIM-KGB) sebagai keterangan.
+  const isiBulan = useMemo(() => {
+    const siklusBulan = siklus.filter((k) => kunciBulanTmt(k.tmtKgbBaru) === bulan);
+    const arsip = semua.filter((k) => k.isArsip && kunciBulanTmt(k.tmtKgbBaru) === bulan);
+    return [...siklusBulan, ...arsip].sort((a, b) => namaPegawai(a).localeCompare(namaPegawai(b), "id"));
+  }, [siklus, semua, bulan]);
+  const cocokSaring = (k: KGB, s: SaringStatus) =>
+    s === "semua" ? true
+    : s === "menunggu" ? k.status === "menunggu_keuangan"
+    : s === "selesai" ? k.status === "selesai"
+    : STATUS_BELUM_SAMPAI.includes(k.status) && !k.isArsip;
+  const q = cari.trim().toLowerCase();
+  const tampilBulan = isiBulan.filter(
+    (k) =>
+      cocokSaring(k, saring) &&
+      (!q || namaPegawai(k).toLowerCase().includes(q) || (k.pegawai?.nip ?? "").includes(q) || (k.surat?.nomorSurat ?? "").toLowerCase().includes(q)),
+  );
+  const dikonfirmasiBulan = isiBulan.filter((k) => k.status === "selesai" && !k.isArsip);
+  // Follow up ke Tim SDM untuk bulan TMT yang masa inputnya sudah dibuka (sampai dua bulan ke depan).
+  const bisaFollowUp = (k: KGB) =>
+    bolehKonfirmasi && !k.isArsip && STATUS_BELUM_SAMPAI.includes(k.status) && bulan <= geserBulan(bulanIni, 2);
+  const perluFollowUp = isiBulan.filter((k) => bisaFollowUp(k) && !followupTerkirim.has(kunciKgb(k)));
+  const rekonBulan = statusRekonGaji(bulan, hariIni);
+
+  /* ─── tinjau dan konfirmasi ─── */
+
+  const target = tinjauId ? [...antrian, ...semua].find((k) => k.id === tinjauId) ?? null : null;
+  const indeksAntrian = target ? antrian.findIndex((k) => k.id === target.id) : -1;
+  const refTinjau = useDialogModal(!!target, () => setTinjauId(null), konfirmasiSibuk);
+
+  function bukaTinjau(k: KGB) {
+    if (!k.id) return;
+    setTinjauId(k.id);
+    setPilihRapelan(k.flagRapelan);
     setKonfirmasiGalat(null);
   }
 
-  function tutupPreview() {
-    setPreviewUrl(null);
-    setPreviewKgbId(null);
+  function geserTinjau(arah: 1 | -1) {
+    const k = antrian[indeksAntrian + arah];
+    if (k) bukaTinjau(k);
   }
 
-  // Galat ditampilkan di dalam dialog, karena banner halaman tertutup latar dialog.
-  async function handleKonfirmasi(kgbId: string, isRapelan: boolean) {
-    setKonfirmasiLoading(true);
+  async function konfirmasi() {
+    if (!target?.id) return;
+    const berikutnya = antrian[indeksAntrian + 1] ?? antrian[indeksAntrian - 1] ?? null;
+    setKonfirmasiSibuk(true);
     setKonfirmasiGalat(null);
     try {
-      const res = await fetch(`/api/kgb/${kgbId}/konfirmasi-keuangan`, {
+      const res = await fetch(`/api/kgb/${target.id}/konfirmasi-keuangan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isRapelan }),
+        body: JSON.stringify({ isRapelan: pilihRapelan }),
       });
       if (res.ok) {
-        setSuccess("KGB berhasil dikonfirmasi.");
-        setTimeout(() => setSuccess(""), 6000);
-        setKonfirmasiId(null);
-        tutupPreview();
-        fetchMenunggu(); fetchAll();
+        tampilkanPesan("hijau", `KGB ${namaPegawai(target)} dikonfirmasi${pilihRapelan ? " sebagai rapelan" : ""}.`);
+        if (lanjutOtomatis && berikutnya && indeksAntrian >= 0) bukaTinjau(berikutnya);
+        else setTinjauId(null);
+        muatUlang();
       } else {
         setKonfirmasiGalat(await pesanGalat(res, "Gagal mengkonfirmasi."));
         // 404/409: KGB sudah tidak menunggu konfirmasi, jadi daftar dimuat ulang.
-        if (res.status === 404 || res.status === 409) { fetchMenunggu(); fetchAll(); }
+        if (res.status === 404 || res.status === 409) muatUlang();
       }
     } catch {
       setKonfirmasiGalat("Gagal menghubungi server. Coba lagi.");
-    } finally { setKonfirmasiLoading(false); }
+    } finally {
+      setKonfirmasiSibuk(false);
+    }
   }
 
-  // Konfirmasi cepat: beberapa SK yang tidak berpotensi rapelan dan TMT-nya belum lewat dikonfirmasi
-  // sekaligus sebagai tidak rapelan. SK lain ditinjau satu per satu; API memeriksa ulang dengan cepat: true.
-  async function handleBulkKonfirmasi() {
-    if (bulkSelected.size === 0) return;
-    const hariIni = hariIniWita();
-    const ids = [...bulkSelected].filter((id) => {
-      const item = kgbList.find((k) => k.id === id);
-      return !!item && bisaKonfirmasiCepat(item, hariIni);
+  async function konfirmasiCepat() {
+    const ids = [...pilihan].filter((id) => {
+      const k = antrian.find((x) => x.id === id);
+      return !!k && bisaKonfirmasiCepat(k, hariIniWita());
     });
-    setBulkLoading(true); setBulkProgress(0);
-    let ok = 0;
+    if (ids.length === 0) {
+      setBukaCepat(false);
+      tampilkanPesan("merah", `SK yang dipilih tidak lagi dapat dikonfirmasi cepat: ${ALASAN_TMT_LEWAT}.`, 10000);
+      return;
+    }
+    setCepatSibuk(true);
+    setCepatProgres(0);
+    let berhasil = 0;
     const gagal: string[] = [];
     for (const id of ids) {
-      const item = kgbList.find((k) => k.id === id);
-      const nama = item ? namaPegawai(item) : id;
+      const k = antrian.find((x) => x.id === id);
+      const nama = k ? namaPegawai(k) : id;
       try {
         const res = await fetch(`/api/kgb/${id}/konfirmasi-keuangan`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ isRapelan: false, cepat: true }),
         });
-        if (res.ok) ok++;
+        if (res.ok) berhasil++;
         else gagal.push(`${nama} (${await pesanGalat(res, `HTTP ${res.status}`)})`);
       } catch {
         gagal.push(`${nama} (koneksi gagal)`);
       }
-      setBulkProgress((p) => p + 1);
+      setCepatProgres((p) => p + 1);
     }
-    setBulkLoading(false); setShowBulk(false);
-    setBulkSelected(new Set());
-    if (ids.length === 0) {
-      setError(`SK yang dipilih tidak lagi dapat dikonfirmasi cepat: ${ALASAN_TMT_LEWAT}.`);
-      setTimeout(() => setError(""), 10000);
-    }
-    if (ok > 0) {
-      setSuccess(`${ok} dari ${ids.length} SK berhasil dikonfirmasi.`);
-      setTimeout(() => setSuccess(""), 6000);
-    }
-    if (gagal.length > 0) {
-      setError(`${gagal.length} SK gagal dikonfirmasi: ${gagal.join("; ")}.`);
-      setTimeout(() => setError(""), 10000);
-    }
-    fetchMenunggu(); fetchAll();
+    setCepatSibuk(false);
+    setBukaCepat(false);
+    setPilihan(new Set());
+    if (gagal.length > 0) tampilkanPesan("merah", `${gagal.length} SK gagal dikonfirmasi: ${gagal.join("; ")}.`, 12000);
+    else tampilkanPesan("hijau", `${berhasil} SK berhasil dikonfirmasi sebagai tidak rapelan.`);
+    muatUlang();
   }
 
-  // KGB yang belum punya record aktif (virtual) atau dibatalkan dikirim dengan pegawaiId.
-  async function handleFollowUp(k: KGB) {
-    const body = k.id && (k.status === "belum_diproses" || k.status === "sedang_diproses")
-      ? { kgbId: k.id }
-      : { pegawaiId: k.pegawaiId };
+  /* ─── follow up Tim SDM ─── */
+
+  // KGB tanpa record aktif (virtual) atau yang dibatalkan dikirim dengan pegawaiId.
+  async function kirimFollowUp(k: KGB): Promise<"baru" | "sudah" | string> {
+    const body = k.id && (k.status === "belum_diproses" || k.status === "sedang_diproses") ? { kgbId: k.id } : { pegawaiId: k.pegawaiId };
     try {
       const res = await fetch("/api/notifikasi/followup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (res.ok) {
-        const d = (await res.json()) as { sudahAda?: boolean };
-        setFollowupSent((prev) => new Set(prev).add(kunciKgb(k)));
-        setSuccess(d.sudahAda
-          ? "Follow up untuk pegawai ini sudah dikirim sebelumnya dan belum dibaca Tim SDM."
-          : "Follow up berhasil dikirim ke Tim SDM.");
-        setTimeout(() => setSuccess(""), 4000);
-      } else {
-        setError(await pesanGalat(res, "Follow up gagal dikirim."));
-        setTimeout(() => setError(""), 6000);
-      }
+      if (!res.ok) return await pesanGalat(res, "Follow up gagal dikirim.");
+      const d = (await res.json()) as { sudahAda?: boolean };
+      setFollowupTerkirim((prev) => new Set(prev).add(kunciKgb(k)));
+      return d.sudahAda ? "sudah" : "baru";
     } catch {
-      setError("Follow up gagal dikirim.");
-      setTimeout(() => setError(""), 6000);
+      return "Follow up gagal dikirim.";
     }
   }
 
-  /* derived */
-  const today       = hariIniWita();
-  const todayMonth  = today.getMonth(); // 0-indexed
-  const todayYear   = today.getFullYear();
-  const dataSemuaSiap = !loadingAll && !galatSemua;
+  async function followUpSatu(k: KGB) {
+    const hasil = await kirimFollowUp(k);
+    if (hasil === "baru") tampilkanPesan("hijau", `Follow up untuk ${namaPegawai(k)} dikirim ke Tim SDM.`, 4000);
+    else if (hasil === "sudah") tampilkanPesan("hijau", `Follow up untuk ${namaPegawai(k)} sudah dikirim sebelumnya dan belum dibaca Tim SDM.`, 5000);
+    else tampilkanPesan("merah", hasil);
+  }
 
-  // Hitungan memakai definisi bersama lib/rekapKgb.ts: satu KGB per pegawai per TMT (dibatalkan lalu
-  // diinput ulang dihitung sekali) dan arsip tidak dihitung. Rekap dihitung dari data KGB saat dibuka.
-  const kgbSiklus = satuPerSiklus(allKgb);
-  const rekapBulan = new Map(rekapPerBulanTmt(kgbSiklus, today).map((r) => [r.bulanTmt, r]));
+  async function followUpSemua() {
+    setFollowupMassal(true);
+    let terkirim = 0;
+    let gagal = 0;
+    for (const k of perluFollowUp) {
+      const hasil = await kirimFollowUp(k);
+      if (hasil === "baru" || hasil === "sudah") terkirim++;
+      else gagal++;
+    }
+    setFollowupMassal(false);
+    if (gagal > 0) tampilkanPesan("merah", `${gagal} follow up gagal dikirim; ${terkirim} terkirim.`);
+    else tampilkanPesan("hijau", `Follow up untuk ${terkirim} pegawai dikirim ke Tim SDM.`);
+  }
 
-  // Ringkasan rekap untuk KGB berlaku bulan depan.
-  const rekonBulanKey = kunciBulan(todayYear, todayMonth + 1);
-  const rekonTmtLabel = bulanLabel(rekonBulanKey);
-  const rekapBulanDepan = rekapBulan.get(rekonBulanKey) ?? null;
-  const rekonPct = rekapBulanDepan && rekapBulanDepan.total > 0
-    ? Math.round((rekapBulanDepan.dikonfirmasi / rekapBulanDepan.total) * 100)
-    : 0;
-  const rekapLengkap = !!rekapBulanDepan && rekapBulanDepan.total > 0 && rekapBulanDepan.dikonfirmasi === rekapBulanDepan.total;
-  const showRekonBanner = !rekonDismissed && dataSemuaSiap && !!rekapBulanDepan && rekapBulanDepan.total > 0;
+  function unduhDasarGajiWeb() {
+    unduhCsv(
+      `dasar-gaji-web_TMT-${bulan}.csv`,
+      ["No", "Nama", "NIP", "Unit kerja", "Golongan", "MKG tahun", "MKG bulan", "Gaji pokok lama", "Gaji pokok baru", "Kenaikan", "TMT KGB", "Nomor SK", "Tanggal SK", "Rapelan", "Dikonfirmasi"],
+      dikonfirmasiBulan.map((k, i) => {
+        const tmt = tanggalKalender(k.tmtKgbBaru);
+        const tglSk = tanggalKalender(k.surat?.tanggalSurat);
+        const tglKonfirmasi = tanggalKalender(k.konfirmasiKeuanganAt);
+        return [
+          i + 1, namaPegawai(k), k.pegawai?.nip ?? "", k.pegawai?.unitKerja ?? "", k.golonganBaru,
+          k.mkgTahunBaru, k.mkgBulanBaru, k.gajiPokokLama, k.gajiPokokBaru, selisihGaji(k),
+          tmt ? isoTanggalLokal(tmt) : "", k.surat?.nomorSurat ?? "", tglSk ? isoTanggalLokal(tglSk) : "",
+          k.rapelanDitetapkan ? "Ya" : "Tidak", tglKonfirmasi ? isoTanggalLokal(tglKonfirmasi) : "",
+        ];
+      }),
+    );
+  }
 
-  // Follow-up untuk KGB dengan TMT bulan ini + 2, yang deadline input SDM-nya jatuh pada bulan ini.
-  const followUpBulanKey = kunciBulan(todayYear, todayMonth + 2);
-  const bulanIniLabel    = bulanLabel(kunciBulan(todayYear, todayMonth));
-  const defaultFilterMonth = followUpBulanKey;
+  /* ─── tampilan ─── */
 
-  const kgbTahunIni    = kgbSiklus.filter((k) => tahunTmt(k) === todayYear);
-  const selesaiTahunIni  = kgbTahunIni.filter((k) => k.status === "selesai");
-  const rapelanTahunIni  = selesaiTahunIni.filter((k) => k.rapelanDitetapkan === true);
-  const totalSelesai     = selesaiTahunIni.length;
-  const totalRapelan     = rapelanTahunIni.length;
-
-  const popupItems = popup === "total"   ? kgbTahunIni
-                   : popup === "selesai" ? selesaiTahunIni
-                   : popup === "rapelan" ? rapelanTahunIni
-                   : [];
-  const popupTitle = popup === "total"   ? `KGB Tahun ${todayYear}`
-                   : popup === "selesai" ? "Selesai Dikonfirmasi"
-                   : popup === "rapelan" ? "Dikonfirmasi Rapelan"
-                   : "";
-
-  // Tabel per bulan: KGB siklus bulan itu, ditambah arsip (SK terbit di luar SIM-KGB) sebagai keterangan.
-  const monthSiklus    = kgbSiklus.filter((k) => kunciBulanTmt(k.tmtKgbBaru) === filterMonth);
-  const monthArsip     = allKgb.filter((k) => k.isArsip && kunciBulanTmt(k.tmtKgbBaru) === filterMonth);
-  const monthItems     = [...monthSiklus, ...monthArsip];
-  const konfirmasiTarget = konfirmasiId ? [...kgbList, ...allKgb].find((k) => k.id === konfirmasiId) ?? null : null;
-
-  // Fokus, Tab di dalam panel, Escape, dan fokus kembali ke pemicu. Konfirmasi yang dibuka dari
-  // pratinjau SK berada di atas tumpukan, jadi hanya dialog itu yang menanggapi Escape.
-  const refPreview = useDialogModal(!!previewUrl, tutupPreview);
-  const refKonfirmasi = useDialogModal(!!konfirmasiId && !!konfirmasiTarget, () => setKonfirmasiId(null), konfirmasiLoading);
-  const refPopup = useDialogModal(!!popup, () => setPopup(null));
+  const cepatTerpilih = antrian.filter((k) => k.id && pilihan.has(k.id) && bisaKonfirmasiCepat(k, hariIni));
+  const semuaCepatTerpilih = layakCepat.length > 0 && layakCepat.every((k) => pilihan.has(k.id as string));
+  const kolomCentang = bolehKonfirmasi && layakCepat.length > 0;
+  const jumlahSaring = (s: SaringStatus) => isiBulan.filter((k) => cocokSaring(k, s)).length;
 
   return (
-    <div className="space-y-5">
-      <style>{`
-        .ku-card { transition: box-shadow .16s, transform .16s, border-color .16s; }
-        .ku-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(9,20,40,0.10); }
-        .ku-btn { transition: filter .14s, transform .1s; }
-        .ku-btn:hover { filter: brightness(1.05); }
-        .ku-btn:active { transform: scale(.97); }
-      `}</style>
-
-      {/* ── Header ── */}
-      <div className="flex items-center gap-3">
-        <div className="adm-chip" style={{ background: "linear-gradient(135deg,#9b7ae0,var(--violet-solid))" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-        </div>
-        <div>
-          <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--st-violet)" }}>Keuangan</p>
-          <h1 className="text-base font-bold leading-tight" style={{ color:"var(--dtn)" }}>Dashboard Keuangan</h1>
-          <p className="text-xs" style={{ color:"var(--dt4)" }}>
-            Konfirmasi SK yang masuk · Pantau status KGB berjalan · Rekap per bulan TMT dihitung dari data KGB
+    <div className="dsb-halaman" data-muat-layar="">
+      <header className="dsb-halaman-kepala dsb-muncul">
+        <div className="min-w-0">
+          <p className="dsb-label">Keuangan</p>
+          <h1 className="dsb-halaman-judul">Konfirmasi SK KGB</h1>
+          <p className="dsb-sub">
+            Tinjau SK bertanda tangan, tetapkan rapelan, lalu siapkan dasar input Gaji Web.
+            {!bolehKonfirmasi && <> <strong style={{ color: "var(--dtn)", fontWeight: 600 }}>Mode lihat:</strong> konfirmasi dan follow up hanya oleh petugas Keuangan.</>}
           </p>
-          {!bolehKonfirmasi && (
-            <p className="text-xs mt-1 font-medium" style={{ color:"var(--st-violet)" }}>
-              Mode lihat: konfirmasi dan follow up hanya dilakukan petugas Keuangan.
-            </p>
-          )}
         </div>
-      </div>
-
-      {/* ── Stat chips ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-        {([
-          {
-            key: "total" as const,
-            label: "Total KGB Tahun Ini",
-            value: dataSemuaSiap ? kgbTahunIni.length : "-",
-            sub: galatSemua ? "Data KGB gagal dimuat" : `Berlaku ${todayYear} · klik lihat daftar`,
-            clickable: dataSemuaSiap && kgbTahunIni.length > 0,
-            bg: "var(--sub)", border: "var(--ln1)", color: "var(--dtn)",
-            icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5a7a9a" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-          },
-          {
-            key: null,
-            label: "Menunggu Konfirmasi",
-            value: loading || galatMenunggu ? "-" : kgbList.length,
-            sub: galatMenunggu ? "Daftar SK gagal dimuat" : "SK masuk, belum dikonfirmasi keuangan",
-            clickable: false,
-            bg: kgbList.length > 0 ? "var(--tint-violet-bg)" : "var(--sub)",
-            border: kgbList.length > 0 ? "var(--tint-violet-ln)" : "var(--ln1)",
-            color: kgbList.length > 0 ? "var(--st-violet)" : "var(--dt4)",
-            icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={kgbList.length > 0 ? "var(--st-violet)" : "var(--dt5)"} strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-          },
-          {
-            key: "selesai" as const,
-            label: "Sudah Dikonfirmasi",
-            value: dataSemuaSiap ? totalSelesai : "-",
-            sub: galatSemua ? "Data KGB gagal dimuat" : `dari ${kgbTahunIni.length} total KGB tahun ini`,
-            clickable: dataSemuaSiap && totalSelesai > 0,
-            bg: totalSelesai > 0 ? "var(--tint-green-bg)" : "var(--sub)",
-            border: totalSelesai > 0 ? "var(--tint-green-ln)" : "var(--ln1)",
-            color: totalSelesai > 0 ? "var(--st-green)" : "var(--dt4)",
-            icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={totalSelesai > 0 ? "var(--st-green)" : "var(--dt5)"} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>,
-          },
-          {
-            key: "rapelan" as const,
-            label: "Dikonfirmasi Rapelan",
-            value: dataSemuaSiap ? totalRapelan : "-",
-            sub: galatSemua ? "Data KGB gagal dimuat" : totalRapelan > 0 ? "SK terlambat, selisih gaji dibayar mundur" : "Tidak ada rapelan",
-            clickable: dataSemuaSiap && totalRapelan > 0,
-            bg: totalRapelan > 0 ? "var(--tint-amber-bg)" : "var(--sub)",
-            border: totalRapelan > 0 ? "var(--tint-amber-ln)" : "var(--ln1)",
-            color: totalRapelan > 0 ? "var(--st-amber)" : "var(--dt4)",
-            icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={totalRapelan > 0 ? "var(--st-amber)" : "var(--dt5)"} strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
-          },
-        ] as { key: "total"|"selesai"|"rapelan"|null; label:string; value:string|number; sub:string; clickable:boolean; bg:string; border:string; color:string; icon:React.ReactNode }[]).map(({ key, label, value, sub, clickable, bg, border, color, icon }) => (
-          <div
-            key={label}
-            onClick={() => key && clickable && setPopup(key)}
-            role={clickable ? "button" : undefined}
-            tabIndex={clickable ? 0 : undefined}
-            aria-label={clickable ? `${label}: ${value}. Lihat daftar` : undefined}
-            onKeyDown={(e) => {
-              if (key && clickable && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setPopup(key); }
-            }}
-            className="rounded-xl px-3 py-2.5 flex items-center gap-2.5 transition-shadow"
-            style={{
-              background: bg, border: `1px solid ${border}`,
-              cursor: clickable ? "pointer" : "default",
-              boxShadow: clickable ? undefined : "none",
-            }}
-            onMouseEnter={(e) => { if (clickable) (e.currentTarget as HTMLDivElement).style.boxShadow = `0 2px 10px ${border}80`; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; }}
-          >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-              style={{ background: "var(--card)", border: `1px solid ${border}` }}>
-              {icon}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1">
-                <p className="text-lg font-bold leading-none" style={{ color }}>{value}</p>
-                {clickable && (
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" style={{ opacity: 0.5 }}>
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                )}
-              </div>
-              <p className="text-xs mt-0.5 font-medium" style={{ color: "var(--dt4)" }}>{label}</p>
-              <p style={{ fontSize:"10px", color:"var(--dt5)", marginTop:"1px" }}>{sub}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Alerts ── */}
-      {success && (
-        <div role="status" className="rounded-xl px-4 py-2.5 text-xs font-medium flex items-center gap-2"
-          style={{ background:"var(--tint-green-bg)", color:"var(--st-green)", border:"1px solid var(--tint-green-ln)" }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          {success}
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="dsb-ikon-tombol" onClick={muatUlang} title="Muat ulang" aria-label="Muat ulang data">
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={muatSemua || muatMenunggu ? "dsb-putar" : undefined}><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg>
+          </button>
+          <Link href="/dashboard/keuangan/riwayat" className="dsb-tombol" data-jenis="garis">Riwayat aktivitas</Link>
         </div>
-      )}
-      {error && (
-        <div role="alert" className="rounded-xl px-4 py-2.5 text-xs font-medium"
-          style={{ background:"var(--tint-red-bg)", color:"var(--st-red)", border:"1px solid var(--tint-red-ln)" }}>
-          {error}
-        </div>
-      )}
+      </header>
 
-      {/* ── Rekap KGB berlaku bulan depan (dihitung dari data KGB) ── */}
-      {showRekonBanner && rekapBulanDepan && (
-        <div className="rounded-xl px-4 py-3 flex items-center gap-3"
-          style={{ background: rekapLengkap ? "var(--tint-green-bg)" : "var(--tint-blue-bg)", border:`1px solid ${rekapLengkap ? "var(--tint-green-ln)" : "var(--tint-blue-ln)"}` }}>
-          <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" aria-hidden
-            style={{ background: rekapLengkap ? "var(--tint-green-bg2)" : "var(--tint-blue-bg2)", color: rekapLengkap ? "var(--st-green)" : "var(--st-blue)" }}>
-            {rekapLengkap
-              ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            }
-          </div>
-          <p className="text-xs flex-1" style={{ color: rekapLengkap ? "var(--st-green)" : "var(--st-blue)" }}>
-            {rekapLengkap
-              ? <>Seluruh <strong>{rekapBulanDepan.total} KGB</strong> berlaku <strong>{rekonTmtLabel}</strong> sudah dikonfirmasi dan dapat dijadikan dasar input Sistem Gaji Web.</>
-              : <>KGB berlaku <strong>{rekonTmtLabel}</strong>: <strong>{rekapBulanDepan.dikonfirmasi} dari {rekapBulanDepan.total}</strong> sudah dikonfirmasi, {rekapBulanDepan.menungguKeuangan} menunggu konfirmasi, {rekapBulanDepan.belumSampaiKeuangan} belum sampai keuangan.</>
-            }
-            {" "}
-            <Link href="/dashboard/keuangan/riwayat" className="underline font-semibold">Lihat Rekap Gaji Web</Link>
-          </p>
-          <button type="button" onClick={() => setRekonDismissed(true)}
-            className="shrink-0 opacity-40 hover:opacity-80 transition-opacity"
-            aria-label="Tutup ringkasan rekap" title="Tutup ringkasan rekap"
-            style={{ lineHeight: 1 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+      {pesan && (
+        <div role={pesan.nada === "merah" ? "alert" : "status"} className="dsb-pesan" data-nada={pesan.nada}>
+          <span className="dsb-pesan-ikon" aria-hidden="true">
+            {pesan.nada === "hijau" ? <IkonCentang /> : "!"}
+          </span>
+          <p>{pesan.teks}</p>
+          <button type="button" className="dsb-ikon-tombol" aria-label="Tutup pesan" onClick={() => setPesan(null)}>
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
       )}
 
-      {/* ════════════════════════════════════════
-          4:3 : Perlu Konfirmasi | Kalender KGB
-      ════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 md:grid-cols-[4fr_3fr] gap-4 items-stretch">
-
-        {/* ── Perlu Konfirmasi (Masa Rekon) ── */}
-        <div className="flex flex-col rounded-2xl overflow-hidden"
-          style={{ background:"var(--card)", border:"1px solid var(--ln1)" }}>
-          {/* Header */}
-          <div className="px-4 py-3 flex items-center gap-2 shrink-0"
-            style={{ borderBottom:"1px solid var(--ln2)", background:"var(--sub)" }}>
-            <div className="w-1 h-4 rounded-full shrink-0" style={{ background:"var(--violet-solid)" }} />
-            <div className="flex-1 min-w-0">
-              <h2 className="text-sm font-bold leading-none" style={{ color:"var(--dtn)" }}>SK Masuk: Konfirmasi</h2>
-              <p className="text-xs mt-0.5" style={{ color:"var(--dt5)" }}>
-                SK yang sudah ditandatangani dan menunggu konfirmasi keuangan
-              </p>
-            </div>
-            {!loading && !galatMenunggu && kgbList.length > 0 && (
-              <span className="text-xs px-2 py-0.5 rounded-full font-semibold shrink-0"
-                style={{ background:"var(--tint-violet-bg)", color:"var(--st-violet)" }}>{kgbList.length}</span>
-            )}
-          </div>
-          {/* Progres konfirmasi KGB berlaku bulan depan */}
-          {dataSemuaSiap && rekapBulanDepan && rekapBulanDepan.total > 0 && (
-            <div className="px-4 py-2 shrink-0" style={{ borderBottom:"1px solid var(--ln2)", background:"var(--sub)" }}>
-              <div className="flex items-center justify-between mb-1">
-                <p style={{ fontSize:"10px", color:"var(--dt4)" }}>
-                  KGB berlaku {rekonTmtLabel}: <strong style={{ color:"var(--dtn)" }}>{rekapBulanDepan.dikonfirmasi} dari {rekapBulanDepan.total}</strong> selesai dikonfirmasi
-                </p>
-                <p style={{ fontSize:"10px", fontWeight:700, color: rekonPct === 100 ? "var(--st-green)" : "var(--st-violet)" }}>
-                  {rekonPct}%
-                </p>
-              </div>
-              <div className="rounded-full overflow-hidden" style={{ height:"4px", background:"var(--ln2)" }}
-                role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={rekonPct} aria-label={`Progres konfirmasi KGB berlaku ${rekonTmtLabel}`}>
-                <div style={{ height:"100%", width:`${rekonPct}%`, background: rekonPct === 100 ? "var(--st-green)" : "var(--st-violet)", borderRadius:"999px", transition:"width 0.5s" }} />
-              </div>
-            </div>
-          )}
-          {/* Toolbar konfirmasi cepat (hanya SK non-rapelan) */}
-          {bolehKonfirmasi && !loading && !galatMenunggu && (() => {
-            const eligibleIds = kgbList.filter((k) => bisaKonfirmasiCepat(k, today)).map((k) => k.id);
-            if (eligibleIds.length === 0) return null;
-            const allSel = eligibleIds.every((id) => bulkSelected.has(id));
-            return (
-              <div className="px-3 py-2 flex items-center gap-2 shrink-0" style={{ borderBottom:"1px solid var(--ln2)" }}>
-                <button type="button" onClick={() => setBulkSelected(allSel ? new Set() : new Set(eligibleIds))}
-                  aria-pressed={allSel}
-                  className="ku-btn flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg font-medium"
-                  style={{ background:"var(--sub)", color:"var(--dt3)", border:"0.5px solid var(--ln1)" }}>
-                  <span aria-hidden style={{ width:"14px", height:"14px", borderRadius:"4px", border:`1.5px solid ${allSel ? "var(--st-green)" : "var(--dt5)"}`, background: allSel ? "var(--st-green)" : "transparent", display:"inline-flex", alignItems:"center", justifyContent:"center" }}>
-                    {allSel && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
-                  </span>
-                  {allSel ? "Batal pilih" : `Pilih semua (${eligibleIds.length})`}
-                </button>
-                <span className="text-xs" style={{ color:"var(--dt5)" }}>SK tanpa potensi rapelan dengan TMT yang belum lewat</span>
-                <div className="flex-1" />
-                {bulkSelected.size > 0 && (
-                  <button onClick={() => setShowBulk(true)}
-                    className="ku-btn flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold text-white"
-                    style={{ background:"var(--green-solid)" }}>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                    Konfirmasi cepat ({bulkSelected.size})
-                  </button>
-                )}
-              </div>
-            );
-          })()}
-          <div className="flex-1 overflow-y-auto px-3 pt-2 pb-3 space-y-2" style={{ scrollbarWidth:"thin" }}>
-            {loading ? (
-              <>{[1,2,3].map(i=>(
-                <div key={i} className="h-24 rounded-xl animate-pulse" style={{ background:"var(--ln2)" }} />
-              ))}</>
-            ) : galatMenunggu ? (
-              <GalatMuat pesan="Daftar SK menunggu konfirmasi gagal dimuat." onMuatUlang={() => void fetchMenunggu()} />
-            ) : kgbList.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full py-10 gap-2">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ background:"var(--tint-green-bg)" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f6e56" strokeWidth="2.5">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                </div>
-                <p className="text-xs font-semibold" style={{ color:"var(--st-green)" }}>Tidak ada SK menunggu konfirmasi</p>
-              <p className="text-xs text-center mt-1" style={{ color:"var(--dt5)" }}>Semua KGB yang masuk sudah dikonfirmasi</p>
-              </div>
-            ) : (
-              kgbList.map((k) => (
-                <KGBCard key={kunciKgb(k)} k={k}
-                  selectable={bolehKonfirmasi && bisaKonfirmasiCepat(k, today)}
-                  alasanTanpaPilih={bolehKonfirmasi ? alasanTanpaKonfirmasiCepat(k, today) : null}
-                  selected={!!k.id && bulkSelected.has(k.id)}
-                  onToggleSelect={() => setBulkSelected((prev) => {
-                    if (!k.id) return prev;
-                    const n = new Set(prev); if (n.has(k.id)) n.delete(k.id); else n.add(k.id); return n;
-                  })}
-                  onPreview={(url) => { setPreviewUrl(url); setPreviewKgbId(k.id); }}
-                  onKonfirmasi={bolehKonfirmasi ? () => bukaKonfirmasi(k) : undefined}
-                />
-              ))
-            )}
-          </div>
+      {/* ── Ringkasan kerja ── */}
+      <div className="dsb-angka-kisi dsb-muncul" style={{ "--i": 1 } as React.CSSProperties}>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Menunggu konfirmasi</span>
+          <span className="dsb-angka-nilai" style={{ color: antrian.length > 0 ? "var(--st-violet)" : undefined }}>
+            {muatMenunggu && antrian.length === 0 ? "–" : antrian.length}
+          </span>
+          <span className="dsb-angka-meta">
+            {antrian.length === 0
+              ? "Antrian kosong"
+              : [antrianRapelan > 0 && `${antrianRapelan} berpotensi rapelan`, antrianTmtLewat > 0 && `${antrianTmtLewat} TMT lewat`, layakCepat.length > 0 && `${layakCepat.length} bisa cepat`]
+                  .filter(Boolean)
+                  .join(" · ")}
+          </span>
         </div>
-
-        {/* ── Kalender KGB ── */}
-        <div className="flex flex-col rounded-2xl overflow-hidden"
-          style={{ background:"var(--card)", border:"1px solid var(--ln1)" }}>
-          <div className="px-4 py-3 flex items-center gap-2 shrink-0"
-            style={{ borderBottom:"1px solid var(--ln2)", background:"var(--sub)" }}>
-            <div className="w-1 h-4 rounded-full shrink-0" style={{ background:"var(--navy-solid)" }} />
-            <div className="flex-1 min-w-0">
-              <h2 className="text-sm font-bold leading-none" style={{ color:"var(--dtn)" }}>Kalender KGB</h2>
-              <p className="text-xs mt-0.5" style={{ color:"var(--dt5)" }}>Klik bulan untuk filter tabel di bawah</p>
-            </div>
-          </div>
-          {/* Keterangan warna; setiap ubin juga menuliskan tingkatnya sebagai teks. */}
-          <div className="px-3 pt-2 pb-1 flex flex-wrap gap-x-3 gap-y-1 shrink-0">
-            {([
-              { bar:WARNA_TINGKAT.urgent, label:"\"n perlu aksi\": ada SK menunggu konfirmasi" },
-              { bar:WARNA_TINGKAT.partial, label:"\"x/y\": sebagian dikonfirmasi" },
-              { bar:WARNA_TINGKAT.done, label:"\"selesai\": seluruhnya dikonfirmasi" },
-            ] as {bar:string;label:string}[]).map(({bar,label}) => (
-              <div key={label} className="flex items-center gap-1">
-                <div aria-hidden style={{ width:"8px", height:"3px", borderRadius:"2px", background:bar }} />
-                <span style={{ fontSize:"9px", color:"var(--dt4)" }}>{label}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex-1 px-3 pb-3">
-            {loadingAll ? (
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"5px" }}>
-                {Array.from({length:12}).map((_,i)=>(
-                  <div key={i} className="rounded-lg animate-pulse" style={{ height:"62px", background:"var(--ln2)" }} />
-                ))}
-              </div>
-            ) : galatSemua ? (
-              <GalatMuat pesan="Data KGB gagal dimuat." onMuatUlang={() => void fetchAll()} />
-            ) : (
-              <MonthGrid rekapBulan={rekapBulan} filterMonth={filterMonth}
-                onSelect={(key) => setFilterMonth(key ?? defaultFilterMonth)} />
-            )}
-          </div>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Siap rekon TMT {namaBulan(bulanFokus, true)}</span>
+          <span className="dsb-angka-nilai">
+            {dataSiap ? rekapFokus?.dikonfirmasi ?? 0 : "–"}
+            {dataSiap && <small>/ {rekapFokus?.total ?? 0} dikonfirmasi</small>}
+          </span>
+          <span className="dsb-angka-meta">
+            <span className="dsb-bar-mini" style={{ width: "100%" }} aria-hidden="true"><span style={{ width: `${pctFokus}%` }} /></span>
+          </span>
+          <span className="dsb-angka-meta" style={{ marginTop: 4 }}>
+            Rekon {teksJendelaRekon(bulanFokus)} · {LABEL_STATUS_REKON[statusRekonGaji(bulanFokus, hariIni)]}
+          </span>
+        </div>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Belum sampai keuangan</span>
+          <span className="dsb-angka-nilai" style={{ color: (rekapFokus?.belumSampaiKeuangan ?? 0) > 0 ? "var(--st-amber)" : undefined }}>
+            {dataSiap ? rekapFokus?.belumSampaiKeuangan ?? 0 : "–"}
+          </span>
+          <span className="dsb-angka-meta">
+            {(rekapFokus?.belumSampaiKeuangan ?? 0) > 0 ? `TMT ${namaBulan(bulanFokus)} masih di Tim SDM` : `Semua KGB TMT ${namaBulan(bulanFokus)} sudah sampai`}
+          </span>
+        </div>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Rapelan TMT {tahun}</span>
+          <span className="dsb-angka-nilai">
+            {dataSiap ? rapelanDitetapkan : "–"}
+            {dataSiap && <small>ditetapkan</small>}
+          </span>
+          <span className="dsb-angka-meta">
+            {rapelanBerpotensi > 0 && <span className="dsb-titik" data-nada="kuning" aria-hidden="true" />}
+            {rapelanBerpotensi > 0 ? `${rapelanBerpotensi} lagi berpotensi rapelan` : "Tidak ada yang berpotensi rapelan"}
+          </span>
         </div>
       </div>
 
-      {/* ════════════════════════════════════════
-          Detail KGB per bulan : selalu tampil
-      ════════════════════════════════════════ */}
-      <div className="rounded-2xl overflow-hidden" style={{ background:"var(--card)", border:"1px solid var(--ln1)" }}>
-        <div className="px-4 py-3 flex items-start justify-between gap-3"
-          style={{ borderBottom:"1px solid var(--ln2)", background:"var(--sub)" }}>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-bold" style={{ color:"var(--dtn)" }}>
-                KGB Berlaku {bulanLabel(filterMonth)}
-              </p>
-              {/* Context badge */}
-              {filterMonth === followUpBulanKey && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                  style={{ background:"var(--tint-navy)", color:"var(--dtn)", border:"1px solid var(--ln0)" }}>
-                  SDM kirim bulan ini ({bulanIniLabel})
-                </span>
-              )}
-              {filterMonth === rekonBulanKey && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                  style={{ background:"var(--tint-violet-bg)", color:"var(--st-violet)", border:"1px solid var(--tint-violet-ln)" }}>
-                  Berlaku bulan depan
-                </span>
-              )}
-            </div>
-            <p className="text-xs mt-0.5" style={{ color:"var(--dt5)" }}>
-              {loadingAll ? "Memuat…" : galatSemua ? "Data KGB gagal dimuat" : `${monthSiklus.length} KGB`}
-              {dataSemuaSiap && monthArsip.length > 0 && <span style={{ color:"var(--dt4)" }}> · {monthArsip.length} arsip</span>}
-              {filterMonth === followUpBulanKey && dataSemuaSiap && (() => {
-                const terkirim = monthSiklus.filter(k=>["menunggu_keuangan","selesai"].includes(k.status)).length;
-                const belum = monthSiklus.length - terkirim;
-                return <span style={{ color:"var(--dt4)" }}> · {terkirim} sudah dikirim SDM{belum > 0 ? `, ${belum} belum` : ""}</span>;
-              })()}
-              {filterMonth === rekonBulanKey && dataSemuaSiap && (
-                <span style={{ color:"var(--dt4)" }}> · {monthSiklus.filter(k=>k.status==="selesai").length} selesai dikonfirmasi</span>
-              )}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-            {monthSiklus.filter(k=>k.status==="menunggu_keuangan").length > 0 && (
-              <span className="text-xs px-2.5 py-1 rounded-full font-semibold"
-                style={{ background:"var(--tint-violet-bg)", color:"var(--st-violet)", border:"1px solid var(--tint-violet-ln)" }}>
-                {monthSiklus.filter(k=>k.status==="menunggu_keuangan").length} perlu aksi
-              </span>
-            )}
-            {filterMonth !== defaultFilterMonth && (
-              <button onClick={() => setFilterMonth(defaultFilterMonth)}
-                className="text-xs px-2 py-1 rounded-lg"
-                style={{ background:"var(--ln2)", color:"var(--dt3)" }}>
-                Tampilkan bulan aktif
-              </button>
+      <div className="dsb-dasbor-isi">
+        <div className="dsb-kolom">
+        {/* ── Antrian SK menunggu konfirmasi ── */}
+        <section className="dsb-panel dsb-antrian dsb-susut overflow-hidden dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-labelledby="judul-antrian-sk">
+          <div className="dsb-panel-kepala">
+            <h2 id="judul-antrian-sk" className="dsb-panel-judul">SK menunggu konfirmasi <small>{antrian.length}</small></h2>
+            {bolehKonfirmasi && antrian.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                {cepatTerpilih.length > 0 ? (
+                  <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" onClick={() => setBukaCepat(true)}>
+                    <IkonCentang /> Konfirmasi cepat ({cepatTerpilih.length})
+                  </button>
+                ) : (
+                  <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => bukaTinjau(antrian[0])}>
+                    Mulai tinjau dari yang teratas
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        </div>
 
-        {loadingAll ? (
-          <div className="space-y-2 p-4">
-            {[1,2,3].map(i=><div key={i} className="h-10 rounded-xl animate-pulse" style={{ background:"var(--ln2)" }} />)}
-          </div>
-        ) : galatSemua ? (
-          <GalatMuat pesan="Data KGB gagal dimuat." onMuatUlang={() => void fetchAll()} />
-        ) : monthItems.length === 0 ? (
-          <div className="text-center py-10 text-xs" style={{ color:"var(--dt5)" }}>
-            Tidak ada data KGB pada bulan ini
-          </div>
-        ) : (
-          <>
-            {/* ── Mobile: kartu per KGB ── */}
-            <div className="md:hidden divide-y" style={{ borderColor:"var(--ln2)" }}>
-              {monthItems.map((k, i) => {
-                const st = badgeStatus(k.status);
-                const canFollowUp = bolehKonfirmasi && !k.isArsip && kunciBulanTmt(k.tmtKgbBaru) === followUpBulanKey
-                  && ["belum_diproses","sedang_diproses","ditolak"].includes(k.status);
-                const justSent = followupSent.has(kunciKgb(k));
-                const nama = namaPegawai(k);
-                return (
-                  <div key={kunciKgb(k)} className="px-4 py-3.5" style={{ background: i%2===0?"var(--card)":"var(--sub)" }}>
-                    {/* Row 1: avatar + nama + status */}
-                    <div className="flex items-start gap-3 mb-2.5">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold" aria-hidden
-                        style={{ background:"var(--tint-navy)", color:"var(--dtn)" }}>
-                        {initials(nama)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold truncate" style={{ color:"var(--dtn)" }}>{nama}</p>
-                        <p style={{ fontSize:"10px", color:"var(--dt5)" }}>{k.pegawai?.nip ?? "-"}</p>
-                        <p style={{ fontSize:"10px", color:"var(--dt4)" }} className="truncate">{k.pegawai?.jabatan ?? "-"}</p>
-                      </div>
-                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0"
-                        style={{ background:st.bg, color:st.color, fontSize:"10px" }}>
-                        {st.label}{k.isArsip ? " (arsip)" : ""}
-                      </span>
-                    </div>
-                    {/* Row 2: data grid */}
-                    <div className="grid grid-cols-3 gap-2 mb-2.5 px-0.5">
-                      <div>
-                        <p style={{ fontSize:"9px", color:"var(--dt5)" }}>Golongan</p>
-                        <p style={{ fontSize:"11px", color:"var(--dtn)", fontWeight:600 }}>{k.golonganLama}→{k.golonganBaru}</p>
-                      </div>
-                      <div>
-                        <p style={{ fontSize:"9px", color:"var(--dt5)" }}>Gaji Baru</p>
-                        <p style={{ fontSize:"11px", color:"var(--st-green)", fontWeight:600 }}>{fmtRp(k.gajiPokokBaru)}</p>
-                      </div>
-                      <div>
-                        <p style={{ fontSize:"9px", color:"var(--dt5)" }}>MKG</p>
-                        <p style={{ fontSize:"11px", color:"var(--dt3)" }}>{fmtMkg(k)}</p>
-                      </div>
-                    </div>
-                    {/* Row 3: actions */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {k.surat?.pathFile && (
-                        <button onClick={() => setPreviewUrl(`/api/blob/download?url=${encodeURIComponent(k.surat!.pathFile!)}`)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                          style={{ background:"var(--tint-navy)", color:"var(--dtn)" }}>
-                          Lihat SK Tertandatangani
-                        </button>
-                      )}
-                      {bolehKonfirmasi && k.status === "menunggu_keuangan" && k.id && (
-                        <button onClick={() => bukaKonfirmasi(k)}
-                          className="flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white text-center"
-                          style={{ background:"var(--green-solid)" }}>
-                          {k.flagRapelan ? "Tinjau dan Konfirmasi" : "Konfirmasi"}
-                        </button>
-                      )}
-                      {canFollowUp && (
-                        <button onClick={() => handleFollowUp(k)} disabled={justSent}
-                          className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-center"
-                          style={{ background: justSent?"var(--tint-green-bg)":"var(--tint-amber-bg)", color: justSent?"var(--st-green)":"var(--st-amber)", border:`1px solid ${justSent?"var(--tint-green-ln)":"var(--tint-amber-ln)"}` }}>
-                          {justSent ? "Terkirim" : "Follow Up SDM"}
-                        </button>
-                      )}
-                      {k.status === "selesai" && k.rapelanDitetapkan && (
-                        <span style={{ fontSize:"10px", fontWeight:700, padding:"2px 8px", borderRadius:999, background:"var(--tint-amber-bg2)", color:"var(--st-amber)" }}>Rapelan ditetapkan</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+          {muatMenunggu && antrian.length === 0 ? (
+            <div className="flex flex-col gap-2" style={{ padding: "16px" }} role="status" aria-label="Memuat antrian">
+              {[1, 2, 3].map((i) => <div key={i} className="dsb-kerangka" style={{ height: 48, borderRadius: 8 }} />)}
             </div>
-
-            {/* ── Desktop: tabel ── */}
-            <div className="hidden md:block overflow-x-auto tbl-scroll">
-              <table className="w-full" style={{ borderCollapse:"collapse", fontSize:"12px" }}>
+          ) : galatMenunggu ? (
+            <div className="dsb-kosong" role="alert">
+              <p style={{ margin: 0, color: "var(--st-red)" }}>Daftar SK menunggu konfirmasi gagal dimuat.</p>
+              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => void muatDaftarMenunggu()}>Muat ulang</button>
+            </div>
+          ) : antrian.length === 0 ? (
+            <div className="dsb-kosong" style={{ padding: "44px 16px" }}>
+              <span className="dsb-pesan-ikon" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", width: 36, height: 36 }} aria-hidden="true"><IkonCentang /></span>
+              <p className="dsb-nama" style={{ margin: 0 }}>Tidak ada SK yang menunggu konfirmasi</p>
+              <p style={{ margin: 0 }}>SK baru muncul di sini setelah Tim SDM mengunggah SK yang sudah ditandatangani.</p>
+            </div>
+          ) : (
+            <div className="dsb-antrian-gulir">
+              <table className="dsb-tabel" style={{ minWidth: kolomCentang ? "760px" : "720px" }}>
                 <thead>
-                  <tr style={{ borderBottom:"1px solid var(--ln2)", background:"var(--sub)" }}>
-                    {["Nama / NIP","Jabatan","Golongan","Gaji Baru","MKG","Status","Aksi"].map(h => (
-                      <th key={h} className="px-4 py-2.5 text-left font-semibold"
-                        style={{ color:"var(--dt4)", whiteSpace:"nowrap", fontWeight:600, fontSize:"11px" }}>
-                        {h}
+                  <tr>
+                    {kolomCentang && (
+                      <th scope="col" style={{ width: 36 }}>
+                        <input
+                          type="checkbox"
+                          className="dsb-cek"
+                          checked={semuaCepatTerpilih}
+                          onChange={() => setPilihan(semuaCepatTerpilih ? new Set() : new Set(layakCepat.map((k) => k.id as string)))}
+                          aria-label="Pilih semua SK yang bisa dikonfirmasi cepat"
+                          title="Pilih semua SK tanpa potensi rapelan dengan TMT yang belum lewat"
+                        />
                       </th>
-                    ))}
+                    )}
+                    <th scope="col">Pegawai</th>
+                    <th scope="col">TMT</th>
+                    <th scope="col">Gaji pokok baru</th>
+                    <th scope="col">Nomor SK</th>
+                    <th scope="col" className="kanan"><span className="sr-only">Aksi</span></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {monthItems.map((k, i) => {
-                    const st = badgeStatus(k.status);
-                    const canFollowUp = bolehKonfirmasi && !k.isArsip && kunciBulanTmt(k.tmtKgbBaru) === followUpBulanKey
-                      && ["belum_diproses","sedang_diproses","ditolak"].includes(k.status);
-                    const justSent = followupSent.has(kunciKgb(k));
+                  {antrian.map((k) => {
+                    const alasan = alasanTanpaKonfirmasiCepat(k, hariIni);
+                    const sisa = sisaHari(k.tmtKgbBaru, hariIni);
+                    const selisih = selisihGaji(k);
                     return (
-                      <tr key={kunciKgb(k)} style={{ borderBottom:"1px solid var(--ln2)", background: i%2===0?"var(--card)":"var(--sub)" }}>
-                        <td className="px-4 py-2.5">
-                          <p className="font-semibold" style={{ color:"var(--dtn)" }}>{namaPegawai(k)}</p>
-                          <p style={{ color:"var(--dt5)", fontSize:"10px" }}>{k.pegawai?.nip ?? "-"}</p>
+                      <tr key={kunciKgb(k)} className="dsb-baris-klik" onClick={() => bukaTinjau(k)}>
+                        {kolomCentang && (
+                          <td onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              className="dsb-cek"
+                              disabled={!!alasan}
+                              checked={!!k.id && pilihan.has(k.id)}
+                              onChange={() => setPilihan((prev) => {
+                                if (!k.id) return prev;
+                                const n = new Set(prev);
+                                if (n.has(k.id)) n.delete(k.id); else n.add(k.id);
+                                return n;
+                              })}
+                              aria-label={`Pilih SK ${namaPegawai(k)} untuk konfirmasi cepat`}
+                              title={alasan ?? "Pilih untuk konfirmasi cepat"}
+                            />
+                          </td>
+                        )}
+                        <td style={{ maxWidth: "220px" }}>
+                          <p className="dsb-nama truncate" style={{ margin: 0 }} title={k.pegawai?.jabatan}>{namaPegawai(k)}</p>
+                          <p className="dsb-kecil truncate" style={{ margin: 0 }} title={k.pegawai?.unitKerja}>
+                            {k.pegawai?.nip ?? "-"} · {satkerPendek(k.pegawai?.unitKerja)}
+                          </p>
                         </td>
-                        <td className="px-4 py-2.5" style={{ color:"var(--dt3)", maxWidth:"180px" }}>
-                          <p className="truncate">{k.pegawai?.jabatan ?? "-"}</p>
+                        <td className="whitespace-nowrap">
+                          {fmt(k.tmtKgbBaru)}
+                          <p className="dsb-kecil" style={{ margin: 0, color: k.flagRapelan || alasan === ALASAN_TMT_LEWAT ? "var(--st-amber)" : undefined }}>
+                            {k.flagRapelan ? "berpotensi rapelan" : alasan === ALASAN_TMT_LEWAT ? "TMT sudah lewat" : sisa !== null ? `${sisa} hari lagi` : ""}
+                          </p>
                         </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap" style={{ color:"var(--dtn)", fontWeight:600 }}>
-                          {k.golonganLama} → {k.golonganBaru}
+                        <td className="whitespace-nowrap">
+                          <span style={{ color: "var(--dtn)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{fmtRp(k.gajiPokokBaru)}</span>
+                          <p className="dsb-kecil" style={{ margin: 0 }}>
+                            {selisih > 0 && <span style={{ color: "var(--st-green)" }}>+{selisih.toLocaleString("id-ID")} · </span>}
+                            {golongan(k)} · {fmtMkg(k)}
+                          </p>
                         </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap font-semibold" style={{ color:"var(--st-green)" }}>
-                          {fmtRp(k.gajiPokokBaru)}
+                        <td className="whitespace-nowrap">
+                          {k.surat?.nomorSurat ?? <span className="dsb-kecil">-</span>}
+                          {k.surat?.tanggalSurat && <p className="dsb-kecil" style={{ margin: 0 }}>{fmt(k.surat.tanggalSurat)}</p>}
                         </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap" style={{ color:"var(--dt3)" }}>
-                          {fmtMkg(k)}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap"
-                            style={{ background:st.bg, color:st.color }}>
-                            {st.label}{k.isArsip ? " (arsip)" : ""}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {k.surat?.pathFile && (
-                              <button onClick={() => setPreviewUrl(`/api/blob/download?url=${encodeURIComponent(k.surat!.pathFile!)}`)}
-                                className="px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap"
-                                style={{ background:"var(--tint-navy)", color:"var(--dtn)" }}>
-                                Lihat SK Tertandatangani
-                              </button>
-                            )}
-                            {bolehKonfirmasi && k.status === "menunggu_keuangan" && k.id && (
-                              <button onClick={() => bukaKonfirmasi(k)}
-                                className="px-2.5 py-1 rounded-lg text-xs font-semibold text-white whitespace-nowrap"
-                                style={{ background:"var(--green-solid)" }}>
-                                {k.flagRapelan ? "Tinjau dan Konfirmasi" : "Konfirmasi"}
-                              </button>
-                            )}
-                            {canFollowUp && (
-                              <button onClick={() => handleFollowUp(k)} disabled={justSent}
-                                className="px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap"
-                                style={{ background: justSent?"var(--tint-green-bg)":"var(--tint-amber-bg)", color: justSent?"var(--st-green)":"var(--st-amber)", border:`1px solid ${justSent?"var(--tint-green-ln)":"var(--tint-amber-ln)"}` }}>
-                                {justSent ? "Terkirim" : "Follow Up SDM"}
-                              </button>
-                            )}
-                            {k.status === "selesai" && k.rapelanDitetapkan === true && (
-                              <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                                style={{ background:"var(--tint-amber-bg2)", color:"var(--st-amber)", fontSize:"10px" }}>
-                                Rapelan ditetapkan
-                              </span>
-                            )}
-                          </div>
+                        <td className="kanan">
+                          <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis={bolehKonfirmasi ? undefined : "garis"} onClick={(e) => { e.stopPropagation(); bukaTinjau(k); }}>
+                            {bolehKonfirmasi ? "Tinjau" : "Lihat"}
+                          </button>
                         </td>
                       </tr>
                     );
@@ -1036,279 +675,148 @@ export default function KeuanganDashboardPage() {
                 </tbody>
               </table>
             </div>
-          </>
-        )}
-      </div>
+          )}
+          {antrian.length > 0 && (
+            <div className="dsb-kaki">
+              <span>Urut TMT terdekat · klik baris untuk meninjau SK{kolomCentang ? " · centang untuk konfirmasi cepat" : ""}</span>
+            </div>
+          )}
+        </section>
 
-      {/* ════════════════════════════════════════
-          MODAL: Preview SK (iframe)
-      ════════════════════════════════════════ */}
-      {previewUrl && (
-        <>
-          <div style={{ position:"fixed", inset:0, background:"rgba(6,14,28,0.55)", backdropFilter:"blur(6px)", WebkitBackdropFilter:"blur(6px)", zIndex:50, animation:"admFade .2s ease both" }}
-            onClick={tutupPreview} />
-          <div ref={refPreview} role="dialog" aria-modal="true" aria-labelledby="judul-pratinjau-sk" tabIndex={-1}
-            style={{ outline:"none", position:"fixed", inset:"4%", zIndex:51, display:"flex", flexDirection:"column", background:"var(--card)", border:"1px solid var(--ln1)", borderRadius:"16px", overflow:"hidden", boxShadow:"0 32px 80px rgba(0,0,0,0.3)", animation:"admRise .32s cubic-bezier(.22,1,.36,1) both" }}>
-            <div className="flex items-center justify-between px-4 py-3 shrink-0"
-              style={{ borderBottom:"1px solid var(--ln1)", background:"var(--sub)" }}>
-              <div>
-                <p id="judul-pratinjau-sk" className="text-sm font-bold" style={{ color:"var(--dtn)" }}>SK yang Sudah Ditandatangani</p>
-                <p className="text-xs" style={{ color:"var(--dt4)" }}>Verifikasi data sebelum konfirmasi</p>
+          {/* ── KGB berlaku per bulan TMT ── */}
+          <section className="dsb-panel dsb-penuh overflow-hidden dsb-muncul" style={{ "--i": 4 } as React.CSSProperties} aria-labelledby="judul-bulan-tmt">
+            <div className="dsb-panel-kepala">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <button type="button" className="dsb-ikon-tombol" onClick={() => setBulan(geserBulan(bulan, -1))} aria-label="Bulan TMT sebelumnya" title="Bulan sebelumnya">
+                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                </button>
+                <h2 id="judul-bulan-tmt" className="dsb-panel-judul" style={{ minWidth: 0 }}>
+                TMT {namaBulan(bulan)}
+                <small title="SK bulan TMT ini harus dikonfirmasi sebelum rekon Gaji Web">
+                  {isiBulan.length} KGB · rekon {teksJendelaRekon(bulan)},{" "}
+                  <span style={{ color: rekonBulan === "berjalan" ? "var(--st-violet)" : rekonBulan === "lewat" && jumlahSaring("belum") + jumlahSaring("menunggu") > 0 ? "var(--st-red)" : undefined }}>{LABEL_STATUS_REKON[rekonBulan]}</span>
+                </small>
+              </h2>
+                <button type="button" className="dsb-ikon-tombol" onClick={() => setBulan(geserBulan(bulan, 1))} aria-label="Bulan TMT berikutnya" title="Bulan berikutnya">
+                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                </button>
+                {bulan !== bulanFokus && (
+                  <button type="button" className="dsb-tautan" onClick={() => setBulan(bulanFokus)}>Ke bulan fokus</button>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                {bolehKonfirmasi && previewKgbId && kgbList.find(k=>k.id===previewKgbId) && (
-                  <button
-                    onClick={() => {
-                      bukaKonfirmasi(kgbList.find(x=>x.id===previewKgbId)!);
-                    }}
-                    className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white flex items-center gap-1.5"
-                    style={{ background:"var(--green-solid)" }}>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                    Konfirmasi
+              <div className="flex flex-wrap items-center gap-2">
+                {bolehKonfirmasi && perluFollowUp.length > 1 && (
+                  <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" disabled={followupMassal} onClick={() => void followUpSemua()}>
+                    {followupMassal ? "Mengirim…" : `Follow up (${perluFollowUp.length})`}
                   </button>
                 )}
-                <button type="button" onClick={tutupPreview}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center"
-                  aria-label="Tutup pratinjau SK" title="Tutup pratinjau SK"
-                  style={{ background:"var(--ln2)", color:"var(--dt3)" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
+                <button
+                  type="button"
+                  className="dsb-tombol dsb-tombol-kecil"
+                  data-jenis="garis"
+                  disabled={dikonfirmasiBulan.length === 0}
+                  onClick={unduhDasarGajiWeb}
+                  title={dikonfirmasiBulan.length === 0 ? "Belum ada KGB yang dikonfirmasi pada bulan ini" : "Unduh daftar KGB yang sudah dikonfirmasi sebagai dasar input Gaji Web"}
+                >
+                  <IkonUnduh /> Gaji Web ({dikonfirmasiBulan.length})
                 </button>
               </div>
             </div>
-            <iframe src={previewUrl} className="flex-1 w-full" style={{ border:"none" }} title="Pratinjau SK tertandatangani" />
-          </div>
-        </>
-      )}
 
-      {/* ════════════════════════════════════════
-          MODAL: Konfirmasi + Rapelan
-      ════════════════════════════════════════ */}
-      {konfirmasiId && konfirmasiTarget && (
-        <>
-          <div style={{ position:"fixed", inset:0, background:"rgba(6,14,28,0.55)", backdropFilter:"blur(6px)", WebkitBackdropFilter:"blur(6px)", zIndex:52, animation:"admFade .2s ease both" }}
-            onClick={() => !konfirmasiLoading && setKonfirmasiId(null)} />
-          <div style={{ position:"fixed", inset:0, zIndex:53, display:"flex", alignItems:"center", justifyContent:"center", padding:"1rem" }}>
-            <div ref={refKonfirmasi} className="rounded-2xl w-full p-6 space-y-4"
-              role="dialog" aria-modal="true" aria-labelledby="judul-konfirmasi-kgb" aria-busy={konfirmasiLoading} tabIndex={-1}
-              style={{ outline:"none", maxWidth:"420px", background:"var(--card)", border:"1px solid var(--ln1)", boxShadow:"0 24px 64px rgba(0,0,0,0.18)" }}>
-
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" aria-hidden
-                  style={{ background:"var(--tint-green-bg)", color:"var(--st-green)" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                </div>
-                <div>
-                  <p id="judul-konfirmasi-kgb" className="text-sm font-bold" style={{ color:"var(--dtn)" }}>Konfirmasi KGB</p>
-                  <p className="text-xs" style={{ color:"var(--dt4)" }}>{namaPegawai(konfirmasiTarget)}</p>
-                </div>
-              </div>
-
-              {/* Ringkasan finansial dengan selisih */}
-              <div className="rounded-xl overflow-hidden" style={{ border:"1px solid var(--ln1)" }}>
-                <div className="px-3 py-2.5 flex items-end justify-between" style={{ background:"var(--tint-green-bg)" }}>
-                  <div>
-                    <p style={{ fontSize:"10px", color:"var(--st-green)" }}>Gaji pokok baru</p>
-                    <p className="text-lg font-bold leading-tight" style={{ color:"var(--st-green)" }}>{fmtRp(konfirmasiTarget.gajiPokokBaru)}</p>
-                  </div>
-                  {(konfirmasiTarget.gajiPokokBaru ?? 0) - konfirmasiTarget.gajiPokokLama > 0 && (
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background:"var(--card)", color:"var(--st-green)" }}>
-                      +{fmtRp((konfirmasiTarget.gajiPokokBaru ?? 0) - konfirmasiTarget.gajiPokokLama)}
-                    </span>
-                  )}
-                </div>
-                <div className="px-3 py-2.5 space-y-1.5" style={{ background:"var(--sub)" }}>
-                  {[
-                    { l:"Gaji lama", v:fmtRp(konfirmasiTarget.gajiPokokLama) },
-                    { l:"Golongan",  v:`${konfirmasiTarget.golonganLama} → ${konfirmasiTarget.golonganBaru}` },
-                    { l:"TMT KGB",   v:fmtFull(konfirmasiTarget.tmtKgbBaru) },
-                    { l:"MKG baru",  v:fmtMkg(konfirmasiTarget) },
-                  ].map(({l,v}) => (
-                    <div key={l} className="flex justify-between text-xs">
-                      <span style={{ color:"var(--dt5)" }}>{l}</span>
-                      <span className="font-semibold" style={{ color:"var(--dtn)" }}>{v}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Peringatan bila SK berpotensi rapelan */}
-              {konfirmasiTarget.flagRapelan && (
-                <div className="rounded-lg px-3 py-2 flex items-start gap-2" style={{ background:"var(--tint-amber-bg)", border:"1px solid var(--tint-amber-ln)" }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--st-amber)" style={{ marginTop:"1px", flexShrink:0 }} aria-hidden><path d="M12 2L1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></svg>
-                  <p className="text-xs" style={{ color:"var(--st-amber2)", fontSize:"10.5px", lineHeight:1.5 }}>KGB ini diinput Tim SDM setelah deadline input, sehingga <strong>berpotensi rapelan</strong>. Pilih opsi <strong>Rapelan</strong> bila selisih gaji perlu dibayar mundur.</p>
-                </div>
-              )}
-
-              {/* toggle rapelan */}
-              <div className="rounded-xl p-3" style={{ background:"var(--sub)", border:"1px solid var(--ln1)" }}>
-                <p className="text-xs font-semibold mb-2" style={{ color:"var(--dtn)" }}>Status pembayaran</p>
-                <div className="flex gap-2">
-                  {[
-                    { val:false, label:"Tidak Rapelan", desc:"Dibayar mulai TMT", bg:"var(--tint-green-bg)", active:"var(--st-green)" },
-                    { val:true,  label:"Rapelan",       desc:"Selisih dibayar mundur", bg:"var(--tint-amber-bg2)", active:"var(--st-amber)" },
-                  ].map(({val,label,desc,bg,active}) => (
-                    <button key={String(val)} type="button" onClick={() => setKonfirmasiRapelan(val)} aria-pressed={konfirmasiRapelan===val}
-                      className="flex-1 py-2 px-2 rounded-xl text-xs font-semibold transition text-left"
-                      style={{
-                        background: konfirmasiRapelan===val ? bg : "var(--ln2)",
-                        color:      konfirmasiRapelan===val ? active : "var(--dt4)",
-                        border:    `1.5px solid ${konfirmasiRapelan===val ? active : "transparent"}`,
-                      }}>
-                      <span className="flex items-center gap-1.5">
-                        <span style={{ width:"12px", height:"12px", borderRadius:"50%", border:`3px solid ${konfirmasiRapelan===val ? active : "var(--dt6)"}`, display:"inline-block", flexShrink:0 }} />
-                        {label}
-                      </span>
-                      <span className="block mt-0.5" style={{ fontSize:"9.5px", fontWeight:400, color: konfirmasiRapelan===val ? active : "var(--dt5)", opacity:0.85 }}>{desc}</span>
+            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--ln2)" }}>
+              <div className="dsb-alat">
+                <div className="dsb-segmen" role="group" aria-label="Saring status">
+                  {([
+                    ["semua", "Semua"],
+                    ["menunggu", "Menunggu"],
+                    ["selesai", "Dikonfirmasi"],
+                    ["belum", "Belum sampai"],
+                  ] as [SaringStatus, string][]).map(([s, l]) => (
+                    <button key={s} type="button" aria-pressed={saring === s} onClick={() => setSaring(s)}>
+                      {l} {dataSiap && <span style={{ color: "var(--dt5)" }}>{jumlahSaring(s)}</span>}
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div>
-                <p className="text-xs" style={{ color:"var(--dt2)" }}>
-                  KGB akan ditandai <strong>selesai</strong> dan data gaji pegawai diperbarui otomatis.
-                </p>
-                <div role="alert" aria-live="assertive">
-                  {konfirmasiGalat && (
-                    <p className="text-xs rounded-lg px-3 py-2 mt-2"
-                      style={{ background:"var(--tint-red-bg)", color:"var(--st-red)", border:"1px solid var(--tint-red-ln)" }}>
-                      {konfirmasiGalat}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button disabled={konfirmasiLoading} onClick={() => setKonfirmasiId(null)}
-                  className="flex-1 text-xs py-2.5 rounded-xl"
-                  style={{ border:"1px solid var(--ln1)", color:"var(--dt4)" }}>
-                  Batal
-                </button>
-                <button disabled={konfirmasiLoading}
-                  onClick={() => handleKonfirmasi(konfirmasiId, konfirmasiRapelan)}
-                  className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white"
-                  style={{ background: konfirmasiLoading?"#7fb3a0":"var(--green-solid)" }}>
-                  {konfirmasiLoading ? "Memproses..." : "Konfirmasi"}
-                </button>
+                <input type="search" className="dsb-cari" style={{ flex: "1 1 160px" }} aria-label="Cari di bulan ini" placeholder="Cari nama, NIP, atau nomor SK" value={cari} onChange={(e) => setCari(e.target.value)} />
               </div>
             </div>
-          </div>
-        </>
-      )}
 
-      {/* ════════════════════════════════════════
-          MODAL: Konfirmasi cepat (bulk non-rapelan)
-      ════════════════════════════════════════ */}
-      {showBulk && (() => {
-        const items = kgbList.filter((k) => bisaKonfirmasiCepat(k, today) && bulkSelected.has(k.id));
-        const totalNaik = items.reduce((s, k) => s + Math.max(0, (k.gajiPokokBaru ?? 0) - k.gajiPokokLama), 0);
-        return (
-          <div className="adm-overlay" onClick={() => !bulkLoading && setShowBulk(false)}>
-            <div className="adm-modal" style={{ maxWidth:"26rem", maxHeight:"88dvh", display:"flex", flexDirection:"column" }} onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-3 px-5 py-4 shrink-0" style={{ borderBottom:"0.5px solid var(--ln2)", background:"var(--sub)" }}>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background:"linear-gradient(135deg,#17a37e,var(--green-solid))" }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                </div>
-                <div className="flex-1"><h2 className="text-sm font-semibold leading-tight" style={{ color:"var(--dtn)" }}>Konfirmasi Cepat {items.length} SK</h2><p className="text-xs" style={{ color:"var(--dt4)" }}>Semua ditandai <strong>tidak rapelan</strong></p></div>
+            {muatSemua && semua.length === 0 ? (
+              <div className="flex flex-col gap-2" style={{ padding: "16px" }} role="status" aria-label="Memuat KGB bulan ini">
+                {[1, 2, 3].map((i) => <div key={i} className="dsb-kerangka" style={{ height: 44, borderRadius: 8 }} />)}
               </div>
-              <div className="p-5 space-y-2 overflow-y-auto">
-                <div className="rounded-xl px-3 py-2.5 flex items-center justify-between" style={{ background:"var(--tint-green-bg)", border:"1px solid var(--tint-green-ln)" }}>
-                  <span className="text-xs font-medium" style={{ color:"var(--st-green)" }}>Total kenaikan gaji</span>
-                  <span className="text-sm font-bold" style={{ color:"var(--st-green)" }}>+{fmtRp(totalNaik)}/bln</span>
-                </div>
-                <div className="rounded-xl overflow-hidden" style={{ border:"1px solid var(--ln1)", maxHeight:"200px", overflowY:"auto" }}>
-                  {items.map((k, i) => (
-                    <div key={kunciKgb(k)} className="flex items-center gap-2.5 px-3 py-2" style={{ borderBottom: i < items.length - 1 ? "0.5px solid var(--ln2)" : "none" }}>
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0" aria-hidden style={{ background:"var(--tint-violet-bg)", color:"var(--st-violet)", fontSize:"9px" }}>{initials(namaPegawai(k))}</div>
-                      <div className="flex-1 min-w-0"><p className="text-xs font-medium truncate" style={{ color:"var(--dtn)" }}>{namaPegawai(k)}</p><p className="text-xs" style={{ color:"var(--dt5)" }}>{k.golonganLama}→{k.golonganBaru}</p></div>
-                      <span className="text-xs font-semibold shrink-0" style={{ color:"var(--st-green)" }}>{fmtRp(k.gajiPokokBaru)}</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs" style={{ color:"var(--dt5)", fontSize:"10.5px" }}>SK berpotensi rapelan dan SK dengan TMT hari ini atau sebelumnya tidak termasuk di sini; tinjau satu per satu.</p>
-                {bulkLoading && (
-                  <div>
-                    <div className="rounded-full overflow-hidden" style={{ height:"5px", background:"var(--ln2)" }}>
-                      <div style={{ height:"100%", width:`${(bulkProgress / items.length) * 100}%`, background:"var(--green-solid)", transition:"width .2s" }} />
-                    </div>
-                    <p className="text-xs text-center mt-1" style={{ color:"var(--dt4)" }}>{bulkProgress}/{items.length} diproses…</p>
-                  </div>
-                )}
+            ) : galatSemua ? (
+              <div className="dsb-kosong" role="alert">
+                <p style={{ margin: 0, color: "var(--st-red)" }}>Data KGB gagal dimuat.</p>
+                <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => void muatDaftarSemua()}>Muat ulang</button>
               </div>
-              <div className="flex gap-2 px-5 py-4 shrink-0" style={{ borderTop:"0.5px solid var(--ln2)" }}>
-                <button onClick={() => setShowBulk(false)} disabled={bulkLoading} className="flex-1 text-xs py-2.5 rounded-xl" style={{ border:"0.5px solid var(--ln1)", color:"var(--dt4)" }}>Batal</button>
-                <button onClick={handleBulkKonfirmasi} disabled={bulkLoading} className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white disabled:opacity-60" style={{ background:"var(--green-solid)" }}>{bulkLoading ? "Memproses…" : `Konfirmasi ${items.length} SK`}</button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ════════════════════════════════════════
-          POPUP: Daftar KGB (Total / Selesai / Rapelan)
-      ════════════════════════════════════════ */}
-      {popup && (
-        <>
-          <div style={{ position:"fixed", inset:0, background:"rgba(6,14,28,0.55)", backdropFilter:"blur(6px)", WebkitBackdropFilter:"blur(6px)", zIndex:60, animation:"admFade .2s ease both" }}
-            onClick={() => setPopup(null)} />
-          <div style={{ position:"fixed", inset:0, zIndex:61, display:"flex", alignItems:"center", justifyContent:"center", padding:"1.5rem", pointerEvents:"none" }}>
-            <div ref={refPopup} role="dialog" aria-modal="true" aria-labelledby="judul-daftar-kgb" tabIndex={-1}
-              style={{ outline:"none", background:"var(--card)", borderRadius:"16px", width:"100%", maxWidth:"700px", maxHeight:"80dvh", display:"flex", flexDirection:"column", boxShadow:"0 24px 64px rgba(0,0,0,0.18)", pointerEvents:"all" }}>
-              <div className="px-5 py-3.5 flex items-center justify-between shrink-0"
-                style={{ borderBottom:"1px solid var(--ln2)" }}>
-                <div>
-                  <p id="judul-daftar-kgb" className="text-sm font-bold" style={{ color:"var(--dtn)" }}>{popupTitle}</p>
-                  <p className="text-xs mt-0.5" style={{ color:"var(--dt5)" }}>{popupItems.length} KGB · TMT {todayYear}</p>
-                </div>
-                <button type="button" onClick={() => setPopup(null)}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center"
-                  aria-label="Tutup daftar" title="Tutup daftar"
-                  style={{ background:"var(--ln2)", color:"var(--dt3)" }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </div>
-              <div className="overflow-y-auto" style={{ scrollbarWidth:"thin" }}>
-                <table className="w-full" style={{ borderCollapse:"collapse", fontSize:"12px" }}>
-                  <thead className="sticky top-0">
-                    <tr style={{ borderBottom:"1px solid var(--ln2)", background:"var(--sub)" }}>
-                      {["Pegawai","Golongan","Gaji Baru","TMT","Status"].map(h => (
-                        <th key={h} className="px-4 py-2.5 text-left"
-                          style={{ color:"var(--dt5)", fontWeight:600, fontSize:"11px", whiteSpace:"nowrap" }}>{h}</th>
-                      ))}
+            ) : tampilBulan.length === 0 ? (
+              <p className="dsb-kosong" style={{ padding: "40px 16px" }}>
+                {isiBulan.length === 0 ? `Tidak ada KGB berlaku ${namaBulan(bulan, true)}.` : "Tidak ada KGB yang cocok dengan saringan."}
+              </p>
+            ) : (
+              <div className="dsb-gulir-tabel tbl-scroll">
+                <table className="dsb-tabel" style={{ minWidth: "720px" }}>
+                  <thead>
+                    <tr>
+                      <th scope="col">Pegawai</th>
+                      <th scope="col">Gaji pokok baru</th>
+                      <th scope="col">Nomor SK</th>
+                      <th scope="col">Status</th>
+                      <th scope="col" className="kanan"><span className="sr-only">Aksi</span></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {popupItems.map((k, i) => {
-                      const st = badgeStatus(k.status);
+                    {tampilBulan.map((k) => {
+                      const terkirim = followupTerkirim.has(kunciKgb(k));
+                      const selisih = selisihGaji(k);
+                      const sk = tautanSk(k);
                       return (
-                        <tr key={kunciKgb(k)} style={{ borderBottom:"1px solid var(--ln2)", background: i%2===0?"var(--card)":"var(--sub)" }}>
-                          <td className="px-4 py-2.5">
-                            <p className="font-semibold" style={{ color:"var(--dtn)" }}>{namaPegawai(k)}</p>
-                            <p style={{ color:"var(--dt5)", fontSize:"10px" }}>{k.pegawai?.nip ?? "-"}</p>
+                        <tr key={kunciKgb(k)} className={k.isArsip ? "dsb-redup" : undefined}>
+                          <td style={{ maxWidth: "220px" }}>
+                            <p className="dsb-nama truncate" style={{ margin: 0 }} title={k.pegawai?.jabatan}>{namaPegawai(k)}</p>
+                            <p className="dsb-kecil truncate" style={{ margin: 0 }} title={k.pegawai?.unitKerja}>
+                              {k.pegawai?.nip ?? "-"} · {satkerPendek(k.pegawai?.unitKerja)}
+                            </p>
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-xs">
-                            <span style={{ color:"var(--dt5)" }}>{k.golonganLama}</span>
-                            <span style={{ color:"var(--dt6)", margin:"0 4px" }}>→</span>
-                            <span style={{ color:"var(--st-green)", fontWeight:600 }}>{k.golonganBaru}</span>
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap font-semibold text-xs" style={{ color:"var(--st-green)" }}>
-                            {fmtRp(k.gajiPokokBaru)}
-                            {k.rapelanDitetapkan && (
-                              <span className="ml-1 px-1 rounded" style={{ background:"var(--tint-amber-bg2)", color:"var(--st-amber)", fontSize:"9px", fontWeight:700 }}>Rapelan ditetapkan</span>
+                          <td className="whitespace-nowrap">
+                            {k.gajiPokokBaru === null ? (
+                              <span className="dsb-kecil">Belum diinput</span>
+                            ) : (
+                              <span style={{ color: "var(--dtn)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{fmtRp(k.gajiPokokBaru)}</span>
                             )}
+                            <p className="dsb-kecil" style={{ margin: 0 }}>
+                              {selisih > 0 && <span style={{ color: "var(--st-green)" }}>+{selisih.toLocaleString("id-ID")} · </span>}
+                              {golongan(k)}{k.mkgTahunBaru !== null && <> · {fmtMkg(k)}</>}
+                            </p>
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-xs" style={{ color:"var(--dt3)" }}>
-                            {fmt(k.tmtKgbBaru)}
+                          <td className="whitespace-nowrap">
+                            {k.surat?.nomorSurat ?? <span className="dsb-kecil">-</span>}
+                            {k.surat?.tanggalSurat && <p className="dsb-kecil" style={{ margin: 0 }}>{fmt(k.surat.tanggalSurat)}</p>}
                           </td>
-                          <td className="px-4 py-2.5">
-                            <span className="px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
-                              style={{ background:st.bg, color:st.color, fontSize:"10px" }}>
-                              {st.label}
+                          <td>
+                            <StatusKgb k={k} />
+                            {k.status === "selesai" && k.rapelanDitetapkan && <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-red)" }}>Rapelan ditetapkan</p>}
+                            {k.status !== "selesai" && k.flagRapelan && <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-amber)" }}>Berpotensi rapelan</p>}
+                            {k.status === "selesai" && k.konfirmasiKeuanganAt && <p className="dsb-kecil" style={{ margin: 0 }}>{fmt(k.konfirmasiKeuanganAt)}</p>}
+                          </td>
+                          <td className="kanan">
+                            <span className="dsb-aksi">
+                              {k.status === "menunggu_keuangan" && k.id && (
+                                <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis={bolehKonfirmasi ? undefined : "garis"} onClick={() => bukaTinjau(k)}>
+                                  {bolehKonfirmasi ? "Tinjau" : "Lihat"}
+                                </button>
+                              )}
+                              {bisaFollowUp(k) && (
+                                <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" disabled={terkirim} onClick={() => void followUpSatu(k)} title="Minta Tim SDM segera memproses KGB ini">
+                                  {terkirim ? "Terkirim" : "Follow up"}
+                                </button>
+                              )}
+                              {k.status === "selesai" && sk && (
+                                <a href={sk} target="_blank" rel="noopener noreferrer" className="dsb-ikon-tombol" title="Buka SK yang sudah ditandatangani" aria-label={`Buka SK ${namaPegawai(k)}`}>
+                                  <IkonMata />
+                                </a>
+                              )}
                             </span>
                           </td>
                         </tr>
@@ -1317,11 +825,222 @@ export default function KeuanganDashboardPage() {
                   </tbody>
                 </table>
               </div>
+            )}
+          </section>
+        </div>
+
+        {/* ── Kolom kanan: per bulan TMT dan konfirmasi terakhir ── */}
+        <aside className="dsb-samping dsb-muncul" data-urutan="tetap" style={{ "--i": 3 } as React.CSSProperties} aria-label="Rekap per bulan TMT dan konfirmasi terakhir">
+          <section className="dsb-panel dsb-susut" aria-labelledby="judul-per-bulan">
+            <div className="dsb-panel-kepala">
+              <h2 id="judul-per-bulan" className="dsb-panel-judul">Per bulan TMT <small>dasar Gaji Web</small></h2>
+              <Link href="/dashboard/keuangan/riwayat?tab=rekap" className="dsb-tautan">Semua →</Link>
+            </div>
+            {muatSemua && semua.length === 0 ? (
+              <div className="dsb-panel-isi flex flex-col gap-2" aria-hidden="true">
+                {[1, 2, 3, 4].map((i) => <div key={i} className="dsb-kerangka" style={{ height: 40, borderRadius: 8 }} />)}
+              </div>
+            ) : galatSemua ? (
+              <div className="dsb-kosong" role="alert">
+                <p style={{ margin: 0, color: "var(--st-red)" }}>Data KGB gagal dimuat.</p>
+                <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => void muatDaftarSemua()}>Muat ulang</button>
+              </div>
+            ) : (
+              <DaftarBulanRekon rekap={rekapBulan} bulanFokus={bulanFokus} terpilih={bulan} onPilih={(b) => { setBulan(b); setSaring("semua"); }} />
+            )}
+          </section>
+
+          <section className="dsb-panel dsb-penuh" aria-labelledby="judul-konfirmasi-terakhir">
+            <div className="dsb-panel-kepala">
+              <h2 id="judul-konfirmasi-terakhir" className="dsb-panel-judul">Konfirmasi terakhir</h2>
+              <Link href="/dashboard/keuangan/riwayat" className="dsb-tautan">Riwayat →</Link>
+            </div>
+            {!logTerakhir ? (
+              <div className="dsb-panel-isi flex flex-col gap-2" aria-hidden="true">
+                {[1, 2, 3].map((i) => <div key={i} className="dsb-kerangka" style={{ height: 36, borderRadius: 8 }} />)}
+              </div>
+            ) : logTerakhir.length === 0 ? (
+              <p className="dsb-kosong">Belum ada konfirmasi yang tercatat.</p>
+            ) : (
+              <ul className="dsb-log-ringkas dsb-gulir">
+                {logTerakhir.map((l) => {
+                  const isi = uraiLog(l);
+                  return (
+                    <li key={l.id}>
+                      <span className="dsb-titik" data-nada={isi?.rapelan ? "merah" : "hijau"} aria-hidden="true" />
+                      <span className="min-w-0">
+                        <span className="dsb-nama truncate" style={{ display: "block" }}>{isi?.nama ?? l.targetNama ?? "-"}</span>
+                        <span className="dsb-kecil">
+                          {formatTanggalId(l.waktu, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          {isi?.rapelan && <span style={{ color: "var(--st-red)" }}> · rapelan</span>}
+                          {isi?.cepat && " · cepat"}
+                          {l.user && ` · ${l.user.nama}`}
+                        </span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </aside>
+      </div>
+
+      {/* ── Tinjau SK ── */}
+      {target && (
+        <>
+          <div className="dsb-lapis" onClick={() => !konfirmasiSibuk && setTinjauId(null)} />
+          <div ref={refTinjau} className="dsb-tinjau" role="dialog" aria-modal="true" aria-labelledby="judul-tinjau" aria-busy={konfirmasiSibuk} tabIndex={-1}>
+            <div className="dsb-tinjau-kepala">
+              <div className="min-w-0 flex-1">
+                <p className="dsb-label">{target.status === "menunggu_keuangan" ? "Tinjau SK KGB" : "SK KGB"}</p>
+                <h2 id="judul-tinjau" className="dsb-panel-judul truncate">{namaPegawai(target)}</h2>
+              </div>
+              {indeksAntrian >= 0 && antrian.length > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <button type="button" className="dsb-ikon-tombol" disabled={indeksAntrian === 0 || konfirmasiSibuk} onClick={() => geserTinjau(-1)} aria-label="SK sebelumnya" title="SK sebelumnya">
+                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                  </button>
+                  <span className="dsb-kecil" style={{ minWidth: 64, textAlign: "center" }}>{indeksAntrian + 1} dari {antrian.length}</span>
+                  <button type="button" className="dsb-ikon-tombol" disabled={indeksAntrian === antrian.length - 1 || konfirmasiSibuk} onClick={() => geserTinjau(1)} aria-label="SK berikutnya" title="SK berikutnya">
+                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                  </button>
+                </div>
+              )}
+              <button type="button" className="dsb-ikon-tombol" disabled={konfirmasiSibuk} onClick={() => setTinjauId(null)} aria-label="Tutup">
+                <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+
+            <div className="dsb-tinjau-isi">
+              <div className="dsb-tinjau-berkas">
+                {tautanSk(target) ? (
+                  <iframe key={target.id} src={tautanSk(target)!} title={`SK KGB ${namaPegawai(target)} yang sudah ditandatangani`} />
+                ) : (
+                  <div className="dsb-kosong" style={{ margin: "auto", maxWidth: 360 }}>
+                    <p className="dsb-nama" style={{ margin: 0 }}>Berkas SK bertanda tangan tidak ditemukan</p>
+                    <p style={{ margin: 0 }}>Periksa data di samping dengan SK yang Anda terima, atau minta Tim SDM mengunggah ulang SK-nya.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="dsb-tinjau-data">
+                <dl className="dsb-rincian-data">
+                  <dt>NIP</dt><dd>{target.pegawai?.nip ?? "-"}</dd>
+                  <dt>Jabatan</dt><dd>{target.pegawai?.jabatan ?? "-"}</dd>
+                  <dt>Unit kerja</dt><dd>{satkerPendek(target.pegawai?.unitKerja)}</dd>
+                  <dt>Golongan</dt><dd>{golongan(target)}</dd>
+                  <dt>MKG baru</dt><dd>{fmtMkg(target)}</dd>
+                  <dt>Gaji pokok lama</dt><dd>{fmtRp(target.gajiPokokLama)}</dd>
+                  <dt>Gaji pokok baru</dt>
+                  <dd style={{ color: "var(--st-green)", fontWeight: 600 }}>
+                    {fmtRp(target.gajiPokokBaru)}
+                    {selisihGaji(target) > 0 && <span className="dsb-kecil" style={{ display: "block", fontWeight: 500 }}>naik {fmtRp(selisihGaji(target))} per bulan</span>}
+                  </dd>
+                  <dt>TMT KGB</dt>
+                  <dd>
+                    {formatTanggalId(target.tmtKgbBaru)}
+                    {alasanTanpaKonfirmasiCepat(target, hariIni) === ALASAN_TMT_LEWAT && <span className="dsb-kecil" style={{ display: "block", color: "var(--st-amber)" }}>TMT sudah lewat</span>}
+                  </dd>
+                  <dt>Nomor SK</dt><dd>{target.surat?.nomorSurat ?? "-"}</dd>
+                  <dt>Tanggal SK</dt><dd>{target.surat?.tanggalSurat ? formatTanggalId(target.surat.tanggalSurat) : "-"}</dd>
+                  {target.status !== "menunggu_keuangan" && <><dt>Status</dt><dd><StatusKgb k={target} /></dd></>}
+                </dl>
+
+                {target.status === "menunggu_keuangan" && (
+                  <div className="flex flex-col gap-3" style={{ padding: "0 18px 16px" }}>
+                    {target.flagRapelan && (
+                      <div className="dsb-pesan" data-nada="kuning" style={{ padding: "8px 10px" }}>
+                        <span className="dsb-pesan-ikon" aria-hidden="true">!</span>
+                        <p style={{ fontSize: "12.5px" }}>Tim SDM menginput KGB ini setelah batas input, jadi <strong>berpotensi rapelan</strong>. Pilih Rapelan bila selisih gaji dibayar mundur.</p>
+                      </div>
+                    )}
+                    {bolehKonfirmasi ? (
+                      <fieldset className="dsb-pilihan">
+                        <legend className="dsb-kecil" style={{ marginBottom: 6, color: "var(--dt3)", fontWeight: 500 }}>Status pembayaran</legend>
+                        <label>
+                          <input type="radio" name="rapelan" checked={!pilihRapelan} onChange={() => setPilihRapelan(false)} />
+                          Tidak rapelan
+                          <small>Dibayar mulai TMT</small>
+                        </label>
+                        <label data-nada="kuning">
+                          <input type="radio" name="rapelan" checked={pilihRapelan} onChange={() => setPilihRapelan(true)} />
+                          Rapelan
+                          <small>Selisih dibayar mundur</small>
+                        </label>
+                      </fieldset>
+                    ) : (
+                      <p className="dsb-kecil" style={{ margin: 0 }}>Mode lihat: konfirmasi hanya oleh petugas Keuangan.</p>
+                    )}
+                    <div role="alert" aria-live="assertive">
+                      {konfirmasiGalat && <p className="dsb-pesan" data-nada="merah" style={{ margin: 0, padding: "8px 10px", fontSize: "12.5px" }}>{konfirmasiGalat}</p>}
+                    </div>
+                  </div>
+                )}
+
+                {target.status === "menunggu_keuangan" && bolehKonfirmasi && (
+                  <div className="dsb-tinjau-kaki">
+                    {indeksAntrian >= 0 && antrian.length > 1 && (
+                      <label className="dsb-kecil flex items-center gap-2" style={{ color: "var(--dt3)", cursor: "pointer" }}>
+                        <input type="checkbox" className="dsb-cek" checked={lanjutOtomatis} onChange={(e) => setLanjutOtomatis(e.target.checked)} />
+                        Setelah konfirmasi, buka SK berikutnya
+                      </label>
+                    )}
+                    <p className="dsb-kecil" style={{ margin: 0 }}>KGB ditandai selesai dan data gaji pegawai diperbarui otomatis.</p>
+                    <button type="button" className="dsb-tombol dsb-tombol-penuh" disabled={konfirmasiSibuk} onClick={() => void konfirmasi()} style={{ minHeight: 38 }}>
+                      <IkonCentang />
+                      {konfirmasiSibuk ? "Memproses…" : pilihRapelan ? "Konfirmasi sebagai rapelan" : "Konfirmasi"}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </>
       )}
 
+      {/* ── Konfirmasi cepat ── */}
+      {bukaCepat && (
+        <KerangkaModal
+          judul={`Konfirmasi cepat ${cepatTerpilih.length} SK`}
+          subjudul="Semua ditandai tidak rapelan"
+          nada="hijau"
+          ukuran="sm"
+          sibuk={cepatSibuk}
+          onTutup={() => setBukaCepat(false)}
+          ikon={<IkonCentang />}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" disabled={cepatSibuk} onClick={() => setBukaCepat(false)}>Batal</button>
+              <button type="button" className="kgbm-tombol kgbm-utama" disabled={cepatSibuk} onClick={() => void konfirmasiCepat()}>
+                {cepatSibuk ? `Memproses ${cepatProgres}/${cepatTerpilih.length}…` : `Konfirmasi ${cepatTerpilih.length} SK`}
+              </button>
+            </>
+          }
+        >
+          <div className="dsb-catatan">
+            <span>Total kenaikan gaji</span>
+            <strong>+{fmtRp(cepatTerpilih.reduce((s, k) => s + Math.max(0, selisihGaji(k)), 0))} per bulan</strong>
+          </div>
+          <ul className="dsb-daftar-ringkas">
+            {cepatTerpilih.map((k) => (
+              <li key={kunciKgb(k)}>
+                <span className="min-w-0">
+                  <span className="dsb-nama truncate" style={{ display: "block" }}>{namaPegawai(k)}</span>
+                  <span className="dsb-kecil">{golongan(k)} · TMT {fmt(k.tmtKgbBaru)}</span>
+                </span>
+                <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--dtn)" }}>{fmtRp(k.gajiPokokBaru)}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="dsb-kecil" style={{ margin: 0 }}>SK berpotensi rapelan dan SK dengan TMT hari ini atau sebelumnya tidak ikut; tinjau satu per satu.</p>
+          {cepatSibuk && (
+            <div className="dsb-status-bar" role="progressbar" aria-valuemin={0} aria-valuemax={cepatTerpilih.length} aria-valuenow={cepatProgres}>
+              <span style={{ width: `${(cepatProgres / Math.max(cepatTerpilih.length, 1)) * 100}%`, background: "var(--st-green)" }} />
+            </div>
+          )}
+        </KerangkaModal>
+      )}
     </div>
   );
 }

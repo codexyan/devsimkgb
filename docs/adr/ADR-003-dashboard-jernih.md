@@ -49,3 +49,79 @@ Pemilik meminta dashboard diselaraskan dengan tema baru, dimulai dari halaman ut
 - Halaman dashboard selain `/dashboard` ikut berganti warna, font, tombol, dan dialog lewat token. Tata letaknya belum memakai kelas `dsb-*` sampai didesain ulang satu per satu.
 - Pratinjau lokal tidak butuh kredensial produksi. Sesi dicetak dengan `AUTH_SECRET` lokal dan respons API diganti data contoh di peramban, jadi tidak ada penulisan ke data asli.
 - Matriks hak akses dijaga `lib/auth/roles.test.ts`.
+
+### Pembaruan 22 September 2026 (lanjutan): dashboard tanpa angka ganda, Satker & UPT, modul Data
+
+11. **Panel atas memuat "Perlu tindakan".** Pemberitahuan tidak lagi berupa deretan banner di bawah panel, melainkan daftar di dalam panel navy dengan tombol di tiap baris. Chip ringkasan dihapus karena mengulang KPI.
+12. **KPI mengikuti alur KGB tahun ini:** belum diproses, dalam proses, selesai, dan berpotensi rapelan. Ubinnya membuka Proses KGB yang sudah tersaring (`?status=`).
+13. **Kartu dihapus karena isinya ganda.** Kartu Status proses sama dengan KPI. Kartu Tren sama dengan kalender KGB per bulan.
+14. **Kartu pemantauan satker menggantikan tren** (`PemantauanSatker`):
+    - satu kartu per satker yang punya data, diurutkan dari yang paling perlu perhatian;
+    - satker tanpa data diringkas dalam satu kartu.
+15. **Modul Satker & UPT** (`/dashboard/satker`, hanya peran KGB) memuat:
+    - ringkasan KGB 19 satker;
+    - halaman rincian per satker berisi pegawai, KGB berjalan, dan jadwal surat usulan UPT;
+    - saringan satker di Data Pegawai dan Proses KGB.
+
+    Hitungannya ada di `lib/rekapSatker.ts` dan memakai definisi bersama `lib/rekapKgb.ts`.
+16. **Data Pegawai dan Proses KGB memakai kelas `dsb-*`.**
+    - Kolom status Data Pegawai menampilkan keadaan KGB berikutnya: dalam proses, lewat batas, siap diinput, atau tanggal dibuka.
+    - "Lewat batas input" memakai definisi yang sama dengan dashboard.
+    - Proses KGB memisahkan KGB yang masa inputnya belum dibuka ke tab "Belum dibuka".
+    - Urutan bawaan Proses KGB adalah "Prioritas".
+17. **Tema bawaan selalu terang.** Mode gelap hanya aktif bila pengguna memilihnya, tidak lagi mengikuti preferensi sistem.
+18. **Basis data lokal untuk pengembangan.** `DATA_BACKEND=lokal` menyimpan data di berkas JSON (`lib/sheets/klienLokal.ts`), diisi data contoh oleh `scripts/seed-lokal.ts`. Tidak dipakai di produksi.
+
+### Pembaruan 22 September 2026 (lanjutan): tata letak kerja, bukan brosur
+
+19. **Ruang dipakai penuh.**
+    - Halaman melebar sampai 1920 px.
+    - Dashboard terdiri dari pita navy yang ringkas (sapaan dan strip empat angka yang dipisah garis) lalu dua kolom.
+    - Kolom kiri berisi antrian kerja dengan tabel bergulir di dalam panelnya (lihat butir 23).
+    - Kolom kanan berisi Perlu tindakan, kalender KGB per bulan, dan daftar satker.
+20. **Satu antrian kerja** menggantikan tabel "Pegawai mendekati deadline" dan kanban "Alur proses", yang dulu menampilkan pegawai yang sama dua kali.
+    - Tab tahapnya: perlu diproses, lewat batas, di keuangan, selesai, dan semua.
+    - Aksi ada di tiap baris.
+    - Urutan: lewat batas, sedang diproses, lalu TMT terdekat.
+21. **Bahasa visual lebih tenang.**
+    - Panel bersudut 12 px dengan garis rambut, tanpa bayangan.
+    - Kontrol bersudut 8 px dan label bersudut 5 px, bukan pil.
+    - Judul panel berupa satu baris teks, tanpa label huruf kapital di atasnya.
+    - Status ditulis sebagai titik dan teks.
+    - Aurora di pita diredam dan kisinya dihilangkan.
+22. **Layar sempit.** Baris antrian menjadi blok bertumpuk tanpa gulir mendatar, dan Perlu tindakan tampil di atas antrian.
+
+### Pembaruan 22 September 2026 (lanjutan): model gulir, Hukdis, dan Laporan
+
+23. **Model gulir dashboard** (Super Admin, SDM KGB, Keuangan, SDM Hukdis; atribut `data-muat-layar`):
+    - Layar kerja (lebar ≥ 1200 px dan tinggi ≥ 720 px): dashboard pas satu layar dan halaman tidak bergulir. Pita navy diam. Antrian setinggi isinya, paling tinggi sisa layar; bila lebih, hanya baris tabel yang bergulir, sedangkan kepala panel, tab, kepala kolom, dan kaki tetap terlihat. Kolom pendamping bergulir sendiri bila isinya lebih tinggi dari layar.
+    - Layar lebar tetapi pendek: halaman bergulir biasa dan tabel antrian dibatasi setinggi layar.
+    - Tablet dan ponsel: satu gulir halaman saja, tanpa gulir bersarang.
+    - Tabel panjang di halaman modul (Laporan, Hukuman Disiplin) memakai `dsb-gulir-tabel`: bergulir di dalam panel setinggi layar dengan kepala kolom menempel, hanya pada layar ≥ 1024 × 640 px.
+    - Pengganti `contain: size` yang membuat tinggi antrian mengikuti kolom kanan.
+24. **Hukuman Disiplin.**
+    - Status aktif dihitung dari tanggal berakhir (kalender WITA, tanggal berakhir ikut dihitung) oleh `/api/hukdis`. Karena itu dashboard SDM Hukdis kini membaca `/api/hukdis`, dan angka "Perlu diperbarui" (selalu 0) diganti "Menunda KGB".
+    - Ringkasan: aktif (dengan rincian kategori), menunda KGB, berakhir ≤ 30 hari (`summary.berakhir30`), sudah berakhir.
+    - Saringan: masa berlaku (aktif, berakhir ≤ 30 hari, menunda KGB, sudah berakhir, semua), kategori, satker, dan pencarian. Halaman menerima `?satker=` dan `?saringan=` dari dashboard.
+    - Hukdis yang berjalan diurutkan dari yang paling dekat berakhir.
+25. **Laporan.**
+    - Angka memakai definisi yang sama dengan dashboard: KGB yang jatuh tempo tetapi belum diinput ikut sebagai Belum Diproses (entri virtual dari `entriVirtual`, tampil "Belum diinput" tanpa gaji baru dan nomor SK).
+    - Rekap per satker memakai daftar satker baku (`kodeSatkerPegawai`), bukan teks unit kerja mentah; ada saringan satker.
+    - Tampilan memakai kelas `dsb-*`; area cetak (`#laporan-print-area`, kop surat, rekap per bulan) tetap.
+
+### Pembaruan 22 September 2026 (lanjutan): Keuangan dan halaman kerja tanpa ruang kosong
+
+26. **Halaman kerja pas satu layar tanpa ruang kosong** (menggantikan "antrian setinggi isinya" pada butir 23). Pada layar kerja (≥ 1200 × 720 px) halaman bertanda `data-muat-layar` tidak bergulir dan panel mengisi tinggi yang tersisa:
+    - `dsb-penuh`: panel yang mengambil sisa tinggi induknya (halaman, `dsb-kolom`, atau kolom pendamping).
+    - `dsb-susut`: panel setinggi isinya yang menyusut dan bergulir di dalam bila ruang kurang.
+    - `dsb-gulir`: bagian panel yang bergulir. Kepala panel, tab, saringan, kepala kolom, dan kaki tetap terlihat.
+    - Berlaku untuk dashboard keempat peran, Keuangan, Riwayat Aktivitas, dan Hukuman Disiplin. Laporan tetap bergulir biasa karena dicetak.
+    - Tablet dan ponsel tetap satu gulir halaman tanpa gulir bersarang.
+27. **Modul Keuangan disusun menurut alur kerja petugas keuangan.**
+    - Jadwal rekon Gaji Web (tanggal 1–15 bulan sebelum TMT) dihitung di `lib/rekonGaji.ts` (diuji). "Bulan fokus rekon" adalah bulan TMT yang rekonnya berjalan, atau sesudah tanggal 15, bulan TMT berikutnya.
+    - Strip angka: menunggu konfirmasi, siap rekon bulan fokus, belum sampai keuangan, rapelan tahun ini.
+    - Antrian SK berupa tabel urut TMT terdekat. **Tinjau SK** membuka berkas SK bertanda tangan dan datanya berdampingan, dengan pilihan rapelan, navigasi SK sebelumnya/berikutnya, dan pilihan membuka SK berikutnya setelah konfirmasi. Konfirmasi cepat tetap hanya untuk SK tanpa potensi rapelan dengan TMT yang belum lewat.
+    - Tabel KGB per bulan TMT dengan saringan status dan pencarian, follow up Tim SDM per pegawai atau sekaligus, dan unduhan CSV **dasar Gaji Web** (KGB yang sudah dikonfirmasi).
+    - Kolom kanan: daftar bulan TMT (komponen `DaftarBulanRekon`, juga di dashboard Keuangan) dan umpan konfirmasi terakhir.
+    - Halaman menerima `?bulan=yyyy-mm`.
+28. **Riwayat Aktivitas Keuangan**: log konfirmasi dikelompokkan per hari dengan saringan rapelan/konfirmasi cepat dan unduhan CSV; rekap dasar Gaji Web per bulan TMT dengan jendela rekon dan tautan ke bulan itu di halaman Keuangan; riwayat KGB per pegawai yang dapat dibuka. API log memuat sampai 500 entri. Halaman menerima `?tab=rekap|kgb`.

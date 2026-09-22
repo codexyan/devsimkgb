@@ -40,9 +40,9 @@ test("Super Admin melihat halaman keuangan tetapi tidak mengonfirmasi", () => {
   assert.equal(canKonfirmasiKeuangan(SA), false);
 });
 
-test("halaman Proses KGB dan Laporan hanya untuk peran KGB", () => {
+test("halaman Proses KGB, Laporan, dan Satker & UPT hanya untuk peran KGB", () => {
   assert.deepEqual(PERAN_KGB, [SA, KGB]);
-  for (const berkas of ["app/dashboard/kgb/layout.tsx", "app/dashboard/laporan/layout.tsx"]) {
+  for (const berkas of ["app/dashboard/kgb/layout.tsx", "app/dashboard/laporan/layout.tsx", "app/dashboard/satker/layout.tsx"]) {
     assert.match(readFileSync(berkas, "utf8"), /requireRole\(PERAN_KGB,/, berkas);
   }
 });
@@ -55,6 +55,8 @@ test("API memakai guard yang sesuai dengan peran", () => {
     ["app/api/dashboard/route.ts", /canViewKGB\(/],
     ["app/api/kgb/summary/route.ts", /canProcessKGB\(/],
     ["app/api/laporan/route.ts", /canProcessKGB\(/],
+    ["app/api/satker/route.ts", /canProcessKGB\(/],
+    ["app/api/satker/[kode]/route.ts", /canProcessKGB\(/],
   ];
   for (const [berkas, pola] of harus) {
     const isi = readFileSync(berkas, "utf8");
