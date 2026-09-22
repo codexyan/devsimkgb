@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { JAM_LAYANAN } from "@/lib/jamLayanan";
 import { jadwalPengusulan } from "@/lib/jadwalPengusulan";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { STATUS_KGB, type StatusKgb } from "@/lib/statusKgb";
 import { tanggaGaji } from "@/lib/tabelGaji";
 import { formatTanggalId } from "@/lib/waktu";
@@ -113,7 +114,8 @@ function KepalaBagian({ nomor, label, id, judul, keterangan, aksi }: {
   );
 }
 
-export default function HalamanBeranda() {
+export default async function HalamanBeranda() {
+  await muatBatasInputSdm();
   const jadwal = jadwalPengusulan(6);
   const tangga = tanggaGaji();
 
@@ -213,7 +215,7 @@ export default function HalamanBeranda() {
             label="Jadwal"
             id="judul-jadwal"
             judul="Jadwal pengusulan"
-            keterangan="Dihitung dari hari ini. Kirim surat permohonan sebelum input untuk TMT itu dibuka, agar SK terbit tepat waktu."
+            keterangan="Dihitung dari hari ini. Kirim surat sebelum input dibuka; SK harus selesai sebelum keuangan merekon gaji di Gaji Web, agar gaji baru terbayar mulai TMT."
             aksi={
               <Link href="/panduan#jadwal" className="sx-tautan">
                 Aturan jadwal
@@ -242,6 +244,12 @@ export default function HalamanBeranda() {
                     <dt>Input SIM-KGB</dt>
                     <dd>
                       {tanggalBulan(b.inputDibuka)} sampai {tanggalPendek(b.batasInput)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Rekon Gaji Web</dt>
+                    <dd>
+                      {tanggalBulan(b.rekonMulai)} sampai {tanggalPendek(b.rekonBatas)}
                     </dd>
                   </div>
                 </dl>

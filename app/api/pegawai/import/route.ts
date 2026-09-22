@@ -9,10 +9,12 @@ import { bacaIsianPegawai, teksAtauNull, teksIsian } from "@/lib/dataPegawai";
 import { rencanaSiklusBerikutnya } from "@/lib/jadwalKgb";
 import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
 import { hariIniWita } from "@/lib/waktu";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

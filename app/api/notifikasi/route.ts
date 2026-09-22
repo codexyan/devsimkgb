@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { bolehLihatNotifikasi, generateNotifikasi, tipeNotifikasiUntukRole } from "@/lib/generateNotifikasi";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,7 @@ async function buatNotifikasiBilaPerlu() {
 }
 
 export async function GET(req: NextRequest) {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -54,6 +56,7 @@ export async function GET(req: NextRequest) {
 // Tandai dibaca. Status dibaca berlaku untuk semua pengguna, jadi hanya notifikasi yang boleh dilihat
 // role ini yang dapat ditandai.
 export async function PATCH(req: Request) {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -86,6 +89,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: NextRequest) {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

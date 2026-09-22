@@ -11,10 +11,12 @@ import { penandaHukdisBerlaku } from "@/lib/hukdisKedaluwarsa";
 import { rencanaSiklusBerikutnya, type RencanaSiklusKgb } from "@/lib/jadwalKgb";
 import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
 import { hariIniWita } from "@/lib/waktu";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
+  await muatBatasInputSdm();
   try {
     const session = await auth();
     if (!session)
@@ -75,6 +77,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

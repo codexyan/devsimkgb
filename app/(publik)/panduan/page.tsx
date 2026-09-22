@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getGajiPokok, getPangkat, kalkulasiKGB } from "@/lib/tabelGaji";
+import { getGajiPokok, getPangkat, hitungRekonGaji, kalkulasiKGB } from "@/lib/tabelGaji";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { satkerPerKppn } from "@/lib/satker";
 import { STATUS_KGB, type StatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId } from "@/lib/waktu";
@@ -29,26 +30,28 @@ const TANGGAL_SURAT = new Date(2026, 8, 8);
 const TANGGAL_DITERIMA = new Date(2026, 8, 10);
 const TANGGAL_DISPOSISI = new Date(2026, 8, 14);
 
-const kasus = kalkulasiKGB({
-  golonganRuang: GOLONGAN,
-  mkgTahun: 0,
-  mkgBulan: 0,
-  tmtKgbBerikutnya: TMT_KGB,
-  tmtKgbTerakhir: TMT_CPNS,
-});
-const siklusBerikutnya = kalkulasiKGB({
-  golonganRuang: GOLONGAN,
-  mkgTahun: kasus.mkgTahunBaru,
-  mkgBulan: kasus.mkgBulanBaru,
-  tmtKgbBerikutnya: kasus.tmtKgbBerikutnya,
-  tmtKgbTerakhir: kasus.tmtKgbBaru,
-});
+/* Dihitung per permintaan, setelah batas input Tim SDM dimuat dari Pengaturan (lihat PanduanPage). */
+function hitungKasus() {
+  const kasus = kalkulasiKGB({
+    golonganRuang: GOLONGAN,
+    mkgTahun: 0,
+    mkgBulan: 0,
+    tmtKgbBerikutnya: TMT_KGB,
+    tmtKgbTerakhir: TMT_CPNS,
+  });
+  const siklusBerikutnya = kalkulasiKGB({
+    golonganRuang: GOLONGAN,
+    mkgTahun: kasus.mkgTahunBaru,
+    mkgBulan: kasus.mkgBulanBaru,
+    tmtKgbBerikutnya: kasus.tmtKgbBerikutnya,
+    tmtKgbTerakhir: kasus.tmtKgbBaru,
+  });
+  return { kasus, siklusBerikutnya, rekon: hitungRekonGaji(TMT_KGB) };
+}
 
 const GAJI_MKG_0 = getGajiPokok(GOLONGAN, 0, 0);
 const GAJI_MKG_1 = getGajiPokok(GOLONGAN, 1, 0);
 const GAJI_MKG_3 = getGajiPokok(GOLONGAN, 3, 0);
-const selisihGaji = kasus.gajiPokokBaru - GAJI_MKG_0;
-const suratSetelahBatas = TANGGAL_SURAT > kasus.deadlineSDM;
 
 /* Aturan praktis UPT: kirim pada bulan ketiga sebelum TMT; surat paling lambat diterima awal bulan kedua. */
 const bulanKirim = (tmt: Date) => new Date(tmt.getFullYear(), tmt.getMonth() - 3, 1);
@@ -82,7 +85,14 @@ function TandaRapelan() {
   return <span className="pub-status pub-status-rapelan">Berpotensi rapelan</span>;
 }
 
-export default function PanduanPage() {
+// Batas input Tim SDM diatur di Pengaturan, jadi halaman dirender per permintaan.
+export const dynamic = "force-dynamic";
+
+export default async function PanduanPage() {
+  const batas = await muatBatasInputSdm();
+  const { kasus, siklusBerikutnya, rekon } = hitungKasus();
+  const selisihGaji = kasus.gajiPokokBaru - GAJI_MKG_0;
+  const suratSetelahBatas = TANGGAL_SURAT > kasus.deadlineSDM;
   const kppn = satkerPerKppn();
 
   return (
@@ -342,9 +352,18 @@ export default function PanduanPage() {
             </p>
             <p>
               Jadwal Kanwil mengikuti jendela proses di SIM-KGB. Untuk TMT pada tanggal 1 suatu bulan, input KGB
-              dibuka pada tanggal 1 bulan kedua sebelum TMT, dan Tim SDM harus selesai menginput paling lambat hari
-              terakhir bulan itu. Input sebelum jendela dibuka ditolak SIM-KGB. Input setelah batas tetap diterima,
-              tetapi ditandai <TandaRapelan />.
+              dibuka pada tanggal 1 bulan kedua sebelum TMT, dan Tim SDM harus selesai menginput paling lambat
+              tanggal {batas} bulan itu. Input sebelum jendela dibuka ditolak SIM-KGB. Input setelah batas tetap
+              diterima, tetapi ditandai <TandaRapelan />.
+            </p>
+            <p>
+              Batas itu sengaja sebelum akhir bulan. Setelah Input KGB masih ada Buat SK, tanda tangan elektronik,
+              unggah SK, dan konfirmasi keuangan, dan semuanya harus selesai sebelum bagian keuangan satker
+              merekonsiliasi data gaji di aplikasi Gaji Web. Rekon gaji dan pengajuan SPM gaji induk berlangsung
+              tanggal 1 sampai paling lambat tanggal 15 bulan sebelum TMT, secara daring tanpa berkas fisik ke KPPN.
+              Keuangan dapat mengirimnya lebih awal dari tanggal 15; SK KGB yang baru masuk setelah pengiriman itu
+              tidak ikut gaji bulan TMT dan dibayar sebagai kekurangan gaji. Karena itu Tim SDM dan keuangan
+              memverifikasi data bersama sebelum penginputan di Gaji Web.
             </p>
             <p>
               Semua tanggal di SIM-KGB, termasuk pembukaan jendela proses, batas proses Tim SDM, dan TMT, dihitung
@@ -375,6 +394,16 @@ export default function PanduanPage() {
                   <tr>
                     <th scope="row">Batas proses Tim SDM</th>
                     <td>{tgl(kasus.deadlineSDM)}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">SK ditandatangani, diunggah, dan dikonfirmasi keuangan</th>
+                    <td>sebelum {tgl(rekon.mulai)}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Rekon gaji dan pengajuan di Gaji Web oleh keuangan</th>
+                    <td>
+                      {tgl(rekon.mulai)} sampai {tgl(rekon.batas)}
+                    </td>
                   </tr>
                   <tr>
                     <th scope="row">TMT KGB</th>
@@ -866,6 +895,15 @@ export default function PanduanPage() {
               Bagian ini untuk pengguna SIM-KGB dengan akses Keuangan. KGB yang perlu dikonfirmasi berstatus{" "}
               <Status status="menunggu_keuangan" />.
             </p>
+            <div className="pub-note">
+              <strong className="pub-note-title">Sebelum rekon gaji dikirim</strong>
+              <p>
+                Konfirmasi SK di SIM-KGB dan rekam perubahan gajinya di Gaji Web sebelum rekon gaji dikirim, yaitu
+                tanggal 1 sampai paling lambat tanggal 15 bulan sebelum TMT. Untuk TMT {tgl(TMT_KGB)}: rekon{" "}
+                {tgl(rekon.mulai)} sampai {tgl(rekon.batas)}. Bila rekon sudah dikirim lebih awal, SK yang masuk
+                sesudahnya dibayar sebagai kekurangan gaji. Kabari Tim SDM sebelum mengirim rekon.
+              </p>
+            </div>
             <ol>
               <li>Buka menu Keuangan. Bagian SK Masuk: Konfirmasi memuat SK yang menunggu konfirmasi.</li>
               <li>
@@ -1352,6 +1390,14 @@ export default function PanduanPage() {
                   Membuat Kekurangan Gaji pada Aplikasi Gaji Web
                 </a>
                 , KPPN Jakarta I, Direktorat Jenderal Perbendaharaan.
+              </li>
+              <li>
+                <a href="https://djpb.kemenkeu.go.id/kppn/merauke/id/data-publikasi/artikel/3022-ketentuan-penyampaian-spm-gaji-induk.html">
+                  Ketentuan Penyampaian SPM Gaji Induk
+                </a>
+                , KPPN Merauke, Direktorat Jenderal Perbendaharaan: SPM gaji induk paling lambat tanggal 15 sebelum
+                bulan pembayaran dan rekon data gaji berakhir tanggal 15 bulan pengajuan (PMK Nomor 62 Tahun 2023
+                Pasal 225).
               </li>
             </ul>
             <p className="pub-meta">

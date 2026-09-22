@@ -1,4 +1,5 @@
 import { hariIniWita, tanggalKalender, type NilaiTanggal } from "./waktu";
+import { batasInputSdm, REKON_GAJI_BATAS, REKON_GAJI_MULAI } from "./batasInputSdm";
 
 export const GOLONGAN_PANGKAT: Record<string, string> = {
   "I/a": "Juru Muda",
@@ -468,12 +469,24 @@ export function hitungUnlockDate(tmtKgbBaru: Date): Date {
 }
 
 /**
- * Batas input Tim SDM: hari terakhir bulan ke-2 sebelum TMT.
- * Contoh: TMT 1 Juni 2026 → 30 April 2026. Input sesudahnya berpotensi rapelan.
+ * Batas input Tim SDM: tanggal batas (Pengaturan, bawaan 20) pada bulan ke-2 sebelum TMT, dijepit ke
+ * hari terakhir bulan itu. Contoh: TMT 1 Juni 2026 → 20 April 2026. Input sesudahnya berpotensi
+ * rapelan, karena SK harus sudah dikonfirmasi keuangan sebelum rekon gaji tanggal 1 sampai 15 bulan
+ * sebelum TMT (lihat lib/batasInputSdm.ts).
  */
-export function hitungDeadlineSDM(tmtKgbBaru: Date): Date {
+export function hitungDeadlineSDM(tmtKgbBaru: Date, tanggalBatas: number = batasInputSdm()): Date {
   const tmt = tanggalKalender(tmtKgbBaru) ?? tmtKgbBaru;
-  return new Date(tmt.getFullYear(), tmt.getMonth() - 1, 0);
+  const hariTerakhir = new Date(tmt.getFullYear(), tmt.getMonth() - 1, 0).getDate();
+  return new Date(tmt.getFullYear(), tmt.getMonth() - 2, Math.min(tanggalBatas, hariTerakhir));
+}
+
+/** Rekon gaji oleh keuangan di aplikasi Gaji Web: tanggal 1 sampai 15 bulan sebelum TMT. */
+export function hitungRekonGaji(tmtKgbBaru: Date): { mulai: Date; batas: Date } {
+  const tmt = tanggalKalender(tmtKgbBaru) ?? tmtKgbBaru;
+  return {
+    mulai: new Date(tmt.getFullYear(), tmt.getMonth() - 1, REKON_GAJI_MULAI),
+    batas: new Date(tmt.getFullYear(), tmt.getMonth() - 1, REKON_GAJI_BATAS),
+  };
 }
 
 interface JendelaProsesKgb {
@@ -571,7 +584,7 @@ export function kalkulasiKGB(pegawai: {
     bulanKeKgbBerikutnya(pegawai.golonganRuang, mkgTahunBaru, mkgBulanBaru),
   );
 
-  // Jendela proses: dibuka tanggal 1 bulan ke-2 sebelum TMT, batas SDM akhir bulan yang sama.
+  // Jendela proses: dibuka tanggal 1 bulan ke-2 sebelum TMT, batas SDM pada tanggal batas bulan yang sama.
   const hariIni = normalisasiHariIni(pegawai.hariIni);
   const deadlineSDM = hitungDeadlineSDM(tmtKgbBaru);
   const unlockDate = hitungUnlockDate(tmtKgbBaru);

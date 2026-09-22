@@ -16,18 +16,26 @@ test("jadwal dimulai dari TMT yang jendela inputnya sedang terbuka", () => {
   assert.deepEqual(
     baris.map((b) => [iso(b.tmt), iso(b.kirimSurat), iso(b.inputDibuka), iso(b.batasInput), b.keadaan]),
     [
-      ["2026-11-01", "2026-08-01", "2026-09-01", "2026-09-30", "terbuka"],
-      ["2026-12-01", "2026-09-01", "2026-10-01", "2026-10-31", "berikutnya"],
-      ["2027-01-01", "2026-10-01", "2026-11-01", "2026-11-30", "berikutnya"],
+      ["2026-11-01", "2026-08-01", "2026-09-01", "2026-09-20", "terbuka"],
+      ["2026-12-01", "2026-09-01", "2026-10-01", "2026-10-20", "berikutnya"],
+      ["2027-01-01", "2026-10-01", "2026-11-01", "2026-11-20", "berikutnya"],
     ],
   );
+  // Rekon gaji keuangan tanggal 1 sampai 15 bulan sebelum TMT, sesudah batas input Tim SDM.
+  assert.deepEqual([iso(baris[0].rekonMulai), iso(baris[0].rekonBatas)], ["2026-10-01", "2026-10-15"]);
+  assert.ok(baris[0].batasInput < baris[0].rekonMulai);
 });
 
-test("batas input pada hari terakhir bulan masih terbuka, dan pergantian tahun benar", () => {
-  const akhirBulan = jadwalPengusulan(1, tgl(2026, 12, 31));
-  assert.equal(iso(akhirBulan[0].tmt), "2027-02-01");
-  assert.equal(akhirBulan[0].keadaan, "terbuka");
-  assert.equal(iso(akhirBulan[0].kirimSurat), "2026-11-01");
+test("tanggal batas input masih terbuka, sesudahnya jadwal pindah ke TMT berikutnya, dan pergantian tahun benar", () => {
+  const padaBatas = jadwalPengusulan(1, tgl(2026, 12, 20));
+  assert.equal(iso(padaBatas[0].tmt), "2027-02-01");
+  assert.equal(padaBatas[0].keadaan, "terbuka");
+  assert.equal(iso(padaBatas[0].kirimSurat), "2026-11-01");
+
+  // Sesudah tanggal 20 input TMT 1 Februari berpotensi rapelan; jadwal menampilkan TMT 1 Maret yang belum dibuka.
+  const sesudahBatas = jadwalPengusulan(1, tgl(2026, 12, 21));
+  assert.equal(iso(sesudahBatas[0].tmt), "2027-03-01");
+  assert.equal(sesudahBatas[0].keadaan, "berikutnya");
 
   const awalBulan = jadwalPengusulan(1, tgl(2027, 1, 1));
   assert.equal(iso(awalBulan[0].tmt), "2027-03-01");

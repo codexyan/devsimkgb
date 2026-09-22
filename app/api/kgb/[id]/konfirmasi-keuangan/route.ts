@@ -8,6 +8,7 @@ import { penetapDariSurat } from "@/lib/penetapSk";
 import { rencanaSetelahKgbSelesai, type RencanaSetelahKgbSelesai } from "@/lib/jadwalKgb";
 import { placeholderBerlebih, type SuratKgbTersimpan } from "@/lib/prosesKgb";
 import { hariIniWita, tanggalKalender } from "@/lib/waktu";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,7 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

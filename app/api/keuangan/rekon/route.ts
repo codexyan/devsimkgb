@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { canAccessKeuangan } from "@/lib/auth";
 import { hariIniWita } from "@/lib/waktu";
 import { entriRekapKgb, kunciBulanTmt, rekapPerBulanTmt } from "@/lib/rekapKgb";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,7 @@ export const runtime = "nodejs";
  * Bulan TMT yang masa inputnya belum dibuka hanya disertakan bila sudah ada KGB yang sampai keuangan.
  */
 export async function GET() {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

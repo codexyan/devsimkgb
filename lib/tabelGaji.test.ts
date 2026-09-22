@@ -105,18 +105,18 @@ test("kedua bentuk TMT tersimpan menghasilkan perhitungan yang sama", () => {
     assert.equal(hasil.mkgBulanBaru, 0, tmt.tmtKgbBerikutnya);
     assert.deepEqual(hasil.tmtKgbBaru, tanggal(2026, 6));
     assert.deepEqual(hasil.tmtKgbBerikutnya, tanggal(2028, 6));
-    assert.deepEqual(hasil.deadlineSDM, tanggal(2026, 4, 30));
+    assert.deepEqual(hasil.deadlineSDM, tanggal(2026, 4, 20));
     assert.deepEqual(hasil.unlockDate, tanggal(2026, 4, 1));
   }
 });
 
 test("flagRapelan dan isLocked dibandingkan dengan hari ini WITA", () => {
   const dasar = { golonganRuang: "III/a", mkgTahun: 4, mkgBulan: 0, tmtKgbTerakhir: "2024-06-01T00:00:00Z" };
-  // TMT 1 Juni 2026: batas SDM 30 April 2026. Pukul 16.30Z tanggal 30 April sudah 1 Mei WITA.
+  // TMT 1 Juni 2026: batas SDM 20 April 2026 (bawaan). Pukul 16.30Z tanggal 20 April sudah 21 April WITA.
   const tmtJuni = { ...dasar, tmtKgbBerikutnya: "2026-06-01T00:00:00Z" };
-  assert.equal(kalkulasiKGB({ ...tmtJuni, hariIni: hariIniWita(new Date("2026-04-30T15:30:00Z")) }).flagRapelan, false);
-  assert.equal(kalkulasiKGB({ ...tmtJuni, hariIni: hariIniWita(new Date("2026-04-30T16:30:00Z")) }).flagRapelan, true);
-  assert.equal(kalkulasiKGB({ ...tmtJuni, hariIni: new Date(2026, 3, 30, 23, 0) }).flagRapelan, false, "jam diabaikan");
+  assert.equal(kalkulasiKGB({ ...tmtJuni, hariIni: hariIniWita(new Date("2026-04-20T15:30:00Z")) }).flagRapelan, false);
+  assert.equal(kalkulasiKGB({ ...tmtJuni, hariIni: hariIniWita(new Date("2026-04-20T16:30:00Z")) }).flagRapelan, true);
+  assert.equal(kalkulasiKGB({ ...tmtJuni, hariIni: new Date(2026, 3, 20, 23, 0) }).flagRapelan, false, "jam diabaikan");
 
   // TMT 1 Juli 2026: jendela dibuka 1 Mei 2026 WITA.
   const tmtJuli = { ...dasar, tmtKgbBerikutnya: "2026-06-30T16:00:00Z", tmtKgbTerakhir: "2024-07-01T00:00:00Z" };
@@ -131,11 +131,11 @@ test("TMT berikutnya kosong atau tidak valid ditolak", () => {
 });
 
 test("jendela proses dari TMT tersimpan", () => {
-  assert.deepEqual(hitungDeadlineSDM(new Date("2026-02-28T16:00:00Z")), tanggal(2026, 1, 31));
+  assert.deepEqual(hitungDeadlineSDM(new Date("2026-02-28T16:00:00Z")), tanggal(2026, 1, 20));
   assert.deepEqual(hitungUnlockDate(new Date("2026-03-01T00:00:00Z")), tanggal(2026, 1, 1));
   assert.deepEqual(jendelaProsesKgb("2026-05-31T16:00:00Z", tanggal(2026, 4, 15)), {
     unlockDate: tanggal(2026, 4, 1),
-    deadlineSDM: tanggal(2026, 4, 30),
+    deadlineSDM: tanggal(2026, 4, 20),
     isLocked: false,
     flagRapelan: false,
   });

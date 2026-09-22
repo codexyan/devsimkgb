@@ -424,9 +424,9 @@ test("flagRapelan placeholder mengikuti hari ini WITA yang disuntikkan", () => {
     tmtKgbBerikutnya: "2026-05-31T16:00:00Z",
     tmtKgbTerakhir: "2024-06-01T00:00:00Z",
   };
-  // Batas SDM untuk TMT 1 Juni 2026 adalah 30 April 2026 (WITA).
-  const sebelumBatas = rencanaSiklusBerikutnya({ ...dasar, hariIni: hariIniWita(new Date("2026-04-30T15:30:00Z")) });
-  const sesudahBatas = rencanaSiklusBerikutnya({ ...dasar, hariIni: hariIniWita(new Date("2026-04-30T16:30:00Z")) });
+  // Batas SDM untuk TMT 1 Juni 2026 adalah 20 April 2026 (WITA, batas bawaan).
+  const sebelumBatas = rencanaSiklusBerikutnya({ ...dasar, hariIni: hariIniWita(new Date("2026-04-20T15:30:00Z")) });
+  const sesudahBatas = rencanaSiklusBerikutnya({ ...dasar, hariIni: hariIniWita(new Date("2026-04-20T16:30:00Z")) });
   assert.equal(sebelumBatas.flagRapelan, false);
   assert.equal(sesudahBatas.flagRapelan, true);
   assert.equal(sesudahBatas.mkgTahunBaru, 6);

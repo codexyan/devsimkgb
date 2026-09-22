@@ -5,6 +5,7 @@ import { NON_KEUANGAN } from "@/lib/authGuard";
 import { hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { hitungRekapStatus, satuPerSiklus, tanpaBatalYangDiganti, tanpaEntriPegawaiNonaktif } from "@/lib/rekapKgb";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,7 @@ export const runtime = "nodejs";
 // lib/rekapKgb.ts; daftar tetap memuat entri yang dibatalkan dan belum diganti. Pembatalan yang sudah
 // diganti dibuang dari data lengkap sebelum periode disaring, karena penggantinya bisa di periode lain.
 export async function GET(req: Request) {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

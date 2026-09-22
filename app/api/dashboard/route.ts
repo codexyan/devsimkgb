@@ -18,12 +18,14 @@ import {
   satuPerSiklus,
   tahunTmt,
 } from "@/lib/rekapKgb";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
 type KgbDenganSurat = RiwayatKGBRow & { surat: SuratKgbTersimpan | null };
 
 export async function GET() {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

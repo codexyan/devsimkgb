@@ -142,7 +142,7 @@ test("menunggu keuangan dihitung terpisah dan masuk diproses", () => {
 });
 
 test("satu aturan rapelan per status", () => {
-  // TMT 1 November 2026: deadline SDM 30 September 2026. TMT 1 Oktober 2026: deadline 31 Agustus.
+  // TMT 1 November 2026: deadline SDM 20 September 2026. TMT 1 Oktober 2026: deadline 20 Agustus.
   const lewat = tanggal(2026, 10);
   const belumLewat = tanggal(2026, 11);
   assert.equal(statusRapelan({ status: "selesai", tmtKgbBaru: lewat, rapelanDitetapkan: true }, HARI_INI), "ditetapkan");
@@ -204,7 +204,7 @@ test("rekap per bulan TMT: dibatalkan lalu diinput ulang tidak menambah total", 
   assert.equal(rekap[0].total, 2);
   assert.equal(rekap[0].dibatalkan, 0);
   assert.equal(rekap[0].menungguKeuangan, 1);
-  // TMT 1 Oktober 2026: deadline SDM 31 Agustus 2026 sudah lewat pada 15 September 2026.
+  // TMT 1 Oktober 2026: deadline SDM 20 Agustus 2026 sudah lewat pada 15 September 2026.
   assert.equal(rekap[0].berpotensiRapelan, 2);
 });
 

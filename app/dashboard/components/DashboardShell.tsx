@@ -7,6 +7,7 @@ import Sidebar from "./Sidebar";
 import { RoleContext, UserContext } from "./RoleContext";
 import { useDialogModal } from "./useDialogModal";
 import { useThemeMode } from "@/lib/ui/themeMode";
+import { aturBatasInputSdm } from "@/lib/batasInputSdm";
 
 const TICK_INTERVAL = 10 * 1000;
 const WARN_LEAD     = 2 * 60 * 1000; // peringatan muncul 2 menit sebelum logout
@@ -17,10 +18,15 @@ interface DashboardShellProps {
   role: string;
   /** Durasi idle (menit) sebelum auto-logout; dari Pengaturan. Default 60. */
   sesiTimeoutMenit?: number;
+  /** Tanggal batas input Tim SDM dari Pengaturan; kosong berarti bawaan (lib/batasInputSdm.ts). */
+  batasInputSdm?: number | null;
   children: React.ReactNode;
 }
 
-export default function DashboardShell({ nama, nip, role, sesiTimeoutMenit = 60, children }: DashboardShellProps) {
+export default function DashboardShell({ nama, nip, role, sesiTimeoutMenit = 60, batasInputSdm, children }: DashboardShellProps) {
+  // Ditetapkan saat render, sebelum halaman di dalamnya menghitung jendela proses KGB di peramban.
+  // Idempoten: nilai yang sama untuk setiap render, jadi aman walau render diulang.
+  aturBatasInputSdm(batasInputSdm);
   const IDLE_LIMIT = Math.max(5, sesiTimeoutMenit) * 60 * 1000;
   const WARN_AT    = Math.max(0, IDLE_LIMIT - WARN_LEAD);
 

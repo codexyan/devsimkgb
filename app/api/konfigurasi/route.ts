@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
+import { BATAS_INPUT_SDM_BAWAAN, BATAS_INPUT_SDM_MAKS, BATAS_INPUT_SDM_MIN } from "@/lib/batasInputSdm";
+import { lupakanBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
@@ -29,7 +31,7 @@ export async function PATCH(req: Request) {
 
   const body = (await req.json()) as {
     nomorPP?: string; tahunPP?: string; waAdmin?: unknown;
-    notifKgbH1?: unknown; notifKgbH2?: unknown; sesiTimeoutMenit?: unknown;
+    notifKgbH1?: unknown; notifKgbH2?: unknown; sesiTimeoutMenit?: unknown; batasInputSdm?: unknown;
   };
 
   const clampInt = (v: unknown, def: number, min: number, max: number) => {
@@ -41,6 +43,7 @@ export async function PATCH(req: Request) {
   let notifKgbH2 = clampInt(body.notifKgbH2, 7, 1, 120);
   if (notifKgbH2 > notifKgbH1) [notifKgbH1, notifKgbH2] = [notifKgbH2, notifKgbH1];
   const sesiTimeoutMenit = clampInt(body.sesiTimeoutMenit, 60, 5, 480);
+  const batasInputSdm = clampInt(body.batasInputSdm, BATAS_INPUT_SDM_BAWAAN, BATAS_INPUT_SDM_MIN, BATAS_INPUT_SDM_MAKS);
 
   // Penandatangan surat KGB dikelola di /api/penandatangan, bukan di sini.
   const data = {
@@ -50,6 +53,7 @@ export async function PATCH(req: Request) {
     notifKgbH1,
     notifKgbH2,
     sesiTimeoutMenit,
+    batasInputSdm,
     updatedAt: new Date(),
     updatedBy: session.user.nip,
   };
@@ -63,11 +67,13 @@ export async function PATCH(req: Request) {
     config = { id: "default", namaKepala: "", nipKepala: "", ...data };
     await db.konfigurasiKanwil.create(config);
   }
+  // Isolate ini langsung memakai batas baru; isolate lain menyusul saat cache 60 detiknya habis.
+  lupakanBatasInputSdm();
 
   logAudit({
     userId: userLogin.id,
     aksi: "edit_konfigurasi",
-    detail: `Update konfigurasi kanwil: dasar hukum ${data.nomorPP}, notifikasi H-${notifKgbH1}/H-${notifKgbH2}, sesi ${sesiTimeoutMenit} menit`,
+    detail: `Update konfigurasi kanwil: dasar hukum ${data.nomorPP}, notifikasi H-${notifKgbH1}/H-${notifKgbH2}, sesi ${sesiTimeoutMenit} menit, batas input SDM tanggal ${batasInputSdm}`,
   });
 
   return NextResponse.json(config);

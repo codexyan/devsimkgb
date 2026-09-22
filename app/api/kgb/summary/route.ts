@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { hariIniWita } from "@/lib/waktu";
 import { entriRekapKgb, hitungRekapStatus } from "@/lib/rekapKgb";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,7 @@ export const runtime = "nodejs";
 // TMT (dibatalkan lalu diinput ulang dihitung sekali), arsip tidak dihitung, dan entri virtual untuk
 // pegawai aktif tanpa KGB aktif masuk Belum Diproses.
 export async function GET() {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

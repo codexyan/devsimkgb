@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateNotifikasi } from "@/lib/generateNotifikasi";
 import { bersihkanHukdisKedaluwarsa } from "@/lib/hukdisKedaluwarsa";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 /**
  * Endpoint cron harian. Dipanggil handler `scheduled` di worker-entry.js oleh Cloudflare Cron
@@ -11,6 +12,7 @@ import { bersihkanHukdisKedaluwarsa } from "@/lib/hukdisKedaluwarsa";
  * dibuat dari data yang sudah diselaraskan. Kegagalan penyelarasan hukdis tidak menghentikan notifikasi.
  */
 export async function GET(req: NextRequest) {
+  await muatBatasInputSdm();
   const authHeader = req.headers.get("authorization");
 
   if (!process.env.CRON_SECRET) {

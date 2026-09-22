@@ -105,8 +105,8 @@ export const defs = {
   KonfigurasiKanwil: {
     tab: "KonfigurasiKanwil",
     // namaKepala/nipKepala tidak dipakai lagi (pindah ke tab Penandatangan), tetapi kolomnya
-    // tetap ada karena penulisan posisional.
-    columns: [s("id"), s("namaKepala"), s("nipKepala"), s("nomorPP"), s("tahunPP"), s("waAdmin"), i("notifKgbH1"), i("notifKgbH2"), i("sesiTimeoutMenit"), d("updatedAt"), s("updatedBy")],
+    // tetap ada karena penulisan posisional. batasInputSdm: tanggal batas input Tim SDM (lib/batasInputSdm.ts).
+    columns: [s("id"), s("namaKepala"), s("nipKepala"), s("nomorPP"), s("tahunPP"), s("waAdmin"), i("notifKgbH1"), i("notifKgbH2"), i("sesiTimeoutMenit"), d("updatedAt"), s("updatedBy"), i("batasInputSdm")],
   },
   Penandatangan: {
     tab: "Penandatangan",

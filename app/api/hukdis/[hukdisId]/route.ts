@@ -13,6 +13,7 @@ import {
   type RencanaSiklusKgb,
 } from "@/lib/jadwalKgb";
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,7 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ hukdisId: string }> },
 ) {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -4,12 +4,18 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { aturBatasInputSdm } from "./batasInputSdm";
 import {
   bolehLihatNotifikasi,
   rencanaNotifikasi,
   tahapPengingatKgb,
   tipeNotifikasiUntukRole,
 } from "./generateNotifikasi";
+
+// Pengingat dihitung relatif terhadap batas input SDM. Uji di bawah memakai batas akhir bulan (31) agar
+// tanggalnya mudah dibaca: TMT 1 Juni 2026 → batas 30 April 2026. Aturan tanggal batas sendiri diuji di
+// batasInputSdm.test.ts dan tabelGaji.test.ts.
+aturBatasInputSdm(31);
 
 const tanggal = (tahun: number, bulan: number, hari = 1, jam = 0) => new Date(tahun, bulan - 1, hari, jam);
 

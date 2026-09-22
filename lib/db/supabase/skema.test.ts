@@ -2,7 +2,7 @@
 // Supabase tetap sejalan. Jalankan dari folder proyek: node --import tsx --test lib/db/supabase/*.test.ts
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { ALL_DEFS, sheets } from "../../sheets/tables";
@@ -10,13 +10,18 @@ import { backendData, db } from "../index";
 import { KOLOM_URUTAN, keSnake, namaTabel } from "./nama";
 import { supabase } from "./tables";
 
-const FILE_SQL = path.join(process.cwd(), "supabase", "migrations", "20260915090000_skema_awal.sql");
+const FOLDER_MIGRASI = path.join(process.cwd(), "supabase", "migrations");
 
+/** Seluruh migrasi, urut nama berkas (awalan tanggal) seperti urutan penerapannya. */
 function bacaSql(): string {
-  return readFileSync(FILE_SQL, "utf8").replace(/\r\n/g, "\n");
+  return readdirSync(FOLDER_MIGRASI)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()
+    .map((f) => readFileSync(path.join(FOLDER_MIGRASI, f), "utf8").replace(/\r\n/g, "\n"))
+    .join("\n");
 }
 
-/** Nama tabel → kolom, dibaca dari pernyataan create table di migrasi. */
+/** Nama tabel → kolom, dibaca dari create table lalu alter table ... add column di migrasi. */
 function tabelDiSql(sql: string): Map<string, string[]> {
   const hasil = new Map<string, string[]>();
   for (const cocok of sql.matchAll(/create table public\.(\w+) \(\n([\s\S]*?)\n\);/g)) {
@@ -26,6 +31,10 @@ function tabelDiSql(sql: string): Map<string, string[]> {
       .filter((baris) => baris && !baris.startsWith("--") && !baris.startsWith("check"))
       .map((baris) => baris.split(/\s+/)[0]);
     hasil.set(cocok[1], kolom);
+  }
+  for (const cocok of sql.matchAll(/alter table public\.(\w+) add column (?:if not exists )?(\w+)/g)) {
+    const kolom = hasil.get(cocok[1]);
+    if (kolom && !kolom.includes(cocok[2])) kolom.push(cocok[2]);
   }
   return hasil;
 }

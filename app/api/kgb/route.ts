@@ -19,10 +19,12 @@ import {
   type HukdisUntukKgb,
   type SuratKgbTersimpan,
 } from "@/lib/prosesKgb";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -175,6 +177,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  await muatBatasInputSdm();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

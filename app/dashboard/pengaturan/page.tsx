@@ -5,26 +5,32 @@ import { useRole } from "@/app/dashboard/components/RoleContext";
 import { ROLES } from "@/lib/auth";
 import PenandatanganManager from "./PenandatanganManager";
 import PemeriksaanData from "./PemeriksaanData";
+import { aturBatasInputSdm, BATAS_INPUT_SDM_BAWAAN, normalisasiBatasInputSdm } from "@/lib/batasInputSdm";
+import { hitungDeadlineSDM, hitungRekonGaji, hitungUnlockDate } from "@/lib/tabelGaji";
+import { formatTanggalId, hariIniWita } from "@/lib/waktu";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Pengaturan (super admin). Terbagi menjadi beberapa seksi:
    1. Penandatangan surat KGB   — definitif, Plh, Plt, Dirjen, dengan masa berlaku
    2. Dasar hukum KGB
-   3. Notifikasi KGB            — ambang H-… peringatan
-   4. Keamanan sesi             — durasi auto-logout
-   5. Kontak                    — nomor WA admin (dipakai tombol lupa password)
-   6. Pemeriksaan data          — temuan data pegawai tidak konsisten (hanya membaca)
+   3. Jadwal proses KGB         — tanggal batas input Tim SDM
+   4. Notifikasi KGB            — ambang H-… peringatan
+   5. Keamanan sesi             — durasi auto-logout
+   6. Kontak                    — nomor WA admin (dipakai tombol lupa password)
+   7. Pemeriksaan data          — temuan data pegawai tidak konsisten (hanya membaca)
    ───────────────────────────────────────────────────────────────────────── */
 
 interface Konfigurasi {
   nomorPP: string; tahunPP: string;
   waAdmin: string; notifKgbH1: number; notifKgbH2: number; sesiTimeoutMenit: number;
+  batasInputSdm: number;
   updatedAt?: string; updatedBy?: string | null;
 }
 
 const EMPTY: Konfigurasi = {
   nomorPP: "Nomor 5 Tahun 2024", tahunPP: "2024",
   waAdmin: "", notifKgbH1: 14, notifKgbH2: 7, sesiTimeoutMenit: 60,
+  batasInputSdm: BATAS_INPUT_SDM_BAWAAN,
 };
 
 /* Kartu seksi dengan chip ikon — siap masonry (break-inside-avoid) + anchor id */
@@ -72,6 +78,35 @@ function Field({ label, hint, value, onChange, placeholder, type = "text", suffi
   );
 }
 
+/* Contoh jadwal untuk TMT dua bulan ke depan dengan batas yang sedang diisi: jendela input Tim SDM, lalu
+   rekon gaji keuangan di Gaji Web. SK harus sudah dikonfirmasi keuangan sebelum rekon itu dikirim. */
+function ContohJadwal({ batas }: { batas: number }) {
+  const hariIni = hariIniWita();
+  const tmt = new Date(hariIni.getFullYear(), hariIni.getMonth() + 2, 1);
+  const rekon = hitungRekonGaji(tmt);
+  const baris: [string, string][] = [
+    ["Input Tim SDM", `${formatTanggalId(hitungUnlockDate(tmt), { day: "numeric", month: "short" })} – ${formatTanggalId(hitungDeadlineSDM(tmt, batas))}`],
+    ["SK TTE, unggah, konfirmasi keuangan", "sebelum rekon dikirim keuangan"],
+    ["Rekon gaji Gaji Web (keuangan)", `${formatTanggalId(rekon.mulai, { day: "numeric", month: "short" })} – ${formatTanggalId(rekon.batas)}`],
+  ];
+  return (
+    <div className="rounded-lg px-3 py-2.5" style={{ background: "var(--tint-indigo-bg, #eef0fb)", fontSize: "10.5px", lineHeight: 1.55 }}>
+      <p className="font-semibold mb-1" style={{ color: "var(--dt2)" }}>Contoh untuk TMT {formatTanggalId(tmt)}</p>
+      <dl className="space-y-0.5">
+        {baris.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-3">
+            <dt style={{ color: "var(--dt4)" }}>{k}</dt>
+            <dd className="font-medium text-right" style={{ color: "var(--dtn)" }}>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-1.5" style={{ color: "var(--dt4)" }}>
+        Keuangan dapat mengirim rekon lebih awal dari tanggal {rekon.batas.getDate()}. SK yang masuk setelah rekon dikirim dibayar sebagai kekurangan gaji (rapel).
+      </p>
+    </div>
+  );
+}
+
 export default function PengaturanPage() {
   const role = useRole();
   const [form, setForm]       = useState<Konfigurasi>(EMPTY);
@@ -92,6 +127,7 @@ export default function PengaturanPage() {
             nomorPP: cfg.nomorPP ?? EMPTY.nomorPP, tahunPP: cfg.tahunPP ?? EMPTY.tahunPP,
             waAdmin: cfg.waAdmin ?? "", notifKgbH1: cfg.notifKgbH1 ?? 14,
             notifKgbH2: cfg.notifKgbH2 ?? 7, sesiTimeoutMenit: cfg.sesiTimeoutMenit ?? 60,
+            batasInputSdm: normalisasiBatasInputSdm(cfg.batasInputSdm),
             updatedAt: cfg.updatedAt, updatedBy: cfg.updatedBy,
           };
           setForm(c); setInitial(c);
@@ -113,6 +149,7 @@ export default function PengaturanPage() {
           nomorPP: form.nomorPP.trim(), tahunPP: form.tahunPP.trim(),
           waAdmin: form.waAdmin.trim(), notifKgbH1: form.notifKgbH1,
           notifKgbH2: form.notifKgbH2, sesiTimeoutMenit: form.sesiTimeoutMenit,
+          batasInputSdm: form.batasInputSdm,
         }),
       });
       const d = await res.json() as any;
@@ -120,8 +157,11 @@ export default function PengaturanPage() {
       const c: Konfigurasi = {
         nomorPP: d.nomorPP, tahunPP: d.tahunPP,
         waAdmin: d.waAdmin ?? "", notifKgbH1: d.notifKgbH1, notifKgbH2: d.notifKgbH2,
-        sesiTimeoutMenit: d.sesiTimeoutMenit, updatedAt: d.updatedAt, updatedBy: d.updatedBy,
+        sesiTimeoutMenit: d.sesiTimeoutMenit, batasInputSdm: normalisasiBatasInputSdm(d.batasInputSdm),
+        updatedAt: d.updatedAt, updatedBy: d.updatedBy,
       };
+      // Halaman dashboard lain di tab ini langsung memakai batas yang baru disimpan.
+      aturBatasInputSdm(c.batasInputSdm);
       setForm(c); setInitial(c); setSaved(true);
       setTimeout(() => setSaved(false), 4000);
     } catch { setError("Gagal menghubungi server"); }
@@ -142,6 +182,7 @@ export default function PengaturanPage() {
   const nav = [
     { id: "pejabat",    label: "Penandatangan Surat",    ok: adaPenandatangan, grad: "linear-gradient(135deg,#2d5d94,var(--navy-solid))" },
     { id: "dokumen",    label: "Dasar Hukum KGB",        ok: !!form.nomorPP.trim(), grad: "linear-gradient(135deg,#17a37e,var(--green-solid))" },
+    { id: "jadwal",     label: "Jadwal Proses KGB",      ok: true,           grad: "linear-gradient(135deg,#6b5bd6,#4338ca)" },
     { id: "notifikasi", label: "Notifikasi KGB",         ok: true,           grad: "linear-gradient(135deg,#d99414,var(--amber-solid))" },
     { id: "keamanan",   label: "Keamanan Sesi",          ok: true,           grad: "linear-gradient(135deg,#e35d5d,var(--red-solid))" },
     { id: "kontak",     label: "Kontak WhatsApp",        ok: !!form.waAdmin.trim(), grad: "linear-gradient(135deg,#22c55e,#15803d)" },
@@ -232,7 +273,17 @@ export default function PengaturanPage() {
           </div>
         </Section>
 
-        {/* 3. Notifikasi */}
+        {/* 3. Jadwal proses: batas input Tim SDM sebelum rekon gaji keuangan */}
+        <Section id="jadwal" grad="linear-gradient(135deg,#6b5bd6,#4338ca)" title="Jadwal Proses KGB" desc="Batas input Tim SDM pada bulan kedua sebelum TMT"
+          icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>}>
+          <Field label="Batas input Tim SDM" type="number" suffix="tanggal"
+            value={String(form.batasInputSdm)}
+            onChange={(v) => setForm((f) => ({ ...f, batasInputSdm: Math.min(31, Math.max(1, num(v, BATAS_INPUT_SDM_BAWAAN))) }))}
+            hint="Tanggal 1–31 pada bulan kedua sebelum TMT (31 = akhir bulan). Input setelahnya tetap diterima tetapi ditandai berpotensi rapelan." />
+          <ContohJadwal batas={form.batasInputSdm} />
+        </Section>
+
+        {/* 4. Notifikasi */}
         <Section id="notifikasi" grad="linear-gradient(135deg,#d99414,var(--amber-solid))" title="Notifikasi KGB" desc="Kapan sistem mulai memperingatkan sebelum deadline SDM"
           icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>}>
           <div className="grid grid-cols-2 gap-3">
@@ -244,13 +295,13 @@ export default function PengaturanPage() {
           </p>
         </Section>
 
-        {/* 4. Keamanan */}
+        {/* 5. Keamanan */}
         <Section id="keamanan" grad="linear-gradient(135deg,#e35d5d,var(--red-solid))" title="Keamanan Sesi" desc="Keluar otomatis saat perangkat tidak aktif"
           icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}>
           <Field label="Durasi idle sebelum auto-logout" type="number" suffix="menit" value={String(form.sesiTimeoutMenit)} onChange={(v) => setForm((f) => ({ ...f, sesiTimeoutMenit: num(v, 60) }))} hint="Peringatan muncul 2 menit sebelum keluar. Rentang aman 5–480 menit." />
         </Section>
 
-        {/* 5. Kontak */}
+        {/* 6. Kontak */}
         <Section id="kontak" badge={<StatusBadge ok={!!form.waAdmin.trim()} okLabel="Aktif" noLabel="Nonaktif" />} grad="linear-gradient(135deg,#22c55e,#15803d)" title="Kontak Admin (WhatsApp)" desc="Dipakai tombol 'Lupa Password' di halaman login"
           icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>}>
           <Field label="Nomor WhatsApp" value={form.waAdmin} onChange={(v) => setForm((f) => ({ ...f, waAdmin: v.replace(/[^\d]/g, "") }))} placeholder="6281234567890" hint="Format internasional tanpa + atau spasi (mis. 62812…). Kosongkan untuk menonaktifkan tombol." />
