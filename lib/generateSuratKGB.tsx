@@ -7,28 +7,54 @@ import {
   Font,
   Image,
 } from "@react-pdf/renderer";
-import path from "path";
-import fs from "fs";
 import type { JenisPenandatangan } from "./penandatangan";
 import { formatTanggalId, type NilaiTanggal } from "./waktu";
-
-Font.register({
-  family: "Times",
-  fonts: [
-    { src: path.join(process.cwd(), "public/fonts/times.ttf") },
-    {
-      src: path.join(process.cwd(), "public/fonts/timesbd.ttf"),
-      fontWeight: "bold",
-    },
-    {
-      src: path.join(process.cwd(), "public/fonts/timesi.ttf"),
-      fontStyle: "italic",
-    },
-  ],
-});
+import { dataUrlAsetPublik } from "./asetPublik";
 
 // Nonaktifkan hyphenation otomatis, cegah pemisahan kata seperti "Kali-mantan"
 Font.registerHyphenationCallback((word) => [word]);
+
+/** Logo dan label Srikandi sebagai data URL, disiapkan oleh siapkanAsetSurat(). */
+export interface AsetSurat {
+  logoSrc: string;
+  labelSrikandiSrc: string | null;
+}
+
+let fontTerdaftar: Promise<void> | null = null;
+
+// Font didaftarkan sebagai data URL, bukan path disk, karena Cloudflare Workers tidak punya
+// filesystem. Cukup sekali per isolate; @react-pdf menyimpan hasil parsing font di memori.
+function daftarkanFont(): Promise<void> {
+  fontTerdaftar ??= Promise.all([
+    dataUrlAsetPublik("fonts/times.ttf", "font/ttf"),
+    dataUrlAsetPublik("fonts/timesbd.ttf", "font/ttf"),
+    dataUrlAsetPublik("fonts/timesi.ttf", "font/ttf"),
+  ]).then(([biasa, tebal, miring]) => {
+    Font.register({
+      family: "Times",
+      fonts: [
+        { src: biasa },
+        { src: tebal, fontWeight: "bold" },
+        { src: miring, fontStyle: "italic" },
+      ],
+    });
+  });
+  // Gagal memuat font tidak di-cache, agar permintaan berikutnya mencoba lagi.
+  fontTerdaftar.catch(() => {
+    fontTerdaftar = null;
+  });
+  return fontTerdaftar;
+}
+
+/** Wajib dipanggil sebelum merender SuratKGBDocument: mendaftarkan font dan memuat gambar. */
+export async function siapkanAsetSurat(srikandi: boolean): Promise<AsetSurat> {
+  const [, logoSrc, labelSrikandiSrc] = await Promise.all([
+    daftarkanFont(),
+    dataUrlAsetPublik("logo-imipas.png", "image/png"),
+    srikandi ? dataUrlAsetPublik("label-srikandi.png", "image/png") : Promise.resolve(null),
+  ]);
+  return { logoSrc, labelSrikandiSrc };
+}
 
 const S = StyleSheet.create({
   page: {
@@ -150,6 +176,8 @@ interface SuratKGBProps {
   dasarHukum: string;
   /** Render versi Srikandi: placeholder ${ttd_pengirim} + label Srikandi di area TTD */
   srikandi?: boolean;
+  /** Hasil siapkanAsetSurat() dengan nilai srikandi yang sama. */
+  aset: AsetSurat;
 }
 
 export function SuratKGBDocument({
@@ -161,13 +189,9 @@ export function SuratKGBDocument({
   penandatangan,
   dasarHukum,
   srikandi = false,
+  aset,
 }: SuratKGBProps) {
-  const logoSrc = `data:image/png;base64,${fs
-    .readFileSync(path.join(process.cwd(), "public/logo-imipas.png"))
-    .toString("base64")}`;
-  const labelSrikandiSrc = srikandi
-    ? `data:image/png;base64,${fs.readFileSync(path.join(process.cwd(), "public/label-srikandi.png")).toString("base64")}`
-    : null;
+  const { logoSrc, labelSrikandiSrc } = aset;
   // KGB milik pimpinan Kanwil ditandatangani Dirjen, sehingga suratnya berkop Direktorat Jenderal.
   const kopDitjen = penandatangan.jenis === "dirjen";
 

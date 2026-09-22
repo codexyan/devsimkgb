@@ -4,7 +4,7 @@ import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { SuratKGBDocument } from "@/lib/generateSuratKGB";
+import { siapkanAsetSurat, SuratKGBDocument } from "@/lib/generateSuratKGB";
 import { ReactElement } from "react";
 import { DocumentProps } from "@react-pdf/renderer";
 import React from "react";
@@ -149,6 +149,7 @@ export async function POST(
     };
   }
 
+  const aset = await siapkanAsetSurat(isSrikandi);
   const pdfBuffer = await renderToBuffer(
     React.createElement(SuratKGBDocument, {
       nomorSurat,
@@ -187,6 +188,7 @@ export async function POST(
       },
       dasarHukum: teksDasarHukum(kanwil?.nomorPP, kanwil?.tahunPP),
       srikandi: isSrikandi,
+      aset,
     }) as ReactElement<DocumentProps>,
   );
 
