@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { requireRole, NON_KEUANGAN } from "@/lib/authGuard";
+import { requireRole, PERAN_KGB } from "@/lib/authGuard";
 
 export const metadata: Metadata = { title: "Laporan KGB" };
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
-  await requireRole(NON_KEUANGAN, "/dashboard/keuangan");
+  // Keuangan dan SDM Hukdis diarahkan ke dashboard perannya.
+  await requireRole(PERAN_KGB, "/dashboard");
   return <>{children}</>;
 }

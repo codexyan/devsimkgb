@@ -4,7 +4,7 @@ import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { isGolonganDikenal, jendelaProsesKgb } from "@/lib/tabelGaji";
-import { canProcessKGB } from "@/lib/auth";
+import { canProcessKGB, canViewKGB } from "@/lib/auth";
 import { rencanaSetelahKgbSelesai, rencanaSiklusBerikutnya, type RencanaSiklusKgb } from "@/lib/jadwalKgb";
 import { formatTanggalId, hariIniWita, samaTanggalKalender, tanggalKalender, type NilaiTanggal } from "@/lib/waktu";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
@@ -28,6 +28,8 @@ export async function GET(req: Request) {
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canViewKGB(session.user.role ?? ""))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") || "";

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
-import { NON_KEUANGAN } from "@/lib/authGuard";
+import { canProcessKGB } from "@/lib/auth";
 import { hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { hitungRekapStatus, satuPerSiklus, tanpaBatalYangDiganti, tanpaEntriPegawaiNonaktif } from "@/lib/rekapKgb";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!NON_KEUANGAN.includes(session.user.role ?? ""))
+  if (!canProcessKGB(session.user.role ?? ""))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(req.url);

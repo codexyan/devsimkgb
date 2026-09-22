@@ -17,3 +17,6 @@ export async function requireRole(allowed: string[], fallback = "/dashboard") {
 // Peran non-keuangan (superAdmin, SDM KGB, SDM Hukdis). Keuangan diarahkan ke
 // beranda keuangan bila mencoba membuka modul di luar wewenangnya.
 export const NON_KEUANGAN = ["superAdminCore", "sdm_kgb", "sdm_hukdis"];
+
+// Peran modul KGB (Proses KGB, Laporan). SDM Hukdis dan Keuangan diarahkan ke dashboard perannya.
+export const PERAN_KGB = ["superAdminCore", "sdm_kgb"];

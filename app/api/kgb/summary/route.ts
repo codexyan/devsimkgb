@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
+import { canProcessKGB } from "@/lib/auth";
 import { hariIniWita } from "@/lib/waktu";
 import { entriRekapKgb, hitungRekapStatus } from "@/lib/rekapKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
@@ -15,6 +16,8 @@ export async function GET() {
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canProcessKGB(session.user.role ?? ""))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const [allKgb, pegawaiList] = await Promise.all([
     db.riwayatKGB.findMany(),

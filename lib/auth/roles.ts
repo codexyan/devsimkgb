@@ -13,9 +13,17 @@ export const canProcessKGB = (role: string) =>
 export const canManageHukdis = (role: string) =>
   role === ROLES.SUPER_ADMIN || role === ROLES.SDM_HUKDIS;
 
-// Keuangan fitur: superAdminCore + keuangan
+// Keuangan fitur (lihat halaman keuangan, rekon, riwayat): superAdminCore + keuangan
 export const canAccessKeuangan = (role: string) =>
   role === ROLES.SUPER_ADMIN || role === ROLES.KEUANGAN;
+
+// Konfirmasi keuangan dan follow up ke Tim SDM: keuangan saja. Super Admin hanya melihat, supaya
+// verifikasi SDM dan verifikasi Keuangan tetap dilakukan dua orang berbeda.
+export const canKonfirmasiKeuangan = (role: string) => role === ROLES.KEUANGAN;
+
+// Membaca data KGB (daftar, ringkasan dashboard): peran KGB + keuangan. SDM Hukdis tidak.
+export const canViewKGB = (role: string) =>
+  canProcessKGB(role) || role === ROLES.KEUANGAN;
 
 // Edit/hapus pegawai: superAdminCore + sdm_kgb (sdm_hukdis hanya baca)
 export const canEditPegawai = (role: string) =>

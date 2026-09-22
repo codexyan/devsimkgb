@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { type RiwayatKGBRow } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
-import { canProcessKGB } from "@/lib/auth";
-import { NON_KEUANGAN } from "@/lib/authGuard";
+import { canProcessKGB, canViewKGB } from "@/lib/auth";
 import { penetapDariSurat } from "@/lib/penetapSk";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { hariIniWita, tanggalKalender } from "@/lib/waktu";
@@ -31,6 +30,9 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const role = session.user.role ?? "";
+  // SDM Hukdis memakai dashboard hukdis sendiri dan tidak membaca data KGB.
+  if (!canViewKGB(role))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const bolehLihatFollowup = canProcessKGB(role);
 
   try {
@@ -196,7 +198,7 @@ export async function GET() {
         terlambat: rekapSemua.terlambat,
       },
       // Beranda keuangan hanya memakai statistik; data per pegawai, termasuk hukdis, tidak dikirim.
-      pegawaiJatuhTempo: NON_KEUANGAN.includes(role) ? result : [],
+      pegawaiJatuhTempo: canProcessKGB(role) ? result : [],
       trenBulanan,
       followupNotifs,
     });

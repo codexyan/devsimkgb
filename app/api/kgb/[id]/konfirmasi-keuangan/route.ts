@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
-import { canAccessKeuangan } from "@/lib/auth";
+import { canKonfirmasiKeuangan } from "@/lib/auth";
 import { penetapDariSurat } from "@/lib/penetapSk";
 import { rencanaSetelahKgbSelesai, type RencanaSetelahKgbSelesai } from "@/lib/jadwalKgb";
 import { placeholderBerlebih, type SuratKgbTersimpan } from "@/lib/prosesKgb";
@@ -21,7 +21,8 @@ export async function POST(
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!canAccessKeuangan(session.user.role!))
+  // Hanya petugas Keuangan; Super Admin melihat saja agar verifikasi tetap oleh dua orang.
+  if (!canKonfirmasiKeuangan(session.user.role!))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const userLogin = await db.user.findUnique({ nip: session.user.nip! });

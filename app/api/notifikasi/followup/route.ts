@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
-import { canAccessKeuangan } from "@/lib/auth";
+import { canKonfirmasiKeuangan } from "@/lib/auth";
 import { formatTanggalId } from "@/lib/waktu";
 import { TIPE_NOTIFIKASI } from "@/lib/generateNotifikasi";
 
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canAccessKeuangan(session.user.role ?? ""))
+  if (!canKonfirmasiKeuangan(session.user.role ?? ""))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let body: { kgbId?: unknown; pegawaiId?: unknown };

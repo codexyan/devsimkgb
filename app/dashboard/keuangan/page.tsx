@@ -6,6 +6,8 @@ import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { kunciBulanTmt, rekapPerBulanTmt, satuPerSiklus, tahunTmt, type RekapBulanTmt } from "@/lib/rekapKgb";
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
+import { useRole } from "@/app/dashboard/components/RoleContext";
+import { canKonfirmasiKeuangan } from "@/lib/auth";
 
 /* ─────────────── interfaces ─────────────── */
 
@@ -176,7 +178,8 @@ function KGBCard({
 }: {
   k: KGB;
   onPreview: (url: string) => void;
-  onKonfirmasi: () => void;
+  /** Tanpa handler (Super Admin), kartu tampil tanpa tombol konfirmasi. */
+  onKonfirmasi?: () => void;
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
@@ -245,12 +248,14 @@ function KGBCard({
               SK
             </button>
           )}
+          {onKonfirmasi && (
           <button onClick={onKonfirmasi}
             className="ku-btn flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold text-white"
             style={{ background: k.flagRapelan ? "var(--amber-solid)" : "var(--green-solid)" }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><polyline points="20 6 9 17 4 12"/></svg>
             {k.flagRapelan ? "Tinjau dan Konfirmasi" : "Konfirmasi"}
           </button>
+          )}
         </div>
       </div>
     </div>
@@ -260,6 +265,8 @@ function KGBCard({
 /* ─────────────── page ─────────────── */
 
 export default function KeuanganDashboardPage() {
+  // Super Admin membuka halaman ini untuk memantau; konfirmasi dan follow up hanya oleh petugas Keuangan.
+  const bolehKonfirmasi = canKonfirmasiKeuangan(useRole());
   const [kgbList,    setKgbList]    = useState<KGB[]>([]);
   const [allKgb,     setAllKgb]     = useState<KGB[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -526,6 +533,11 @@ export default function KeuanganDashboardPage() {
           <p className="text-xs" style={{ color:"var(--dt4)" }}>
             Konfirmasi SK yang masuk · Pantau status KGB berjalan · Rekap per bulan TMT dihitung dari data KGB
           </p>
+          {!bolehKonfirmasi && (
+            <p className="text-xs mt-1 font-medium" style={{ color:"var(--st-violet)" }}>
+              Mode lihat: konfirmasi dan follow up hanya dilakukan petugas Keuangan.
+            </p>
+          )}
         </div>
       </div>
 
@@ -699,7 +711,7 @@ export default function KeuanganDashboardPage() {
             </div>
           )}
           {/* Toolbar konfirmasi cepat (hanya SK non-rapelan) */}
-          {!loading && !galatMenunggu && (() => {
+          {bolehKonfirmasi && !loading && !galatMenunggu && (() => {
             const eligibleIds = kgbList.filter((k) => bisaKonfirmasiCepat(k, today)).map((k) => k.id);
             if (eligibleIds.length === 0) return null;
             const allSel = eligibleIds.every((id) => bulkSelected.has(id));
@@ -748,15 +760,15 @@ export default function KeuanganDashboardPage() {
             ) : (
               kgbList.map((k) => (
                 <KGBCard key={kunciKgb(k)} k={k}
-                  selectable={bisaKonfirmasiCepat(k, today)}
-                  alasanTanpaPilih={alasanTanpaKonfirmasiCepat(k, today)}
+                  selectable={bolehKonfirmasi && bisaKonfirmasiCepat(k, today)}
+                  alasanTanpaPilih={bolehKonfirmasi ? alasanTanpaKonfirmasiCepat(k, today) : null}
                   selected={!!k.id && bulkSelected.has(k.id)}
                   onToggleSelect={() => setBulkSelected((prev) => {
                     if (!k.id) return prev;
                     const n = new Set(prev); if (n.has(k.id)) n.delete(k.id); else n.add(k.id); return n;
                   })}
                   onPreview={(url) => { setPreviewUrl(url); setPreviewKgbId(k.id); }}
-                  onKonfirmasi={() => bukaKonfirmasi(k)}
+                  onKonfirmasi={bolehKonfirmasi ? () => bukaKonfirmasi(k) : undefined}
                 />
               ))
             )}
@@ -875,7 +887,7 @@ export default function KeuanganDashboardPage() {
             <div className="md:hidden divide-y" style={{ borderColor:"var(--ln2)" }}>
               {monthItems.map((k, i) => {
                 const st = badgeStatus(k.status);
-                const canFollowUp = !k.isArsip && kunciBulanTmt(k.tmtKgbBaru) === followUpBulanKey
+                const canFollowUp = bolehKonfirmasi && !k.isArsip && kunciBulanTmt(k.tmtKgbBaru) === followUpBulanKey
                   && ["belum_diproses","sedang_diproses","ditolak"].includes(k.status);
                 const justSent = followupSent.has(kunciKgb(k));
                 const nama = namaPegawai(k);
@@ -921,7 +933,7 @@ export default function KeuanganDashboardPage() {
                           Lihat SK Tertandatangani
                         </button>
                       )}
-                      {k.status === "menunggu_keuangan" && k.id && (
+                      {bolehKonfirmasi && k.status === "menunggu_keuangan" && k.id && (
                         <button onClick={() => bukaKonfirmasi(k)}
                           className="flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white text-center"
                           style={{ background:"var(--green-solid)" }}>
@@ -960,7 +972,7 @@ export default function KeuanganDashboardPage() {
                 <tbody>
                   {monthItems.map((k, i) => {
                     const st = badgeStatus(k.status);
-                    const canFollowUp = !k.isArsip && kunciBulanTmt(k.tmtKgbBaru) === followUpBulanKey
+                    const canFollowUp = bolehKonfirmasi && !k.isArsip && kunciBulanTmt(k.tmtKgbBaru) === followUpBulanKey
                       && ["belum_diproses","sedang_diproses","ditolak"].includes(k.status);
                     const justSent = followupSent.has(kunciKgb(k));
                     return (
@@ -996,7 +1008,7 @@ export default function KeuanganDashboardPage() {
                                 Lihat SK Tertandatangani
                               </button>
                             )}
-                            {k.status === "menunggu_keuangan" && k.id && (
+                            {bolehKonfirmasi && k.status === "menunggu_keuangan" && k.id && (
                               <button onClick={() => bukaKonfirmasi(k)}
                                 className="px-2.5 py-1 rounded-lg text-xs font-semibold text-white whitespace-nowrap"
                                 style={{ background:"var(--green-solid)" }}>
@@ -1044,7 +1056,7 @@ export default function KeuanganDashboardPage() {
                 <p className="text-xs" style={{ color:"var(--dt4)" }}>Verifikasi data sebelum konfirmasi</p>
               </div>
               <div className="flex items-center gap-2">
-                {previewKgbId && kgbList.find(k=>k.id===previewKgbId) && (
+                {bolehKonfirmasi && previewKgbId && kgbList.find(k=>k.id===previewKgbId) && (
                   <button
                     onClick={() => {
                       bukaKonfirmasi(kgbList.find(x=>x.id===previewKgbId)!);
