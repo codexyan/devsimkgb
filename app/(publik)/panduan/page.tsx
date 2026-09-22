@@ -6,7 +6,7 @@ import { satkerPerKppn } from "@/lib/satker";
 import { STATUS_KGB, type StatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId } from "@/lib/waktu";
 import Kata from "../Kata";
-import LatarNavy from "../LatarNavy";
+import LatarNavy from "@/app/_bersama/LatarNavy";
 import { DaftarIsiPanduan, LanjutBagian, PeranAktif, PilihPeran } from "./NavigasiPanduan";
 import { PERAN, peranUntuk, SEMUA } from "./peran";
 import "./panduan.css";

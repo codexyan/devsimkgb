@@ -4,7 +4,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { tanggaGaji } from "@/lib/tabelGaji";
-import LatarNavy from "../LatarNavy";
+import LatarNavy from "@/app/_bersama/LatarNavy";
 import TanggaMasuk from "./TanggaMasuk";
 import "./login.css";
 

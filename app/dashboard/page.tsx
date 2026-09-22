@@ -3,9 +3,20 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRole, useDashUser } from "@/app/dashboard/components/RoleContext";
-import { ROLES } from "@/lib/auth";
+import { ROLES, ROLE_LABEL } from "@/lib/auth";
 import DashboardHukdis from "@/app/dashboard/components/DashboardHukdis";
 import DashboardKeuangan from "@/app/dashboard/components/DashboardKeuangan";
+import {
+  KepalaKartu,
+  KerangkaDashboard,
+  KisiKpi,
+  Kpi,
+  PanelNavy,
+  namaDepan,
+  sapaanWita,
+  tanggalPanjangWita,
+  type Nada,
+} from "@/app/dashboard/components/PanelNavy";
 import {
   IkonPeringatan,
   KerangkaModal,
@@ -146,16 +157,17 @@ function MonthGrid({
   }
 
   type Tier = "terlambat" | "kritis" | "warn" | "aman" | "empty";
-  const palette: Record<Tier, { accent: string; soft: string; text: string; bar: string }> = {
-    terlambat: { accent: "var(--st-red)", soft: "var(--tint-red-bg)", text: "var(--st-red)", bar: "#ef4444" },
-    kritis:    { accent: "var(--st-amber)", soft: "var(--tint-amber-bg)", text: "var(--st-amber2)", bar: "#f59e0b" },
-    warn:      { accent: "var(--st-amber)", soft: "#fef9ec", text: "var(--st-amber2)", bar: "#fcd34d" },
-    aman:      { accent: "var(--st-green)", soft: "var(--tint-green-bg)", text: "#0a8f6a", bar: "#34d399" },
-    empty:     { accent: "var(--dt6)", soft: "var(--sub)", text: "var(--dt6)", bar: "#e5eaf0" },
+  // Tingkat hanya ditandai titik kecil; warna status tidak mewarnai seluruh ubin.
+  const tanda: Record<Tier, { nada?: Nada; cincin?: boolean; label: string }> = {
+    terlambat: { nada: "merah", label: "terlambat" },
+    kritis:    { nada: "kuning", label: "kritis, batas input 7 hari lagi atau kurang" },
+    warn:      { nada: "kuning", cincin: true, label: "batas input 30 hari lagi atau kurang" },
+    aman:      { nada: "hijau", label: "aman" },
+    empty:     { label: "" },
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "5px" }}>
+    <div className="dsb-bulan-kisi">
       {Array.from({ length: 12 }, (_, mo) => {
         const key = `${yr}-${String(mo + 1).padStart(2, "0")}`;
         const isCurrentMonth = mo === today.getMonth();
@@ -173,70 +185,31 @@ function MonthGrid({
         else if (count > 0)                          tier = "aman";
         else                                         tier = "empty";
 
-        const { accent, soft, text } = palette[tier];
-
-        // Progress bar width inside bottom strip
+        const t = tanda[tier];
         const progressPct = count > 0 ? (done / count) * 100 : 0;
 
         return (
           <button
             key={key}
             type="button"
+            className="dsb-bulan"
             aria-pressed={isSelected}
-            aria-label={`${BULAN_ID[mo]} ${yr}: ${count} KGB, ${done} selesai`}
+            data-sekarang={isCurrentMonth ? "" : undefined}
+            data-kosong={count === 0 ? "" : undefined}
+            aria-label={`${BULAN_ID[mo]} ${yr}: ${count} KGB, ${done} selesai${t.label ? `, ${t.label}` : ""}${isCurrentMonth ? ", bulan ini" : ""}`}
             onClick={() => onSelect(isSelected ? null : key)}
-            className="relative flex flex-col items-center justify-center rounded-lg overflow-hidden transition-all"
-            style={{
-              height: "54px",
-              background: isSelected ? accent : soft,
-              outline: isCurrentMonth && !isSelected ? `2px solid ${accent}` : "none",
-              outlineOffset: "0px",
-              boxShadow: isSelected ? "0 3px 10px rgba(9,20,40,0.25)" : "none",
-            }}
           >
-            <span
-              style={{
-                fontSize: "9px",
-                fontWeight: 700,
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-                color: isSelected ? "rgba(255,255,255,0.7)" : isCurrentMonth ? accent : "var(--dt5)",
-                lineHeight: 1,
-              }}
-            >
+            <span className="dsb-bulan-nama">
               {BULAN_ID[mo]}
+              {t.nada && <span className="dsb-titik" data-nada={t.nada} data-cincin={t.cincin ? "" : undefined} aria-hidden="true" />}
             </span>
-            <span
-              style={{
-                fontSize: count >= 10 ? "15px" : "17px",
-                fontWeight: 800,
-                lineHeight: 1.1,
-                marginTop: "3px",
-                color: isSelected ? "#fff" : tier === "empty" ? "var(--dt6)" : text,
-              }}
-            >
-              {count}
+            <span className="dsb-bulan-baris">
+              <span className="dsb-bulan-angka">{count}</span>
+              {count > 0 && <span className="dsb-bulan-sub">{allDone ? "selesai" : `${done}/${count}`}</span>}
             </span>
-            {/* Progress fraction */}
-            {count > 0 && (
-              <span style={{
-                fontSize: "9px",
-                fontWeight: 600,
-                lineHeight: 1,
-                marginTop: "2px",
-                color: isSelected
-                  ? "rgba(255,255,255,0.75)"
-                  : allDone ? "var(--st-green)" : "var(--dt5)",
-              }}>
-                {allDone ? "semua selesai" : `${done}/${count} selesai`}
-              </span>
-            )}
-            {/* Bottom bar: grey track + green progress */}
-            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "3px", background: isSelected ? "rgba(255,255,255,0.2)" : "#e5eaf0" }}>
-              {count > 0 && (
-                <div style={{ height: "100%", width: `${progressPct}%`, background: isSelected ? "rgba(255,255,255,0.7)" : "#34d399", transition: "width 0.6s ease" }} />
-              )}
-            </div>
+            <span className="dsb-bulan-bar" aria-hidden="true">
+              {count > 0 && <span style={{ width: `${progressPct}%` }} />}
+            </span>
           </button>
         );
       })}
@@ -249,10 +222,11 @@ function MonthGrid({
    ----------------------------------------- */
 
 function TrenLineChart({ data }: { data: TrenBulanan[] }) {
-  const VW = 500;
-  const VH = 180;
-  const padL = 30;
-  const padR = 16;
+  // viewBox dekat ukuran tampil di kartu (sekitar 340 px) agar teks sumbu tidak ikut mengecil
+  const VW = 360;
+  const VH = 230;
+  const padL = 26;
+  const padR = 24;
   const padT = 20;
   const padB = 32;
   const cW = VW - padL - padR;
@@ -270,7 +244,7 @@ function TrenLineChart({ data }: { data: TrenBulanan[] }) {
 
   const series = [
     { key: "selesai" as const, color: "var(--st-green)", fillOpacity: 0.08, label: "Selesai", futureOnly: false },
-    { key: "diproses" as const, color: "var(--dtn)", fillOpacity: 0.08, label: "Diproses", futureOnly: false },
+    { key: "diproses" as const, color: "var(--accent)", fillOpacity: 0.08, label: "Diproses", futureOnly: false },
     { key: "terlambat" as const, color: "var(--st-red)", fillOpacity: 0.08, label: "Rapelan", futureOnly: false },
     { key: "mendatang" as const, color: "var(--st-violet)", fillOpacity: 0.08, label: "Mendatang", futureOnly: true },
   ];
@@ -287,22 +261,16 @@ function TrenLineChart({ data }: { data: TrenBulanan[] }) {
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-2 flex-wrap">
+      <div className="dsb-legenda mb-3">
         {series.filter((s) => !s.futureOnly).map((s) => (
-          <div key={s.label} className="flex items-center gap-1.5">
-            <div className="w-4 h-0.5 rounded-full" style={{ background: s.color }} />
-            <span className="text-xs" style={{ color: "var(--dt4)" }}>{s.label}</span>
-          </div>
+          <span key={s.label}><span className="dsb-legenda-garis" style={{ background: s.color }} aria-hidden="true" />{s.label}</span>
         ))}
         {futureStartIdx > 0 && (
-          <div className="flex items-center gap-1.5">
-            <div className="w-4 h-0.5 rounded-full" style={{ borderTop: "2px dashed var(--st-violet)" }} />
-            <span className="text-xs" style={{ color: "var(--st-violet)" }}>Mendatang (proj.)</span>
-          </div>
+          <span><span className="dsb-legenda-garis" style={{ background: "none", height: 0, borderTop: "2px dashed var(--st-violet)" }} aria-hidden="true" />Mendatang (proyeksi)</span>
         )}
       </div>
       <div className="overflow-x-auto">
-        <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{ minWidth: "300px", display: "block" }}>
+        <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{ minWidth: "280px", display: "block", overflow: "visible" }}>
           {/* Future background shading */}
           {dividerX !== null && (
             <rect
@@ -310,8 +278,7 @@ function TrenLineChart({ data }: { data: TrenBulanan[] }) {
               y={padT}
               width={VW - padR - dividerX}
               height={cH}
-              fill="#f0f7ff"
-              opacity="0.7"
+              fill="var(--sub)"
             />
           )}
 
@@ -321,9 +288,9 @@ function TrenLineChart({ data }: { data: TrenBulanan[] }) {
             const val = Math.round(pct * maxVal);
             return (
               <g key={pct}>
-                <line x1={padL} y1={y} x2={VW - padR} y2={y} stroke="#f0f4f8" strokeWidth="1" />
+                <line x1={padL} y1={y} x2={VW - padR} y2={y} stroke="var(--ln2)" strokeWidth="1" />
                 {pct > 0 && (
-                  <text x={padL - 5} y={y + 3.5} textAnchor="end" fontSize="9" fill="#c0cdd8">{val}</text>
+                  <text x={padL - 6} y={y + 3.5} textAnchor="end" fontSize="11" fill="var(--dt5)">{val}</text>
                 )}
               </g>
             );
@@ -336,7 +303,7 @@ function TrenLineChart({ data }: { data: TrenBulanan[] }) {
               y1={padT}
               x2={dividerX}
               y2={padT + cH}
-              stroke="#b0c8e0"
+              stroke="var(--ln0)"
               strokeWidth="1"
               strokeDasharray="4 3"
             />
@@ -413,7 +380,7 @@ function TrenLineChart({ data }: { data: TrenBulanan[] }) {
                     opacity={isFut ? 0.8 : 1}
                   />
                   {v > 0 && (
-                    <text x={cx} y={cy - 8} textAnchor="middle" fontSize="9" fill={s.color} fontWeight="600" opacity={isFut ? 0.7 : 1}>{v}</text>
+                    <text x={cx} y={cy - 8} textAnchor="middle" fontSize="11" fill={s.color} fontWeight="600" opacity={isFut ? 0.7 : 1}>{v}</text>
                   )}
                 </g>
               );
@@ -429,8 +396,8 @@ function TrenLineChart({ data }: { data: TrenBulanan[] }) {
                 x={xOf(i)}
                 y={VH - 8}
                 textAnchor="middle"
-                fontSize="10"
-                fill={d.isFuture ? "#a0b8d0" : isCurrentMonth ? "var(--dtn)" : "var(--dt4)"}
+                fontSize="11"
+                fill={d.isFuture ? "var(--dt5)" : isCurrentMonth ? "var(--dtn)" : "var(--dt4)"}
                 fontWeight={isCurrentMonth ? "700" : "400"}
               >
                 {d.bulan}
@@ -480,6 +447,7 @@ function pegawaiModal(p: PegawaiJatuhTempo): PegawaiModal {
 
 function DashboardMain() {
   const dashUser = useDashUser();
+  const role = useRole();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -536,25 +504,18 @@ function DashboardMain() {
     return () => clearTimeout(t);
   }, [pesanBerhasil]);
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center py-20">
-        <p className="text-xs" style={{ color: "var(--dt4)" }}>Memuat dashboard...</p>
-      </div>
-    );
+  if (loading) return <KerangkaDashboard />;
 
   if (apiError)
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <p className="text-sm font-semibold" style={{ color: "var(--st-red)" }}>Gagal memuat dashboard</p>
-        <p className="text-xs" style={{ color: "var(--dt4)" }}>{apiError}</p>
-        <button
-          onClick={() => fetchDashboard()}
-          className="text-xs px-4 py-2 rounded"
-          style={{ background: "var(--navy-solid)", color: "#fff" }}
-        >
-          Coba Lagi
-        </button>
+      <div className="dsb-halaman">
+        <div className="dsb-kartu dsb-kosong" style={{ padding: "56px 20px" }} role="alert">
+          <p className="dsb-judul" style={{ marginTop: 0 }}>Gagal memuat dashboard</p>
+          <p>{apiError}</p>
+          <button type="button" onClick={() => fetchDashboard()} className="dsb-tombol" style={{ marginTop: "8px" }}>
+            Coba lagi
+          </button>
+        </div>
       </div>
     );
 
@@ -574,32 +535,37 @@ function DashboardMain() {
     .map((p) => ({ tmtKgbBerikutnya: p.tmtKgbBerikutnya }));
 
   /* -- Banners -- */
-  const banners: { id: string; bg: string; border: string; color: string; icon: React.ReactNode; message: React.ReactNode }[] = [];
+  const ikonPesan = (d: React.ReactNode) => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
+  );
+  const IKON_PERINGATAN = ikonPesan(<><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>);
+  const IKON_JAM = ikonPesan(<><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>);
+  const banners: { id: string; nada: "merah" | "kuning" | "biru"; icon: React.ReactNode; message: React.ReactNode }[] = [];
 
   const terlambatList = pegawaiJatuhTempo.filter((p) => p.terlambat);
   if (terlambatList.length > 0)
     banners.push({
       id: "terlambat",
-      bg: "var(--tint-red-bg)", border: "var(--tint-red-ln)", color: "var(--st-red)",
-      icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>,
-      message: <><strong>{terlambatList.length} pegawai</strong> deadline input SK-nya sudah lewat dan belum diproses, berisiko selisih gaji (rapelan). Segera selesaikan.</>,
+      nada: "merah",
+      icon: IKON_PERINGATAN,
+      message: <><strong>{terlambatList.length} pegawai</strong> melewati batas input SK dan belum diproses, berisiko selisih gaji (rapelan). Segera selesaikan.</>,
     });
 
   const deadline7 = pegawaiJatuhTempo.filter((p) => p.statusKGB !== "selesai" && !p.terlambat && daysDiff(p.deadlineSDM) >= 0 && daysDiff(p.deadlineSDM) <= 7);
   if (deadline7.length > 0)
     banners.push({
       id: "deadline7",
-      bg: "var(--tint-amber-bg)", border: "var(--tint-amber-ln)", color: "var(--st-amber2)",
-      icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b87c0a" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>,
+      nada: "kuning",
+      icon: IKON_JAM,
       message: <><strong>{deadline7.length} pegawai</strong> batas input SK-nya tinggal kurang dari 7 hari, segera proses sebelum terlambat.</>,
     });
 
   if (stats.totalHukdis > 0)
     banners.push({
       id: "hukdis",
-      bg: "var(--tint-red-bg)", border: "var(--tint-red-ln)", color: "var(--st-red)",
-      icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>,
-      message: <><strong>{stats.totalHukdis} pegawai</strong> sedang menjalani Hukuman Disiplin. KGB diblokir otomatis hanya untuk jenis <em>Penundaan KGB</em>. <Link href="/dashboard/pegawai" className="underline font-semibold">Lihat daftar</Link></>,
+      nada: "merah",
+      icon: ikonPesan(<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>),
+      message: <><strong>{stats.totalHukdis} pegawai</strong> sedang menjalani Hukuman Disiplin. KGB diblokir otomatis hanya untuk jenis <em>Penundaan KGB</em>. <Link href="/dashboard/pegawai">Lihat daftar</Link></>,
     });
 
   // H-2 banner: KGB dengan TMT bulan depan+1 (= 2 bulan dari sekarang) yang belum dikirim ke keuangan
@@ -623,8 +589,8 @@ function DashboardMain() {
     if (belumKirimH2.length > 0)
       banners.push({
         id: "h2-deadline",
-        bg: "var(--tint-blue-bg)", border: "var(--tint-blue-ln)", color: "var(--st-blue)",
-        icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1e40af" strokeWidth="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>,
+        nada: "biru",
+        icon: ikonPesan(<><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4 20-7z" /></>),
         message: <>
           <strong>{belumKirimH2.length} KGB berlaku {h2BulanNama}</strong> belum dikirim ke keuangan.
           {" "}Kirim SK ke keuangan sebelum akhir <strong>{deadlineBulanNama}</strong>. Setelah itu masuk masa konfirmasi keuangan.
@@ -636,8 +602,8 @@ function DashboardMain() {
   for (const notif of (followupNotifs ?? [])) {
     banners.push({
       id: `followup-${notif.id}`,
-      bg: "var(--tint-amber-bg)", border: "var(--tint-amber-ln)", color: "var(--st-amber2)",
-      icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b87c0a" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.3a16 16 0 0 0 6 6l.86-.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17.92z"/></svg>,
+      nada: "kuning",
+      icon: ikonPesan(<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.3a16 16 0 0 0 6 6l.86-.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17.92z" />),
       message: <>{notif.pesan}</>,
     });
   }
@@ -646,11 +612,6 @@ function DashboardMain() {
 
   /* -- KGB Jatuh Tempo filter : berdasarkan DEADLINE SDM bukan TMT -- */
   const today = new Date();
-  const jamSekarang = today.getHours();
-  const greeting =
-    jamSekarang < 11 ? "Selamat pagi" :
-    jamSekarang < 15 ? "Selamat siang" :
-    jamSekarang < 19 ? "Selamat sore" : "Selamat malam";
 
   // "Bulan Berjalan" = masa unlock SDM bulan ini → TMT = bulan ini + 2
   const unlockTmtMonth = (today.getMonth() + 2) % 12;
@@ -690,449 +651,272 @@ function DashboardMain() {
     { value: "terlambat", label: "Terlambat" },
   ];
 
+  function bukaRapelan() {
+    setShowRapelanPopup(true);
+    setRapelanKonfirmasiLoading(true);
+    fetch("/api/kgb?rapelanDitetapkan=true")
+      .then((r) => r.json() as Promise<unknown>)
+      .then((d) => setRapelanKonfirmasiList(Array.isArray(d) ? d : []))
+      .catch(() => setRapelanKonfirmasiList([]))
+      .finally(() => setRapelanKonfirmasiLoading(false));
+  }
+
+  const tahunIni = today.getFullYear();
+  const pctKgbSelesai = stats.kgbTahunIni > 0 ? Math.round((stats.selesai / stats.kgbTahunIni) * 100) : 0;
+  const pctBelum = totalKGBAktif > 0 ? Math.round((stats.belumDiproses / totalKGBAktif) * 100) : 0;
+  const namaBulanFilter = filterMonth
+    ? (() => {
+        const [y, m] = filterMonth.split("-");
+        return new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleDateString("id-ID", { month: "short", year: "numeric" });
+      })()
+    : null;
+
   return (
     <>
-    <div className="space-y-3">
+    <div className="dsb-halaman">
 
-      {/* -- Header : sapaan + ringkasan hari ini -- */}
-      <div className="dash-sec rounded-xl px-4 py-3.5 flex flex-wrap items-center justify-between gap-3" style={{
-        background: "linear-gradient(120deg, var(--tint-navy) 0%, var(--card) 70%)",
-        border: "0.5px solid var(--ln1)",
-      }}>
-        <div className="min-w-0">
-          <h1 className="text-base font-bold leading-tight" style={{ color: "var(--dtn)", letterSpacing: "-0.01em" }}>
-            {greeting}{dashUser.nama ? `, ${dashUser.nama.split(" ")[0]}` : ""}
-          </h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--dt4)" }}>
-            {today.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-            {" · "}Monitoring KGB Kanwil Ditjenpas Kalsel
-          </p>
-          <p className="text-xs mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1" style={{ color: "var(--dt3)" }}>
-            {stats.belumDiproses > 0 ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)", fontSize: "10px" }}>
-                {stats.belumDiproses} KGB menunggu diproses
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", fontSize: "10px" }}>
-                Semua KGB tahun ini tertangani
-              </span>
-            )}
-            {terlambatList.length > 0 && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", fontSize: "10px" }}>
-                {terlambatList.length} melewati deadline
-              </span>
-            )}
-            <span style={{ fontSize: "10px", color: "var(--dt5)" }}>
-              {stats.selesai}/{totalKGBAktif} selesai ({progressPct}%)
-            </span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {lastRefresh && (
-            <p className="hidden sm:block text-xs" style={{ color: "var(--dt5)" }}>
-              Diperbarui {lastRefresh.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={handleManualRefresh}
-            disabled={refreshing}
-            title="Perbarui data dashboard"
-            aria-label="Perbarui data dashboard"
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition hover:opacity-80 disabled:opacity-40"
-            style={{ background: "var(--card)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-              style={{ animation: refreshing ? "spin 0.8s linear infinite" : "none" }}>
-              <polyline points="23 4 23 10 17 10"/>
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes dashRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-        .dash-sec { animation: dashRise .4s cubic-bezier(.22,1,.36,1) both; }
-        .dash-sec:nth-child(2) { animation-delay: .04s } .dash-sec:nth-child(3) { animation-delay: .08s }
-        .dash-sec:nth-child(4) { animation-delay: .12s } .dash-sec:nth-child(5) { animation-delay: .16s }
-        .dash-card { transition: box-shadow .18s, transform .18s, border-color .18s; }
-        a.dash-card:hover, button.dash-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 28px rgba(9,20,40,0.12);
-        }
-        /* — KPI card system — */
-        .kpi-strip { position: absolute; top: 0; left: 0; right: 0; height: 2.5px; opacity: .85; }
-        .kpi-chip {
-          width: 38px; height: 38px; border-radius: 11px;
-          display: flex; align-items: center; justify-content: center;
-          box-shadow: 0 6px 16px rgba(9,20,40,0.18), inset 0 1px 0 rgba(255,255,255,0.22);
-        }
-        .kpi-num { font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; margin-bottom: 3px; }
-        .kpi-foot {
-          display: flex; align-items: center; justify-content: center; gap: 6px;
-          padding: 7px 10px; font-size: 11px; font-weight: 600;
-          background: var(--sub); border-top: 0.5px solid var(--ln2);
-          transition: gap .15s;
-        }
-        .kpi-card:hover .kpi-foot { gap: 9px; }
-      `}</style>
+      {/* -- Panel navy: sapaan, ringkasan hari ini, dan KPI -- */}
+      <PanelNavy
+        label={`Dashboard · ${ROLE_LABEL[role] ?? "SIM-KGB"}`}
+        judul={`${sapaanWita()}${namaDepan(dashUser.nama) ? `, ${namaDepan(dashUser.nama)}` : ""}`}
+        sub={<>{tanggalPanjangWita()} · Monitoring KGB Kanwil Ditjenpas Kalimantan Selatan</>}
+        chips={[
+          stats.belumDiproses > 0
+            ? { teks: `${stats.belumDiproses} KGB menunggu diproses`, nada: "kuning" }
+            : { teks: "Semua KGB tahun ini tertangani", nada: "hijau" },
+          ...(terlambatList.length > 0 ? [{ teks: `${terlambatList.length} melewati batas input`, nada: "merah" as const }] : []),
+          { teks: `${stats.selesai} dari ${totalKGBAktif} selesai (${progressPct}%)`, nada: "hijau" },
+        ]}
+        diperbarui={lastRefresh}
+        onMuatUlang={handleManualRefresh}
+        memuat={refreshing}
+      >
+        <KisiKpi>
+          <Kpi
+            href="/dashboard/pegawai"
+            label="Pegawai aktif"
+            angka={stats.totalPegawai}
+            meta={stats.totalHukdis > 0 ? `${stats.totalHukdis} dalam hukdis aktif` : "Tidak ada hukdis aktif"}
+            metaNada={stats.totalHukdis > 0 ? "merah" : undefined}
+          />
+          <Kpi
+            href="/dashboard/kgb"
+            label="KGB tahun ini"
+            angka={stats.kgbTahunIni}
+            satuan={tahunIni}
+            progres={pctKgbSelesai}
+            meta={`${stats.selesai} selesai · ${stats.sedangDiproses} dalam proses`}
+            metaNada="hijau"
+          />
+          <Kpi
+            href="/dashboard/kgb"
+            label="Belum diproses"
+            angka={stats.belumDiproses}
+            satuan={`${pctBelum}%`}
+            progres={pctBelum}
+            meta={stats.belumDiproses > 0 ? "Proses sekarang" : "Semua sudah diproses"}
+            metaNada={stats.belumDiproses > 0 ? "kuning" : "hijau"}
+          />
+          <Kpi
+            onClick={bukaRapelan}
+            label="Rapelan terkonfirmasi"
+            angka={stats.rapelanKonfirmasi}
+            meta={stats.rapelanBerisiko > 0 ? `${stats.rapelanBerisiko} berpotensi rapelan` : "Tidak ada potensi rapelan"}
+            metaNada={stats.rapelanBerisiko > 0 ? "kuning" : undefined}
+            sorot={stats.rapelanKonfirmasi > 0}
+          />
+        </KisiKpi>
+      </PanelNavy>
 
-      {/* -- Banners -- */}
+      {/* -- Pemberitahuan -- */}
       {visibleBanners.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="dsb-pesan-daftar dsb-muncul" style={{ "--i": 1 } as React.CSSProperties}>
           {visibleBanners.map((b) => (
-            <div key={b.id} className="rounded-lg px-3 py-1.5 flex items-center gap-2.5" style={{ background: b.bg, border: `1px solid ${b.border}` }}>
-              <div className="shrink-0">{b.icon}</div>
-              <p className="text-xs leading-relaxed flex-1" style={{ color: b.color }}>{b.message}</p>
-              <button type="button" aria-label="Tutup pemberitahuan" onClick={() => setDismissedBanners((prev) => new Set(prev).add(b.id))} className="shrink-0 opacity-50 hover:opacity-100 transition">
-                <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={b.color} strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            <div key={b.id} className="dsb-pesan" data-nada={b.nada}>
+              <span className="dsb-pesan-ikon" aria-hidden="true">{b.icon}</span>
+              <p>{b.message}</p>
+              <button type="button" className="dsb-ikon-tombol" aria-label="Tutup pemberitahuan" onClick={() => setDismissedBanners((prev) => new Set(prev).add(b.id))}>
+                <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {/* -- KPI Cards : 4 kolom seragam, semuanya interaktif -- */}
-      <div className="dash-sec grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* -- KGB per bulan | Status proses | Tren -- */}
+      <div className="dsb-kisi-3 dsb-muncul" style={{ "--i": 2 } as React.CSSProperties}>
 
-        {/* Total Pegawai → /dashboard/pegawai */}
-        <Link href="/dashboard/pegawai" className="dash-card kpi-card bg-white rounded-xl w-full text-left active:scale-95 overflow-hidden flex flex-col" style={{ border: "0.5px solid var(--ln1)", textDecoration: "none", position: "relative" }}>
-          <span aria-hidden className="kpi-strip" style={{ background: "linear-gradient(90deg, var(--navy-solid), transparent)" }} />
-          <div className="p-3.5 flex items-start gap-3 flex-1">
-            <div className="kpi-chip shrink-0" style={{ background: "linear-gradient(135deg, #2d5d94, var(--navy-solid))" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="kpi-num" style={{ color: "var(--dtn)" }}>{stats.totalPegawai}</p>
-              <p className="text-xs font-medium" style={{ color: "var(--dt3)" }}>Pegawai Aktif</p>
-              <p className="text-xs mt-1" style={{ color: stats.totalHukdis > 0 ? "var(--st-red)" : "var(--dt5)", fontSize: "10.5px" }}>
-                {stats.totalHukdis > 0 ? `${stats.totalHukdis} dalam hukdis aktif` : "Tidak ada hukdis"}
-              </p>
-            </div>
-          </div>
-          <div className="kpi-foot" style={{ color: "var(--dtn)" }}>
-            Lihat Pegawai
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </div>
-        </Link>
-
-        {/* KGB Tahun Ini → /dashboard/kgb, dengan progress selesai */}
-        <Link href="/dashboard/kgb" className="dash-card kpi-card bg-white rounded-xl w-full text-left active:scale-95 overflow-hidden flex flex-col" style={{ border: "0.5px solid var(--ln1)", textDecoration: "none", position: "relative" }}>
-          <span aria-hidden className="kpi-strip" style={{ background: "linear-gradient(90deg, var(--green-solid), transparent)" }} />
-          <div className="p-3.5 flex items-start gap-3 flex-1">
-            <div className="kpi-chip shrink-0" style={{ background: "linear-gradient(135deg, #17a37e, var(--green-solid))" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-1.5">
-                <p className="kpi-num" style={{ color: "var(--st-green)" }}>{stats.kgbTahunIni}</p>
-                <span className="text-xs font-bold" style={{ color: "var(--st-green)", opacity: 0.45 }}>{today.getFullYear()}</span>
-              </div>
-              <p className="text-xs font-medium" style={{ color: "var(--dt3)" }}>KGB Tahun Ini</p>
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <div style={{ flex: 1, height: "4px", borderRadius: "99px", background: "var(--ln2)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${stats.kgbTahunIni > 0 ? Math.round((stats.selesai / stats.kgbTahunIni) * 100) : 0}%`, background: "linear-gradient(90deg, #17a37e, var(--green-solid))", borderRadius: "99px", transition: "width .8s ease" }} />
-                </div>
-                <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--st-green)", flexShrink: 0 }}>
-                  {stats.kgbTahunIni > 0 ? Math.round((stats.selesai / stats.kgbTahunIni) * 100) : 0}%
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="kpi-foot" style={{ color: "var(--st-green)" }}>
-            {stats.selesai} selesai · {stats.sedangDiproses} dalam proses
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </div>
-        </Link>
-
-        {/* Belum Diproses → /dashboard/kgb */}
-        <Link href="/dashboard/kgb" className="dash-card kpi-card bg-white rounded-xl w-full text-left active:scale-95 overflow-hidden flex flex-col" style={{ border: "0.5px solid var(--ln1)", textDecoration: "none", position: "relative" }}>
-          <span aria-hidden className="kpi-strip" style={{ background: "linear-gradient(90deg, var(--amber-solid), transparent)" }} />
-          <div className="p-3.5 flex items-start gap-3 flex-1">
-            <div className="kpi-chip shrink-0" style={{ background: "linear-gradient(135deg, #d99414, var(--amber-solid))" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="kpi-num" style={{ color: "var(--st-amber)" }}>{stats.belumDiproses}</p>
-              <p className="text-xs font-medium" style={{ color: "var(--dt3)" }}>{infoStatusKgb("belum_diproses").label}</p>
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <div style={{ flex: 1, height: "4px", borderRadius: "99px", background: "var(--ln2)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${totalKGBAktif > 0 ? Math.round((stats.belumDiproses / totalKGBAktif) * 100) : 0}%`, background: "linear-gradient(90deg, #d99414, var(--amber-solid))", borderRadius: "99px", transition: "width .8s ease" }} />
-                </div>
-                <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--st-amber)", flexShrink: 0 }}>
-                  {totalKGBAktif > 0 ? Math.round((stats.belumDiproses / totalKGBAktif) * 100) : 0}%
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="kpi-foot" style={{ color: "var(--st-amber)" }}>
-            {stats.belumDiproses > 0 ? "Proses sekarang" : "Semua sudah diproses"}
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </div>
-        </Link>
-
-        {/* Rapelan : klik untuk lihat detail */}
-        <button type="button" onClick={() => {
-            setShowRapelanPopup(true);
-            setRapelanKonfirmasiLoading(true);
-            fetch("/api/kgb?rapelanDitetapkan=true")
-              .then((r) => r.json() as Promise<unknown>)
-              .then((d) => setRapelanKonfirmasiList(Array.isArray(d) ? d : []))
-              .catch(() => setRapelanKonfirmasiList([]))
-              .finally(() => setRapelanKonfirmasiLoading(false));
-          }} className="dash-card kpi-card rounded-xl w-full text-left active:scale-95 overflow-hidden flex flex-col"
-          style={{ border: (stats.rapelanKonfirmasi > 0 || stats.rapelanBerisiko > 0) ? "0.5px solid var(--tint-red-ln)" : "0.5px solid var(--ln1)", background: stats.rapelanKonfirmasi > 0 ? "var(--tint-red-bg)" : "var(--card)", position: "relative", cursor: "pointer" }}>
-          <span aria-hidden className="kpi-strip" style={{ background: "linear-gradient(90deg, var(--red-solid), transparent)" }} />
-          <div className="p-3.5 flex items-start gap-3 flex-1">
-            <div className="kpi-chip shrink-0" style={{ background: "linear-gradient(135deg, #e35d5d, var(--red-solid))" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="kpi-num" style={{ color: "var(--st-red)" }}>{stats.rapelanKonfirmasi}</p>
-              <p className="text-xs font-medium" style={{ color: "var(--dt3)" }}>Rapelan Terkonfirmasi</p>
-              <p className="text-xs mt-1" style={{ color: stats.rapelanBerisiko > 0 ? "var(--st-amber)" : "var(--dt5)", fontSize: "10.5px" }}>
-                {stats.rapelanBerisiko > 0 ? `${stats.rapelanBerisiko} berpotensi rapelan` : "Tidak ada potensi rapelan"}
-              </p>
-            </div>
-          </div>
-          <div className="kpi-foot" style={{ color: "var(--st-red)" }}>
-            Lihat Detail
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </div>
-        </button>
-      </div>
-
-      {/* -- Row 2: KGB per Bulan | Progress | Tren -- */}
-      <div className="dash-sec grid grid-cols-1 gap-3 lg:grid-cols-3">
-
-        {/* KGB per Bulan */}
-        <div className="bg-white rounded-xl p-4 flex flex-col gap-2.5" style={{ border: "0.5px solid var(--ln1)" }}>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              </div>
-              <div>
-                <p className="text-xs font-semibold leading-tight" style={{ color: "var(--dtn)" }}>KGB per Bulan</p>
-                <p style={{ fontSize: "10px", color: "var(--dt4)" }}>{today.getFullYear()} · klik bulan untuk filter</p>
-              </div>
-            </div>
-            {filterMonth && (
+        {/* KGB per bulan */}
+        <section className="dsb-kartu dsb-kartu-isi flex flex-col gap-4" aria-labelledby="judul-kgb-bulan">
+          <KepalaKartu
+            idJudul="judul-kgb-bulan"
+            label={`Tahun ${tahunIni}`}
+            judul="KGB per bulan"
+            sub="Pilih bulan untuk menyaring daftar pegawai"
+            aksi={filterMonth && (
               <button type="button" onClick={() => { setFilterMonth(null); setKgbPage(0); }}
-                aria-label={`Hapus filter bulan ${filterMonth}`}
-                className="shrink-0 flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg transition hover:opacity-75"
-                style={{ background: "var(--tint-navy)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}>
-                <svg aria-hidden="true" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                {filterMonth}
+                aria-label={`Hapus filter bulan ${namaBulanFilter}`}
+                className="dsb-tombol dsb-tombol-kecil" data-jenis="lembut">
+                <svg aria-hidden="true" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                {namaBulanFilter}
               </button>
             )}
-          </div>
+          />
           <MonthGrid pegawaiKalender={pegawaiKalenderDerived} selesaiKalender={selesaiKalenderDerived} filterMonth={filterMonth} onSelect={(m) => { setFilterMonth(m); setKgbPage(0); }} />
-          <div className="flex items-center gap-3 flex-wrap">
-            {([{ bar: "#ef4444", label: "Terlambat" }, { bar: "#f59e0b", label: "Kritis" }, { bar: "#fcd34d", label: "≤30 hari" }, { bar: "#34d399", label: "Aman" }] as { bar: string; label: string }[]).map(({ bar, label }) => (
-              <div key={label} className="flex items-center gap-1">
-                <div style={{ width: "10px", height: "3px", borderRadius: "2px", background: bar, flexShrink: 0 }} />
-                <span style={{ fontSize: "10px", color: "var(--dt5)" }}>{label}</span>
-              </div>
-            ))}
+          <div className="dsb-legenda">
+            <span><span className="dsb-titik" data-nada="merah" aria-hidden="true" />Terlambat</span>
+            <span><span className="dsb-titik" data-nada="kuning" aria-hidden="true" />Kritis</span>
+            <span><span className="dsb-titik" data-nada="kuning" data-cincin="" aria-hidden="true" />≤30 hari</span>
+            <span><span className="dsb-titik" data-nada="hijau" aria-hidden="true" />Aman</span>
+            <span><span className="dsb-titik" data-nada="emas" data-cincin="" aria-hidden="true" />Bulan ini</span>
           </div>
-        </div>
+        </section>
 
-        {/* Progress KGB */}
-        <div className="bg-white rounded-xl p-4 flex flex-col gap-3" style={{ border: "0.5px solid var(--ln1)" }}>
-          {(() => {
-            // stats.sedangDiproses menggabungkan Sedang Diproses dan Menunggu Keuangan; rinciannya dipisah di sini.
-            const menungguKeuangan = Math.min(stats.menungguKeuangan ?? 0, stats.sedangDiproses);
-            const label = (status: string) => infoStatusKgb(status).label;
-            const statusList = [
-              { label: label("selesai"),           value: stats.selesai,                             color: "#10b981", bg: "var(--tint-green-bg2)", icon: (<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>) },
-              { label: label("sedang_diproses"),   value: stats.sedangDiproses - menungguKeuangan,   color: "#3b82f6", bg: "var(--tint-blue-bg2)", icon: (<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>) },
-              { label: label("menunggu_keuangan"), value: menungguKeuangan,                          color: "#8b5cf6", bg: "var(--tint-violet-bg)", icon: (<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>) },
-              { label: label("belum_diproses"),    value: stats.belumDiproses,                       color: "#f59e0b", bg: "var(--tint-amber-bg2)", icon: (<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>) },
-              { label: label("ditolak"),           value: stats.ditolak,                             color: "#ef4444", bg: "var(--tint-red-bg2)", icon: (<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>) },
-            ];
-            const dominant = statusList.reduce((a, b) => b.value > a.value ? b : a, statusList[0]);
-            const dominantPct = totalKGBAktif > 0 ? Math.round((dominant.value / totalKGBAktif) * 100) : 0;
-            const R = 48, CX = 64, CY = 64;
-            const CIRCUM = 2 * Math.PI * R;
-            const dash = (dominantPct / 100) * CIRCUM;
-            const infoMsg = stats.selesai === totalKGBAktif && totalKGBAktif > 0
-              ? "Semua proses KGB selesai"
-              : stats.selesai === 0 ? "Belum ada yang selesai"
-              : stats.ditolak > 0 ? `${stats.ditolak} KGB dibatalkan`
-              : progressPct >= 75 ? "Hampir selesai"
-              : `${stats.sedangDiproses} sedang berjalan`;
-            return (
-              <>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/></svg>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold leading-tight" style={{ color: "var(--dtn)" }}>Status Proses KGB {today.getFullYear()}</p>
-                    <p style={{ fontSize: "10px", color: "var(--dt4)" }}>{totalKGBAktif} KGB terdaftar tahun ini</p>
-                  </div>
+        {/* Status proses */}
+        {(() => {
+          // stats.sedangDiproses menggabungkan Sedang Diproses dan Menunggu Keuangan; rinciannya dipisah di sini.
+          const menungguKeuangan = Math.min(stats.menungguKeuangan ?? 0, stats.sedangDiproses);
+          const label = (status: string) => infoStatusKgb(status).label;
+          const statusList: { label: string; value: number; nada: Nada; warna: string }[] = [
+            { label: label("selesai"),           value: stats.selesai,                           nada: "hijau",  warna: "var(--st-green)" },
+            { label: label("sedang_diproses"),   value: stats.sedangDiproses - menungguKeuangan, nada: "navy",   warna: "var(--accent)" },
+            { label: label("menunggu_keuangan"), value: menungguKeuangan,                        nada: "ungu",   warna: "var(--st-violet)" },
+            { label: label("belum_diproses"),    value: stats.belumDiproses,                     nada: "kuning", warna: "var(--st-amber)" },
+            { label: label("ditolak"),           value: stats.ditolak,                           nada: "merah",  warna: "var(--st-red)" },
+          ];
+          const R = 56;
+          const KELILING = 2 * Math.PI * R;
+          const infoMsg = stats.selesai === totalKGBAktif && totalKGBAktif > 0
+            ? "Semua proses KGB selesai"
+            : stats.selesai === 0 ? "Belum ada yang selesai"
+            : stats.ditolak > 0 ? `${stats.ditolak} KGB dibatalkan`
+            : progressPct >= 75 ? "Hampir selesai"
+            : `${stats.sedangDiproses} sedang berjalan`;
+          return (
+            <section className="dsb-kartu dsb-kartu-isi flex flex-col gap-4" aria-labelledby="judul-status-proses">
+              <KepalaKartu idJudul="judul-status-proses" label={`Tahun ${tahunIni}`} judul="Status proses KGB" sub={`${totalKGBAktif} KGB terdaftar tahun ini`} />
+              <div className="flex items-center gap-5">
+                <div className="dsb-cincin" style={{ width: 112, height: 112 }}>
+                  <svg viewBox="0 0 128 128" width="112" height="112" aria-hidden="true">
+                    <circle cx="64" cy="64" r={R} fill="none" stroke="var(--ln2)" strokeWidth="8" />
+                    {totalKGBAktif > 0 && (
+                      <circle cx="64" cy="64" r={R} fill="none" stroke={progressPct >= 100 ? "var(--st-green)" : "var(--accent)"} strokeWidth="8" strokeLinecap="round"
+                        strokeDasharray={`${(progressPct / 100) * KELILING} ${KELILING}`} transform="rotate(-90 64 64)"
+                        style={{ transition: "stroke-dasharray .8s cubic-bezier(.16,1,.3,1)" }} />
+                    )}
+                  </svg>
+                  <p className="dsb-cincin-angka" style={{ fontSize: "26px" }}>
+                    {progressPct}%
+                    <span className="dsb-cincin-label">selesai</span>
+                  </p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="shrink-0 flex flex-col items-center gap-1.5">
-                    <svg width="110" height="110" viewBox="0 0 128 128">
-                      <circle cx={CX} cy={CY} r={R} fill="none" stroke="#edf2f7" strokeWidth="10" />
-                      {totalKGBAktif > 0 && (
-                        <circle cx={CX} cy={CY} r={R} fill="none" stroke={dominant.color} strokeWidth="10" strokeLinecap="round"
-                          strokeDasharray={`${dash} ${CIRCUM}`} transform={`rotate(-90 ${CX} ${CY})`} />
-                      )}
-                      <text x={CX} y={CY - 7} textAnchor="middle" fontSize="20" fontWeight="800" fill={dominant.color}>{dominantPct}%</text>
-                      <text x={CX} y={CY + 9} textAnchor="middle" fontSize="9" fontWeight="600" fill="#64748b">{dominant.label}</text>
-                      <text x={CX} y={CY + 21} textAnchor="middle" fontSize="8" fill="#a0b4c8">{dominant.value}/{totalKGBAktif}</text>
-                    </svg>
-                    <div className="rounded-lg px-2 py-0.5 text-center" style={{ background: dominant.bg, maxWidth: "110px" }}>
-                      <p style={{ fontSize: "9px", fontWeight: 600, color: dominant.color, lineHeight: "1.4" }}>{infoMsg}</p>
-                    </div>
-                  </div>
-                  <div className="flex-1 flex flex-col gap-2 pt-1">
-                    {statusList.map((s) => {
-                      const pct = totalKGBAktif > 0 ? Math.round((s.value / totalKGBAktif) * 100) : 0;
-                      return (
-                        <div key={s.label}>
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
-                              <span style={{ fontSize: "11px", color: "var(--dt3)", fontWeight: 500 }}>{s.label}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <span style={{ fontSize: "14px", fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</span>
-                              <span style={{ fontSize: "10px", color: "var(--dt5)", minWidth: "24px", textAlign: "right" }}>{pct}%</span>
-                            </div>
-                          </div>
-                          <div style={{ height: "4px", borderRadius: "99px", background: "var(--ln2)", overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${pct}%`, background: s.color, transition: "width 0.8s ease", borderRadius: "99px" }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="min-w-0">
+                  <p className="dsb-status-nilai" style={{ fontSize: "22px", fontWeight: 400, letterSpacing: "-0.03em", margin: 0 }}>
+                    {stats.selesai} <span style={{ fontSize: "14px", color: "var(--dt4)" }}>dari {totalKGBAktif}</span>
+                  </p>
+                  <p className="dsb-sub" style={{ marginTop: "6px" }}>{infoMsg}. Target: semua KGB tahun ini selesai.</p>
                 </div>
-                <div className="rounded-lg px-2.5 py-1.5 flex items-center justify-between gap-2 mt-auto" style={{ background: "var(--tint-amber-bg)", border: "0.5px solid var(--tint-amber-ln)" }}>
-                  <p style={{ fontSize: "10px", fontWeight: 700, color: "var(--st-amber2)" }}>Target: semua pegawai KGB-nya selesai tahun ini</p>
-                  <div className="flex items-center gap-1.5">
-                    <div style={{ width: "64px", height: "4px", borderRadius: "99px", background: "var(--tint-amber-ln)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${progressPct}%`, background: progressPct >= 100 ? "#10b981" : "#f59e0b", borderRadius: "99px" }} />
-                    </div>
-                    <span className="rounded px-1 py-px font-bold" style={{ background: progressPct >= 100 ? "#10b981" : "#f59e0b", color: "#fff", fontSize: "10px" }}>{progressPct}%</span>
-                  </div>
-                </div>
-              </>
-            );
-          })()}
-        </div>
+              </div>
+              <div className="dsb-status-daftar">
+                  {statusList.map((s) => {
+                    const pct = totalKGBAktif > 0 ? Math.round((s.value / totalKGBAktif) * 100) : 0;
+                    return (
+                      <div key={s.label} className="dsb-status-baris">
+                        <span className="dsb-status-nama">
+                          <span className="dsb-titik" data-nada={s.nada} aria-hidden="true" />
+                          <span>{s.label}</span>
+                        </span>
+                        <span className="dsb-status-nilai">{s.value}</span>
+                        <span className="dsb-status-persen">{pct}%</span>
+                        <span className="dsb-status-bar" aria-hidden="true">
+                          <span style={{ width: `${pct}%`, background: s.warna }} />
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </section>
+          );
+        })()}
 
-        {/* Tren KGB Bulanan */}
+        {/* Tren bulanan */}
         {trenBulanan?.length > 0 && (
-          <div className="bg-white rounded-xl p-4" style={{ border: "0.5px solid var(--ln1)" }}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
-              </div>
-              <div>
-                <h2 className="text-xs font-semibold leading-tight" style={{ color: "var(--dtn)" }}>Tren KGB Bulanan</h2>
-                <p className="text-xs" style={{ color: "var(--dt4)", fontSize: "10px" }}>3 bulan lalu · bulan ini · 3 bulan ke depan</p>
-              </div>
-            </div>
+          <section className="dsb-kartu dsb-kartu-isi flex flex-col gap-4" aria-labelledby="judul-tren">
+            <KepalaKartu idJudul="judul-tren" label="Tren" judul="KGB per bulan TMT" sub="Tiga bulan lalu sampai tiga bulan ke depan" />
             <TrenLineChart data={trenBulanan} />
-          </div>
+          </section>
         )}
 
       </div>
 
-      {/* -- KGB Jatuh Tempo | Pipeline : sama tinggi via grid stretch -- */}
-      <div className="dash-sec grid grid-cols-1 xl:grid-cols-5 gap-3">
+      {/* -- Pegawai mendekati deadline | Alur proses -- */}
+      <div className="dsb-kisi-dua dsb-muncul" style={{ "--i": 3 } as React.CSSProperties}>
 
-      {/* KGB Jatuh Tempo : col-span-2 */}
-      <div className="xl:col-span-2 bg-white rounded-xl overflow-hidden flex flex-col" style={{ border: "0.5px solid var(--ln1)" }}>
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 shrink-0" style={{ borderBottom: "0.5px solid var(--ln2)" }}>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            </div>
-            <div>
-            <h2 className="text-xs font-semibold leading-tight" style={{ color: "var(--dtn)" }}>Pegawai Mendekati Deadline</h2>
-            <p className="text-xs" style={{ color: "var(--dt4)" }}>
+      <section className="dsb-kartu flex flex-col overflow-hidden" aria-labelledby="judul-deadline">
+        <div className="dsb-kartu-isi flex flex-col gap-3" style={{ paddingBottom: "14px" }}>
+          <KepalaKartu
+            idJudul="judul-deadline"
+            label="Batas input SDM"
+            judul="Pegawai mendekati deadline"
+            sub={<>
               {filterMonth
-                ? `${filtered.length} pegawai, KGB berlaku ${filterMonth}`
+                ? `${filtered.length} pegawai, KGB berlaku ${namaBulanFilter}`
                 : filterBulan === "terlambat"
-                  ? `${filtered.length} pegawai, deadline sudah terlewat`
+                  ? `${filtered.length} pegawai, batas input sudah terlewat`
                   : filterBulan === "bulan_ini"
-                    ? `${filtered.length} pegawai, berlaku ${unlockLabel}, SDM kirim bulan ini`
+                    ? `${filtered.length} pegawai berlaku ${unlockLabel}, SDM kirim bulan ini`
                     : `${filtered.length} pegawai`}
               {filtered.filter((p) => p.terlambat).length > 0 && filterBulan !== "terlambat" && (
-                <span className="ml-1.5 px-1.5 py-0.5 rounded font-semibold" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", fontSize: "9px" }}>
-                  {filtered.filter((p) => p.terlambat).length} terlambat
-                </span>
+                <span style={{ color: "var(--st-red)" }}> · {filtered.filter((p) => p.terlambat).length} terlambat</span>
               )}
-            </p>
-            </div>
-          </div>
-          <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--ln1)" }}>
-            {filterButtons.map((b) => {
-              const isActive = (filterBulan === b.value) && !filterMonth;
-              return (
-                <button
-                  key={String(b.value)}
-                  type="button"
-                  aria-pressed={isActive}
-                  onClick={() => { setFilterBulan(b.value); setFilterMonth(null); setKgbPage(0); }}
-                  className="px-2.5 py-1 font-medium transition"
-                  style={{
-                    fontSize: "10px",
-                    background: isActive ? (b.value === "terlambat" ? "var(--red-solid)" : "var(--navy-solid)") : "var(--card)",
-                    color: isActive ? "#fff" : b.value === "terlambat" ? "var(--st-red)" : "var(--dt4)",
-                    borderRight: "1px solid var(--ln1)",
-                  }}
-                >
-                  {b.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* -- Banner reminder progress bulan yang dipilih -- */}
-        {filterMonth && (() => {
-          const totalBulan = pegawaiKalenderDerived.filter((p) => kunciBulan(p.tmtKgbBerikutnya) === filterMonth).length;
-          const selesaiBulan = selesaiKalenderDerived.filter((p) => kunciBulan(p.tmtKgbBerikutnya) === filterMonth).length;
-          const sisa = totalBulan - selesaiBulan;
-          if (totalBulan === 0) return null;
-          const bulanNama = (() => {
-            const [y, m] = filterMonth!.split("-");
-            return new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-          })();
-          if (sisa === 0) return (
-            <div className="mx-4 mb-2 px-3 py-1.5 rounded-lg flex items-center gap-2" style={{ background: "var(--tint-green-bg)", border: "1px solid var(--tint-green-ln)" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0f6e56" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
-              <p className="text-xs font-medium" style={{ color: "var(--st-green)" }}>
-                Semua {totalBulan} KGB berlaku <strong>{bulanNama}</strong> sudah selesai diproses.
-              </p>
-            </div>
-          );
-          return (
-            <div className="mx-4 mb-2 px-3 py-1.5 rounded-lg flex items-center gap-2" style={{ background: "var(--tint-amber-bg)", border: "1px solid var(--tint-amber-ln)" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#b87c0a" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-              <p className="text-xs flex-1" style={{ color: "var(--st-amber2)" }}>
-                KGB berlaku <strong>{bulanNama}</strong>: {selesaiBulan}/{totalBulan} selesai, <strong>{sisa} masih perlu diproses</strong>.
-              </p>
-              <div style={{ width: "48px", height: "4px", borderRadius: "99px", background: "var(--tint-amber-ln)", flexShrink: 0, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${(selesaiBulan / totalBulan) * 100}%`, background: "#f59e0b" }} />
+            </>}
+            aksi={
+              <div className="dsb-segmen" role="group" aria-label="Saring daftar pegawai">
+                {filterButtons.map((b) => {
+                  const isActive = (filterBulan === b.value) && !filterMonth;
+                  return (
+                    <button
+                      key={String(b.value)}
+                      type="button"
+                      aria-pressed={isActive}
+                      data-nada={b.value === "terlambat" ? "merah" : undefined}
+                      onClick={() => { setFilterBulan(b.value); setFilterMonth(null); setKgbPage(0); }}
+                    >
+                      {b.value === "bulan_ini" && <span className="dsb-titik" data-nada="emas" aria-hidden="true" />}
+                      {b.label}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-          );
-        })()}
+            }
+          />
+
+          {/* Progres bulan yang dipilih di kalender */}
+          {filterMonth && (() => {
+            const totalBulan = pegawaiKalenderDerived.filter((p) => kunciBulan(p.tmtKgbBerikutnya) === filterMonth).length;
+            const selesaiBulan = selesaiKalenderDerived.filter((p) => kunciBulan(p.tmtKgbBerikutnya) === filterMonth).length;
+            const sisa = totalBulan - selesaiBulan;
+            if (totalBulan === 0) return null;
+            return (
+              <div className="dsb-catatan">
+                <span>
+                  {sisa === 0
+                    ? <>Semua {totalBulan} KGB berlaku <strong style={{ fontSize: "inherit" }}>{namaBulanFilter}</strong> sudah selesai diproses.</>
+                    : <>KGB berlaku {namaBulanFilter}: {selesaiBulan} dari {totalBulan} selesai, {sisa} masih perlu diproses.</>}
+                </span>
+                <span className="dsb-status-bar" style={{ width: "64px", marginTop: 0, flexShrink: 0 }} aria-hidden="true">
+                  <span style={{ width: `${(selesaiBulan / totalBulan) * 100}%`, background: "var(--st-green)" }} />
+                </span>
+              </div>
+            );
+          })()}
+        </div>
 
         <div className="flex flex-col flex-1 min-h-0">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-2">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d0dce8" strokeWidth="1.5"><polyline points="20 6 9 17 4 12" /></svg>
-            <p className="text-xs" style={{ color: "var(--dt5)" }}>Tidak ada pegawai untuk filter ini</p>
+          <div className="dsb-kosong flex-1">
+            <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--dt6)" strokeWidth="1.5"><polyline points="20 6 9 17 4 12" /></svg>
+            Tidak ada pegawai untuk saringan ini
           </div>
         ) : (() => {
           const totalPages = Math.ceil(filtered.length / KGB_PAGE_SIZE);
@@ -1142,17 +926,17 @@ function DashboardMain() {
 
           return (
             <>
-              <div className="overflow-x-auto flex-1">
-                <table className="w-full">
+              <div className="overflow-x-auto flex-1" style={{ borderTop: "1px solid var(--ln2)" }}>
+                <table className="dsb-tabel">
                   <thead>
-                    <tr style={{ background: "var(--sub)", borderBottom: "0.5px solid var(--ln1)" }}>
-                      {["#", "Pegawai", "Gol.", "Berlaku", "Batas Input SK", "Status"].map((h) => (
-                        <th key={h} className="text-left px-3 py-1.5 whitespace-nowrap font-semibold" style={{ fontSize: "10px", color: "var(--dt4)" }}>{h}</th>
+                    <tr>
+                      {["Pegawai", "Berlaku", "Batas input SK", "Status"].map((h) => (
+                        <th key={h} scope="col" className={h === "Berlaku" ? "hidden sm:table-cell" : undefined}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {paged.map((p, idx) => {
+                    {paged.map((p) => {
                       const isSelesai = p.statusKGB === "selesai";
                       const days = daysDiff(p.deadlineSDM);
                       const late = !isSelesai && (p.terlambat || days < 0);
@@ -1162,58 +946,56 @@ function DashboardMain() {
                           ? { color: "var(--st-red)", bg: "var(--tint-red-bg)" }
                           : days <= 14 ? { color: "var(--st-red)", bg: "var(--tint-red-bg)" }
                           : days <= 30 ? { color: "var(--st-amber)", bg: "var(--tint-amber-bg)" }
-                          : { color: "var(--dt3)", bg: "transparent" };
+                          : { color: "var(--dt3)", bg: "var(--sub)" };
                       // Pegawai tanpa record KGB berjalan ditampilkan sebagai Belum Diproses.
                       const statusCfg = tampilanStatus(p.statusKGB ?? "belum_diproses");
+                      const dMendesak = !isSelesai && !late ? daysDiff(p.deadlineSDM) : null;
 
                       return (
-                        <tr key={p.id} style={{ borderBottom: idx < paged.length - 1 ? "0.5px solid var(--ln2)" : "none", background: late && !p.statusKGB ? "var(--tint-red-bg)" : "transparent" }}>
-                          <td className="px-3 py-1.5" style={{ color: "var(--dt5)", fontSize: "10px" }}>{startNo + idx + 1}</td>
-                          <td className="px-3 py-1.5">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center font-bold shrink-0"
-                                style={{ background: p.statusHukdis ? "var(--tint-red-bg)" : "var(--tint-navy)", color: p.statusHukdis ? "var(--st-red)" : "var(--dtn)", fontSize: "9px" }}>
+                        <tr key={p.id} style={{ background: late && !p.statusKGB ? "var(--tint-red-bg)" : undefined }}>
+                          <td>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="dsb-avatar" data-nada={p.statusHukdis ? "merah" : undefined} aria-hidden="true">
                                 {p.nama.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
-                              </div>
-                              <div style={{ lineHeight: 1.3 }}>
-                                <div className="flex items-center gap-1">
-                                  <p className="font-medium truncate" style={{ fontSize: "11px", color: "var(--dtn)", maxWidth: "110px" }}>{p.nama}</p>
-                                  {p.terlambat && <span className="px-1 rounded font-bold" title="Melewati batas input" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", fontSize: "8px" }}><span aria-hidden="true">!</span><span className="sr-only">Melewati batas input</span></span>}
-                                </div>
-                                <p style={{ fontSize: "9px", color: "var(--dt5)" }} className="truncate" title={p.jabatan}>{p.jabatan.length > 22 ? p.jabatan.slice(0, 22) + "…" : p.jabatan}</p>
+                              </span>
+                              <div className="min-w-0" style={{ lineHeight: 1.35 }}>
+                                <p className="dsb-nama truncate" style={{ maxWidth: "220px" }}>
+                                  {p.nama}
+                                  {p.terlambat && <span className="sr-only">, melewati batas input</span>}
+                                </p>
+                                <p className="dsb-kecil truncate" style={{ maxWidth: "220px" }} title={p.jabatan}>
+                                  {p.golonganRuang} · {p.jabatan}
+                                </p>
+                                <p className="dsb-kecil sm:hidden">
+                                  Berlaku {formatTanggalId(p.tmtKgbBerikutnya, { month: "short", year: "numeric" })}
+                                </p>
                               </div>
                             </div>
                           </td>
-                          <td className="px-3 py-1.5 whitespace-nowrap">
-                            <span style={{ fontSize: "10px", fontWeight: 600, padding: "1px 5px", borderRadius: "4px", background: "var(--tint-navy)", color: "var(--dtn)" }}>{p.golonganRuang}</span>
+                          <td className="whitespace-nowrap hidden sm:table-cell">
+                            {formatTanggalId(p.tmtKgbBerikutnya, { month: "short", year: "numeric" })}
                           </td>
-                          <td className="px-3 py-1.5" style={{ color: "var(--dt3)" }}>
-                            <p className="whitespace-nowrap font-medium" style={{ fontSize: "11px" }}>
-                              {formatTanggalId(p.tmtKgbBerikutnya, { month: "short", year: "numeric" })}
-                            </p>
-                          </td>
-                          <td className="px-3 py-1.5">
-                            <p className="whitespace-nowrap font-medium" style={{ fontSize: "11px", color: deadlineCfg.color, background: deadlineCfg.bg, padding: "1px 5px", borderRadius: "4px", display: "inline-block" }}>
+                          <td className="whitespace-nowrap">
+                            <span className="dsb-tag" style={{ background: deadlineCfg.bg, color: deadlineCfg.color }}>
                               {isSelesai ? "Selesai" : late ? "Terlambat" : days === 0 ? "Hari ini" : `${days} hari lagi`}
-                            </p>
-                            <p style={{ fontSize: "9px", color: "var(--dt5)", marginTop: "1px" }}>
+                            </span>
+                            <p className="dsb-kecil" style={{ marginTop: "3px" }}>
                               {formatTanggalId(p.deadlineSDM, { day: "numeric", month: "short" })}
                             </p>
                           </td>
-                          <td className="px-3 py-1.5">
-                            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                          <td>
+                            <div className="flex flex-col items-start gap-1">
                               {p.statusHukdis ? (
-                                <span className="px-1.5 py-px rounded-full font-medium" style={{ fontSize: "10px", background: "var(--tint-red-bg)", color: "var(--st-red)" }}>Hukdis</span>
+                                <span className="dsb-tag" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>Hukdis</span>
                               ) : (
-                                <span className="px-1.5 py-px rounded-full font-medium" style={{ fontSize: "10px", background: statusCfg.bg, color: statusCfg.color }}>{statusCfg.label}</span>
+                                <span className="dsb-tag" style={{ background: statusCfg.bg, color: statusCfg.color }}>{statusCfg.label}</span>
                               )}
-                              {/* Indikator kritis inline */}
-                              {!isSelesai && !late && (() => {
-                                const d = daysDiff(p.deadlineSDM);
-                                if (d <= 7 && d >= 0) return <span className="px-1.5 py-px rounded-full font-bold" style={{ fontSize: "9px", background: "var(--tint-red-bg)", color: "var(--st-red)" }}>Mendesak, {d} hari</span>;
-                                if (d <= 14) return <span className="px-1.5 py-px rounded-full font-semibold" style={{ fontSize: "9px", background: "var(--tint-amber-bg)", color: "var(--st-amber)" }}>Kritis, {d} hari</span>;
-                                return null;
-                              })()}
+                              {dMendesak !== null && dMendesak >= 0 && dMendesak <= 7 && (
+                                <span className="dsb-tag" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>Mendesak, {dMendesak} hari</span>
+                              )}
+                              {dMendesak !== null && dMendesak > 7 && dMendesak <= 14 && (
+                                <span className="dsb-tag" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)" }}>Kritis, {dMendesak} hari</span>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1223,71 +1005,56 @@ function DashboardMain() {
                 </table>
               </div>
 
-              {/* -- Pagination footer -- */}
-              <div className="flex items-center justify-between px-4 py-2 shrink-0 mt-auto" style={{ borderTop: "0.5px solid var(--ln2)" }}>
-                <p style={{ fontSize: "10px", color: "var(--dt5)" }}>
-                  {startNo + 1}–{Math.min(startNo + KGB_PAGE_SIZE, filtered.length)} / {filtered.length}
-                </p>
-                <div className="flex items-center gap-1.5">
+              <div className="dsb-kaki mt-auto">
+                <span>{startNo + 1}–{Math.min(startNo + KGB_PAGE_SIZE, filtered.length)} dari {filtered.length}</span>
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    className="dsb-ikon-tombol"
+                    style={{ width: 30, height: 30 }}
                     aria-label="Halaman sebelumnya"
                     onClick={() => setKgbPage((p) => Math.max(0, p - 1))}
                     disabled={page === 0}
-                    className="px-2 py-1 rounded-lg transition disabled:opacity-30"
-                    style={{ fontSize: "10px", background: "var(--sub)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}
                   >
-                    ←
+                    <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                   </button>
-                  <span style={{ fontSize: "10px", color: "var(--dt3)" }}>{page + 1}/{totalPages}</span>
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{page + 1}/{totalPages}</span>
                   <button
                     type="button"
+                    className="dsb-ikon-tombol"
+                    style={{ width: 30, height: 30 }}
                     aria-label="Halaman berikutnya"
                     onClick={() => setKgbPage((p) => Math.min(totalPages - 1, p + 1))}
                     disabled={page >= totalPages - 1}
-                    className="px-2 py-1 rounded-lg transition disabled:opacity-30"
-                    style={{ fontSize: "10px", background: "var(--sub)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}
                   >
-                    →
+                    <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                   </button>
                   <Link
-                    href={
-                      filterBulan === "terlambat" ? "/dashboard/kgb?rapelan=1"
-                      : "/dashboard/kgb"
-                    }
-                    className="px-2.5 py-1 rounded-lg font-medium transition"
-                    style={{ fontSize: "10px", background: "var(--navy-solid)", color: "#fff" }}
+                    href={filterBulan === "terlambat" ? "/dashboard/kgb?rapelan=1" : "/dashboard/kgb"}
+                    className="dsb-tombol dsb-tombol-kecil"
                   >
-                    Lihat Semua
+                    Lihat semua
                   </Link>
                 </div>
               </div>
             </>
           );
         })()}
-        </div>{/* end flex-1 table area */}
-      </div>
+        </div>
+      </section>
 
-      {/* Pipeline Status KGB : col-span-2 */}
+      {/* Alur proses KGB */}
       {(() => {
-        const cols = [
-          { colId: "belum",          key: null,              label: infoStatusKgb("belum_diproses").label,  color: "var(--st-amber)", bg: "var(--tint-amber-bg)", activeBg: "var(--tint-amber-bg2)", border: "var(--tint-amber-ln)",  badgeBg: "var(--tint-amber-bg2)" },
-          { colId: "sedang_diproses",key: "sedang_diproses", label: infoStatusKgb("sedang_diproses").label, color: "var(--dtn)", bg: "var(--sub)", activeBg: "var(--tint-blue-bg2)", border: "var(--ln0)",  badgeBg: "var(--ln1)" },
-          { colId: "selesai",        key: "selesai",         label: infoStatusKgb("selesai").label,         color: "var(--st-green)", bg: "var(--tint-green-bg)", activeBg: "var(--tint-green-bg2)", border: "var(--tint-green-ln)",  badgeBg: "var(--tint-green-bg2)" },
+        const cols: { colId: string; key: string | null; label: string; nada: Nada }[] = [
+          { colId: "belum",           key: null,              label: infoStatusKgb("belum_diproses").label,  nada: "kuning" },
+          { colId: "sedang_diproses", key: "sedang_diproses", label: infoStatusKgb("sedang_diproses").label, nada: "navy" },
+          { colId: "selesai",         key: "selesai",         label: infoStatusKgb("selesai").label,         nada: "hijau" },
         ];
         return (
-          <div className="xl:col-span-3 bg-white rounded-xl p-4" style={{ border: "0.5px solid var(--ln1)" }}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="4" height="18" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="5" width="4" height="16" rx="1"/></svg>
-              </div>
-              <div>
-                <p className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>Alur Proses KGB {today.getFullYear()}</p>
-                <p style={{ fontSize: "10px", color: "var(--dt4)" }}>Pilih tombol pada kartu pegawai untuk memproses KGB</p>
-              </div>
-            </div>
+          <section className="dsb-kartu dsb-kartu-isi flex flex-col gap-4" aria-labelledby="judul-alur">
+            <KepalaKartu idJudul="judul-alur" label={`Tahun ${tahunIni}`} judul="Alur proses KGB" sub="Pilih tombol pada kartu pegawai untuk memproses KGB" />
             <div className="overflow-x-auto pb-1 -mx-1 px-1">
-            <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(3, minmax(200px, 1fr))", minWidth: "620px" }}>
+            <div className="dsb-alur">
               {cols.map((col) => {
                 // Locked items (today < unlockDate) tidak ditampilkan : muncul saat masa unlock tiba
                 // menunggu_keuangan masuk ke kolom sedang_diproses (pipeline tetap 3 stage)
@@ -1306,132 +1073,114 @@ function DashboardMain() {
                     })
                   : rawItems;
                 return (
-                  <div key={col.colId} className="rounded-xl flex flex-col overflow-hidden"
-                    style={{ border: `1.5px solid ${col.border}`, background: col.bg }}>
-
-                    {/* Header kolom */}
-                    <div className="px-2.5 py-2 flex items-center justify-between"
-                      style={{ borderBottom: `1px solid ${col.border}` }}>
-                      <span className="font-semibold" style={{ fontSize: "10px", color: col.color }}>{col.label}</span>
-                      <span className="font-bold px-1.5 py-px rounded-full" style={{ fontSize: "11px", background: col.badgeBg, color: col.color }}>{items.length}</span>
+                  <div key={col.colId} className="dsb-alur-kolom">
+                    <div className="dsb-alur-kepala">
+                      <span><span className="dsb-titik" data-nada={col.nada} aria-hidden="true" />{col.label}</span>
+                      <span className="dsb-alur-jumlah">{items.length}</span>
                     </div>
 
-                    {/* Kartu pegawai */}
-                    <div className="flex flex-col gap-1 p-1.5 overflow-y-auto" style={{ maxHeight: "380px", minHeight: "60px" }}>
+                    <div className="dsb-alur-isi">
                       {items.length === 0 ? (
-                        <div className="flex items-center justify-center py-4">
-                          <p style={{ fontSize: "11px", color: col.color, opacity: 0.4 }}>Tidak ada</p>
-                        </div>
+                        <p className="dsb-kosong" style={{ padding: "18px 8px", fontSize: "12.5px" }}>Tidak ada</p>
                       ) : items.map((p) => {
                         const dibatalkan = p.statusKGB === "ditolak";
                         return (
-                        <div key={p.id} className="rounded-lg px-2 py-1.5 transition"
-                          style={{ background: "var(--card)", border: `0.5px solid ${col.border}` }}>
-                          <div className="flex items-center gap-1.5">
-                            <div aria-hidden="true" className="w-5 h-5 rounded-full flex items-center justify-center font-bold shrink-0" style={{ background: col.badgeBg, color: col.color, fontSize: "8px" }}>
+                        <div key={p.id} className="dsb-alur-kartu">
+                          <div className="dsb-alur-orang">
+                            <span aria-hidden="true" className="dsb-avatar">
                               {p.nama.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate" style={{ fontSize: "11px", color: "var(--dtn)" }}>{p.nama}</p>
-                              <p style={{ fontSize: "9px", color: "var(--dt4)" }}>
+                            </span>
+                            <div className="min-w-0">
+                              <p className="dsb-nama truncate" style={{ fontSize: "13px" }}>{p.nama}</p>
+                              <p className="dsb-kecil">
                                 {formatTanggalId(p.tmtKgbBerikutnya, { month: "short", year: "numeric" })}
-                                {p.terlambat && <span className="ml-1 font-semibold" style={{ color: "var(--st-amber)" }}>· terlambat</span>}
-                                {dibatalkan && <span className="ml-1 font-semibold" style={{ color: "var(--st-red)" }}>· {infoStatusKgb("ditolak").label}</span>}
+                                {p.terlambat && <span style={{ color: "var(--st-amber)", fontWeight: 600 }}> · terlambat</span>}
+                                {dibatalkan && <span style={{ color: "var(--st-red)", fontWeight: 600 }}> · {infoStatusKgb("ditolak").label}</span>}
                               </p>
                             </div>
                           </div>
                           {/* Aksi per status : hanya tampil jika ada aksi relevan */}
                           {col.key === null && (
-                            <div className="mt-1 flex flex-col gap-0.5">
+                            <>
                               {p.statusHukdis && (
-                                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded" style={{ background: "var(--tint-amber-bg)", border: "0.5px solid var(--tint-amber-ln)" }}>
-                                  <svg aria-hidden="true" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#b87c0a" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                                  <p style={{ fontSize: "9px", color: "var(--st-amber2)", lineHeight: 1.3 }}>
-                                    Hukdis aktif{p.tanggalHukdisBerakhir ? ` s.d. ${formatTanggalId(p.tanggalHukdisBerakhir, { day: "numeric", month: "short" })}` : ""}
-                                  </p>
-                                </div>
+                                <p className="dsb-alur-info">
+                                  <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                  Hukdis aktif{p.tanggalHukdisBerakhir ? ` s.d. ${formatTanggalId(p.tanggalHukdisBerakhir, { day: "numeric", month: "short" })}` : ""}
+                                </p>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => setModal({ jenis: "input", pegawai: pegawaiModal(p), ulang: dibatalkan, dasarAwal: dasarAwalInputKgb(p) })}
-                                className="w-full py-1 rounded font-semibold transition hover:opacity-80"
-                                style={p.terlambat || dibatalkan
-                                  ? { fontSize: "10px", background: "var(--tint-red-bg)", color: "var(--st-red)", border: "0.5px solid var(--tint-red-ln)" }
-                                  : { fontSize: "10px", background: "var(--tint-amber-bg)", color: "var(--st-amber)", border: `0.5px solid ${col.border}` }}>
-                                {dibatalkan ? "Input Ulang KGB" : "Input KGB"}
-                              </button>
-                              {/* Jalur arsip: SK periode ini sudah terbit di luar SIM-KGB */}
-                              {p.terlambat && (
+                              <div className="dsb-alur-aksi">
                                 <button
                                   type="button"
-                                  onClick={() => setModal({ jenis: "arsip", pegawai: pegawaiModal(p) })}
-                                  className="w-full py-1 rounded font-semibold flex items-center justify-center gap-1 hover:opacity-80 transition"
-                                  style={{ fontSize: "10px", background: "var(--tint-navy)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}>
-                                  Arsip KGB
+                                  className="dsb-tombol"
+                                  data-nada={p.terlambat || dibatalkan ? "merah" : undefined}
+                                  onClick={() => setModal({ jenis: "input", pegawai: pegawaiModal(p), ulang: dibatalkan, dasarAwal: dasarAwalInputKgb(p) })}
+                                >
+                                  {dibatalkan ? "Input Ulang KGB" : "Input KGB"}
                                 </button>
-                              )}
-                            </div>
+                                {/* Jalur arsip: SK periode ini sudah terbit di luar SIM-KGB */}
+                                {p.terlambat && (
+                                  <button type="button" className="dsb-tombol" data-jenis="garis" onClick={() => setModal({ jenis: "arsip", pegawai: pegawaiModal(p) })}>
+                                    Arsip KGB
+                                  </button>
+                                )}
+                              </div>
+                            </>
                           )}
                           {col.key === "sedang_diproses" && p.kgbId && (
-                            <div className="mt-1 flex flex-col gap-0.5">
-                              {p.statusKGB === "menunggu_keuangan" ? (
-                                <div className="w-full py-1 px-1.5 rounded text-center font-semibold"
-                                  style={{ fontSize: "10px", background: "var(--tint-violet-bg)", color: "var(--st-violet)", border: "0.5px solid var(--tint-violet-ln)" }}>
-                                  {infoStatusKgb("menunggu_keuangan").label}
-                                </div>
-                              ) : (
-                                <>
+                            p.statusKGB === "menunggu_keuangan" ? (
+                              <span className="dsb-tag" style={{ justifyContent: "center", background: "var(--tint-violet-bg)", color: "var(--st-violet)" }}>
+                                {infoStatusKgb("menunggu_keuangan").label}
+                              </span>
+                            ) : (
+                              <div className="dsb-alur-aksi">
+                                <button
+                                  type="button"
+                                  className="dsb-tombol"
+                                  onClick={() => p.kgbId && setModal({
+                                    jenis: "buat_sk",
+                                    kgbId: p.kgbId,
+                                    status: p.statusKGB ?? "",
+                                    pegawai: pegawaiModal(p),
+                                    ringkasan: {
+                                      golongan: p.golonganRuang,
+                                      gajiPokokLama: p.gajiPokokLama,
+                                      gajiPokokBaru: p.gajiPokokBaru,
+                                      mkgTahunBaru: p.mkgTahunBaru,
+                                      mkgBulanBaru: p.mkgBulanBaru,
+                                      tmtKgbBaru: p.tmtKgbBerikutnya,
+                                      flagRapelan: p.flagRapelan,
+                                    },
+                                    dasarAwal: { nomorSK: p.nomorSK, tanggalSK: p.tanggalSK, tmtSK: p.tmtSK, penetapSkDasar: p.penetapSkDasar },
+                                    nomorSkBaru: p.suratNomorSurat,
+                                    tanggalSkBaru: p.suratTanggalSurat ?? null,
+                                  })}
+                                >
+                                  Buat SK
+                                </button>
+                                {p.skSudahDibuat && (
                                   <button
                                     type="button"
-                                    onClick={() => p.kgbId && setModal({
-                                      jenis: "buat_sk",
-                                      kgbId: p.kgbId,
-                                      status: p.statusKGB ?? "",
-                                      pegawai: pegawaiModal(p),
-                                      ringkasan: {
-                                        golongan: p.golonganRuang,
-                                        gajiPokokLama: p.gajiPokokLama,
-                                        gajiPokokBaru: p.gajiPokokBaru,
-                                        mkgTahunBaru: p.mkgTahunBaru,
-                                        mkgBulanBaru: p.mkgBulanBaru,
-                                        tmtKgbBaru: p.tmtKgbBerikutnya,
-                                        flagRapelan: p.flagRapelan,
-                                      },
-                                      dasarAwal: { nomorSK: p.nomorSK, tanggalSK: p.tanggalSK, tmtSK: p.tmtSK, penetapSkDasar: p.penetapSkDasar },
-                                      nomorSkBaru: p.suratNomorSurat,
-                                      tanggalSkBaru: p.suratTanggalSurat ?? null,
-                                    })}
-                                    className="w-full py-1 rounded font-semibold transition hover:opacity-80"
-                                    style={{ fontSize: "10px", background: "var(--tint-navy)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}>
-                                    Buat SK
+                                    className="dsb-tombol"
+                                    data-nada="hijau"
+                                    onClick={() => p.kgbId && setModal({ jenis: "unggah_sk", kgbId: p.kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) })}
+                                  >
+                                    Unggah SK TTE
                                   </button>
-                                  {p.skSudahDibuat && (
-                                    <button
-                                      type="button"
-                                      onClick={() => p.kgbId && setModal({ jenis: "unggah_sk", kgbId: p.kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) })}
-                                      className="w-full py-1 rounded font-semibold transition hover:opacity-80"
-                                      style={{ fontSize: "10px", background: "var(--tint-green-bg)", color: "var(--st-green)", border: "0.5px solid var(--tint-green-ln)" }}>
-                                      Unggah SK TTE
-                                    </button>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => p.kgbId && setModal({ jenis: "batalkan", kgbId: p.kgbId, pegawai: pegawaiModal(p) })}
-                                    className="w-full py-1 rounded font-semibold transition hover:opacity-80"
-                                    style={{ fontSize: "10px", background: "var(--sub)", color: "var(--dt3)", border: "0.5px solid var(--ln1)" }}>
-                                    Batalkan KGB
-                                  </button>
-                                </>
-                              )}
-                            </div>
+                                )}
+                                <button
+                                  type="button"
+                                  className="dsb-tombol"
+                                  data-jenis="garis"
+                                  onClick={() => p.kgbId && setModal({ jenis: "batalkan", kgbId: p.kgbId, pegawai: pegawaiModal(p) })}
+                                >
+                                  Batalkan KGB
+                                </button>
+                              </div>
+                            )
                           )}
                           {col.key === "selesai" && (
-                            <div className="mt-1">
-                              <button
-                                type="button"
-                                onClick={() => setModal({ jenis: "riwayat", pegawai: pegawaiModal(p) })}
-                                className="w-full py-1 rounded font-semibold transition hover:opacity-80"
-                                style={{ fontSize: "10px", background: "var(--tint-green-bg)", color: "var(--st-green)", border: `0.5px solid ${col.border}` }}>
+                            <div className="dsb-alur-aksi">
+                              <button type="button" className="dsb-tombol" data-jenis="garis" onClick={() => setModal({ jenis: "riwayat", pegawai: pegawaiModal(p) })}>
                                 Riwayat KGB
                               </button>
                             </div>
@@ -1445,11 +1194,11 @@ function DashboardMain() {
               })}
             </div>
             </div>{/* end overflow-x-auto */}
-          </div>
+          </section>
         );
       })()}
 
-      </div>{/* end KGB Jatuh Tempo | Pipeline grid */}
+      </div>{/* end Pegawai mendekati deadline | Alur proses */}
 
     </div>
 
@@ -1622,9 +1371,8 @@ function DashboardMain() {
       {/* Pesan hasil aksi. Wadah live region selalu ada agar pesan baru dibacakan pembaca layar. */}
       <div role="status" aria-live="polite" className="fixed bottom-4 left-4 right-4 sm:left-auto sm:max-w-sm z-40 pointer-events-none">
         {pesanBerhasil && (
-          <div className="pointer-events-auto rounded-xl px-3 py-2.5 flex items-start gap-2.5 shadow-lg"
-            style={{ background: "var(--card)", border: "1px solid var(--tint-green-ln)" }}>
-            <p className="text-xs leading-relaxed flex-1" style={{ color: "var(--st-green)" }}>{pesanBerhasil}</p>
+          <div className="dsb-toast">
+            <p className="flex-1">{pesanBerhasil}</p>
             <button type="button" onClick={() => setPesanBerhasil(null)} aria-label="Tutup pesan"
               className="shrink-0 opacity-60 hover:opacity-100 transition" style={{ color: "var(--st-green)" }}>
               <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>

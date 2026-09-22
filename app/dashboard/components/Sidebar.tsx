@@ -112,19 +112,20 @@ const menuAdmin = [
   { href: "/dashboard/pengaturan",    label: "Pengaturan",    icon: Ic.gear    },
 ];
 
-/* ── Palet panel sidebar (selalu navy gelap, di kedua tema) ───────────────── */
+/* ── Palet panel sidebar: navy gradient seperti hero publik, di kedua tema ──
+   Emas hanya untuk "posisi Anda" (menu aktif), sama dengan halaman publik. */
 const SB = {
-  bg:        "linear-gradient(180deg, #0e1e33 0%, #0a1526 100%)",
-  hair:      "rgba(255,255,255,0.07)",
-  text:      "#8ea3c0",
-  icon:      "#6b81a1",
-  hover:     "#dce6f5",
+  bg:        "var(--latar-sidebar)",
+  hair:      "rgba(255,255,255,0.08)",
+  text:      "rgba(214,226,255,0.74)",
+  icon:      "rgba(190,208,250,0.56)",
+  hover:     "#ffffff",
   active:    "#ffffff",
-  activeBg:  "rgba(201,162,39,0.12)",
-  gold:      "#c9a227",
-  goldHi:    "#e0bd54",
-  label:     "#51678a",
-  danger:    "#f08a8a",
+  activeBg:  "rgba(255,255,255,0.09)",
+  gold:      "#e0b23a",
+  goldHi:    "#f3c63f",
+  label:     "rgba(180,198,240,0.5)",
+  danger:    "#ff9b93",
 };
 
 /* ── NavItem ──────────────────────────────────────────────────────────────── */
@@ -149,7 +150,7 @@ function NavItem({
         justifyContent: expanded ? "flex-start" : "center",
         padding: expanded ? (indent ? "7px 12px 7px 20px" : "8px 12px 8px 14px") : "9px",
         margin: indent ? "1px 10px 1px 18px" : "1px 10px",
-        borderRadius: "9px",
+        borderRadius: "10px",
         fontSize: indent ? "12.5px" : "13px",
         fontWeight: isActive ? 600 : 400,
         color: isActive ? SB.active : SB.text,
@@ -266,7 +267,7 @@ function GroupLabel({ text, expanded }: { text: string; expanded: boolean }) {
     return <div style={{ height: "1px", background: SB.hair, margin: "8px 14px" }} />;
   return (
     <p style={{
-      fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.14em",
+      fontSize: "10px", fontWeight: 600, letterSpacing: "0.14em",
       textTransform: "uppercase", color: SB.label,
       margin: "12px 0 3px", padding: "0 24px",
     }}>
@@ -377,7 +378,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
           aria-label="Buka menu"
           style={{
             position: "fixed", top: "14px", left: "14px", zIndex: 19,
-            width: "36px", height: "36px", borderRadius: "10px",
+            width: "38px", height: "38px", borderRadius: "999px",
             background: "var(--card)", border: "1px solid var(--ln1)",
             display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", color: "var(--dt2)",
@@ -391,10 +392,10 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
       {/* Hover states panel gelap */}
       <style>{`
         .sb-item { transition: background .12s, color .12s; }
-        .sb-item:hover:not(.sb-active) { background: rgba(255,255,255,0.055); color: ${SB.hover}; }
+        .sb-item:hover:not(.sb-active) { background: rgba(255,255,255,0.06); color: ${SB.hover}; }
         .sb-item:hover:not(.sb-active) .sb-ic { color: ${SB.goldHi}; }
         .sb-btn { transition: background .12s, color .12s; }
-        .sb-btn:hover { background: rgba(255,255,255,0.055); color: ${SB.hover}; }
+        .sb-btn:hover { background: rgba(255,255,255,0.06); color: ${SB.hover}; }
         .sb-chev { transition: color .12s; }
         .sb-chev:hover { color: ${SB.goldHi} !important; }
         .sb-logout:hover { background: rgba(239,68,68,0.12); }
@@ -404,7 +405,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
       <aside
         style={{
           background: SB.bg,
-          borderRight: "1px solid rgba(8,15,28,0.35)",
+          borderRight: "1px solid rgba(4,10,28,0.4)",
           display: "flex",
           flexDirection: "column",
           flexShrink: 0,
@@ -434,7 +435,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
           {/* Hairline emas bawah brand */}
           <span aria-hidden style={{
             position: "absolute", bottom: "-1px", left: "12%", right: "12%", height: "1px",
-            background: "linear-gradient(90deg, transparent, rgba(201,162,39,0.45), transparent)",
+            background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.16), transparent)",
           }} />
           <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, overflow: "hidden" }}>
             {/* Logo tanpa latar, gambar polos */}
@@ -446,7 +447,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
               style={{ flexShrink: 0, display: "block" }}
             />
             {expanded && (
-              <p style={{ fontSize: "14px", fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.2, letterSpacing: "0.05em" }}>
+              <p style={{ fontFamily: "var(--huruf-judul)", fontSize: "17px", fontWeight: 500, color: "#fff", margin: 0, lineHeight: 1.2, letterSpacing: "-0.02em" }}>
                 SIM-KGB
               </p>
             )}
@@ -576,7 +577,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
                     background: "#ef4444", color: "#fff",
                     fontSize: "8px", fontWeight: 700,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    padding: "0 2px", boxShadow: "0 0 0 1.5px #0c1830",
+                    padding: "0 2px", boxShadow: "0 0 0 1.5px #0a1a42",
                   }}>
                     {unread > 9 ? "9+" : unread}
                   </span>
@@ -601,8 +602,8 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
                 width: "296px",
                 background: "var(--card)",
                 border: "1px solid var(--ln1)",
-                borderRadius: "12px",
-                boxShadow: "0 4px 24px rgba(15,23,42,0.10), 0 1px 4px rgba(15,23,42,0.06)",
+                borderRadius: "16px",
+                boxShadow: "var(--bayang-angkat)",
                 zIndex: 200, overflow: "hidden",
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid var(--ln2)" }}>
@@ -713,8 +714,8 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
                 width: "220px",
                 background: "var(--card)",
                 border: "1px solid var(--ln1)",
-                borderRadius: "12px",
-                boxShadow: "0 4px 24px rgba(15,23,42,0.10), 0 1px 4px rgba(15,23,42,0.06)",
+                borderRadius: "16px",
+                boxShadow: "var(--bayang-angkat)",
                 zIndex: 200,
                 overflow: "hidden",
               }}>

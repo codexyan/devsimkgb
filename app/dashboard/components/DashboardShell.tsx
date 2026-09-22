@@ -147,8 +147,9 @@ export default function DashboardShell({ nama, nip, role, sesiTimeoutMenit = 60,
       {/* Main content — satu-satunya area gulir vertikal halaman */}
       <main
         ref={mainRef}
+        className="dsb-main"
         style={{
-          flex: 1, overflowY: "auto", padding: "20px", minWidth: 0,
+          flex: 1, overflowY: "auto", minWidth: 0,
           overscrollBehavior: "contain",
           WebkitOverflowScrolling: "touch",
         }}

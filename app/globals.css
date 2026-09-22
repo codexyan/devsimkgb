@@ -5,69 +5,98 @@
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
+/* Nama token cb-* dipertahankan agar halaman lama tetap jalan; nilainya
+   mengikuti palet navy "Jernih" (ADR-002 untuk publik, ADR-003 untuk dashboard). */
 :root {
   --background: #ffffff;
-  --foreground: #091135;
-  --midnight-ink:   #091135;
-  --electric-blue:  #0f77ff;
-  --cobalt-surface: #127ee3;
-  --slate:          #36394a;
-  --frost-border:   #e1e9f0;
-  --mist:           #b1bbcd;
+  --foreground: #0c1a38;
+  --midnight-ink:   #0c1a38;
+  --electric-blue:  #2f5bd3;
+  --cobalt-surface: #102a63;
+  --cobalt-hover:   #1b3d86;
+  --slate:          #3a4459;
+  --frost-border:   #dde3ec;
+  --mist:           #a3abbb;
   --paper:          #ffffff;
-  --lavender-wash:  #f5f3ff;
-  --focus-ring: 0px 0px 0px 1px rgb(15,119,255), 0px 1px 2px 0px rgba(12,43,100,0.32), 0px 6px 16px 0px rgba(12,43,100,0.32);
+  --lavender-wash:  #f4f6fa;
+  --focus-ring: 0 0 0 2px var(--card, #fff), 0 0 0 4px rgba(47, 91, 211, 0.6);
 }
 
 /* ── Token dashboard (light default) ─────────────────────────────
-   Dipakai seluruh halaman /dashboard lewat var(--*). Nilai light =
-   persis palet lama, sehingga tampilan terang tidak berubah.       */
+   Dipakai seluruh halaman /dashboard lewat var(--*): kanvas dingin,
+   kartu putih, tinta navy. Warna status (--st-*, --tint-*) hanya untuk
+   label status; navy untuk tindakan utama; emas untuk "sekarang".  */
 :root {
   --card: #ffffff;
-  --sub:  #f6f9fc;
-  --dt1: #0f172a;  --dtn: #1a3a5c;
-  --dt2: #44607c;  --dt3: #5f7690;  --dt4: #8a9eb5;  --dt5: #a0b4c8;  --dt6: #c8d8e8;
-  --ln0: #d0dce8;  --ln1: #e0eaf2;  --ln2: #f0f4f8;
-  --tint-navy: #eef4fa;
+  --sub:  #f6f8fb;
+  --dt1: #0c1a38;  --dtn: #13295a;
+  --dt2: #34405a;  --dt3: #4d586f;  --dt4: #677187;  --dt5: #8a93a6;  --dt6: #c2c9d6;
+  --ln0: #d3dae5;  --ln1: #e2e7ef;  --ln2: #edf1f6;
+  --tint-navy: #edf1f9;
   --tint-blue-bg: #eff6ff;  --tint-blue-bg2: #dbeafe;  --tint-blue-ln: #bfdbfe;  --st-blue: #1e40af;
   --tint-red-bg: #fef2f2;   --tint-red-bg2: #fee2e2;   --tint-red-ln: #fecaca;   --st-red: #dc2626;
   --tint-amber-bg: #fff8ec; --tint-amber-bg2: #fef3c7; --tint-amber-ln: #fde68a; --st-amber: #b87c0a; --st-amber2: #92600a;
   --tint-green-bg: #eafaf3; --tint-green-bg2: #d1fae5; --tint-green-ln: #9fe1cb; --st-green: #0f6e56;
   --tint-violet-bg: #f3f0ff; --tint-violet-ln: #c4b5fd; --st-violet: #6d28d9;
-  --accent: #1254a7;  --accent-bg: rgba(17, 84, 167, 0.07);
-  --navy-solid: #1a3a5c;  --red-solid: #dc2626;  --green-solid: #0f6e56;
-  --amber-solid: #b87c0a; --violet-solid: #6d28d9; --accent-solid: #1254a7;
+  --accent: #1b3f8f;  --accent-bg: rgba(27, 63, 143, 0.08);
+  --navy-solid: #102a63;  --red-solid: #dc2626;  --green-solid: #0f6e56;
+  --amber-solid: #b87c0a; --violet-solid: #6d28d9; --accent-solid: #1b3f8f;
+
+  /* Permukaan navy (panel kepala dashboard, sidebar), sama dengan hero publik */
+  --latar-navy:
+    radial-gradient(110% 80% at 88% -12%, rgba(84, 132, 232, 0.5), transparent 58%),
+    radial-gradient(90% 70% at -8% 112%, rgba(38, 84, 196, 0.42), transparent 62%),
+    linear-gradient(158deg, #07132f 0%, #0c2050 46%, #14306f 100%);
+  --latar-sidebar:
+    radial-gradient(140% 38% at 0% 0%, rgba(84, 132, 232, 0.3), transparent 62%),
+    radial-gradient(120% 30% at 100% 100%, rgba(38, 84, 196, 0.22), transparent 60%),
+    linear-gradient(180deg, #0b1d47 0%, #08163a 52%, #07112c 100%);
+  --emas-isi: #f3c63f;
+  --huruf-judul: var(--font-judul), var(--font-inter), system-ui, sans-serif;
+  --bayang-kartu: 0 1px 2px rgba(12, 26, 56, 0.04), 0 14px 34px -24px rgba(12, 26, 56, 0.22);
+  --bayang-angkat: 0 1px 2px rgba(12, 26, 56, 0.06), 0 24px 48px -26px rgba(12, 26, 56, 0.34);
 }
 
 /* ── Mode gelap dashboard ────────────────────────────────────────
    Aktif saat DashboardShell menyetel data-dash-theme="dark" pada
    <html>. Semua token (termasuk milik cb-*) dialihkan ke navy pekat. */
 html[data-dash-theme="dark"] {
-  --background: #0a111e;
-  --foreground: #e8eef7;
-  --paper: #131c2b;
-  --lavender-wash: #0a111e;
-  --frost-border: #263349;
-  --mist: #64758d;
-  --midnight-ink: #e8eef7;
-  --slate: #c3cede;
-  --electric-blue: #3d8bff;
-  --cobalt-surface: #1f6fd0;
+  --background: #060d1f;
+  --foreground: #eef2fb;
+  --paper: #0d1730;
+  --lavender-wash: #060d1f;
+  --frost-border: #1f2a44;
+  --mist: #5d6a84;
+  --midnight-ink: #eef2fb;
+  --slate: #c5cee0;
+  --electric-blue: #7aa2ff;
+  --cobalt-surface: #2c4f9e;
+  --cobalt-hover: #3a60b4;
 
-  --card: #131c2b;
-  --sub:  rgba(255, 255, 255, 0.045);
-  --dt1: #e8eef7;  --dtn: #d9e5f5;
-  --dt2: #c0cfe2;  --dt3: #9db0c9;  --dt4: #8296b0;  --dt5: #66788f;  --dt6: #4c5c70;
-  --ln0: rgba(255,255,255,0.16);  --ln1: rgba(255,255,255,0.10);  --ln2: rgba(255,255,255,0.07);
-  --tint-navy: rgba(110, 168, 255, 0.13);
+  --card: #0d1730;
+  --sub:  rgba(255, 255, 255, 0.04);
+  --dt1: #eef2fb;  --dtn: #e3e9f7;
+  --dt2: #c5cee0;  --dt3: #a3aec4;  --dt4: #8390a8;  --dt5: #66728b;  --dt6: #3f4a61;
+  --ln0: rgba(255,255,255,0.14);  --ln1: rgba(255,255,255,0.09);  --ln2: rgba(255,255,255,0.06);
+  --tint-navy: rgba(120, 160, 255, 0.12);
   --tint-blue-bg: rgba(96,165,250,0.13);  --tint-blue-bg2: rgba(96,165,250,0.22);  --tint-blue-ln: rgba(96,165,250,0.38);  --st-blue: #93b3f5;
   --tint-red-bg: rgba(239,68,68,0.12);    --tint-red-bg2: rgba(239,68,68,0.20);    --tint-red-ln: rgba(239,68,68,0.36);    --st-red: #f87171;
   --tint-amber-bg: rgba(245,158,11,0.12); --tint-amber-bg2: rgba(245,158,11,0.20); --tint-amber-ln: rgba(245,158,11,0.36); --st-amber: #fbbf24; --st-amber2: #f5cd67;
   --tint-green-bg: rgba(52,211,153,0.12); --tint-green-bg2: rgba(52,211,153,0.22); --tint-green-ln: rgba(52,211,153,0.40); --st-green: #34d399;
   --tint-violet-bg: rgba(167,139,250,0.15); --tint-violet-ln: rgba(167,139,250,0.42); --st-violet: #b79df8;
-  --accent: #6ea8ff;  --accent-bg: rgba(110, 168, 255, 0.14);
-  --navy-solid: #1f4d7e;  --red-solid: #cf3d3d;  --green-solid: #0d8465;
-  --amber-solid: #b8770a; --violet-solid: #7c4fe0; --accent-solid: #2e6fc2;
+  --accent: #8fb0ff;  --accent-bg: rgba(143, 176, 255, 0.14);
+  --navy-solid: #2c4f9e;  --red-solid: #cf3d3d;  --green-solid: #0d8465;
+  --amber-solid: #b8770a; --violet-solid: #7c4fe0; --accent-solid: #3a60b4;
+
+  --latar-navy:
+    radial-gradient(110% 80% at 88% -12%, rgba(84, 132, 232, 0.34), transparent 58%),
+    radial-gradient(90% 70% at -8% 112%, rgba(38, 84, 196, 0.3), transparent 62%),
+    linear-gradient(158deg, #081530 0%, #0b1c46 50%, #112a60 100%);
+  --latar-sidebar:
+    radial-gradient(140% 38% at 0% 0%, rgba(84, 132, 232, 0.18), transparent 62%),
+    linear-gradient(180deg, #081533 0%, #060f26 100%);
+  --bayang-kartu: none;
+  --bayang-angkat: 0 24px 48px -26px rgba(0, 0, 0, 0.6);
   color-scheme: dark;
 }
 
@@ -102,25 +131,26 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--frost-border); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--mist); }
 
-/* ── Clearbit components ─────────────────────────── */
+/* ── Tombol bersama (nama lama cb-*): pil navy dan pil garis ─────── */
 .cb-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   background: var(--cobalt-surface); color: #fff;
-  border: none; border-radius: 8px; padding: 10px 20px;
+  border: none; border-radius: 999px; padding: 10px 20px;
   font-size: 14px; font-weight: 500; font-family: inherit;
-  cursor: pointer; transition: background 0.15s;
+  cursor: pointer; transition: background 0.15s, transform 0.1s;
 }
-.cb-btn:hover:not(:disabled) { background: #0d6fd4; }
+.cb-btn:hover:not(:disabled) { background: var(--cobalt-hover); }
+.cb-btn:active:not(:disabled) { transform: scale(0.98); }
 .cb-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .cb-btn-ghost {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   background: transparent; color: var(--midnight-ink);
-  border: 1px solid var(--frost-border); border-radius: 8px; padding: 9px 20px;
+  border: 1px solid var(--ln0); border-radius: 999px; padding: 9px 20px;
   font-size: 14px; font-weight: 500; font-family: inherit;
-  cursor: pointer; transition: background 0.15s;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s;
 }
-.cb-btn-ghost:hover { background: var(--lavender-wash); }
+.cb-btn-ghost:hover { background: var(--sub); border-color: var(--dt6); }
 
 /* ── Arsitektur scroll ────────────────────────────────────────────
    Prinsip: kerangka halaman (judul, filter, tab) tetap diam — hanya
@@ -158,7 +188,7 @@ body {
 
 .adm-overlay {
   position: fixed; inset: 0; z-index: 50;
-  background: rgba(6, 14, 28, 0.55);
+  background: rgba(8, 18, 45, 0.5);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center; padding: 16px;
   animation: admFade .2s ease both;
@@ -168,15 +198,11 @@ body {
 .adm-modal {
   position: relative; width: 100%;
   background: var(--card); border: 1px solid var(--ln1);
-  border-radius: 18px; box-shadow: 0 28px 70px rgba(6,14,28,0.28);
+  border-radius: 22px; box-shadow: 0 1px 2px rgba(12,26,56,0.08), 0 40px 80px -30px rgba(8,18,45,0.45);
   animation: admRise .32s cubic-bezier(.22,1,.36,1) both;
   overflow: hidden;
 }
 .adm-modal [style*="overflow"], .adm-modal .overflow-y-auto { overscroll-behavior: contain; }
-.adm-modal::before {
-  content: ""; position: absolute; top: 0; left: 8%; right: 8%; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(201,162,39,0.55), transparent);
-}
 
 /* Chip ikon judul seksi/halaman */
 .adm-chip {
@@ -187,7 +213,7 @@ body {
 
 /* Kartu statistik ringkas */
 .adm-stat {
-  background: var(--card); border: 0.5px solid var(--ln1); border-radius: 14px;
+  background: var(--card); border: 1px solid var(--ln1); border-radius: 16px;
   padding: 12px 14px; position: relative; overflow: hidden;
   transition: box-shadow .18s, transform .18s, border-color .18s;
 }

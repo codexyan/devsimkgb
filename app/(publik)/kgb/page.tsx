@@ -8,7 +8,7 @@ import { tanggaGaji } from "@/lib/tabelGaji";
 import { formatTanggalId } from "@/lib/waktu";
 import { StatusLayanan } from "../JamLayanan";
 import Kata from "../Kata";
-import LatarNavy from "../LatarNavy";
+import LatarNavy from "@/app/_bersama/LatarNavy";
 import CekStatus from "./CekStatus";
 import PenjelajahTangga from "./tangga/PenjelajahTangga";
 import "./beranda.css";

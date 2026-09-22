@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import DashboardShell from "./components/DashboardShell";
 import { normalisasiBatasInputSdm } from "@/lib/batasInputSdm";
+import "./dasbor.css";
 
 export const metadata: Metadata = { title: "Dashboard" };
 

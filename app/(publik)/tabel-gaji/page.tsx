@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { tanggaGaji } from "@/lib/tabelGaji";
 import Kata from "../Kata";
-import LatarNavy from "../LatarNavy";
+import LatarNavy from "@/app/_bersama/LatarNavy";
 import TabelGaji from "./TabelGaji";
 import "./tabel-gaji.css";
 

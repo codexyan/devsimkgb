@@ -8,7 +8,7 @@
 
    ARAH: "Jernih" bertema navy (lihat docs/adr/ADR-002-halaman-publik-jernih.md)
    Tenang, profesional, dan lapang. Setiap halaman dibuka panel navy gradient
-   dengan latar bergerak halus (.pub-navy .pub-hero + LatarNavy.tsx); isi
+   dengan latar bergerak halus (.pub-navy .pub-hero + app/_bersama/LatarNavy.tsx); isi
    panjang di kanvas terang bernuansa dingin dengan kartu putih bersudut
    lembut. Judul sans rapat berbobot ringan (Inter Tight), teks isi Inter yang
    sama dengan dashboard. Tombol berbentuk pil, navy di kanvas terang dan
@@ -117,7 +117,7 @@
   color-scheme: light;
 }
 
-/* Permukaan navy: gradient biru tua dengan latar bergerak (LatarNavy.tsx). Token dibalik agar teks,
+/* Permukaan navy: gradient biru tua dengan latar bergerak (app/_bersama/LatarNavy.tsx). Token dibalik agar teks,
    garis, dan label di dalamnya otomatis terang. */
 .pub .pub-navy {
   --ink: #ffffff;
@@ -160,89 +160,6 @@
   .pub .pub-hero {
     margin: 6px 6px 0;
     border-radius: var(--radius-lg);
-  }
-}
-
-
-/* ── Latar bergerak ────────────────────────────────────────────────────── */
-.pub .ln {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.pub .ln-cahaya {
-  position: absolute;
-  width: 62vmax;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  opacity: 0.55;
-  will-change: transform;
-}
-
-.pub .ln-a {
-  top: -34vmax;
-  right: -18vmax;
-  background: radial-gradient(circle, rgba(104, 156, 255, 0.55), transparent 62%);
-  animation: lnMelayang 22s var(--ease) infinite alternate;
-}
-
-.pub .ln-b {
-  bottom: -40vmax;
-  left: -22vmax;
-  background: radial-gradient(circle, rgba(64, 104, 230, 0.5), transparent 60%);
-  animation: lnMelayang 28s var(--ease) infinite alternate-reverse;
-}
-
-.pub .ln-c {
-  top: 10%;
-  left: 38%;
-  width: 34vmax;
-  background: radial-gradient(circle, rgba(126, 214, 255, 0.28), transparent 62%);
-  animation: lnBerdenyut 16s var(--ease) infinite alternate;
-}
-
-@keyframes lnMelayang {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(-6vmax, 4vmax, 0) scale(1.08);
-  }
-  100% {
-    transform: translate3d(4vmax, 8vmax, 0) scale(0.96);
-  }
-}
-
-@keyframes lnBerdenyut {
-  0% {
-    opacity: 0.25;
-    transform: translate3d(0, 0, 0) scale(0.9);
-  }
-  100% {
-    opacity: 0.6;
-    transform: translate3d(-8vmax, 3vmax, 0) scale(1.15);
-  }
-}
-
-/* Kisi tipis yang memudar ke tepi dan bergeser pelan satu petak */
-.pub .ln-kisi {
-  position: absolute;
-  inset: -56px 0 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, #000 20%, transparent 75%);
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, #000 20%, transparent 75%);
-  animation: lnKisi 14s linear infinite;
-}
-
-@keyframes lnKisi {
-  to {
-    transform: translate3d(0, 56px, 0);
   }
 }
 
