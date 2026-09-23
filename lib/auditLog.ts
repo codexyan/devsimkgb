@@ -2,7 +2,8 @@ import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 
 interface AuditParams {
-  userId: string;
+  /** Pelaku aksi; null untuk aksi yang dijalankan skrip atau cron, ditampilkan sebagai "Sistem". */
+  userId: string | null;
   aksi: string;
   detail: string;
   targetNama?: string;
