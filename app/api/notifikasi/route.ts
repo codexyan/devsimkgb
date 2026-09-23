@@ -2,28 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
-import { bolehLihatNotifikasi, generateNotifikasi, tipeNotifikasiUntukRole } from "@/lib/generateNotifikasi";
+import { bolehLihatNotifikasi, tipeNotifikasiUntukRole } from "@/lib/generateNotifikasi";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
 import { ROLES } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
-// Pembuatan notifikasi berjalan paling sering sekali tiap 15 menit per isolate; cron harian tetap
-// menjalankannya tanpa batas ini.
-const JEDA_PEMBUATAN_MS = 15 * 60 * 1000;
-let terakhirDibuat = 0;
-
-async function buatNotifikasiBilaPerlu() {
-  const sekarang = Date.now();
-  if (sekarang - terakhirDibuat < JEDA_PEMBUATAN_MS) return;
-  terakhirDibuat = sekarang;
-  try {
-    await generateNotifikasi();
-  } catch (err) {
-    console.error("[notifikasi] gagal membuat notifikasi:", err);
-  }
-}
+// Rute ini hanya membaca. Notifikasi dibuat oleh cron harian (/api/cron/notifikasi) dan tombol
+// "Periksa sekarang" (/api/notifikasi/periksa), bukan di sini: sidebar memanggil GET dari setiap
+// halaman dashboard, dan menjalankan generator di jalur itu membuat Worker melampaui batas sumber daya.
 
 export async function GET(req: NextRequest) {
   await muatBatasInputSdm();
@@ -33,8 +21,6 @@ export async function GET(req: NextRequest) {
 
   const tipeRole = tipeNotifikasiUntukRole(session.user.role);
   if (tipeRole !== null && tipeRole.length === 0) return NextResponse.json([]);
-
-  await buatNotifikasiBilaPerlu();
 
   const { searchParams } = new URL(req.url);
   const tipeFilter = searchParams.get("tipe") || "";
@@ -59,9 +45,12 @@ export async function GET(req: NextRequest) {
     const pengguna = await penggunaLogin(session);
     const kode = pengguna ? satkerAkunUpt({ role: pengguna.role, satker: pengguna.satker }) : null;
     if (!kode) return NextResponse.json([]);
-    const [semuaPegawai, semuaKgb] = await Promise.all([db.pegawai.findMany(), db.riwayatKGB.findMany()]);
-    const idPegawai = new Set(pegawaiSatker(semuaPegawai, kode).map((p) => p.id));
-    const idKgb = new Set(semuaKgb.filter((k) => idPegawai.has(k.pegawaiId)).map((k) => k.id));
+    const idPegawai = new Set(pegawaiSatker(await db.pegawai.findMany(), kode).map((p) => p.id));
+    // Riwayat KGB hanya dibaca bila memang ada notifikasi yang menunjuk ke KGB, bukan ke pegawai.
+    const adaSkTerbit = all.some((n) => n.tipe === "sk_terbit");
+    const idKgb = adaSkTerbit
+      ? new Set((await db.riwayatKGB.findMany()).filter((k) => idPegawai.has(k.pegawaiId)).map((k) => k.id))
+      : new Set<string>();
     const milikSatker = all.filter((n) => {
       const ref = n.referenceId ?? "";
       return n.tipe === "sk_terbit" ? idKgb.has(ref) : idPegawai.has(ref);

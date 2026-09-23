@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { ROLES, ROLE_LABEL } from "@/lib/auth";
@@ -56,6 +57,17 @@ const PRIORITAS_NOTIF: Record<string, { label: string; warna: string; bg: string
   info:     { label: "Informasi", warna: "var(--st-blue)",  bg: "var(--tint-blue-bg)"  },
 };
 
+/* Layar sempit: sidebar menjadi laci dan panel dibuat selebar layar (lihat posisiPopup). */
+const LAYAR_SEMPIT = "(max-width: 639px)";
+const bacaLayarSempit = () => window.matchMedia(LAYAR_SEMPIT).matches;
+function langgananLayarSempit(ubah: () => void) {
+  const layar = window.matchMedia(LAYAR_SEMPIT);
+  layar.addEventListener("change", ubah);
+  return () => layar.removeEventListener("change", ubah);
+}
+/** Langganan kosong: dipakai hanya untuk membedakan render server dan peramban. */
+const tanpaLangganan = () => () => {};
+
 /* ── Menus ────────────────────────────────────────────────────────────────── */
 type Leaf  = { href: string; label: string; icon: React.ReactNode; newTab?: boolean };
 type Group = { groupLabel: string; icon: React.ReactNode; children: Leaf[] };
@@ -108,9 +120,11 @@ const menuKeuanganSub = [
   { href: "/dashboard/keuangan",         label: "Keuangan",          icon: Ic.lock    },
   { href: "/dashboard/keuangan/riwayat", label: "Riwayat Aktivitas", icon: Ic.history },
 ];
-// Admin UPT: satu dashboard berisi jadwal usulan, status KGB pegawai satkernya, dan SK yang sudah terbit.
+// Admin UPT: satu dashboard berisi jadwal usulan, status KGB pegawai satkernya, dan SK yang sudah terbit,
+// ditambah Profil Saya untuk mengganti password sendiri.
 const menuAdminUpt: Entry[] = [
   { href: "/dashboard", label: "Dashboard", icon: Ic.dashboard },
+  { href: "/dashboard/profile", label: "Profil Saya", icon: Ic.person },
 ];
 // Panduan berada di halaman publik; dibuka di tab baru agar pekerjaan di dashboard tidak hilang.
 const menuBantuan: Leaf[] = [
@@ -298,9 +312,18 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
   const [showNotif,   setShowNotif]   = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [themeMode, toggleTheme]      = useThemeMode();
+  // Di bawah 640px sidebar berupa laci dan layar terlalu sempit untuk panel selebar 296px yang
+  // dipasang pada offset sidebar; panel dibuat melebar mengikuti layar. Dibaca dari matchMedia, dengan
+  // hasil render server selalu "lebar" agar hidrasi tidak berbeda.
+  const sempit = useSyncExternalStore(langgananLayarSempit, bacaLayarSempit, () => false);
+  /** Portal baru boleh dipasang setelah komponen terpasang di peramban. */
+  const terpasang = useSyncExternalStore(tanpaLangganan, () => true, () => false);
 
   const notifRef   = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  // Panelnya berada di luar pohon DOM sidebar (portal), jadi pemeriksaan klik di luar memakai ref sendiri.
+  const panelNotifRef = useRef<HTMLDivElement>(null);
+  const panelProfilRef = useRef<HTMLDivElement>(null);
 
   const expanded = isOpen || !isCollapsed;
 
@@ -336,8 +359,11 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
   /* close dropdowns on outside click, dan dengan Escape */
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (notifRef.current   && !notifRef.current.contains(e.target as Node))   setShowNotif(false);
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setShowProfile(false);
+      const sasaran = e.target as Node;
+      const diDalam = (...ref: React.RefObject<HTMLDivElement | null>[]) =>
+        ref.some((r) => r.current?.contains(sasaran));
+      if (!diDalam(notifRef, panelNotifRef)) setShowNotif(false);
+      if (!diDalam(profileRef, panelProfilRef)) setShowProfile(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
@@ -367,8 +393,16 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
 
   const roleLabel = ROLE_LABEL[role] ?? role;
 
-  /* popup offset */
+  /* popup offset: mengikuti sidebar di layar lebar, melebar penuh di layar sempit */
   const popupLeft = expanded ? "232px" : "70px";
+  // Laci sidebar memakai transform, sehingga position: fixed di dalamnya mengacu ke laci itu, bukan ke
+  // layar. Lebarnya karena itu dihitung dengan vw agar panel tetap selebar layar dikurangi tepi.
+  const posisiPopup: React.CSSProperties = sempit
+    ? { left: "10px", width: "calc(100vw - 20px)", maxWidth: "none" }
+    : { left: popupLeft, width: "296px" };
+  const posisiPopupProfil: React.CSSProperties = sempit
+    ? { left: "10px", width: "calc(100vw - 20px)", maxWidth: "none" }
+    : { left: popupLeft, width: "220px" };
 
   return (
     <>
@@ -608,10 +642,10 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
             </button>
 
             {/* Notif panel */}
-            {showNotif && (
-              <div style={{
-                position: "fixed", top: "68px", left: popupLeft,
-                width: "296px",
+            {showNotif && terpasang && createPortal(
+              <div ref={panelNotifRef} style={{
+                position: "fixed", top: "68px",
+                ...posisiPopup,
                 background: "var(--card)",
                 border: "1px solid var(--ln1)",
                 borderRadius: "16px",
@@ -663,7 +697,8 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
                 <Link href="/dashboard/notifikasi" onClick={() => setShowNotif(false)} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "10px", fontSize: "12px", color: "var(--accent)", borderTop: "1px solid var(--ln2)", textDecoration: "none", fontWeight: 500 }}>
                   Lihat Semua
                 </Link>
-              </div>
+              </div>,
+              document.body,
             )}
           </div>
         </nav>
@@ -718,12 +753,11 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
             </button>
 
             {/* Profile popup */}
-            {showProfile && (
-              <div style={{
+            {showProfile && terpasang && createPortal(
+              <div ref={panelProfilRef} style={{
                 position: "fixed",
                 bottom: "72px",
-                left: popupLeft,
-                width: "220px",
+                ...posisiPopupProfil,
                 background: "var(--card)",
                 border: "1px solid var(--ln1)",
                 borderRadius: "16px",
@@ -763,7 +797,8 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
                     </div>
                   </Link>
                 </div>
-              </div>
+              </div>,
+              document.body,
             )}
           </div>
 
