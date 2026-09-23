@@ -56,6 +56,22 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
 .kgbm-bagian-judul { font-size: 12px; font-weight: 600; color: var(--dtn); }
 .kgbm-bagian-ket { font-size: 11px; color: var(--dt4); margin-top: 1px; line-height: 1.4; }
 .kgbm-bagian-isi { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.kgbm-bantuan { display: block; margin-top: 3px; font-size: 11px; font-weight: 400; line-height: 1.45; color: var(--dt4); }
+/* Pilihan keadaan: dua tombol berdampingan, yang terpilih diberi latar */
+.kgbm-pilihan { display: flex; gap: 6px; padding: 3px; border-radius: 10px; background: var(--sub); border: 1px solid var(--ln1); }
+.kgbm-pilihan button { flex: 1; border: 0; border-radius: 8px; padding: 7px 10px; background: none; font: inherit;
+  font-size: 12px; font-weight: 500; color: var(--dt3); cursor: pointer; }
+.kgbm-pilihan button[aria-checked="true"] { background: var(--kartu); color: var(--dtn); font-weight: 600;
+  box-shadow: 0 1px 2px rgba(15, 30, 60, .08); }
+/* Panel hasil hitungan: angka yang tidak boleh diketik operator */
+.kgbm-hitungan { border: 1px solid var(--tint-navy-ln, var(--ln1)); border-radius: 10px; padding: 10px 12px; background: var(--tint-navy); }
+.kgbm-hitungan-judul { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--dt4); }
+.kgbm-hitungan dl { display: grid; grid-template-columns: 1fr; gap: 4px; margin-top: 6px; }
+@media (min-width: 480px) { .kgbm-hitungan dl { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.kgbm-hitungan dt { font-size: 11px; color: var(--dt4); }
+.kgbm-hitungan dd { font-size: 13px; font-weight: 600; color: var(--dtn); font-variant-numeric: tabular-nums; }
+.kgbm-hitungan-ket { margin-top: 7px; font-size: 11.5px; line-height: 1.5; color: var(--dt3); }
+.kgbm-hitungan-ingat { margin-top: 5px; font-size: 11.5px; line-height: 1.5; color: var(--st-red); }
 .kgbm-kosongkan { display: block; margin: 3px 0 0 auto; border: 0; padding: 0; background: none; font: inherit;
   font-size: 11px; font-weight: 500; color: var(--dt4); cursor: pointer; }
 .kgbm-kosongkan:hover { color: var(--st-red); text-decoration: underline; }

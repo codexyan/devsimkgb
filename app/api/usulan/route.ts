@@ -22,8 +22,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
   const status = new URL(req.url).searchParams.get("status") ?? "";
+  // Draf adalah data yang masih disiapkan UPT dan belum diajukan, jadi tidak pernah tampil di Kanwil.
+  const saring = status && status !== "draf" ? { status } : { status: { not: "draf" } };
   const [semuaUsulan, semuaPegawai] = await Promise.all([
-    db.usulanPegawai.findMany(status ? { where: { status } } : undefined) as Promise<UsulanPegawaiRow[]>,
+    db.usulanPegawai.findMany({ where: saring }) as Promise<UsulanPegawaiRow[]>,
     db.pegawai.findMany(),
   ]);
   const pegawaiById = new Map(semuaPegawai.map((p) => [p.id, p]));

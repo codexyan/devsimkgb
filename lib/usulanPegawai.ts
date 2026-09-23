@@ -7,10 +7,17 @@
 
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
+import { bulanKeKgbBerikutnya, getGajiPokok, getPangkat, isGolonganDikenal, tambahBulan } from "./tabelGaji";
 
-export type StatusUsulan = "menunggu" | "disetujui" | "ditolak";
+export type StatusUsulan = "draf" | "menunggu" | "disetujui" | "ditolak";
 
-export const STATUS_USULAN: Record<StatusUsulan, { label: string; nada: "kuning" | "hijau" | "merah" }> = {
+/**
+ * Daur hidup usulan. "draf" hanya ada di tangan UPT: belum menjadi dokumen usulan, tidak pernah masuk
+ * antrian tinjauan Kanwil, dan boleh disunting atau dihapus sesukanya. Sesudah diajukan barulah ia
+ * mengikat, karena itu perubahannya hanya lewat pembatalan lalu pengiriman ulang.
+ */
+export const STATUS_USULAN: Record<StatusUsulan, { label: string; nada: "biru" | "kuning" | "hijau" | "merah" }> = {
+  draf: { label: "Disiapkan UPT", nada: "biru" },
   menunggu: { label: "Menunggu tinjauan", nada: "kuning" },
   disetujui: { label: "Disetujui", nada: "hijau" },
   ditolak: { label: "Ditolak", nada: "merah" },
@@ -144,4 +151,118 @@ export function ringkasHukdisUsulan(usulan: Partial<UsulanPegawaiRow>): string |
  */
 export function usulanKosong(pegawai: Partial<PegawaiRow>, usulan: Partial<UsulanPegawaiRow>): boolean {
   return bandingkanUsulan(pegawai, usulan).length === 0 && !usulan.hukdisAda;
+}
+
+/* ── Hitungan yang tidak boleh diketik UPT ────────────────────────────────────────────────────── */
+
+/**
+ * Gaji pokok, pangkat, dan jatuh tempo KGB berikutnya seluruhnya turunan dari golongan, masa kerja
+ * golongan, dan TMT KGB terakhir. Ketiganya dihitung di sini, bukan diketik operator, karena salah
+ * ketik pada angka ini langsung menggeser uang: kekurangan rapelan atau kelebihan yang harus
+ * dikembalikan ke kas negara. Fungsi ini dipakai dua tempat — peramban untuk memperlihatkan hasilnya
+ * sambil mengetik, dan rute API sebagai penentu nilai yang benar-benar disimpan.
+ */
+export interface HitunganUsulan {
+  pangkat: string;
+  gajiPokok: number;
+  tmtKgbBerikutnya: Date | null;
+  /** Jarak ke langkah tabel gaji berikutnya; 12 bulan untuk II/a dari MKG 0, umumnya 24 bulan. */
+  bulanKeBerikutnya: number;
+  /** Hal yang harus dibaca operator sebelum mengirim; kosong bila isiannya masuk akal. */
+  peringatan: string[];
+  /** Satu kalimat yang menerangkan asal angkanya, untuk ditampilkan di bawah isian. */
+  penjelasan: string;
+}
+
+function angka(nilai: unknown): number {
+  const n = typeof nilai === "string" ? Number(nilai.trim()) : Number(nilai);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+}
+
+export function hitungUsulan(isian: {
+  golonganRuang?: string | null;
+  mkgTahun?: number | string | null;
+  mkgBulan?: number | string | null;
+  tmtKgbTerakhir?: NilaiTanggal;
+}): HitunganUsulan {
+  const golongan = (isian.golonganRuang ?? "").trim();
+  const mkgTahun = angka(isian.mkgTahun);
+  const mkgBulan = angka(isian.mkgBulan);
+  const tmtTerakhir = tanggalKalender(isian.tmtKgbTerakhir);
+  const peringatan: string[] = [];
+
+  if (!golongan) {
+    return {
+      pangkat: "", gajiPokok: 0, tmtKgbBerikutnya: null, bulanKeBerikutnya: 0,
+      peringatan: ["Golongan/ruang belum diisi, sehingga gaji pokok dan jatuh tempo KGB belum dapat dihitung."],
+      penjelasan: "",
+    };
+  }
+  if (!isGolonganDikenal(golongan)) {
+    return {
+      pangkat: "", gajiPokok: 0, tmtKgbBerikutnya: null, bulanKeBerikutnya: 0,
+      peringatan: [`Golongan "${golongan}" tidak ada pada tabel gaji PP 5/2024.`],
+      penjelasan: "",
+    };
+  }
+  if (mkgBulan > 11) peringatan.push("Masa kerja golongan bagian bulan mestinya 0 sampai 11; sisanya dihitung sebagai tahun.");
+
+  const gajiPokok = getGajiPokok(golongan, mkgTahun, mkgBulan);
+  if (gajiPokok === 0) {
+    // Mis. II/c dengan MKG 0: golongan itu tidak pernah menjadi pangkat pengangkatan pertama, sehingga
+    // tabelnya memang tidak punya barisnya. Dulu keadaan ini lolos diam-diam sebagai gaji pokok nol.
+    peringatan.push(
+      `Golongan ${golongan} dengan masa kerja ${mkgTahun} tahun ${mkgBulan} bulan tidak ada pada tabel PP 5/2024. ` +
+      "Periksa kembali masa kerja golongan pada SK; angka ini menentukan gaji pokoknya.",
+    );
+  }
+
+  const bulanKeBerikutnya = bulanKeKgbBerikutnya(golongan, mkgTahun, mkgBulan);
+  const tmtKgbBerikutnya = tmtTerakhir ? tambahBulan(tmtTerakhir, bulanKeBerikutnya) : null;
+  if (!tmtTerakhir) peringatan.push("TMT KGB terakhir belum diisi, sehingga jatuh tempo KGB berikutnya belum dapat dihitung.");
+
+  const penjelasan = [
+    `${golongan} · masa kerja ${mkgTahun} tahun ${mkgBulan} bulan → gaji pokok ${gajiPokok > 0 ? rupiah(gajiPokok) : "belum dapat dihitung"} menurut PP 5/2024.`,
+    tmtKgbBerikutnya
+      ? `KGB berikutnya ${bulanKeBerikutnya} bulan setelah ${nilaiTampil(tmtTerakhir, "tanggal")}, yaitu ${nilaiTampil(tmtKgbBerikutnya, "tanggal")}.`
+      : `Jarak ke KGB berikutnya ${bulanKeBerikutnya} bulan dari TMT KGB terakhir.`,
+  ].join(" ");
+
+  return { pangkat: getPangkat(golongan), gajiPokok, tmtKgbBerikutnya, bulanKeBerikutnya, peringatan, penjelasan };
+}
+
+/**
+ * Apa yang masih kurang sebelum sebuah draf boleh diajukan ke Kanwil. Draf sengaja boleh disimpan
+ * setengah jadi — itu gunanya draf — sehingga pemeriksaan kelengkapan dilakukan di sini, sekali, pada
+ * saat pengajuan. Daftar yang kosong berarti siap diajukan.
+ */
+export function kekuranganUsulan(
+  usulan: Partial<UsulanPegawaiRow>,
+  jenis: string,
+  pegawai?: Partial<PegawaiRow> | null,
+): string[] {
+  const kurang: string[] = [];
+  const nilai = <K extends keyof PegawaiRow & keyof UsulanPegawaiRow>(kunci: K) =>
+    (usulan[kunci] ?? pegawai?.[kunci] ?? null) as PegawaiRow[K] | null;
+
+  if (jenis === "baru") {
+    if (!String(usulan.nama ?? "").trim()) kurang.push("nama lengkap");
+    if (!/^\d{18}$/.test(String(usulan.nip ?? "").trim())) kurang.push("NIP 18 digit");
+    if (!String(usulan.jabatan ?? "").trim()) kurang.push("jabatan");
+  }
+
+  const golongan = String(nilai("golonganRuang") ?? "").trim();
+  if (!golongan) kurang.push("golongan/ruang");
+  if (!tanggalKalender(nilai("tmtKgbTerakhir"))) kurang.push("TMT KGB terakhir");
+
+  const hitung = hitungUsulan({
+    golonganRuang: golongan,
+    mkgTahun: nilai("mkgTahun"),
+    mkgBulan: nilai("mkgBulan"),
+    tmtKgbTerakhir: nilai("tmtKgbTerakhir"),
+  });
+  if (golongan && hitung.gajiPokok === 0) {
+    kurang.push(`masa kerja golongan yang cocok dengan tabel PP 5/2024 untuk golongan ${golongan}`);
+  }
+  return kurang;
 }

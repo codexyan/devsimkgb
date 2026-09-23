@@ -4,39 +4,134 @@ import { auth } from "@/auth";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { BERKAS_USULAN } from "@/lib/usulanPegawai";
+import { bacaIsianUsulan, isiHitungan } from "@/lib/usulanFormulir";
+import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, hapusBerkasUsulan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
+import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { TIPE_NOTIFIKASI } from "@/lib/generateNotifikasi";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
-import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
+import type { PegawaiRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
 
-const PESAN_BUKAN_UPT = "Usulan hanya dapat dibatalkan akun Admin UPT yang tertaut ke satker.";
+const PESAN_BUKAN_UPT = "Usulan hanya dapat diubah akun Admin UPT yang tertaut ke satker.";
 
-type BucketSk = { delete(keys: string | string[]): Promise<void> };
+/** Baris usulan milik satker akun; hasilnya `galat` bila tidak ada atau bukan miliknya. */
+async function usulanSatker(id: string, kode: string) {
+  const usulan = (await db.usulanPegawai.findUnique({ id })) as UsulanPegawaiRow | null;
+  // Usulan satker lain dijawab sama dengan yang tidak ada, agar keberadaannya tidak terbaca dari luar.
+  if (!usulan || usulan.satker !== kode)
+    return { galat: NextResponse.json({ error: "Usulan tidak ditemukan" }, { status: 404 }) };
+  return { usulan };
+}
 
-/**
- * Hapus berkas usulan di R2. Best effort: kegagalannya tidak membatalkan penghapusan barisnya, karena
- * yang penting bagi UPT adalah usulan salah itu hilang dari antrian tinjauan Kanwil.
- */
-async function hapusBerkasUsulan(jalur: string[]): Promise<void> {
-  if (jalur.length === 0) return;
-  try {
-    const { env } = await getCloudflareContext({ async: true });
-    const bucket = (env as unknown as { SK_BUCKET?: BucketSk }).SK_BUCKET;
-    if (bucket) await bucket.delete(jalur);
-  } catch {
-    // Berkas yatim di R2 tidak terlihat pengguna dan tidak menghalangi apa pun.
-  }
+/** Nama pegawai untuk catatan audit; pada usulan perubahan namanya ada di data induk. */
+async function namaUsulan(usulan: UsulanPegawaiRow): Promise<{ nama: string; pegawai: PegawaiRow | null }> {
+  const pegawai = usulan.pegawaiId ? ((await db.pegawai.findUnique({ id: usulan.pegawaiId })) as PegawaiRow | null) : null;
+  return { nama: pegawai?.nama ?? usulan.nama ?? "-", pegawai };
 }
 
 /**
- * Batalkan usulan yang belum ditinjau Kanwil.
+ * Sunting draf yang belum diajukan.
  *
- * Usulan yang salah isi tidak bisa diperbaiki di tempat: barisnya dihapus seluruhnya, lalu UPT
- * mengirim ulang. Itu disengaja, supaya antrian tinjauan Kanwil tidak pernah berisi dua versi usulan
- * untuk pegawai yang sama. Usulan yang sudah ditinjau tidak dapat dibatalkan, karena hasilnya sudah
- * menjadi riwayat dan, bila disetujui, sudah menempel pada data pegawai.
+ * Hanya draf yang boleh disunting. Usulan yang sudah dikirim tidak, karena peninjau di Kanwil harus
+ * melihat persis apa yang dikirim UPT; yang telanjur salah dibatalkan lalu dikirim ulang. Berkas yang
+ * tidak disertakan pada permintaan ini dibiarkan apa adanya, sehingga menyunting satu isian tidak
+ * menuntut mengunggah ulang seluruh PDF-nya.
+ */
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  await muatBatasInputSdm();
+  const akun = await akunUpt(await auth(), PESAN_BUKAN_UPT);
+  if ("galat" in akun) return akun.galat;
+
+  const panjangIsi = Number(req.headers.get("content-length"));
+  if (Number.isFinite(panjangIsi) && panjangIsi > BERKAS_USULAN.length * BATAS_BERKAS_BYTE + 64 * 1024)
+    return NextResponse.json({ error: PESAN_TERLALU_BESAR }, { status: 413 });
+
+  const { id } = await params;
+  const ditemukan = await usulanSatker(id, akun.kode);
+  if ("galat" in ditemukan) return ditemukan.galat;
+  const { usulan } = ditemukan;
+  if (usulan.status !== "draf")
+    return NextResponse.json(
+      { error: "Usulan ini sudah dikirim ke Kanwil, jadi tidak dapat disunting. Batalkan dulu bila datanya keliru." },
+      { status: 409 },
+    );
+
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Data usulan tidak valid" }, { status: 400 });
+  }
+  const teks = (kunci: string) => (form.get(kunci) as string | null)?.trim() || "";
+
+  const dibaca = bacaIsianUsulan(form);
+  if ("galat" in dibaca) return NextResponse.json({ error: dibaca.galat }, { status: 400 });
+
+  const { nama, pegawai } = await namaUsulan(usulan);
+  const isian = isiHitungan(dibaca.isian, pegawai);
+
+  const tanggalSurat = teks("tanggalSurat") ? bacaTanggalInput(teks("tanggalSurat")) : null;
+  if (teks("tanggalSurat") && !tanggalSurat)
+    return NextResponse.json({ error: "Tanggal surat tidak valid" }, { status: 400 });
+  const tanggalSkTerakhir = teks("tanggalSkTerakhir") ? bacaTanggalInput(teks("tanggalSkTerakhir")) : null;
+  if (teks("tanggalSkTerakhir") && !tanggalSkTerakhir)
+    return NextResponse.json({ error: "Tanggal SK terakhir tidak valid" }, { status: 400 });
+  const hukdisTmtMulai = teks("hukdisTmtMulai") ? bacaTanggalInput(teks("hukdisTmtMulai")) : null;
+  if (teks("hukdisTmtMulai") && !hukdisTmtMulai)
+    return NextResponse.json({ error: "TMT mulai hukuman disiplin tidak valid" }, { status: 400 });
+  const hukdisTmtBerakhir = teks("hukdisTmtBerakhir") ? bacaTanggalInput(teks("hukdisTmtBerakhir")) : null;
+  if (teks("hukdisTmtBerakhir") && !hukdisTmtBerakhir)
+    return NextResponse.json({ error: "TMT berakhir hukuman disiplin tidak valid" }, { status: 400 });
+
+  const berkas = await simpanBerkasUsulan(form, akun.kode);
+  if ("galat" in berkas) return berkas.galat;
+
+  // Berkas lama yang digantikan dibuang, supaya R2 tidak menumpuk unggahan yang tidak lagi dirujuk.
+  const digantikan = BERKAS_USULAN.map((b) => (berkas.jalur[b.kunci] ? usulan[b.kunci] : null)).filter(
+    (jalur): jalur is string => !!jalur,
+  );
+  await hapusBerkasUsulan(digantikan);
+
+  const perubahan: Partial<UsulanPegawaiRow> = {
+    ...isian,
+    nomorSurat: teks("nomorSurat"),
+    tanggalSurat,
+    nomorSkTerakhir: teks("nomorSkTerakhir") || null,
+    tanggalSkTerakhir,
+    hukdisAda: teks("hukdisAda") === "true",
+    hukdisJenis: teks("hukdisJenis") || null,
+    hukdisNomorSk: teks("hukdisNomorSk") || null,
+    hukdisTmtMulai,
+    hukdisTmtBerakhir,
+    hukdisKeterangan: teks("hukdisKeterangan") || null,
+    catatanUpt: teks("catatanUpt") || null,
+    diajukanOleh: `${akun.pengguna.nama} (${akun.pengguna.nip})`,
+    diajukanAt: new Date(),
+  };
+  for (const b of BERKAS_USULAN) {
+    if (berkas.jalur[b.kunci]) perubahan[b.kunci] = berkas.jalur[b.kunci] ?? null;
+  }
+
+  await db.usulanPegawai.update({ id }, perubahan);
+
+  logAudit({
+    userId: akun.pengguna.id,
+    aksi: "simpan_draf_pegawai",
+    detail: `Draf data ${isian.nama ?? nama} diperbarui sebelum diajukan`,
+    targetNama: String(isian.nama ?? nama),
+  });
+
+  return NextResponse.json({ ok: true });
+}
+
+/**
+ * Hapus draf, atau batalkan usulan yang belum ditinjau Kanwil.
+ *
+ * Usulan yang salah isi tidak diperbaiki di tempat: barisnya dihapus seluruhnya, lalu UPT mengirim
+ * ulang. Itu disengaja, supaya antrian tinjauan Kanwil tidak pernah berisi dua versi usulan untuk
+ * pegawai yang sama. Usulan yang sudah ditinjau tidak dapat dihapus, karena hasilnya sudah menjadi
+ * riwayat dan, bila disetujui, sudah menempel pada data pegawai.
  */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   await muatBatasInputSdm();
@@ -44,28 +139,27 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if ("galat" in akun) return akun.galat;
 
   const { id } = await params;
-  const usulan = (await db.usulanPegawai.findUnique({ id })) as UsulanPegawaiRow | null;
-  // Usulan satker lain dijawab sama dengan yang tidak ada, agar keberadaannya tidak terbaca dari luar.
-  if (!usulan || usulan.satker !== akun.kode)
-    return NextResponse.json({ error: "Usulan tidak ditemukan" }, { status: 404 });
-  if (usulan.status !== "menunggu")
+  const ditemukan = await usulanSatker(id, akun.kode);
+  if ("galat" in ditemukan) return ditemukan.galat;
+  const { usulan } = ditemukan;
+  if (usulan.status !== "menunggu" && usulan.status !== "draf")
     return NextResponse.json(
       { error: "Usulan ini sudah ditinjau Kanwil, jadi tidak dapat dibatalkan. Kirim usulan perbaikan baru bila datanya keliru." },
       { status: 409 },
     );
 
-  // Pada usulan perubahan, nama hanya terisi bila namanya sendiri yang diusulkan berubah.
-  const pegawai = usulan.pegawaiId ? await db.pegawai.findUnique({ id: usulan.pegawaiId }) : null;
-  const nama = pegawai?.nama ?? usulan.nama ?? "-";
-  await hapusBerkasUsulan(BERKAS_USULAN.map((b) => usulan[b.kunci]).filter((j): j is string => !!j));
+  const { nama } = await namaUsulan(usulan);
+  await hapusBerkasUsulan(BERKAS_USULAN.map((b) => usulan[b.kunci]).filter((jalur): jalur is string => !!jalur));
   await db.usulanPegawai.delete({ id });
   // Notifikasi "usulan menunggu tinjauan" ikut hilang, supaya Kanwil tidak membuka usulan yang sudah tiada.
   await db.notifikasi.deleteMany({ tipe: TIPE_NOTIFIKASI.USULAN_UPT, referenceId: id });
 
   logAudit({
     userId: akun.pengguna.id,
-    aksi: "batal_usulan",
-    detail: `Usulan ${usulan.jenis === "baru" ? "pegawai baru " : "data "}${nama} dibatalkan UPT sebelum ditinjau, surat ${usulan.nomorSurat}`,
+    aksi: usulan.status === "draf" ? "hapus_draf_pegawai" : "batal_usulan",
+    detail: usulan.status === "draf"
+      ? `Draf data ${nama} dihapus sebelum diajukan`
+      : `Usulan ${usulan.jenis === "baru" ? "pegawai baru " : "data "}${nama} dibatalkan UPT sebelum ditinjau, surat ${usulan.nomorSurat}`,
     targetNama: nama,
   });
 

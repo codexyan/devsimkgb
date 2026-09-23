@@ -665,37 +665,53 @@ export default async function PanduanPage() {
                 <h3 className="pub-h3">Menginventarisir data pegawai lewat SIM-KGB</h3>
                 <p>
                   Dokumen aslinya ada di UPT, sedangkan yang mengetik datanya selama ini Kanwil. Pengetikan ganda itu
-                  sumber salah masa kerja golongan. Karena itu UPT dapat mengirim datanya sendiri: buka Dashboard,
-                  pilih pegawai, lalu tekan Usulkan perbaikan data.
-                </p>
-                <p>
-                  Pegawai yang belum tercatat di SIM-KGB, misalnya CPNS yang baru dilantik, diusulkan lewat tombol
-                  <strong> Usulkan pegawai baru</strong> di kepala daftar pegawai. Isian NIP, nama, golongan ruang, dan
-                  TMT KGB berikutnya wajib; gaji pokok dihitung sendiri dari tabel PP 5/2024 bila dikosongkan. Pegawainya
-                  ditambahkan ke data induk setelah Kanwil menyetujui usulan itu.
+                  sumber salah masa kerja golongan. Karena itu UPT mendata sendiri pegawainya, dan mengusulkannya dalam
+                  dua langkah terpisah: <strong>data dulu, ajukan kemudian</strong>.
                 </p>
                 <ol>
                   <li>
-                    Pada usulan perbaikan, isian sudah terisi dengan data yang tercatat di Kanwil. Ubah yang perlu
-                    diperbaiki saja; isian yang dikosongkan berarti tidak diusulkan berubah.
+                    <strong>Siapkan datanya.</strong> Tekan <strong>Tambah pegawai</strong> untuk pegawai yang belum
+                    tercatat, misalnya CPNS yang baru dilantik, atau <strong>Usulkan perbaikan data</strong> pada baris
+                    pegawai yang sudah ada. Isian disimpan sebagai draf milik satker: belum terlihat Kanwil, boleh
+                    ditinggal dan dilanjutkan kapan saja, dan boleh dihapus bila keliru.
                   </li>
                   <li>
-                    Cantumkan nomor dan tanggal surat usulan yang dikirim lewat Srikandi, lalu unggah berkas dasarnya,
-                    masing-masing PDF paling besar 5 MB: <strong>surat usulan Srikandi</strong>,
-                    <strong> SK KGB terakhir</strong>, <strong>syarat pengangkatan PNS</strong> bila pegawainya CPNS yang
-                    baru dilantik, dan <strong>SK kenaikan pangkat terakhir</strong> bila pernah naik pangkat. Ketiga
-                    berkas terakhir diminta tim keuangan agar masa kerja golongan dapat dicocokkan dengan dokumen
-                    aslinya, bukan dengan ingatan.
+                    <strong>Golongan dan masa kerja golongan disalin dari SK, bukan dihitung sendiri.</strong> Pilih
+                    dulu keadaan pegawainya. <em>Belum pernah KGB</em> cukup meminta TMT CPNS, dan masa kerjanya 0 tahun
+                    0 bulan. <em>Sudah pernah KGB</em> meminta TMT dan masa kerja golongan pada SK KGB terakhir; pegawai
+                    yang baru naik pangkat tetap memakai TMT dari siklus KGB sebelumnya, sebab kenaikan pangkat tidak
+                    mengulang hitungan KGB.
                   </li>
                   <li>
-                    Sebutkan nomor dan tanggal SK terakhir yang menjadi dasar gaji pokok sekarang, yaitu SK KGB
-                    terakhir, atau SK pengangkatan PNS dan SK kenaikan pangkat bila belum pernah KGB.
+                    <strong>Pangkat, gaji pokok, dan TMT KGB berikutnya dihitung sistem</strong> dari tabel PP 5/2024,
+                    lengkap dengan keterangan asal angkanya. Ketiganya tidak diketik operator karena salah ketik di situ
+                    langsung menggeser uang. Perhatikan pegawai golongan II/a: KGB pertamanya jatuh satu tahun setelah
+                    TMT CPNS, bukan dua tahun seperti golongan lain.
                   </li>
                   <li>
-                    Bila pegawai sedang atau pernah menjalani hukuman disiplin yang belum dilaporkan, centang
-                    bagiannya dan isi jenis, nomor SK, serta masa berlakunya.
+                    <strong>Unggah berkas dasarnya</strong>, masing-masing PDF paling besar 1 MB: <strong>surat usulan
+                    Srikandi</strong>, <strong>SK KGB terakhir</strong>, <strong>syarat pengangkatan PNS</strong> bila
+                    pegawainya CPNS yang baru dilantik, dan <strong>SK kenaikan pangkat terakhir</strong> bila pernah
+                    naik pangkat. Pindai sebagai dokumen, bukan foto kamera, agar ukurannya muat. Ketiga berkas terakhir
+                    diminta tim keuangan agar masa kerja golongan dapat dicocokkan dengan dokumen aslinya, bukan dengan
+                    ingatan.
+                  </li>
+                  <li>
+                    Bila pegawai sedang atau pernah menjalani hukuman disiplin yang belum dilaporkan, centang bagiannya
+                    dan isi jenis, nomor SK, serta masa berlakunya.
+                  </li>
+                  <li>
+                    <strong>Ajukan ke Kanwil.</strong> Centang pegawai yang akan diusulkan pada panel Data disiapkan,
+                    lalu tekan Ajukan. Nomor dan tanggal surat Srikandi diisi sekali dan berlaku untuk semuanya, karena
+                    satu surat usulan memang lazim memuat beberapa pegawai. Data yang belum lengkap disebutkan satu per
+                    satu sebelum apa pun terkirim.
                   </li>
                 </ol>
+                <p>
+                  Sesudah diajukan, usulannya tidak lagi dapat disunting — peninjau di Kanwil harus melihat persis apa
+                  yang dikirim UPT. Yang telanjur salah dapat <strong>dibatalkan</strong> selama belum ditinjau, lalu
+                  dikirim ulang setelah diperbaiki.
+                </p>
                 <p>
                   Usulan tidak langsung mengubah data. Super Admin atau Tim SDM KGB meninjaunya lebih dulu, lalu
                   menyetujui atau menolak dengan alasan. Hasilnya terlihat di panel Usulan terkirim pada dashboard UPT.

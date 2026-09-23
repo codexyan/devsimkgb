@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDashUser } from "@/app/dashboard/components/RoleContext";
 import { PanelNavy, Stat, StripStat, namaSapaan, sapaanWita, tanggalPanjangWita, type Nada } from "@/app/dashboard/components/PanelNavy";
 import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
@@ -8,8 +8,8 @@ import { hitungDeadlineSDM } from "@/lib/tabelGaji";
 import { kunciBulanTmt, type RekapStatusKgb } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 import { BUTIR_KONFIRMASI_UPT, LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
-import { BERKAS_USULAN, BIDANG_USULAN, LABEL_JENIS_USULAN, STATUS_USULAN, type StatusUsulan } from "@/lib/usulanPegawai";
-import { bacaDraf, hapusDraf, idBerdraf, kunciDraf, simpanDraf } from "@/lib/drafUsulan";
+import { LABEL_JENIS_USULAN, STATUS_USULAN, type StatusUsulan } from "@/lib/usulanPegawai";
+import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
@@ -40,17 +40,16 @@ interface PegawaiUpt {
   dataSekarang: Record<string, string>;
 }
 
-interface UsulanTerkirim {
-  id: string;
-  jenis: string;
-  nama: string;
-  nip: string;
+/** Satu baris pada daftar usulan UPT: draf yang masih disiapkan maupun usulan yang sudah dikirim. */
+interface UsulanTerkirim extends DrafUsulanUpt {
+  pegawaiId: string | null;
   status: string;
   nomorSurat: string;
   tanggalSurat: string | null;
-  berkasAda: boolean;
   hukdisAda: boolean;
   jumlahPerubahan: number;
+  /** Yang masih kurang sebelum draf ini boleh diajukan; selalu kosong untuk usulan yang sudah dikirim. */
+  kekurangan: string[];
   diajukanAt: string | null;
   ditinjauAt: string | null;
   ditinjauOleh: string | null;
@@ -111,47 +110,6 @@ function keadaan(p: PegawaiUpt): { teks: string; nada?: Nada } {
   return { teks: "Menunggu diproses Kanwil", nada: "kuning" };
 }
 
-const SURAT_KOSONG = { nomorSurat: "", tanggalSurat: "", nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" };
-const HUKDIS_KOSONG = { ada: false, jenis: "", nomorSk: "", tmtMulai: "", tmtBerakhir: "", keterangan: "" };
-
-/** localStorage bila ada; null saat dirender di server atau saat peramban menolak penyimpanan. */
-function penyimpananDraf() {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Isian tanggal beserta tombol pengosongnya. Isian date yang sudah terisi tidak dapat dikosongkan dari
- * papan ketik ponsel, sedangkan pada formulir usulan isian kosong punya arti tersendiri: tidak diusulkan
- * berubah. Karena itu pengosongannya disediakan sebagai tombol.
- */
-function IsianTanggal({
-  label,
-  nilai,
-  onUbah,
-  wajib = false,
-}: {
-  label: string;
-  nilai: string;
-  onUbah: (nilai: string) => void;
-  wajib?: boolean;
-}) {
-  return (
-    <label className="kgbm-label">
-      {wajib ? <span className="kgbm-wajib">{label}</span> : label}
-      <input className="kgbm-input" type="date" value={nilai} onChange={(e) => onUbah(e.target.value)} />
-      {nilai && (
-        <button type="button" className="kgbm-kosongkan" onClick={() => onUbah("")}>
-          Kosongkan
-        </button>
-      )}
-    </label>
-  );
-}
-
 export default function DashboardUpt() {
   const dashUser = useDashUser();
   const [hariIni] = useState(() => hariIniWita());
@@ -159,8 +117,6 @@ export default function DashboardUpt() {
   const [galat, setGalat] = useState<string | null>(null);
   const [memuat, setMemuat] = useState(true);
   const [segar, setSegar] = useState<Date | null>(null);
-  /** Pegawai yang isian usulannya masih tersimpan sebagai draf di peramban ini; "baru" untuk pegawai baru. */
-  const [berdraf, setBerdraf] = useState<Set<string>>(() => new Set());
   const [saring, setSaring] = useState<Saring>("semua");
   const [cari, setCari] = useState("");
 
@@ -173,7 +129,6 @@ export default function DashboardUpt() {
         setData(d);
         setGalat(null);
         setSegar(new Date());
-        setBerdraf(idBerdraf(penyimpananDraf(), d.satker.kode));
       })
       .catch((e: unknown) => setGalat(e instanceof Error ? e.message : "Data gagal dimuat"))
       .finally(() => setMemuat(false));
@@ -219,24 +174,18 @@ export default function DashboardUpt() {
     }
   }
 
-  // Usulan data: UPT menginventarisir datanya sendiri, Kanwil yang menerapkannya.
-  const [dialogUsulan, setDialogUsulan] = useState<PegawaiUpt | null>(null);
-  const [isianUsulan, setIsianUsulan] = useState<Record<string, string>>({});
-  const [suratUsulan, setSuratUsulan] = useState(SURAT_KOSONG);
-  const [hukdisUsulan, setHukdisUsulan] = useState(HUKDIS_KOSONG);
-  const [berkasUsulan, setBerkasUsulan] = useState<Record<string, File | null>>({});
-  /** Penghitung pemasangan ulang tiap isian berkas: input file hanya dapat dikosongkan dengan dipasang ulang. */
-  const [ulangBerkas, setUlangBerkas] = useState<Record<string, number>>({});
-
-  function hapusBerkas(medan: string) {
-    setBerkasUsulan((f) => ({ ...f, [medan]: null }));
-    setUlangBerkas((u) => ({ ...u, [medan]: (u[medan] ?? 0) + 1 }));
-  }
-  /** "baru" saat UPT mengusulkan pegawai yang belum tercatat; dialognya sama, isiannya kosong. */
-  const [jenisUsulan, setJenisUsulan] = useState<"perubahan" | "baru">("perubahan");
-  const [dialogBaru, setDialogBaru] = useState(false);
-  const [nipBaru, setNipBaru] = useState("");
+  // Data pegawai UPT disiapkan dulu sebagai draf, baru diajukan: satu surat usulan lazimnya memuat
+  // beberapa pegawai, dan datanya dilengkapi bertahap dari SK yang tidak selalu ada di meja.
+  const [formulir, setFormulir] = useState<
+    { jenis: "perubahan" | "baru"; pegawai: PegawaiUntukUsulan | null; draf: DrafUsulanUpt | null } | null
+  >(null);
   const [usulan, setUsulan] = useState<UsulanTerkirim[]>([]);
+  const [pilihAjukan, setPilihAjukan] = useState<Set<string>>(() => new Set());
+  const [dialogAjukan, setDialogAjukan] = useState(false);
+  const [suratAjukan, setSuratAjukan] = useState({ nomorSurat: "", tanggalSurat: "" });
+  const [berkasAjukan, setBerkasAjukan] = useState<File | null>(null);
+  const [mengajukan, setMengajukan] = useState(false);
+  const [galatAjukan, setGalatAjukan] = useState<string | null>(null);
 
   const muatUsulan = useCallback(async () => {
     const res = await fetch("/api/upt/usulan");
@@ -249,147 +198,76 @@ export default function DashboardUpt() {
     return () => clearTimeout(t);
   }, [muatUsulan]);
 
-  /** Waktu draf yang baru dipulihkan ke formulir; null bila formulirnya dibuka bersih. */
-  const [drafDipulihkan, setDrafDipulihkan] = useState<string | null>(null);
-  /** Isian sesaat setelah formulir dibuka, sebagai pembanding agar draf tidak ditulis sebelum diketik. */
-  const awalIsian = useRef("");
-
-  const kunciDrafAktif = data && (dialogUsulan || dialogBaru)
-    ? kunciDraf(data.satker.kode, dialogUsulan?.id ?? null)
-    : null;
-
-  function segarkanBerdraf() {
-    if (data) setBerdraf(idBerdraf(penyimpananDraf(), data.satker.kode));
-  }
-
-  /**
-   * Isi formulir dari draf bila ada, selain itu dari data yang tercatat di Kanwil. Berkas PDF tidak
-   * pernah ikut draf: peramban tidak mengizinkan berkas dibaca kembali tanpa dipilih pengguna.
-   */
-  function siapkanFormulir(jenis: "perubahan" | "baru", pegawaiId: string | null, dasar: Record<string, string>) {
-    const kunci = data ? kunciDraf(data.satker.kode, pegawaiId) : null;
-    const draf = kunci ? bacaDraf(penyimpananDraf(), kunci) : null;
-    const isi = draf
-      ? {
-          jenis,
-          nipBaru: draf.nipBaru,
-          surat: { ...SURAT_KOSONG, ...draf.surat },
-          hukdis: { ...HUKDIS_KOSONG, ...draf.hukdis },
-          isian: draf.isian,
-        }
-      : { jenis, nipBaru: "", surat: SURAT_KOSONG, hukdis: HUKDIS_KOSONG, isian: dasar };
-
-    setJenisUsulan(jenis);
-    setNipBaru(isi.nipBaru);
-    setSuratUsulan(isi.surat);
-    setHukdisUsulan(isi.hukdis);
-    setIsianUsulan(isi.isian);
-    setBerkasUsulan({});
-    setUlangBerkas((u) => Object.fromEntries(BERKAS_USULAN.map((b) => [b.medan, (u[b.medan] ?? 0) + 1])));
-    setGalatKonfirmasi(null);
-    awalIsian.current = JSON.stringify(isi);
-    setDrafDipulihkan(draf?.disimpanAt ?? null);
-  }
-
-  function bukaUsulanBaru() {
-    setDialogUsulan(null);
-    setDialogBaru(true);
-    siapkanFormulir("baru", null, {});
+  /** Draf yang tersimpan untuk pegawai ini, bila ada. */
+  function drafPegawai(pegawaiId: string): UsulanTerkirim | null {
+    return usulan.find((u) => u.status === "draf" && u.pegawaiId === pegawaiId) ?? null;
   }
 
   function bukaUsulan(p: PegawaiUpt) {
-    setDialogBaru(false);
-    setDialogUsulan(p);
-    siapkanFormulir("perubahan", p.id, { ...p.dataSekarang });
-  }
-
-  function tutupFormulir() {
-    setDialogUsulan(null);
-    setDialogBaru(false);
-    setDrafDipulihkan(null);
-    segarkanBerdraf();
-  }
-
-  /** Simpan isian tanpa mengirim, untuk data yang belum lengkap atau berkas yang belum siap dipindai. */
-  function simpanDrafDanTutup() {
-    if (!kunciDrafAktif) return;
-    const tersimpan = simpanDraf(penyimpananDraf(), kunciDrafAktif, {
-      jenis: jenisUsulan, nipBaru, surat: suratUsulan, hukdis: hukdisUsulan, isian: isianUsulan,
+    setFormulir({
+      jenis: "perubahan",
+      pegawai: { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang },
+      draf: drafPegawai(p.id),
     });
-    if (!tersimpan) {
-      setGalatKonfirmasi("Draf tidak dapat disimpan di peramban ini. Catat dulu isian pentingnya sebelum menutup.");
-      return;
-    }
-    setKabar("Draf disimpan di peramban ini. Buka pegawai yang sama untuk melanjutkan; berkas PDF perlu dipilih ulang.");
+  }
+
+  function bukaPegawaiBaru() {
+    setFormulir({ jenis: "baru", pegawai: null, draf: null });
+  }
+
+  function lanjutkanDraf(u: UsulanTerkirim) {
+    const p = (data?.pegawai ?? []).find((x) => x.id === u.pegawaiId) ?? null;
+    setFormulir({
+      jenis: u.jenis === "baru" ? "baru" : "perubahan",
+      pegawai: p ? { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang } : null,
+      draf: u,
+    });
+  }
+
+  function selesaiFormulir(pesan: string) {
+    setFormulir(null);
+    setKabar(pesan);
     setTimeout(() => setKabar(null), 7000);
-    tutupFormulir();
+    void muatUsulan();
   }
 
-  function buangDraf() {
-    if (kunciDrafAktif) hapusDraf(penyimpananDraf(), kunciDrafAktif);
-    if (dialogUsulan) siapkanFormulir("perubahan", dialogUsulan.id, { ...dialogUsulan.dataSekarang });
-    else siapkanFormulir("baru", null, {});
-    segarkanBerdraf();
+  function pilihDraf(id: string) {
+    setPilihAjukan((lama) => {
+      const baru = new Set(lama);
+      if (baru.has(id)) baru.delete(id);
+      else baru.add(id);
+      return baru;
+    });
   }
 
-  // Draf ditulis diam-diam sambil mengetik, supaya isian tidak hilang bila dialog atau peramban
-  // tertutup sebelum usulan terkirim. Isian yang belum disentuh tidak ditulis.
-  useEffect(() => {
-    if (!kunciDrafAktif) return;
-    const isi = { jenis: jenisUsulan, nipBaru, surat: suratUsulan, hukdis: hukdisUsulan, isian: isianUsulan };
-    if (JSON.stringify(isi) === awalIsian.current) return;
-    const tunda = setTimeout(() => simpanDraf(penyimpananDraf(), kunciDrafAktif, isi), 600);
-    return () => clearTimeout(tunda);
-  }, [kunciDrafAktif, jenisUsulan, nipBaru, suratUsulan, hukdisUsulan, isianUsulan]);
-
-  async function kirimUsulan() {
-    if (!dialogUsulan && !dialogBaru) return;
-    setMengirim(true);
-    setGalatKonfirmasi(null);
+  /** Kirim draf terpilih ke Kanwil dengan satu surat usulan untuk semuanya. */
+  async function ajukanTerpilih() {
+    setMengajukan(true);
+    setGalatAjukan(null);
     try {
       const form = new FormData();
-      form.set("jenis", jenisUsulan);
-      if (dialogUsulan) form.set("pegawaiId", dialogUsulan.id);
-      if (jenisUsulan === "baru") form.set("nip", nipBaru);
-      form.set("nomorSurat", suratUsulan.nomorSurat);
-      form.set("tanggalSurat", suratUsulan.tanggalSurat);
-      form.set("nomorSkTerakhir", suratUsulan.nomorSkTerakhir);
-      form.set("tanggalSkTerakhir", suratUsulan.tanggalSkTerakhir);
-      form.set("catatanUpt", suratUsulan.catatanUpt);
-      for (const bidang of BIDANG_USULAN) form.set(bidang.kunci, isianUsulan[bidang.kunci] ?? "");
-      form.set("hukdisAda", String(hukdisUsulan.ada));
-      if (hukdisUsulan.ada) {
-        form.set("hukdisJenis", hukdisUsulan.jenis);
-        form.set("hukdisNomorSk", hukdisUsulan.nomorSk);
-        form.set("hukdisTmtMulai", hukdisUsulan.tmtMulai);
-        form.set("hukdisTmtBerakhir", hukdisUsulan.tmtBerakhir);
-        form.set("hukdisKeterangan", hukdisUsulan.keterangan);
-      }
-      for (const b of BERKAS_USULAN) {
-        const isi = berkasUsulan[b.medan];
-        if (isi) form.set(b.medan, isi);
-      }
+      for (const id of pilihAjukan) form.append("id", id);
+      form.set("nomorSurat", suratAjukan.nomorSurat);
+      form.set("tanggalSurat", suratAjukan.tanggalSurat);
+      if (berkasAjukan) form.set("berkas", berkasAjukan);
 
-      const res = await fetch("/api/upt/usulan", { method: "POST", body: form });
-      const d = (await res.json().catch(() => ({}))) as { error?: string; jumlahPerubahan?: number };
+      const res = await fetch("/api/upt/usulan/ajukan", { method: "POST", body: form });
+      const d = (await res.json().catch(() => ({}))) as { error?: string; jumlah?: number };
       if (!res.ok) {
-        setGalatKonfirmasi(d.error ?? "Usulan gagal dikirim");
+        setGalatAjukan(d.error ?? "Usulan gagal dikirim");
         return;
       }
-      const namaTerkirim = dialogUsulan?.nama ?? isianUsulan.nama ?? "pegawai baru";
-      setKabar(
-        jenisUsulan === "baru"
-          ? `Usulan pegawai baru ${namaTerkirim} terkirim ke Kanwil. Pegawainya ditambahkan setelah usulan disetujui.`
-          : `Usulan data ${namaTerkirim} terkirim ke Kanwil. Anda akan melihat hasilnya di daftar usulan.`,
-      );
+      setKabar(`${d.jumlah ?? 0} pegawai diusulkan ke Kanwil dengan surat ${suratAjukan.nomorSurat}.`);
       setTimeout(() => setKabar(null), 7000);
-      if (kunciDrafAktif) hapusDraf(penyimpananDraf(), kunciDrafAktif);
-      tutupFormulir();
+      setDialogAjukan(false);
+      setPilihAjukan(new Set());
+      setSuratAjukan({ nomorSurat: "", tanggalSurat: "" });
+      setBerkasAjukan(null);
       void muatUsulan();
     } catch {
-      setGalatKonfirmasi("Usulan gagal dikirim");
+      setGalatAjukan("Usulan gagal dikirim");
     } finally {
-      setMengirim(false);
+      setMengajukan(false);
     }
   }
 
@@ -410,7 +288,11 @@ export default function DashboardUpt() {
         setGalat(d.error ?? "Usulan gagal dibatalkan");
         return;
       }
-      setKabar(`Usulan ${dialogBatal.nama} dibatalkan. Kirim ulang setelah datanya diperbaiki.`);
+      setKabar(
+        dialogBatal.status === "draf"
+          ? `Data ${dialogBatal.nama} yang disiapkan sudah dihapus.`
+          : `Usulan ${dialogBatal.nama} dibatalkan. Kirim ulang setelah datanya diperbaiki.`,
+      );
       setTimeout(() => setKabar(null), 6000);
       setDialogBatal(null);
       void muatUsulan();
@@ -452,6 +334,9 @@ export default function DashboardUpt() {
 
   const bulanUsulan = bulanUsulanSekarang(hariIni);
   const pegawai = useMemo(() => data?.pegawai ?? [], [data]);
+  /** Data yang masih disiapkan UPT; belum terlihat Kanwil sampai diajukan. */
+  const draf = usulan.filter((u) => u.status === "draf");
+  const terkirim = usulan.filter((u) => u.status !== "draf");
   const perluDiusulkan = pegawai.filter((p) => p.bulanTmt === bulanUsulan);
   const sedangDiproses = pegawai.filter((p) => p.statusKGB === "sedang_diproses" || p.statusKGB === "menunggu_keuangan");
 
@@ -551,8 +436,12 @@ export default function DashboardUpt() {
 
       {dialogBatal && (
         <KerangkaModal
-          judul="Batalkan usulan"
-          subjudul={`${dialogBatal.nama} · surat ${dialogBatal.nomorSurat}`}
+          judul={dialogBatal.status === "draf" ? "Hapus data yang disiapkan" : "Batalkan usulan"}
+          subjudul={
+            dialogBatal.status === "draf"
+              ? `${dialogBatal.nama} · belum diajukan ke Kanwil`
+              : `${dialogBatal.nama} · surat ${dialogBatal.nomorSurat}`
+          }
           nada="merah"
           ukuran="sm"
           sibuk={membatalkan}
@@ -564,207 +453,104 @@ export default function DashboardUpt() {
                 Tidak jadi
               </button>
               <button type="submit" className="kgbm-tombol kgbm-utama" disabled={membatalkan}>
-                {membatalkan ? "Membatalkan…" : "Batalkan usulan"}
+                {membatalkan ? "Menghapus…" : dialogBatal.status === "draf" ? "Hapus data" : "Batalkan usulan"}
               </button>
             </>
           }
         >
           <Catatan nada="amber">
-            Usulan ini beserta berkas yang sudah diunggah dihapus dan tidak lagi masuk antrian tinjauan
-            Kanwil. Isinya tidak dapat dikembalikan; bila datanya keliru, kirim usulan baru setelah diperbaiki.
+            {dialogBatal.status === "draf"
+              ? "Data yang sudah diketik beserta berkas yang diunggah hilang dan tidak dapat dikembalikan. Kanwil belum pernah melihat data ini."
+              : "Usulan ini beserta berkas yang sudah diunggah dihapus dan tidak lagi masuk antrian tinjauan Kanwil. Isinya tidak dapat dikembalikan; bila datanya keliru, kirim usulan baru setelah diperbaiki."}
           </Catatan>
         </KerangkaModal>
       )}
 
-      {(dialogUsulan || dialogBaru) && (
+      {formulir && (
+        <FormulirUsulan
+          jenis={formulir.jenis}
+          pegawai={formulir.pegawai}
+          draf={formulir.draf}
+          onTutup={() => setFormulir(null)}
+          onSelesai={selesaiFormulir}
+        />
+      )}
+
+      {dialogAjukan && (
         <KerangkaModal
-          judul={jenisUsulan === "baru" ? "Usulkan pegawai baru" : "Usulkan perbaikan data pegawai"}
-          subjudul={
-            dialogUsulan
-              ? `${dialogUsulan.nama} · ${dialogUsulan.nip}`
-              : "Pegawai yang belum tercatat di SIM-KGB, misalnya CPNS yang baru dilantik"
-          }
-          ukuran="lg"
-          sibuk={mengirim}
-          onTutup={tutupFormulir}
-          onKirim={() => void kirimUsulan()}
+          judul="Ajukan ke Kanwil"
+          subjudul={`${pilihAjukan.size} pegawai dalam satu surat usulan`}
+          ukuran="md"
+          sibuk={mengajukan}
+          onTutup={() => setDialogAjukan(false)}
+          onKirim={() => void ajukanTerpilih()}
           kaki={
             <>
-              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={tutupFormulir} disabled={mengirim}>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogAjukan(false)} disabled={mengajukan}>
                 Batal
               </button>
-              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={simpanDrafDanTutup} disabled={mengirim}>
-                Simpan dulu
-              </button>
-              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
-                {mengirim ? "Mengirim…" : "Kirim usulan ke Kanwil"}
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengajukan || pilihAjukan.size === 0}>
+                {mengajukan ? "Mengirim…" : `Kirim ${pilihAjukan.size} pegawai`}
               </button>
             </>
           }
         >
-          <PesanGalat pesan={galatKonfirmasi} />
+          <PesanGalat pesan={galatAjukan} />
           <Catatan>
-            {jenisUsulan === "baru"
-              ? "Isi data pegawai sesuai SK pengangkatannya. Pegawai baru ditambahkan ke data induk setelah usulan ini ditinjau dan disetujui Kanwil."
-              : "Isian sudah diisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; yang dikosongkan berarti tidak diusulkan berubah. Usulan berlaku setelah ditinjau dan disetujui Kanwil."}
+            Surat usulan yang sudah dikirim lewat Srikandi diisikan sekali di sini dan berlaku untuk seluruh
+            pegawai yang dipilih. Setelah terkirim, datanya masuk antrian tinjauan Kanwil dan tidak lagi dapat
+            disunting; yang keliru dibatalkan lalu dikirim ulang.
           </Catatan>
-          {drafDipulihkan && (
-            <Catatan nada="amber">
-              Draf yang disimpan {formatTanggalId(drafDipulihkan, { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} dipulihkan.
-              Berkas PDF tidak ikut tersimpan, jadi perlu dipilih ulang sebelum dikirim.{" "}
-              <button type="button" className="dsb-tautan" onClick={buangDraf}>Buang draf, mulai dari data Kanwil</button>
-            </Catatan>
-          )}
-
-          <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
-            <div className="kgbm-bagian-kepala">
-              <p className="kgbm-bagian-judul">Surat usulan</p>
-              <p className="kgbm-bagian-ket">Surat yang sudah dikirim lewat Srikandi, beserta dasar gaji pokok sekarang</p>
-            </div>
-            <div className="kgbm-bagian-isi">
-            <div className="kgbm-grid2">
-              <label className="kgbm-label">
-                <span className="kgbm-wajib">Nomor surat</span>
-                <input className="kgbm-input" data-autofocus value={suratUsulan.nomorSurat} onChange={(e) => setSuratUsulan((f) => ({ ...f, nomorSurat: e.target.value }))} placeholder="W.17.PAS.7-SA.04.04-1" />
-              </label>
-              <IsianTanggal
-                label="Tanggal surat"
-                wajib
-                nilai={suratUsulan.tanggalSurat}
-                onUbah={(v) => setSuratUsulan((f) => ({ ...f, tanggalSurat: v }))}
-              />
-            </div>
-            {BERKAS_USULAN.map((b) => {
-              const terpilih = berkasUsulan[b.medan];
-              return (
-                <div key={b.medan}>
-                  <label className="kgbm-label">
-                    {b.label} (PDF, paling besar 5 MB)
-                    <input
-                      key={ulangBerkas[b.medan] ?? 0}
-                      className="kgbm-input"
-                      type="file"
-                      accept="application/pdf"
-                      onChange={(e) => setBerkasUsulan((f) => ({ ...f, [b.medan]: e.target.files?.[0] ?? null }))}
-                    />
-                  </label>
-                  {terpilih && (
-                    <p className="kgbm-berkas-terpilih">
-                      <span>{terpilih.name} · {terpilih.size >= 1048576 ? `${(terpilih.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(terpilih.size / 1024))} KB`}</span>
-                      <button type="button" onClick={() => hapusBerkas(b.medan)}>Hapus berkas</button>
+          <ul className="dsb-log-ringkas">
+            {draf.filter((u) => pilihAjukan.has(u.id)).map((u) => (
+              <li key={u.id}>
+                <span className="dsb-titik" data-nada={u.kekurangan.length > 0 ? "merah" : "hijau"} aria-hidden="true" />
+                <span className="min-w-0">
+                  <span className="dsb-nama">{u.nama}</span>
+                  <span className="dsb-kecil"> · {LABEL_JENIS_USULAN[u.jenis] ?? u.jenis}</span>
+                  {u.kekurangan.length > 0 && (
+                    <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-red)" }}>
+                      Belum lengkap: {u.kekurangan.join(", ")}
                     </p>
                   )}
-                </div>
-              );
-            })}
-            <div className="kgbm-grid2">
-              <label className="kgbm-label">
-                Nomor SK terakhir (dasar gaji pokok)
-                <input className="kgbm-input" value={suratUsulan.nomorSkTerakhir} onChange={(e) => setSuratUsulan((f) => ({ ...f, nomorSkTerakhir: e.target.value }))} />
-              </label>
-              <IsianTanggal
-                label="Tanggal SK terakhir"
-                nilai={suratUsulan.tanggalSkTerakhir}
-                onUbah={(v) => setSuratUsulan((f) => ({ ...f, tanggalSkTerakhir: v }))}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="kgbm-grid2">
+            <label className="kgbm-label">
+              <span className="kgbm-wajib">Nomor surat</span>
+              <input
+                className="kgbm-input"
+                data-autofocus
+                value={suratAjukan.nomorSurat}
+                onChange={(e) => setSuratAjukan((f) => ({ ...f, nomorSurat: e.target.value }))}
+                placeholder="WP.19.PAS.7-SA.04.04-1"
               />
-              </div>
-            </div>
-          </div>
-
-          <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
-            <div className="kgbm-bagian-kepala">
-              <p className="kgbm-bagian-judul">Data pegawai</p>
-              <p className="kgbm-bagian-ket">
-                {jenisUsulan === "baru"
-                  ? "NIP, nama, golongan, dan TMT KGB berikutnya wajib diisi"
-                  : "Isian yang dikosongkan berarti tidak diusulkan berubah"}
-              </p>
-            </div>
-            <div className="kgbm-bagian-isi">
-              {jenisUsulan === "baru" && (
-                <label className="kgbm-label">
-                  <span className="kgbm-wajib">NIP</span>
-                  <input
-                    className="kgbm-input"
-                    inputMode="numeric"
-                    maxLength={18}
-                    value={nipBaru}
-                    onChange={(e) => setNipBaru(e.target.value.replace(/\D/g, ""))}
-                    placeholder="18 digit angka"
-                  />
-                </label>
-              )}
-            <div className="kgbm-grid2">
-              {BIDANG_USULAN.map((bidang) => bidang.jenis === "tanggal" ? (
-                <IsianTanggal
-                  key={bidang.kunci}
-                  label={bidang.label}
-                  nilai={isianUsulan[bidang.kunci] ?? ""}
-                  onUbah={(v) => setIsianUsulan((f) => ({ ...f, [bidang.kunci]: v }))}
-                />
-              ) : (
-                <label className="kgbm-label" key={bidang.kunci}>
-                  {bidang.label}
-                  <input
-                    className="kgbm-input"
-                    type={bidang.jenis === "teks" ? "text" : "number"}
-                    inputMode={bidang.jenis === "angka" || bidang.jenis === "rupiah" ? "numeric" : undefined}
-                    value={isianUsulan[bidang.kunci] ?? ""}
-                    onChange={(e) => setIsianUsulan((f) => ({ ...f, [bidang.kunci]: e.target.value }))}
-                  />
-                </label>
-              ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
-            <div className="kgbm-bagian-kepala">
-              <p className="kgbm-bagian-judul">Hukuman disiplin</p>
-              <p className="kgbm-bagian-ket">Hanya laporan; penetapannya tetap dicatat Kanwil di modul Hukuman Disiplin</p>
-            </div>
-            <div className="kgbm-bagian-isi">
-            <label className="kgbm-label" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <input type="checkbox" className="dsb-cek" checked={hukdisUsulan.ada} onChange={(e) => setHukdisUsulan((f) => ({ ...f, ada: e.target.checked }))} />
-              Pegawai ini sedang atau pernah menjalani hukuman disiplin yang belum dilaporkan
             </label>
-            {hukdisUsulan.ada && (
-              <>
-                <div className="kgbm-grid2">
-                  <label className="kgbm-label">
-                    Jenis hukuman
-                    <input className="kgbm-input" value={hukdisUsulan.jenis} onChange={(e) => setHukdisUsulan((f) => ({ ...f, jenis: e.target.value }))} placeholder="Penundaan kenaikan gaji berkala" />
-                  </label>
-                  <label className="kgbm-label">
-                    Nomor SK hukuman
-                    <input className="kgbm-input" value={hukdisUsulan.nomorSk} onChange={(e) => setHukdisUsulan((f) => ({ ...f, nomorSk: e.target.value }))} />
-                  </label>
-                  <IsianTanggal
-                    label="TMT mulai"
-                    nilai={hukdisUsulan.tmtMulai}
-                    onUbah={(v) => setHukdisUsulan((f) => ({ ...f, tmtMulai: v }))}
-                  />
-                  <IsianTanggal
-                    label="TMT berakhir"
-                    nilai={hukdisUsulan.tmtBerakhir}
-                    onUbah={(v) => setHukdisUsulan((f) => ({ ...f, tmtBerakhir: v }))}
-                  />
-                </div>
-                <label className="kgbm-label">
-                  Keterangan
-                  <textarea className="kgbm-input" rows={2} value={hukdisUsulan.keterangan} onChange={(e) => setHukdisUsulan((f) => ({ ...f, keterangan: e.target.value }))} />
-                </label>
-              </>
-            )}
-            </div>
+            <label className="kgbm-label">
+              <span className="kgbm-wajib">Tanggal surat</span>
+              <input
+                className="kgbm-input"
+                type="date"
+                value={suratAjukan.tanggalSurat}
+                onChange={(e) => setSuratAjukan((f) => ({ ...f, tanggalSurat: e.target.value }))}
+              />
+            </label>
           </div>
-
           <label className="kgbm-label">
-            Catatan untuk Kanwil
-            <textarea className="kgbm-input" rows={2} value={suratUsulan.catatanUpt} onChange={(e) => setSuratUsulan((f) => ({ ...f, catatanUpt: e.target.value }))} placeholder="Misalnya: koreksi masa kerja golongan sesuai SK kenaikan pangkat terakhir" />
+            Salinan surat usulan (PDF, paling besar 1 MB)
+            <input
+              className="kgbm-input"
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setBerkasAjukan(e.target.files?.[0] ?? null)}
+            />
+            <span className="kgbm-bantuan">Satu salinan untuk seluruh pegawai pada surat ini.</span>
           </label>
         </KerangkaModal>
       )}
+
       {dialogKonfirmasi && (
         <KerangkaModal
           judul="Konfirmasi data pegawai"
@@ -824,8 +610,8 @@ export default function DashboardUpt() {
                 </button>
               ))}
             </div>
-            <button type="button" className="dsb-tombol dsb-tombol-kecil" style={{ marginLeft: "auto" }} onClick={bukaUsulanBaru}>
-              {berdraf.has("baru") ? "Lanjutkan draf pegawai baru" : "Usulkan pegawai baru"}
+            <button type="button" className="dsb-tombol dsb-tombol-kecil" style={{ marginLeft: "auto" }} onClick={bukaPegawaiBaru}>
+              Tambah data pegawai
             </button>
             <input
               type="search"
@@ -905,7 +691,7 @@ export default function DashboardUpt() {
                           ) : null}
                           <span className="upt-aksi">
                             <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => bukaUsulan(p)}>
-                              {berdraf.has(p.id) ? "Lanjutkan draf usulan" : "Usulkan perbaikan data"}
+                              {drafPegawai(p.id) ? "Lanjutkan draf" : "Usulkan perbaikan data"}
                             </button>
                           </span>
                         </td>
@@ -984,14 +770,91 @@ export default function DashboardUpt() {
             )}
           </section>
 
+          {/* Data pegawai yang masih disiapkan UPT: belum terlihat Kanwil sampai diajukan */}
+          <section className="dsb-panel dsb-susut" aria-labelledby="judul-draf-upt">
+            <div className="dsb-panel-kepala">
+              <h2 id="judul-draf-upt" className="dsb-panel-judul">
+                Data disiapkan <small>{draf.length} belum diajukan</small>
+              </h2>
+              <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={bukaPegawaiBaru}>
+                Tambah pegawai
+              </button>
+            </div>
+            {draf.length === 0 ? (
+              <p className="dsb-kosong">
+                Belum ada data yang disiapkan. Tambahkan pegawai yang belum tercatat, atau usulkan perbaikan
+                data dari daftar pegawai; keduanya tersimpan di sini sampai diajukan ke Kanwil.
+              </p>
+            ) : (
+              <>
+                <div className="dsb-gulir">
+                  <ul className="dsb-log-ringkas">
+                    {draf.map((u) => (
+                      <li key={u.id}>
+                        <input
+                          type="checkbox"
+                          className="dsb-cek"
+                          checked={pilihAjukan.has(u.id)}
+                          onChange={() => pilihDraf(u.id)}
+                          aria-label={`Pilih ${u.nama} untuk diajukan`}
+                        />
+                        <span className="min-w-0">
+                          <span className="dsb-nama">{u.nama}</span>
+                          <span className="dsb-kecil"> · {LABEL_JENIS_USULAN[u.jenis] ?? u.jenis}</span>
+                          {u.kekurangan.length > 0 ? (
+                            <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-amber)" }}>
+                              Perlu dilengkapi: {u.kekurangan.join(", ")}
+                            </p>
+                          ) : (
+                            <p className="dsb-kecil" style={{ margin: 0 }}>
+                              Siap diajukan{u.berkas.length > 0 ? ` · ${u.berkas.length} berkas` : ""}
+                            </p>
+                          )}
+                          <span className="upt-aksi">
+                            <button
+                              type="button"
+                              className="dsb-tombol dsb-tombol-kecil"
+                              data-jenis="garis"
+                              onClick={() => lanjutkanDraf(u)}
+                            >
+                              Lanjutkan
+                            </button>{" "}
+                            <button
+                              type="button"
+                              className="dsb-tombol dsb-tombol-kecil"
+                              data-jenis="garis"
+                              onClick={() => setDialogBatal(u)}
+                            >
+                              Hapus
+                            </button>
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div style={{ padding: "10px 16px", borderTop: "1px solid var(--ln2)" }}>
+                  <button
+                    type="button"
+                    className="dsb-tombol"
+                    disabled={pilihAjukan.size === 0}
+                    onClick={() => { setGalatAjukan(null); setDialogAjukan(true); }}
+                  >
+                    {pilihAjukan.size > 0 ? `Ajukan ${pilihAjukan.size} pegawai ke Kanwil` : "Pilih dulu yang akan diajukan"}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+
           {/* Kapan surat usulan dikirim untuk bulan TMT berikutnya */}
           <section className="dsb-panel dsb-susut" aria-labelledby="judul-usulan-upt">
             <div className="dsb-panel-kepala">
               <h2 id="judul-usulan-upt" className="dsb-panel-judul">
-                Usulan terkirim <small>{usulan.filter((u) => u.status === "menunggu").length} menunggu tinjauan</small>
+                Usulan terkirim <small>{terkirim.filter((u) => u.status === "menunggu").length} menunggu tinjauan</small>
               </h2>
             </div>
-            {usulan.length === 0 ? (
+            {terkirim.length === 0 ? (
               <p className="dsb-kosong">
                 Belum ada usulan. Pakai tautan Usulkan perbaikan data pada daftar pegawai untuk mengirim data
                 terbaru beserta surat usulannya ke Kanwil.
@@ -999,7 +862,7 @@ export default function DashboardUpt() {
             ) : (
               <div className="dsb-gulir">
                 <ul className="dsb-log-ringkas">
-                  {usulan.slice(0, 20).map((u) => {
+                  {terkirim.slice(0, 20).map((u) => {
                     const cfg = STATUS_USULAN[u.status as StatusUsulan] ?? { label: u.status, nada: "kuning" as const };
                     return (
                       <li key={u.id}>

@@ -52,7 +52,7 @@ Polanya mengikuti `ProfileChangeRequest` yang sudah ada di aplikasi ini.
   tanggal SK terakhir sebagai dasarnya, serta laporan hukuman disiplin. Mengusulkan pegawai baru semula
   tidak termasuk; ini berubah pada hari yang sama, lihat perluasan di bawah.
 - **Peninjau:** Super Admin dan Tim SDM KGB (`canProcessKGB`), karena merekalah yang memakai datanya.
-- **Surat Srikandi:** nomor dan tanggalnya wajib, salinan PDF-nya diunggah (paling besar 5 MB, disimpan di
+- **Surat Srikandi:** nomor dan tanggalnya wajib, salinan PDF-nya diunggah (paling besar 1 MB, disimpan di
   R2 dengan awalan `usulan/`). Berkas hanya dapat dibuka peninjau Kanwil dan UPT pengusulnya.
 - **Kolom kosong berarti tidak diusulkan berubah.** Angka nol tetap nilai yang sah, karena masa kerja
   golongan 0 tahun 0 bulan adalah keadaan nyata pegawai yang belum pernah KGB.
@@ -170,3 +170,49 @@ pada setiap pembacaan notifikasi, jadi jeda tersebut menjadi nyata. `POST /api/u
 notifikasinya sendiri lewat `notifikasiUsulanUpt()`. Pemeriksaan berkala tetap ada sebagai jaring
 pengaman dan memakai pembentuk yang sama, sehingga tidak ada notifikasi ganda dan isinya seragam.
 Notifikasi untuk usulan pegawai baru berbunyi berbeda, karena pegawainya memang belum ada di data induk.
+
+## Perluasan 23 September 2026 (lanjutan kedua): data dulu, ajukan kemudian
+
+Pemakaian pertama menunjukkan formulir usulan mengerjakan tiga hal sekaligus — data pegawai, surat
+usulan, dan berkas pendukung — padahal ketiganya berbeda sifat. Akibatnya terlihat pada surat Rutan
+Rantau 8 September 2026 yang memuat lima pegawai: operator harus mengetik nomor surat yang sama lima
+kali dan mengunggah surat yang sama lima kali, dan datanya tidak bisa disicil.
+
+### 1. Draf disimpan di server, bukan di peramban
+
+Draf yang sempat disimpan di peramban diganti draf berstatus `draf` pada tabel `usulan_pegawai`.
+Alasannya dua. Draf peramban hilang begitu operator berpindah perangkat, padahal pendataan berlangsung
+berhari-hari. Dan dua macam draf — satu di peramban, satu di server — justru menambah kebingungan yang
+hendak dihilangkan. Status `draf` tidak pernah masuk antrian tinjauan Kanwil maupun notifikasinya, dan
+boleh disunting (`PATCH /api/upt/usulan/[id]`) atau dihapus sesuka UPT.
+
+### 2. Satu surat usulan untuk beberapa pegawai
+
+`POST /api/upt/usulan/ajukan` menerima beberapa id draf beserta satu nomor surat, tanggal, dan satu
+salinan PDF, lalu mengubah semuanya menjadi `menunggu`. Kelengkapan tiap draf diperiksa lebih dulu
+lewat `kekuranganUsulan()`, dan yang kurang disebutkan satu per satu sebelum apa pun disimpan, supaya
+tidak ada pengajuan yang separuh terkirim.
+
+### 3. Gaji pokok dan jatuh tempo tidak lagi diketik operator
+
+Pangkat, gaji pokok, dan TMT KGB berikutnya dihitung `hitungUsulan()` dari golongan, masa kerja
+golongan, dan TMT KGB terakhir, lalu ditampilkan sebagai hasil hitungan beserta kalimat yang
+menerangkan asalnya. Rute API menghitung ulang nilai itu sendiri (`isiHitungan()`), jadi angka yang
+tersimpan tidak pernah bergantung pada apa yang dikirim peramban.
+
+Dua jebakan yang dulu diam kini bersuara. Golongan II/a naik ke MKG 1 setelah **12 bulan**, bukan 24
+seperti golongan lain, sehingga KGB pertama CPNS II/a jatuh setahun setelah TMT CPNS. Dan kombinasi
+yang tidak ada barisnya di tabel — misalnya II/c dengan masa kerja 0 tahun — dulu menghasilkan gaji
+pokok nol tanpa peringatan; sekarang ditahan sebagai kekurangan yang harus diperbaiki sebelum diajukan.
+
+Formulirnya juga menanyakan keadaan pegawai lebih dulu: belum pernah KGB, atau sudah. Yang belum cukup
+mengisi TMT CPNS dengan masa kerja 0, disertai peringatan agar tidak menyalin masa kerja dari SK
+pengangkatan PNS yang terbit terlambat — SK semacam itu sudah memuat KGB yang justru sedang diusulkan,
+dan menyalinnya berarti menghapus rapelan yang menjadi hak pegawai.
+
+### 4. Batas berkas 1 MB
+
+Batas per berkas diturunkan dari 5 MB menjadi 1 MB. Satu lembar SK yang dipindai sebagai dokumen
+berukuran ratusan kilobyte; yang melampaui satu megabyte hampir selalu foto kamera beresolusi penuh.
+Operator UPT mengunggah lewat data seluler, dan unggahan besar yang putus di tengah jalan lebih
+menyakitkan daripada ditolak sejak awal — karena itu pesan penolakannya menyebutkan cara memperkecil.
