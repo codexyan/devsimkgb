@@ -157,7 +157,7 @@ test("SK menunggu keuangan dibuat sekali per KGB dan ditandai dibaca setelah dik
 
 test("tipe notifikasi per role", () => {
   assert.equal(tipeNotifikasiUntukRole("superAdminCore"), null);
-  assert.deepEqual(tipeNotifikasiUntukRole("keuangan"), ["sk_menunggu_keuangan"]);
+  assert.deepEqual(tipeNotifikasiUntukRole("keuangan"), ["sk_menunggu_keuangan", "kgb_perlu_ditinjau"]);
   assert.deepEqual(tipeNotifikasiUntukRole("sdm_hukdis"), ["hukdis_berakhir"]);
   assert.equal(bolehLihatNotifikasi("keuangan", "rapelan"), false);
   assert.equal(bolehLihatNotifikasi("keuangan", "followup_keuangan"), false);
@@ -216,4 +216,32 @@ test("Admin UPT hanya menerima pengingat KGB dan kabar SK terbit", () => {
   assert.equal(bolehLihatNotifikasi("admin_upt", "sk_terbit"), true);
   assert.equal(bolehLihatNotifikasi("admin_upt", "hukdis_berakhir"), false);
   assert.equal(bolehLihatNotifikasi("admin_upt", "sk_menunggu_keuangan"), false);
+});
+
+test("KGB berjalan yang keadaan pegawainya berubah ditandai perlu ditinjau", () => {
+  const kgb = [{ id: "k1", pegawaiId: "p1", status: "sedang_diproses", tmtKgbBaru: tanggal(2026, 9), isArsip: false, flagRapelan: false }];
+  const hariIni = tanggal(2026, 8, 5);
+
+  // Hukdis yang menunda KGB terbit setelah Input KGB.
+  const kenaHukdis = rencana(hariIni, [], {
+    pegawai: [pegawai({ tmtKgbBerikutnya: tanggal(2026, 9) })],
+    kgb,
+    riwayatHukdis: [{ pegawaiId: "p1", berdampakKGB: true, tmtBerakhir: tanggal(2027, 6), tmtMulai: tanggal(2026, 8, 1) }],
+  });
+  const tinjau = kenaHukdis.baru.filter((n) => n.tipe === "kgb_perlu_ditinjau");
+  assert.equal(tinjau.length, 1);
+  assert.equal(tinjau[0].prioritas, "critical");
+  assert.match(tinjau[0].pesan, /kelebihan bayar/);
+
+  // Pegawai tidak aktif lagi.
+  const nonaktif = rencana(hariIni, [], { pegawai: [pegawai({ aktif: false })], kgb });
+  assert.equal(nonaktif.baru.filter((n) => n.tipe === "kgb_perlu_ditinjau").length, 1);
+
+  // Keadaan normal tidak memunculkan apa pun, dan satu KGB hanya diingatkan sekali.
+  assert.equal(rencana(hariIni, [], { pegawai: [pegawai({ tmtKgbBerikutnya: tanggal(2026, 9) })], kgb }).baru.filter((n) => n.tipe === "kgb_perlu_ditinjau").length, 0);
+  const ulang = rencana(hariIni, [notif("t1", "critical", tanggal(2026, 8, 2), "kgb_perlu_ditinjau", "k1")], {
+    pegawai: [pegawai({ aktif: false })],
+    kgb,
+  });
+  assert.equal(ulang.baru.filter((n) => n.tipe === "kgb_perlu_ditinjau").length, 0);
 });

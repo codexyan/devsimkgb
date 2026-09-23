@@ -33,6 +33,8 @@ export interface PegawaiRow {
   tmtKgbBerikutnya: Date | null; statusHukdis: boolean; tanggalHukdisBerakhir: Date | null;
   jenisHukdis: string | null; keteranganHukdis: string | null; aktif: boolean;
   createdAt: Date | null; updatedAt: Date | null;
+  /** Konfirmasi data oleh admin UPT untuk satu siklus KGB: TMT yang dikonfirmasi, waktunya, dan pelakunya. */
+  konfirmasiUptTmt: Date | null; konfirmasiUptAt: Date | null; konfirmasiUptOleh: string | null;
 }
 
 /** Satu kenaikan pangkat: dasar SK-nya dan dampaknya pada MKG serta gaji pokok (lib/kenaikanPangkat.ts). */
@@ -54,6 +56,27 @@ export interface RiwayatKGBRow {
   inputGajiWebAt: Date | null; inputGajiWebBy: string | null; createdBy: string; createdAt: Date | null;
   /** Pejabat yang menetapkan SK dasar; dicetak pada baris "Oleh" di surat KGB. */
   penetapSkDasar: string | null;
+}
+
+/**
+ * Satu usulan data pegawai dari UPT. Nilai yang diusulkan disimpan lengkap, lalu dibandingkan dengan
+ * data pegawai saat ditinjau (lib/usulanPegawai.ts). Kolom kosong berarti UPT tidak mengusulkan
+ * perubahan pada kolom itu. Laporan hukuman disiplin ikut di sini karena UPT yang memegang SK-nya.
+ */
+export interface UsulanPegawaiRow {
+  id: string; pegawaiId: string; satker: string; status: string;
+  nomorSurat: string; tanggalSurat: Date | null; pathBerkas: string | null;
+  nama: string | null; tempatLahir: string | null; tanggalLahir: Date | null; jenisKelamin: string | null;
+  pendidikanTerakhir: string | null; jabatan: string | null; pangkat: string | null; golonganRuang: string | null;
+  eselon: string | null; jenisJabatan: string | null; tmtGolongan: Date | null;
+  mkgTahun: number | null; mkgBulan: number | null; gajiPokok: number | null;
+  tmtKgbTerakhir: Date | null; tmtKgbBerikutnya: Date | null;
+  nomorSkTerakhir: string | null; tanggalSkTerakhir: Date | null;
+  hukdisAda: boolean; hukdisJenis: string | null; hukdisNomorSk: string | null;
+  hukdisTmtMulai: Date | null; hukdisTmtBerakhir: Date | null; hukdisKeterangan: string | null;
+  catatanUpt: string | null;
+  diajukanOleh: string; diajukanAt: Date | null;
+  ditinjauOleh: string | null; ditinjauAt: Date | null; alasanTolak: string | null;
 }
 
 export interface AuditLogRow {
@@ -87,6 +110,25 @@ export const defs = {
       s("eselon"), s("jenisJabatan"), d("tmtGolongan"), i("mkgTahun"), i("mkgBulan"), i("gajiPokok"),
       d("tmtKgbTerakhir"), d("tmtKgbBerikutnya"), b("statusHukdis"), d("tanggalHukdisBerakhir"),
       s("jenisHukdis"), s("keteranganHukdis"), b("aktif"), d("createdAt"), d("updatedAt"),
+      d("konfirmasiUptTmt"), d("konfirmasiUptAt"), s("konfirmasiUptOleh"),
+    ],
+  },
+  UsulanPegawai: {
+    tab: "UsulanPegawai",
+    columns: [
+      s("id"), s("pegawaiId"), s("satker"), s("status"),
+      s("nomorSurat"), d("tanggalSurat"), s("pathBerkas"),
+      s("nama"), s("tempatLahir"), d("tanggalLahir"), s("jenisKelamin"),
+      s("pendidikanTerakhir"), s("jabatan"), s("pangkat"), s("golonganRuang"),
+      s("eselon"), s("jenisJabatan"), d("tmtGolongan"),
+      i("mkgTahun"), i("mkgBulan"), i("gajiPokok"),
+      d("tmtKgbTerakhir"), d("tmtKgbBerikutnya"),
+      s("nomorSkTerakhir"), d("tanggalSkTerakhir"),
+      b("hukdisAda"), s("hukdisJenis"), s("hukdisNomorSk"),
+      d("hukdisTmtMulai"), d("hukdisTmtBerakhir"), s("hukdisKeterangan"),
+      s("catatanUpt"),
+      s("diajukanOleh"), d("diajukanAt"),
+      s("ditinjauOleh"), d("ditinjauAt"), s("alasanTolak"),
     ],
   },
   RiwayatKGB: {
@@ -176,6 +218,7 @@ export const sheets = {
   notifikasi: new Table<NotifikasiRow>(defs.Notifikasi),
   riwayatHukdis: new Table(defs.RiwayatHukdis),
   riwayatPangkat: new Table<RiwayatPangkatRow>(defs.RiwayatPangkat),
+  usulanPegawai: new Table<UsulanPegawaiRow>(defs.UsulanPegawai),
   hukdisJenis: new Table(defs.HukdisJenis),
   hukdisKonfigurasi: new Table(defs.HukdisKonfigurasi),
   regulasi: new Table(defs.Regulasi),

@@ -2,6 +2,7 @@
 // v2 : no useSession dependency
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { ROLE_LABEL } from "@/lib/auth";
 
 interface UserProfile {
   id: string;
@@ -22,11 +23,6 @@ interface ChangeRequest {
   alasanTolak: string | null;
   createdAt: string;
 }
-
-const ROLE_LABEL: Record<string, string> = {
-  superAdminCore: "Super Admin",
-  SDM: "Operator SDM",
-};
 
 const STATUS_CFG: Record<string, { label: string; bg: string; border: string; color: string }> = {
   pending:  { label: "Menunggu Persetujuan", bg: "var(--tint-amber-bg)", border: "var(--tint-amber-ln)", color: "var(--st-amber2)" },

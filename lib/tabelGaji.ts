@@ -1,5 +1,5 @@
 import { hariIniWita, tanggalKalender, type NilaiTanggal } from "./waktu";
-import { batasInputSdm, REKON_GAJI_BATAS, REKON_GAJI_MULAI } from "./batasInputSdm";
+import { batasInputSdm, KIRIM_SURAT_BATAS, REKON_GAJI_BATAS, REKON_GAJI_MULAI } from "./batasInputSdm";
 
 export const GOLONGAN_PANGKAT: Record<string, string> = {
   "I/a": "Juru Muda",
@@ -478,6 +478,18 @@ export function hitungDeadlineSDM(tmtKgbBaru: Date, tanggalBatas: number = batas
   const tmt = tanggalKalender(tmtKgbBaru) ?? tmtKgbBaru;
   const hariTerakhir = new Date(tmt.getFullYear(), tmt.getMonth() - 1, 0).getDate();
   return new Date(tmt.getFullYear(), tmt.getMonth() - 2, Math.min(tanggalBatas, hariTerakhir));
+}
+
+/**
+ * Jendela pengiriman surat usulan UPT: tanggal 1 sampai 10 bulan kedua sebelum TMT, yaitu awal bulan
+ * yang sama dengan dibukanya input di SIM-KGB. Contoh: TMT 1 September 2026 → 1 sampai 10 Juli 2026.
+ */
+export function hitungKirimSurat(tmtKgbBaru: Date): { mulai: Date; batas: Date } {
+  const tmt = tanggalKalender(tmtKgbBaru) ?? tmtKgbBaru;
+  return {
+    mulai: new Date(tmt.getFullYear(), tmt.getMonth() - 2, 1),
+    batas: new Date(tmt.getFullYear(), tmt.getMonth() - 2, KIRIM_SURAT_BATAS),
+  };
 }
 
 /** Rekon gaji oleh keuangan di aplikasi Gaji Web: tanggal 1 sampai 15 bulan sebelum TMT. */

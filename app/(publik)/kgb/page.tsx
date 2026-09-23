@@ -72,7 +72,6 @@ const FAKTA = [
 
 const URUTAN_STATUS: StatusKgb[] = ["belum_diproses", "sedang_diproses", "menunggu_keuangan", "selesai"];
 
-const bulanTahun = (d: Date) => formatTanggalId(d, { month: "long", year: "numeric" });
 const tanggalPendek = (d: Date) => formatTanggalId(d, { day: "numeric", month: "short", year: "numeric" });
 const tanggalBulan = (d: Date) => formatTanggalId(d, { day: "numeric", month: "short" });
 const dua = (n: number) => String(n).padStart(2, "0");
@@ -241,7 +240,9 @@ export default async function HalamanBeranda() {
                 <dl className="jd-rinci">
                   <div>
                     <dt>Kirim surat</dt>
-                    <dd>{bulanTahun(b.kirimSurat)}</dd>
+                    <dd>
+                      {tanggalBulan(b.kirimSurat)} sampai {tanggalPendek(b.kirimSuratBatas)}
+                    </dd>
                   </div>
                   <div>
                     <dt>Input SIM-KGB</dt>

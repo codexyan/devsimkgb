@@ -1,3 +1,4 @@
+import { statusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { makeRiwayatKGB } from "@/lib/sheets/tables";
@@ -106,6 +107,9 @@ export async function GET(req: Request) {
       skSudahDibuat: suratSudahDibuat(sRow),
       unlockDate: jendela ? isoTanggalKalender(jendela.unlockDate) : null,
       isLocked: jendela?.isLocked ?? false,
+      // Konfirmasi data oleh UPT untuk siklus ini; jadi syarat sebelum SK dibuat (masukan tim keuangan).
+      konfirmasiUpt: p ? statusKonfirmasiUpt(p, k.tmtKgbBaru) : "belum",
+      konfirmasiUptOleh: p?.konfirmasiUptOleh ?? null,
     };
   });
 
@@ -171,6 +175,8 @@ export async function GET(req: Request) {
         createdAt: new Date(0).toISOString(),
         surat: null,
         skSudahDibuat: false,
+        konfirmasiUpt: statusKonfirmasiUpt(p, tmt),
+        konfirmasiUptOleh: p.konfirmasiUptOleh ?? null,
       };
     });
   }

@@ -7,6 +7,9 @@ import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { hitungDeadlineSDM } from "@/lib/tabelGaji";
 import { kunciBulanTmt, type RekapStatusKgb } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
+import { BUTIR_KONFIRMASI_UPT, LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
+import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
+import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
 
 /* Dashboard Admin UPT: satu halaman berisi jadwal pengiriman surat usulan, daftar pegawai satker dengan status
@@ -28,6 +31,10 @@ interface PegawaiUpt {
   statusKGB: string | null;
   terlambat: boolean;
   kgbDitunda: boolean;
+  konfirmasi: StatusKonfirmasiUpt;
+  konfirmasiAt: string | null;
+  konfirmasiOleh: string | null;
+  bolehKonfirmasi: boolean;
 }
 
 interface SkUpt {
@@ -66,7 +73,9 @@ const fmtTgl = (s: string | null | undefined) => (s ? formatTanggalId(s, { day: 
 
 /** Bulan TMT yang suratnya dikirim bulan ini: surat UPT dikirim pada bulan ketiga sebelum TMT. */
 function bulanUsulanSekarang(hariIni: Date): string {
-  return geserBulan(kunciBulanTmt(hariIni) ?? "", 3);
+  // Surat usulan dikirim tanggal 1 sampai 10 bulan kedua sebelum TMT, bulan yang sama dengan dibukanya
+  // input di SIM-KGB, sehingga TMT yang diusulkan bulan ini adalah TMT dua bulan ke depan.
+  return geserBulan(kunciBulanTmt(hariIni) ?? "", 2);
 }
 
 /** Keadaan KGB satu pegawai dari kacamata UPT. */
@@ -110,6 +119,38 @@ export default function DashboardUpt() {
     }, 120_000);
     return () => { clearTimeout(t); clearInterval(iv); };
   }, []);
+
+  // Konfirmasi data: satu-satunya penulisan yang boleh dilakukan akun UPT (lib/konfirmasiUpt.ts).
+  const [dialogKonfirmasi, setDialogKonfirmasi] = useState<PegawaiUpt | null>(null);
+  const [mengirim, setMengirim] = useState(false);
+  const [galatKonfirmasi, setGalatKonfirmasi] = useState<string | null>(null);
+  const [kabar, setKabar] = useState<string | null>(null);
+
+  async function kirimKonfirmasi() {
+    if (!dialogKonfirmasi) return;
+    setMengirim(true);
+    setGalatKonfirmasi(null);
+    try {
+      const res = await fetch("/api/upt/konfirmasi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pegawaiId: dialogKonfirmasi.id }),
+      });
+      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setGalatKonfirmasi(d.error ?? "Konfirmasi gagal dikirim");
+        return;
+      }
+      setKabar(`Data ${dialogKonfirmasi.nama} sudah dikonfirmasi. Tim SDM Kanwil melihatnya saat memproses KGB.`);
+      setTimeout(() => setKabar(null), 5000);
+      setDialogKonfirmasi(null);
+      muat();
+    } catch {
+      setGalatKonfirmasi("Konfirmasi gagal dikirim");
+    } finally {
+      setMengirim(false);
+    }
+  }
 
   const bulanUsulan = bulanUsulanSekarang(hariIni);
   const pegawai = useMemo(() => data?.pegawai ?? [], [data]);
@@ -196,6 +237,54 @@ export default function DashboardUpt() {
         </StripStat>
       </PanelNavy>
 
+      {kabar && (
+        <div role="status" className="dsb-pesan" data-nada="hijau">
+          <span className="dsb-pesan-ikon" aria-hidden="true">✓</span>
+          <p>{kabar}</p>
+          <button type="button" className="dsb-ikon-tombol" aria-label="Tutup pesan" onClick={() => setKabar(null)}>
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
+        </div>
+      )}
+
+      {dialogKonfirmasi && (
+        <KerangkaModal
+          judul="Konfirmasi data pegawai"
+          subjudul={`${dialogKonfirmasi.nama} · ${dialogKonfirmasi.nip}${dialogKonfirmasi.tmtKgb ? ` · TMT KGB ${formatTanggalId(dialogKonfirmasi.tmtKgb)}` : ""}`}
+          ukuran="md"
+          sibuk={mengirim}
+          onTutup={() => setDialogKonfirmasi(null)}
+          onKirim={() => void kirimKonfirmasi()}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogKonfirmasi(null)} disabled={mengirim}>
+                Batal
+              </button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
+                {mengirim ? "Mengirim…" : "Ya, data sudah benar"}
+              </button>
+            </>
+          }
+        >
+          <PesanGalat pesan={galatKonfirmasi} />
+          <p className="dsb-sub" style={{ marginTop: 0 }}>
+            Dengan menekan tombol di bawah, UPT menyatakan hal berikut untuk siklus KGB ini:
+          </p>
+          <ol className="dsb-jadwal" style={{ paddingLeft: 18, listStyle: "decimal" }}>
+            {BUTIR_KONFIRMASI_UPT.map((butir) => (
+              <li key={butir}>
+                <span>{butir}</span>
+              </li>
+            ))}
+          </ol>
+          <Catatan nada="amber">
+            Masa kerja golongan dan hukuman disiplin yang keliru membuat gaji pokok pada SK salah. Kekurangannya
+            dibayar sebagai rapel, tetapi kelebihannya harus disetor kembali ke kas negara oleh pegawai yang
+            bersangkutan.
+          </Catatan>
+        </KerangkaModal>
+      )}
+
       <div className="dsb-dasbor-isi">
         {/* Pegawai dan status KGB-nya di Kanwil */}
         <section className="dsb-panel dsb-antrian overflow-hidden dsb-muncul" style={{ "--i": 1 } as React.CSSProperties} aria-labelledby="judul-pegawai-upt">
@@ -250,7 +339,7 @@ export default function DashboardUpt() {
                 <tbody>
                   {tampil.map((p) => {
                     const k = keadaan(p);
-                    const bulanKirim = p.bulanTmt ? geserBulan(p.bulanTmt, -3) : null;
+                    const bulanKirim = p.bulanTmt ? geserBulan(p.bulanTmt, -2) : null;
                     const tmt = tanggalKalender(p.tmtKgb);
                     const batas = tmt ? hitungDeadlineSDM(tmt) : null;
                     return (
@@ -275,6 +364,22 @@ export default function DashboardUpt() {
                             {k.teks}
                           </span>
                           {p.kgbDitunda && <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-red)" }}>KGB ditunda</p>}
+                          {p.konfirmasi === "berlaku" ? (
+                            <p className="dsb-kecil" style={{ margin: "2px 0 0" }} title={p.konfirmasiOleh ?? undefined}>
+                              <span className="dsb-titik" data-nada="hijau" aria-hidden="true" />{" "}
+                              {LABEL_KONFIRMASI_UPT.berlaku}
+                              {p.konfirmasiAt ? ` ${formatTanggalId(p.konfirmasiAt, { day: "numeric", month: "short" })}` : ""}
+                            </p>
+                          ) : p.bolehKonfirmasi ? (
+                            <button
+                              type="button"
+                              className="dsb-tautan"
+                              style={{ marginTop: 2 }}
+                              onClick={() => { setDialogKonfirmasi(p); setGalatKonfirmasi(null); }}
+                            >
+                              Konfirmasi data pegawai
+                            </button>
+                          ) : null}
                         </td>
                       </tr>
                     );
@@ -348,7 +453,7 @@ export default function DashboardUpt() {
                 {(data?.mendatang ?? []).filter((m) => m.jumlah > 0).map((m) => {
                   const [y, b] = m.bulanTmt.split("-").map(Number);
                   const batas = hitungDeadlineSDM(new Date(y, b - 1, 1));
-                  const kirim = geserBulan(m.bulanTmt, -3);
+                  const kirim = geserBulan(m.bulanTmt, -2);
                   const sekarang = m.bulanTmt === bulanUsulan;
                   return (
                     <li key={m.bulanTmt}>
@@ -358,7 +463,7 @@ export default function DashboardUpt() {
                       </span>
                       <span className="dsb-tag" data-garis="">{m.jumlah} pegawai</span>
                       <span className="dsb-kecil">
-                        Surat UPT dikirim {namaBulan(kirim, true)}, diterima Kanwil paling lambat awal {namaBulan(geserBulan(m.bulanTmt, -2), true)}.
+                        Surat UPT dikirim tanggal 1 sampai {KIRIM_SURAT_BATAS} {namaBulan(kirim, true)}.
                         Batas input Tim SDM {formatTanggalId(batas, { day: "numeric", month: "long" })}.
                       </span>
                     </li>

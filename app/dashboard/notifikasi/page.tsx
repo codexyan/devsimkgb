@@ -26,9 +26,10 @@ interface HasilPeriksa {
 
 /* Server hanya mengirim tipe notifikasi yang boleh dilihat peran pengguna (GET /api/notifikasi),
    jadi daftar saringan disusun dari notifikasi yang benar-benar diterima. */
-type KunciKategori = "kgb" | "rapelan" | "sk" | "followup" | "hukdis";
+type KunciKategori = "tinjau" | "kgb" | "rapelan" | "sk" | "followup" | "hukdis";
 
 const KATEGORI: { key: KunciKategori; label: string; tipe: readonly string[]; nada: string }[] = [
+  { key: "tinjau", label: "Perlu ditinjau", tipe: ["kgb_perlu_ditinjau"], nada: "merah" },
   { key: "rapelan", label: "KGB terlambat", tipe: ["rapelan"], nada: "merah" },
   { key: "kgb", label: "Jatuh tempo", tipe: ["kgb_jatuh_tempo"], nada: "navy" },
   { key: "sk", label: "SK & keuangan", tipe: ["sk_menunggu_keuangan", "sk_terbit"], nada: "ungu" },
@@ -37,6 +38,7 @@ const KATEGORI: { key: KunciKategori; label: string; tipe: readonly string[]; na
 ];
 
 const NADA_TIPE: Record<string, string> = {
+  kgb_perlu_ditinjau: "merah",
   rapelan: "merah",
   kgb_jatuh_tempo: "navy",
   sk_menunggu_keuangan: "ungu",
@@ -58,6 +60,8 @@ function IkonTipe({ tipe }: { tipe: string }) {
   const umum = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, "aria-hidden": true } as const;
   switch (tipe) {
     case "hukdis_berakhir":
+      return <svg {...umum}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>;
+    case "kgb_perlu_ditinjau":
       return <svg {...umum}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>;
     case "rapelan":
       return <svg {...umum}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>;

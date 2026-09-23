@@ -1,10 +1,10 @@
 // Jadwal pengusulan KGB untuk beberapa bulan TMT ke depan, dipakai halaman publik /kgb.
-// Aturannya sama dengan panduan: surat UPT dikirim pada bulan ketiga sebelum TMT, input di SIM-KGB
+// Aturannya sama dengan panduan: surat UPT dikirim tanggal 1 sampai 10 bulan kedua sebelum TMT, input di SIM-KGB
 // dibuka tanggal 1 bulan kedua sebelum TMT dan berakhir pada tanggal batas input Tim SDM (Pengaturan,
 // lib/batasInputSdm.ts), lalu keuangan merekonsiliasi gaji di Gaji Web tanggal 1 sampai 15 bulan
 // sebelum TMT. Pemanggil di server memuat batas dari Pengaturan lebih dulu (muatBatasInputSdm).
 
-import { hitungDeadlineSDM, hitungRekonGaji, hitungUnlockDate } from "./tabelGaji";
+import { hitungDeadlineSDM, hitungKirimSurat, hitungRekonGaji, hitungUnlockDate } from "./tabelGaji";
 import { hariIniWita } from "./waktu";
 
 export type KeadaanJadwal = "terbuka" | "berikutnya";
@@ -12,6 +12,7 @@ export type KeadaanJadwal = "terbuka" | "berikutnya";
 export interface BarisJadwalPengusulan {
   tmt: Date;
   kirimSurat: Date;
+  kirimSuratBatas: Date;
   inputDibuka: Date;
   batasInput: Date;
   rekonMulai: Date;
@@ -35,9 +36,11 @@ export function jadwalPengusulan(jumlah = 6, hariIni: Date = hariIniWita()): Bar
     const inputDibuka = hitungUnlockDate(t);
     const batasInput = hitungDeadlineSDM(t);
     const rekon = hitungRekonGaji(t);
+    const surat = hitungKirimSurat(t);
     baris.push({
       tmt: t,
-      kirimSurat: new Date(t.getFullYear(), t.getMonth() - 3, 1),
+      kirimSurat: surat.mulai,
+      kirimSuratBatas: surat.batas,
       inputDibuka,
       batasInput,
       rekonMulai: rekon.mulai,

@@ -46,6 +46,7 @@ const AKSI_CONFIG: Record<string, { label: string; nada: NadaAksi; kelompok: str
   edit_pegawai:             { label: "Ubah pegawai",           nada: "abu",    kelompok: "Pegawai" },
   hapus_pegawai:            { label: "Hapus pegawai",          nada: "merah",  kelompok: "Pegawai" },
   import_pegawai:           { label: "Impor pegawai",          nada: "navy",   kelompok: "Pegawai" },
+  konfirmasi_upt:           { label: "Konfirmasi data UPT",    nada: "hijau",  kelompok: "Pegawai" },
   kenaikan_pangkat:         { label: "Kenaikan pangkat",       nada: "hijau",  kelompok: "Pegawai" },
   input_hukdis:             { label: "Input hukuman disiplin", nada: "kuning", kelompok: "Hukuman disiplin" },
   hapus_hukdis:             { label: "Hapus hukuman disiplin", nada: "merah",  kelompok: "Hukuman disiplin" },

@@ -14,6 +14,9 @@ import { PENETAP_KANWIL } from "@/lib/penetapSk";
 import { cariSatker, SATKER_KANWIL } from "@/lib/satker";
 import { tanggalKalender } from "@/lib/waktu";
 import { alasanTolakBuatSk, bacaTanggalInput, type SuratKgbTersimpan } from "@/lib/prosesKgb";
+import type { HukdisUntukKgb } from "@/lib/prosesKgb";
+import { periksaUlangKgb } from "@/lib/pemeriksaanUlangKgb";
+import { hariIniWita, type NilaiTanggal } from "@/lib/waktu";
 
 export const runtime = "nodejs";
 
@@ -91,6 +94,26 @@ export async function POST(
   ]);
   if (!pegawai)
     return NextResponse.json({ error: "Data pegawai tidak ditemukan" }, { status: 404 });
+
+  // Keadaan pegawai diperiksa ulang di sini, bukan hanya saat Input KGB: jarak input ke TMT sekitar dua
+  // bulan, dan hukuman disiplin yang terbit di sela itu membuat SK ini tidak boleh terbit.
+  if (!isPreview) {
+    const hukdisRows = await db.riwayatHukdis.findMany({ where: { pegawaiId: pegawai.id } });
+    const riwayatHukdis: HukdisUntukKgb[] = hukdisRows.map((h) => ({
+      berdampakKGB: h.berdampakKGB === true,
+      tmtBerakhir: h.tmtBerakhir as NilaiTanggal,
+      tmtMulai: h.tmtMulai as NilaiTanggal,
+    }));
+    const periksa = periksaUlangKgb({
+      tahap: "buat_sk",
+      pegawai,
+      riwayatHukdis,
+      tmtKgb: kgb.tmtKgbBaru,
+      hariIni: hariIniWita(),
+    });
+    if (periksa.tolak) return NextResponse.json({ error: periksa.tolak }, { status: 409 });
+  }
+
   const existingSurat = suratList[0] ?? null;
 
   // SK dikirim ke KPPN mitra satker pegawai, juga saat unduh ulang. Unit kerja kosong berarti Kanwil,

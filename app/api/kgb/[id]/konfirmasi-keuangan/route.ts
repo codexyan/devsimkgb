@@ -7,7 +7,8 @@ import { canKonfirmasiKeuangan } from "@/lib/auth";
 import { penetapDariSurat } from "@/lib/penetapSk";
 import { rencanaSetelahKgbSelesai, type RencanaSetelahKgbSelesai } from "@/lib/jadwalKgb";
 import { placeholderBerlebih, type SuratKgbTersimpan } from "@/lib/prosesKgb";
-import { hariIniWita, tanggalKalender } from "@/lib/waktu";
+import { hariIniWita, tanggalKalender, type NilaiTanggal } from "@/lib/waktu";
+import { periksaUlangKgb } from "@/lib/pemeriksaanUlangKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
@@ -66,6 +67,24 @@ export async function POST(
   ]);
   if (!pegawai)
     return NextResponse.json({ error: "Data pegawai tidak ditemukan" }, { status: 404 });
+
+  // Pintu terakhir sebelum gaji baru masuk rekon Gaji Web: keadaan pegawai diperiksa ulang agar tidak
+  // terjadi kelebihan bayar yang harus disetor kembali (masukan tim keuangan).
+  {
+    const hukdisRows = await db.riwayatHukdis.findMany({ where: { pegawaiId: pegawai.id } });
+    const periksa = periksaUlangKgb({
+      tahap: "konfirmasi_keuangan",
+      pegawai,
+      riwayatHukdis: hukdisRows.map((h) => ({
+        berdampakKGB: h.berdampakKGB === true,
+        tmtBerakhir: h.tmtBerakhir as NilaiTanggal,
+        tmtMulai: h.tmtMulai as NilaiTanggal,
+      })),
+      tmtKgb: kgb.tmtKgbBaru,
+      hariIni: hariIniWita(),
+    });
+    if (periksa.tolak) return NextResponse.json({ error: periksa.tolak }, { status: 409 });
+  }
 
   // TMT berikutnya memakai yang paling akhir antara record KGB dan data pegawai, agar penundaan hukdis
   // yang dicatat selama KGB berjalan tidak hilang. SK dasar siklus berikutnya adalah surat KGB ini,

@@ -23,6 +23,7 @@ export const TIPE_NOTIFIKASI = {
   FOLLOWUP_KEUANGAN: "followup_keuangan",
   SK_MENUNGGU_KEUANGAN: "sk_menunggu_keuangan",
   SK_TERBIT: "sk_terbit",
+  KGB_PERLU_DITINJAU: "kgb_perlu_ditinjau",
 } as const;
 
 const T = TIPE_NOTIFIKASI;
@@ -36,11 +37,11 @@ export function tipeNotifikasiUntukRole(role: string | null | undefined): readon
     case "superAdminCore":
       return null;
     case "sdm_kgb":
-      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.FOLLOWUP_KEUANGAN, T.HUKDIS_BERAKHIR];
+      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.FOLLOWUP_KEUANGAN, T.HUKDIS_BERAKHIR, T.KGB_PERLU_DITINJAU];
     case "sdm_hukdis":
       return [T.HUKDIS_BERAKHIR];
     case "keuangan":
-      return [T.SK_MENUNGGU_KEUANGAN];
+      return [T.SK_MENUNGGU_KEUANGAN, T.KGB_PERLU_DITINJAU];
     case "admin_upt":
       // Disaring lagi per satker oleh GET /api/notifikasi; di sini hanya jenisnya yang dibatasi.
       return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT];
@@ -263,7 +264,39 @@ export function rencanaNotifikasi(input: {
       kategori: "keuangan",
     });
   }
-  // 4. SK sudah dikonfirmasi keuangan: kabar untuk UPT bahwa SK dapat diunduh.
+  // 4. KGB yang sedang berjalan tetapi keadaan pegawainya berubah setelah Input KGB: hukuman disiplin
+  // yang menunda KGB, atau pegawai berhenti aktif. Buat SK dan Konfirmasi keuangan akan menolaknya
+  // (lib/pemeriksaanUlangKgb.ts), jadi Tim SDM perlu tahu lebih dulu agar KGB itu dibatalkan.
+  const STATUS_BERJALAN = new Set(["sedang_diproses", "menunggu_keuangan"]);
+  for (const k of input.kgb) {
+    if (!STATUS_BERJALAN.has(k.status) || k.isArsip) continue;
+    if (notifUntuk(T.KGB_PERLU_DITINJAU, k.id).length > 0) continue;
+    const p = pegawaiById.get(k.pegawaiId);
+    if (!p) continue;
+    const ditahan = hukdisMenahanKgb({
+      riwayatHukdis: hukdisPerPegawai.get(p.id) ?? [],
+      pegawai: p,
+      hariIni,
+      tmtKgb: k.tmtKgbBaru,
+    });
+    const alasan = !p.aktif
+      ? "pegawai sudah ditandai tidak aktif"
+      : ditahan.menahan
+        ? `pegawai sedang menjalani hukuman disiplin yang menunda KGB${ditahan.berakhir ? ` sampai ${formatTanggalId(ditahan.berakhir)}` : ""}`
+        : null;
+    if (!alasan) continue;
+    baru.push({
+      judul: `KGB Perlu Ditinjau: ${p.nama}`,
+      pesan: `KGB ${p.nama} (${p.nip}) dengan TMT ${formatTanggalId(k.tmtKgbBaru)} masih berjalan, tetapi ${alasan}. Batalkan KGB ini sebelum SK dibuat atau dikonfirmasi keuangan agar tidak terjadi kelebihan bayar.`,
+      tipe: T.KGB_PERLU_DITINJAU,
+      referenceId: k.id,
+      prioritas: "critical",
+      linkHref: "/dashboard/kgb",
+      kategori: "kgb",
+    });
+  }
+
+  // 5. SK sudah dikonfirmasi keuangan: kabar untuk UPT bahwa SK dapat diunduh.
   const empatBelasHariLalu = new Date(hariIni.getFullYear(), hariIni.getMonth(), hariIni.getDate() - 14);
   for (const k of input.kgb) {
     if (k.status !== "selesai" || k.isArsip) continue;
@@ -339,6 +372,7 @@ export async function generateNotifikasi(sekarang: Date = new Date()): Promise<N
       if (jumlah(T.KGB_JATUH_TEMPO)) details.push(`Jatuh tempo: ${jumlah(T.KGB_JATUH_TEMPO)} notifikasi`);
       if (jumlah(T.SK_MENUNGGU_KEUANGAN)) details.push(`SK menunggu keuangan: ${jumlah(T.SK_MENUNGGU_KEUANGAN)} notifikasi`);
       if (jumlah(T.SK_TERBIT)) details.push(`SK terbit: ${jumlah(T.SK_TERBIT)} notifikasi`);
+      if (jumlah(T.KGB_PERLU_DITINJAU)) details.push(`KGB perlu ditinjau: ${jumlah(T.KGB_PERLU_DITINJAU)} notifikasi`);
     }
   }
 

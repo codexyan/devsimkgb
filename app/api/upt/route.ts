@@ -7,6 +7,7 @@ import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { isoTanggalKalender, kunciBulanTmt, pilihKgbSiklus, rapelanSiklus } from "@/lib/rekapKgb";
 import { rekapPerSatker } from "@/lib/rekapSatker";
 import { kgbDitunda, pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
+import { statusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { SATKER } from "@/lib/satker";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
@@ -101,6 +102,11 @@ export async function GET() {
         terlambat,
         // Hukdis hanya sebagai penanda; jenis dan keterangannya tidak dikirim ke UPT.
         kgbDitunda: kgbDitunda(hukdisRingkas, p.id),
+        // Konfirmasi data oleh UPT untuk siklus ini; dapat diulang selama KGB belum selesai.
+        konfirmasi: statusKonfirmasiUpt(p, tmt),
+        konfirmasiAt: p.konfirmasiUptAt ? new Date(p.konfirmasiUptAt).toISOString() : null,
+        konfirmasiOleh: p.konfirmasiUptOleh ?? null,
+        bolehKonfirmasi: !!tmt && status !== "selesai",
       };
     })
     .sort((a, b) => (a.tmtKgb ?? "9999").localeCompare(b.tmtKgb ?? "9999") || a.nama.localeCompare(b.nama, "id"));

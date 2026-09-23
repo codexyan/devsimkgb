@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getGajiPokok, getPangkat, hitungRekonGaji, kalkulasiKGB } from "@/lib/tabelGaji";
+import { getGajiPokok, getPangkat, hitungKirimSurat, hitungRekonGaji, kalkulasiKGB } from "@/lib/tabelGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { satkerPerKppn } from "@/lib/satker";
 import { STATUS_KGB, type StatusKgb } from "@/lib/statusKgb";
@@ -8,6 +8,7 @@ import { formatTanggalId } from "@/lib/waktu";
 import Kata from "../Kata";
 import LatarNavy from "@/app/_bersama/LatarNavy";
 import { DaftarIsiPanduan, LanjutBagian, PeranAktif, PilihPeran } from "./NavigasiPanduan";
+import { BUTIR_KONFIRMASI_UPT } from "@/lib/konfirmasiUpt";
 import { PERAN, peranUntuk, SEMUA } from "./peran";
 import "./panduan.css";
 
@@ -64,8 +65,13 @@ const GAJI_MKG_0 = getGajiPokok(GOLONGAN, 0, 0);
 const GAJI_MKG_1 = getGajiPokok(GOLONGAN, 1, 0);
 const GAJI_MKG_3 = getGajiPokok(GOLONGAN, 3, 0);
 
-/* Aturan praktis UPT: kirim pada bulan ketiga sebelum TMT; surat paling lambat diterima awal bulan kedua. */
-const bulanKirim = (tmt: Date) => new Date(tmt.getFullYear(), tmt.getMonth() - 3, 1);
+/* Aturan praktis UPT: surat dikirim tanggal 1 sampai 10 bulan kedua sebelum TMT, yaitu bulan yang sama
+   dengan dibukanya jendela proses di SIM-KGB (lib/tabelGaji.ts, hitungKirimSurat). */
+const bulanKirim = (tmt: Date) => hitungKirimSurat(tmt).mulai;
+const jendelaKirim = (tmt: Date) => {
+  const { mulai, batas } = hitungKirimSurat(tmt);
+  return `${formatTanggalId(mulai, { day: "numeric" })} sampai ${tgl(batas)}`;
+};
 
 const HAL_SURAT = "Permohonan Penerbitan Surat Keputusan Kenaikan Gaji Berkala";
 const KANWIL = "Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan";
@@ -354,7 +360,8 @@ export default async function PanduanPage() {
 
                 <h3 className="pub-h3">Jendela proses di Kanwil</h3>
                 <p>
-                  Kirim usulan KGB sebelum jendela proses dibuka, yaitu pada bulan ketiga sebelum TMT, karena PP 7/1977
+                  Kirim usulan KGB pada awal bulan kedua sebelum TMT, yaitu bulan yang sama dengan dibukanya jendela
+                  proses, karena PP 7/1977
                   Pasal 12 ayat (2) mengatur pemberitahuan KGB diterbitkan 2 bulan sebelum KGB berlaku; batas waktu
                   pengiriman usulan mengikuti jadwal yang ditetapkan Kanwil.
                 </p>
@@ -423,10 +430,10 @@ export default async function PanduanPage() {
                 <div className="pub-note">
                   <strong className="pub-note-title">Aturan praktis untuk UPT</strong>
                   <p>
-                    Kirim surat pada bulan ketiga sebelum TMT, sebelum jendela proses dibuka. Surat paling lambat
-                    diterima Kanwil awal bulan kedua sebelum TMT agar dapat diinput sebelum batas proses Tim SDM. Untuk
-                    TMT {tgl(TMT_KGB)}: kirim pada {bulanTahun(bulanKirim(TMT_KGB))}, surat paling lambat diterima awal{" "}
-                    {bulanTahun(kasus.unlockDate)}.
+                    Kirim surat tanggal 1 sampai 10 bulan kedua sebelum TMT, yaitu bulan yang sama dengan dibukanya
+                    jendela proses di SIM-KGB. Dengan begitu Tim SDM masih punya sisa bulan itu untuk input, membuat SK,
+                    menandatanganinya lewat Srikandi, dan mengirimkannya sebelum keuangan merekon gaji bulan berikutnya.
+                    Untuk TMT {tgl(TMT_KGB)}: kirim {jendelaKirim(TMT_KGB)}.
                   </p>
                 </div>
 
@@ -653,7 +660,30 @@ export default async function PanduanPage() {
                   </p>
                 </div>
 
-                <h3 className="pub-h3">Daftar periksa</h3>
+
+                <h3 className="pub-h3">Yang wajib dipastikan sebelum surat dikirim</h3>
+                <p>
+                  Permintaan tim keuangan: UPT memastikan sendiri masa kerja golongan dan status hukuman disiplin
+                  pegawai yang diusulkan. Masa kerja golongan yang keliru membuat gaji pokok pada SK salah hitung,
+                  dan hukuman disiplin yang tidak dilaporkan membuat KGB tetap terbit padahal seharusnya ditunda.
+                  Kekurangan gaji masih dapat dibayar sebagai rapel, tetapi kelebihan gaji harus disetor kembali ke
+                  kas negara oleh pegawai yang bersangkutan.
+                </p>
+                <ol>
+                  {BUTIR_KONFIRMASI_UPT.map((butir) => (
+                    <li key={butir}>{butir}</li>
+                  ))}
+                </ol>
+                <div className="pub-note">
+                  <strong className="pub-note-title">Konfirmasi di SIM-KGB</strong>
+                  <p>
+                    UPT yang sudah punya akun Admin UPT dapat menekan tombol Konfirmasi data pegawai pada dashboardnya.
+                    Konfirmasi itu tercatat beserta nama dan waktunya, dan terlihat oleh Tim SDM saat memproses KGB.
+                    Konfirmasi berlaku untuk satu siklus KGB, jadi diulang setiap kali pegawai masuk jadwal berikutnya.
+                  </p>
+                </div>
+
+                <h3 className="pub-h3">Daftar periksa surat</h3>
                 <ul>
                   <li>
                     Buat surat dinas dari Kepala UPT kepada Kepala {KANWIL}. Surat ditandatangani secara elektronik oleh
@@ -671,7 +701,7 @@ export default async function PanduanPage() {
                     dari SK, bukan tanggal penetapan SK.
                   </li>
                   <li>
-                    Kirim pada bulan ketiga sebelum TMT, sebelum jendela proses dibuka; surat paling lambat diterima awal
+                    Kirim tanggal 1 sampai 10 bulan kedua sebelum TMT; surat paling lambat diterima awal
                     bulan kedua sebelum TMT agar dapat diinput sebelum batas proses Tim SDM (lihat{" "}
                     <a href="#jadwal">jadwal</a>).
                   </li>

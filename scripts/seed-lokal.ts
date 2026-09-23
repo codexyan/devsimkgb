@@ -137,6 +137,7 @@ async function main() {
         jenisKelamin: urut % 2 === 0 ? "L" : "P", pendidikanTerakhir: urut % 3 === 0 ? "S1" : "D3",
         jabatan: (kode === "kanwil" ? JABATAN_KANWIL : JABATAN_UPT)[urut % 6], pangkat: getPangkat(golongan),
         golonganRuang: golongan, unitKerja: satker.nama, eselon: null, jenisJabatan: "Pelaksana",
+        konfirmasiUptTmt: null, konfirmasiUptAt: null, konfirmasiUptOleh: null,
         tmtGolongan: tgl(2016 + (urut % 6), 4, 1),
         mkgTahun: selesai ? mkgBaru : mkgLama, mkgBulan: selesai ? selang % 12 : 0,
         gajiPokok: selesai ? gajiBaru : gajiLama,

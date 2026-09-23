@@ -16,6 +16,13 @@ export const BATAS_INPUT_SDM_MIN = 1;
 /** 31 berarti hari terakhir bulan; tanggal di atas jumlah hari bulan itu dijepit ke akhir bulan. */
 export const BATAS_INPUT_SDM_MAKS = 31;
 
+/**
+ * Batas tanggal pengiriman surat usulan UPT, pada bulan kedua sebelum TMT. Surat dikirim di awal bulan
+ * yang sama dengan dibukanya input di SIM-KGB, sehingga Tim SDM masih punya sisa bulan itu untuk input,
+ * membuat SK, menandatangani lewat Srikandi, dan mengirimkannya sebelum rekon gaji bulan berikutnya.
+ */
+export const KIRIM_SURAT_BATAS = 10;
+
 /** Tanggal mulai dan batas rekonsiliasi gaji oleh keuangan, pada bulan sebelum TMT. */
 export const REKON_GAJI_MULAI = 1;
 export const REKON_GAJI_BATAS = 15;

@@ -115,6 +115,10 @@ export async function POST(req: Request) {
   const pegawai: PegawaiRow = {
     id: newId(),
     ...isian,
+    // Konfirmasi data oleh UPT belum ada saat pegawai dibuat.
+    konfirmasiUptTmt: null,
+    konfirmasiUptAt: null,
+    konfirmasiUptOleh: null,
     // Tanpa TMT terakhir, masa kerja sekarang dianggap dicapai satu langkah tabel gaji sebelum TMT berikutnya.
     tmtKgbTerakhir:
       isian.tmtKgbTerakhir ??
