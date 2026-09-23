@@ -6,6 +6,7 @@ import { useRole, useDashUser } from "@/app/dashboard/components/RoleContext";
 import { ROLES, ROLE_LABEL } from "@/lib/auth";
 import DashboardHukdis from "@/app/dashboard/components/DashboardHukdis";
 import DashboardKeuangan from "@/app/dashboard/components/DashboardKeuangan";
+import DashboardUpt from "@/app/dashboard/components/DashboardUpt";
 import PemantauanSatker from "@/app/dashboard/components/PemantauanSatker";
 import PapanAntrian, { type KartuPapan, type KolomPapan } from "@/app/dashboard/components/PapanAntrian";
 import {
@@ -1037,5 +1038,6 @@ export default function DashboardPage() {
   const role = useRole();
   if (role === ROLES.SDM_HUKDIS) return <DashboardHukdis />;
   if (role === ROLES.KEUANGAN)   return <DashboardKeuangan />;
+  if (role === ROLES.ADMIN_UPT)  return <DashboardUpt />;
   return <DashboardMain />;
 }

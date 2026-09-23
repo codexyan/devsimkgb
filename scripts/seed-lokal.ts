@@ -27,6 +27,8 @@ const AKUN = [
   { nip: "199202022016042002", nama: "Siti Aminah", role: "sdm_kgb", password: "sdmkgb123" },
   { nip: "199303032017051003", nama: "Rahmat Hidayat", role: "sdm_hukdis", password: "hukdis123" },
   { nip: "199404042018062004", nama: "Dian Puspita", role: "keuangan", password: "keuangan123" },
+  // Operator UPT: hanya melihat satkernya sendiri.
+  { nip: "199505052019051005", nama: "Hendra Saputra", role: "admin_upt", password: "upt123", satker: "rutan-rantau" },
 ];
 
 const KODE_SATKER = [
@@ -87,7 +89,7 @@ async function main() {
     idPengguna[a.role] = id;
     await db.user.create({
       id, nip: a.nip, password: await bcrypt.hash(a.password, 10), nama: a.nama,
-      jabatan: null, email: null, role: a.role, createdAt: new Date(),
+      jabatan: null, email: null, role: a.role, createdAt: new Date(), satker: a.satker ?? null,
     });
   }
 
@@ -194,7 +196,7 @@ async function main() {
   console.log(`✓ Basis data lokal dibuat di ${BERKAS}`);
   console.log(`  ${urut} pegawai di ${KODE_SATKER.length} satker, ${jumlahKgb} riwayat KGB, 2 pegawai ber-hukdis.\n`);
   console.log("  Akun login (khusus lokal):");
-  for (const a of AKUN) console.log(`  - ${a.role.padEnd(15)} NIP ${a.nip}  password ${a.password}`);
+  for (const a of AKUN) console.log(`  - ${a.role.padEnd(15)} NIP ${a.nip}  password ${a.password}${a.satker ? `  satker ${a.satker}` : ""}`);
 }
 
 main().catch((e) => {

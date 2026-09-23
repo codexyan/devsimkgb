@@ -3,6 +3,8 @@ export const ROLES = {
   KEUANGAN:     "keuangan",
   SDM_KGB:      "sdm_kgb",
   SDM_HUKDIS:   "sdm_hukdis",
+  // Operator UPT: hanya melihat data satkernya sendiri, tanpa mengubah apa pun.
+  ADMIN_UPT:    "admin_upt",
 } as const;
 
 // KGB: superAdminCore + sdm_kgb
@@ -32,10 +34,20 @@ export const canEditPegawai = (role: string) =>
 // Fitur admin eksklusif
 export const isSuperAdmin = (role: string) => role === ROLES.SUPER_ADMIN;
 
+// Admin UPT: hanya dashboard satkernya sendiri (lihat saja). Peran ini sengaja tidak masuk ke helper
+// mana pun di atas, sehingga seluruh modul Kanwil menolaknya.
+export const isAdminUpt = (role: string) => role === ROLES.ADMIN_UPT;
+
+// Peran yang boleh mengunduh berkas SK dari penyimpanan lewat /api/blob/download. Admin UPT memakai
+// /api/upt/sk/[id] yang memeriksa satker dan status KGB.
+export const PERAN_UNDUH_SK: string[] = [ROLES.SUPER_ADMIN, ROLES.SDM_KGB, ROLES.SDM_HUKDIS, ROLES.KEUANGAN];
+export const bolehUnduhBerkasSk = (role: string) => PERAN_UNDUH_SK.includes(role);
+
 // Label tampil untuk setiap role
 export const ROLE_LABEL: Record<string, string> = {
   superAdminCore: "Super Admin",
   keuangan:       "Keuangan",
   sdm_kgb:        "SDM KGB",
   sdm_hukdis:     "SDM Hukdis",
+  admin_upt:      "Admin UPT",
 };

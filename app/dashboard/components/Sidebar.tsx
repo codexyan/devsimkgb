@@ -108,6 +108,10 @@ const menuKeuanganSub = [
   { href: "/dashboard/keuangan",         label: "Keuangan",          icon: Ic.lock    },
   { href: "/dashboard/keuangan/riwayat", label: "Riwayat Aktivitas", icon: Ic.history },
 ];
+// Admin UPT: satu dashboard berisi jadwal usulan, status KGB pegawai satkernya, dan SK yang sudah terbit.
+const menuAdminUpt: Entry[] = [
+  { href: "/dashboard", label: "Dashboard", icon: Ic.dashboard },
+];
 // Panduan berada di halaman publik; dibuka di tab baru agar pekerjaan di dashboard tidak hilang.
 const menuBantuan: Leaf[] = [
   { href: "/panduan", label: "Panduan", icon: Ic.book, newTab: true },
@@ -358,6 +362,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
     role === ROLES.KEUANGAN   ? menuKeuanganItems :
     role === ROLES.SDM_HUKDIS ? menuSdmHukdis :
     role === ROLES.SDM_KGB    ? menuSdmKgb :
+    role === ROLES.ADMIN_UPT  ? menuAdminUpt :
     menuUtama;
 
   const roleLabel = ROLE_LABEL[role] ?? role;

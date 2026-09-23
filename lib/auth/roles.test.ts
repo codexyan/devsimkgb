@@ -13,13 +13,15 @@ import {
   canManageHukdis,
   canProcessKGB,
   canViewKGB,
+  isAdminUpt,
   isSuperAdmin,
+  bolehUnduhBerkasSk,
 } from "./roles";
-import { PERAN_KGB } from "../authGuard";
+import { NON_KEUANGAN, PERAN_KGB } from "../authGuard";
 
-const { SUPER_ADMIN: SA, SDM_KGB: KGB, SDM_HUKDIS: HUKDIS, KEUANGAN: KEU } = ROLES;
+const { SUPER_ADMIN: SA, SDM_KGB: KGB, SDM_HUKDIS: HUKDIS, KEUANGAN: KEU, ADMIN_UPT: UPT } = ROLES;
 
-test("matriks hak akses empat peran", () => {
+test("matriks hak akses lima peran", () => {
   const matriks: [string, (role: string) => boolean, string[]][] = [
     ["proses KGB", canProcessKGB, [SA, KGB]],
     ["baca data KGB", canViewKGB, [SA, KGB, KEU]],
@@ -28,11 +30,37 @@ test("matriks hak akses empat peran", () => {
     ["lihat halaman keuangan", canAccessKeuangan, [SA, KEU]],
     ["konfirmasi keuangan dan follow up", canKonfirmasiKeuangan, [KEU]],
     ["fitur admin", isSuperAdmin, [SA]],
+    ["unduh berkas SK lewat blob", bolehUnduhBerkasSk, [SA, KGB, HUKDIS, KEU]],
+    ["dashboard UPT", isAdminUpt, [UPT]],
   ];
   for (const [fitur, boleh, peran] of matriks) {
-    const hasil = [SA, KGB, HUKDIS, KEU, "", "peran_lain"].filter((r) => boleh(r));
+    const hasil = [SA, KGB, HUKDIS, KEU, UPT, "", "peran_lain"].filter((r) => boleh(r));
     assert.deepEqual(hasil, peran, fitur);
   }
+});
+
+test("Admin UPT ditolak seluruh modul Kanwil", () => {
+  for (const boleh of [canProcessKGB, canViewKGB, canEditPegawai, canManageHukdis, canAccessKeuangan, canKonfirmasiKeuangan, isSuperAdmin, bolehUnduhBerkasSk]) {
+    assert.equal(boleh(UPT), false, boleh.name);
+  }
+  // Guard halaman juga tidak menyebut admin_upt di daftar peran mana pun.
+  assert.equal(PERAN_KGB.includes(UPT), false);
+  assert.equal(NON_KEUANGAN.includes(UPT), false);
+  for (const berkas of ["app/dashboard/hukdis/layout.tsx", "app/dashboard/keuangan/layout.tsx", "app/dashboard/users/layout.tsx", "app/dashboard/pengaturan/layout.tsx"]) {
+    assert.doesNotMatch(readFileSync(berkas, "utf8"), /admin_upt/, berkas);
+  }
+});
+
+test("rute UPT memeriksa satker akun, dan unduhan SK umum menolak Admin UPT", () => {
+  const uptApi = readFileSync("app/api/upt/route.ts", "utf8");
+  assert.match(uptApi, /satkerAkunUpt\(/);
+  assert.match(uptApi, /muatBatasInputSdm\(\)/);
+  const uptSk = readFileSync("app/api/upt/sk/[id]/route.ts", "utf8");
+  assert.match(uptSk, /bolehUnduhSkUpt\(/);
+  // Berkas SK umum hanya untuk peran Kanwil; SK milik UPT lewat rute yang memeriksa satker.
+  assert.match(readFileSync("app/api/blob/download/route.ts", "utf8"), /bolehUnduhBerkasSk\(/);
+  // Pratinjau PDF SK memakai daftar peran, bukan penolakan satu peran saja.
+  assert.match(readFileSync("app/api/kgb/[id]/pdf/route.ts", "utf8"), /canViewKGB\(/);
 });
 
 test("Super Admin melihat halaman keuangan tetapi tidak mengonfirmasi", () => {

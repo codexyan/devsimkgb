@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ROLE_LABEL } from "@/lib/auth";
+import { ROLE_LABEL, ROLES } from "@/lib/auth";
+import { SATKER_UPT } from "@/lib/aksesUpt";
+import { namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 
 interface User {
@@ -10,6 +12,8 @@ interface User {
   nip: string;
   nama: string;
   role: string;
+  /** Kode satker untuk peran admin_upt; kosong untuk peran Kanwil. */
+  satker?: string | null;
   createdAt: string;
 }
 
@@ -36,12 +40,20 @@ const ROLE_ICON: Record<string, React.ReactNode> = {
   sdm_kgb:        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
   sdm_hukdis:     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
   keuangan:       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>,
+  admin_upt:      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M10 21v-6h4v6"/></svg>,
 };
 const ROLE_CFG: Record<string, { label: string; bg: string; color: string; grad: string }> = {
   superAdminCore: { label: "Super Admin", bg: "var(--tint-amber-bg)",  color: "var(--st-amber)",  grad: "linear-gradient(135deg,#d9a53a,var(--amber-solid))" },
   sdm_kgb:        { label: "SDM KGB",     bg: "var(--tint-navy)",       color: "var(--dtn)",       grad: "linear-gradient(135deg,#2d5d94,var(--navy-solid))" },
   sdm_hukdis:     { label: "SDM Hukdis",  bg: "var(--tint-red-bg)",     color: "var(--st-red)",    grad: "linear-gradient(135deg,#e35d5d,var(--red-solid))" },
   keuangan:       { label: "Keuangan",    bg: "var(--tint-violet-bg)",  color: "var(--st-violet)", grad: "linear-gradient(135deg,#9b7ae0,var(--violet-solid))" },
+  admin_upt:      { label: "Admin UPT",   bg: "var(--tint-green-bg)",   color: "var(--st-green)",  grad: "linear-gradient(135deg,#17a37e,var(--green-solid))" },
+};
+
+/** Nama satker pendek untuk kolom peran; kode yang tidak dikenal ditampilkan apa adanya. */
+const namaSatkerAkun = (kode: string | null | undefined) => {
+  const s = SATKER_UPT.find((x) => x.kode === kode);
+  return s ? namaSingkatSatker(s) : kode ?? "";
 };
 const roleCfg = (r: string) => ROLE_CFG[r] ?? { label: ROLE_LABEL[r] ?? r, bg: "var(--sub)", color: "var(--dt3)", grad: "linear-gradient(135deg,#8aa0bb,#5f7690)" };
 const initials = (n: string) => n.split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase();
@@ -66,7 +78,7 @@ export default function UsersPage() {
   const [reassignTo, setReassignTo] = useState("");
   const [alasanTolak, setAlasanTolak] = useState("");
 
-  const [formTambah, setFormTambah] = useState({ nip: "", nama: "", role: "sdm_kgb", password: "" });
+  const [formTambah, setFormTambah] = useState({ nip: "", nama: "", role: "sdm_kgb", password: "", satker: "" });
   const [formReset, setFormReset] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [showPwdReset, setShowPwdReset] = useState(false);
@@ -110,6 +122,7 @@ export default function UsersPage() {
     if (!/^\d{18}$/.test(formTambah.nip.trim())) { setError("NIP harus tepat 18 digit angka"); return; }
     if (!formTambah.nama.trim()) { setError("Nama lengkap wajib diisi"); return; }
     if (formTambah.password.length < 6) { setError("Password minimal 6 karakter"); return; }
+    if (formTambah.role === ROLES.ADMIN_UPT && !formTambah.satker) { setError("Pilih satker untuk peran Admin UPT"); return; }
     setSubmitting(true);
     const res = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formTambah) });
     const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -117,7 +130,7 @@ export default function UsersPage() {
     if (!res.ok) { setError(data.error ?? "Gagal menambahkan pengguna"); return; }
     setSuccess("Pengguna berhasil ditambahkan.");
     setShowTambah(false);
-    setFormTambah({ nip: "", nama: "", role: "sdm_kgb", password: "" });
+    setFormTambah({ nip: "", nama: "", role: "sdm_kgb", password: "", satker: "" });
     fetchUsers();
     setTimeout(() => setSuccess(""), 3000);
   }
@@ -180,7 +193,7 @@ export default function UsersPage() {
   const inputClass = "adm-input";
   const usersLain = showHapus ? users.filter((u) => u.id !== showHapus.id) : [];
 
-  const STAT_ORDER = ["superAdminCore", "sdm_kgb", "sdm_hukdis", "keuangan"];
+  const STAT_ORDER = ["superAdminCore", "sdm_kgb", "sdm_hukdis", "keuangan", "admin_upt"];
 
   return (
     <div className="space-y-4">
@@ -205,7 +218,7 @@ export default function UsersPage() {
 
       {/* Stat per role (klik = filter) */}
       {tab === "users" && !loadingUsers && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
           {STAT_ORDER.map((r) => {
             const cfg = roleCfg(r);
             const active = roleFilter === r;
@@ -306,6 +319,7 @@ export default function UsersPage() {
                           <td className="px-5 py-3 text-xs" style={{ color: "var(--dt3)", fontFamily: "monospace" }}>{user.nip}</td>
                           <td className="px-5 py-3">
                             <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+                            {user.satker && <p className="text-xs mt-1" style={{ color: "var(--dt5)" }}>{namaSatkerAkun(user.satker)}</p>}
                           </td>
                           <td className="px-5 py-3 text-xs" style={{ color: "var(--dt4)" }}>{new Date(user.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</td>
                           <td className="px-5 py-3">
@@ -425,11 +439,11 @@ export default function UsersPage() {
               <div>
                 <p id="peran-pengguna-baru" className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>Peran</p>
                 <div role="group" aria-labelledby="peran-pengguna-baru" className="grid grid-cols-2 gap-2">
-                  {(["sdm_kgb", "sdm_hukdis", "keuangan", "superAdminCore"] as const).map((r) => {
+                  {(["sdm_kgb", "sdm_hukdis", "keuangan", "superAdminCore", "admin_upt"] as const).map((r) => {
                     const cfg = roleCfg(r);
                     const active = formTambah.role === r;
                     return (
-                      <button key={r} type="button" aria-pressed={active} onClick={() => setFormTambah((p) => ({ ...p, role: r }))}
+                      <button key={r} type="button" aria-pressed={active} onClick={() => setFormTambah((p) => ({ ...p, role: r, satker: r === ROLES.ADMIN_UPT ? p.satker : "" }))}
                         className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition"
                         style={{
                           border: active ? "1.5px solid var(--accent)" : "1px solid var(--ln1)",
@@ -444,6 +458,25 @@ export default function UsersPage() {
                   })}
                 </div>
               </div>
+              {formTambah.role === ROLES.ADMIN_UPT && (
+                <div>
+                  <label htmlFor="satker-pengguna-baru" className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>Satker</label>
+                  <select
+                    id="satker-pengguna-baru"
+                    className="adm-input"
+                    value={formTambah.satker}
+                    onChange={(e) => setFormTambah((p) => ({ ...p, satker: e.target.value }))}
+                  >
+                    <option value="">Pilih satker…</option>
+                    {SATKER_UPT.map((s) => (
+                      <option key={s.kode} value={s.kode}>{s.nama}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs mt-1" style={{ color: "var(--dt5)" }}>
+                    Akun ini hanya melihat data satker tersebut dan tidak dapat mengubah apa pun.
+                  </p>
+                </div>
+              )}
               {error && (
                 <div className="rounded-lg px-3 py-2 flex items-center gap-2" style={{ background: "var(--tint-red-bg)", border: "1px solid var(--tint-red-ln)" }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--st-red)"><path d="M12 2L1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></svg>

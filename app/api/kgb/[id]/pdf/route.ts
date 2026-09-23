@@ -8,7 +8,7 @@ import { siapkanAsetSurat, SuratKGBDocument } from "@/lib/generateSuratKGB";
 import { ReactElement } from "react";
 import { DocumentProps } from "@react-pdf/renderer";
 import React from "react";
-import { canProcessKGB, ROLES } from "@/lib/auth";
+import { canProcessKGB, canViewKGB } from "@/lib/auth";
 import { tentukanPenandatangan, type JenisPenandatangan } from "@/lib/penandatangan";
 import { PENETAP_KANWIL } from "@/lib/penetapSk";
 import { cariSatker, SATKER_KANWIL } from "@/lib/satker";
@@ -37,7 +37,8 @@ export async function POST(
   const isPreview = url.searchParams.get("preview") === "true";
   const isSrikandi = url.searchParams.get("srikandi") === "true";
   const role = session.user.role!;
-  if (role === ROLES.SDM_HUKDIS)
+  // Daftar peran yang boleh: SDM Hukdis dan Admin UPT tidak pernah membuka SK di sini.
+  if (!canViewKGB(role))
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
   if (!canProcessKGB(role) && !isPreview)
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });

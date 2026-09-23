@@ -3,12 +3,14 @@ import { db } from "@/lib/db";
 import { auth, lupakanSesiPengguna } from "@/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
-import { ROLE_LABEL } from "@/lib/auth";
+import { ROLE_LABEL, ROLES } from "@/lib/auth";
+import { nilaiSatkerUntukPeran } from "@/lib/aksesUpt";
+import { SATKER } from "@/lib/satker";
 import bcrypt from "bcryptjs";
 
 export const runtime = "nodejs";
 
-// PATCH, reset password user
+// PATCH, atur ulang password atau pindahkan satker akun Admin UPT
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -31,21 +33,41 @@ export async function PATCH(
   }
 
   let password = "";
+  let satkerBaru: unknown;
   try {
     const body: unknown = await req.json();
-    const nilai = body && typeof body === "object" ? (body as { password?: unknown }).password : undefined;
-    if (typeof nilai === "string") password = nilai;
+    const isi = body && typeof body === "object" ? (body as { password?: unknown; satker?: unknown }) : {};
+    if (typeof isi.password === "string") password = isi.password;
+    satkerBaru = isi.satker;
   } catch {
     // body tidak valid diperlakukan sebagai password kosong
-  }
-
-  if (password.length < 6) {
-    return NextResponse.json({ error: "Password minimal 6 karakter" }, { status: 400 });
   }
 
   const user = await db.user.findUnique({ id });
   if (!user) {
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
+  }
+
+  // Pindah satker untuk akun Admin UPT; dikirim tanpa password.
+  if (satkerBaru !== undefined && !password) {
+    if (user.role !== ROLES.ADMIN_UPT) {
+      return NextResponse.json({ error: "Satker hanya berlaku untuk peran Admin UPT" }, { status: 400 });
+    }
+    const satker = nilaiSatkerUntukPeran(user.role, satkerBaru);
+    if (!satker.ok) {
+      return NextResponse.json({ error: satker.pesan }, { status: 400 });
+    }
+    await db.user.update({ id }, { satker: satker.satker });
+    logAudit({
+      userId: admin.id,
+      aksi: "ubah_pengguna",
+      detail: `Ubah satker pengguna ${user.nama} (${user.nip}) menjadi ${SATKER.find((s) => s.kode === satker.satker)?.nama ?? satker.satker}`,
+    });
+    return NextResponse.json({ ok: true, satker: satker.satker });
+  }
+
+  if (password.length < 6) {
+    return NextResponse.json({ error: "Password minimal 6 karakter" }, { status: 400 });
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);

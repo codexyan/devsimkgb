@@ -20,6 +20,8 @@ const d = (name: string): ColumnDef => ({ name, type: "datetime" });
 export interface UserRow {
   id: string; nip: string; password: string; nama: string;
   jabatan: string | null; email: string | null; role: string; createdAt: Date | null;
+  /** Kode satker (lib/satker.ts) untuk peran admin_upt; kosong untuk peran Kanwil. */
+  satker: string | null;
 }
 
 export interface PegawaiRow {
@@ -62,7 +64,7 @@ export type { PenandatanganRow };
 export const defs = {
   User: {
     tab: "User",
-    columns: [s("id"), s("nip"), s("password"), s("nama"), s("jabatan"), s("email"), s("role"), d("createdAt")],
+    columns: [s("id"), s("nip"), s("password"), s("nama"), s("jabatan"), s("email"), s("role"), d("createdAt"), s("satker")],
   },
   ProfileChangeRequest: {
     tab: "ProfileChangeRequest",
