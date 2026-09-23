@@ -2,43 +2,29 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { newId } from "@/lib/sheets/id";
-import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
+import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
-import { pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
+import { notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
+import { pegawaiSatker } from "@/lib/aksesUpt";
 import { BERKAS_USULAN, BIDANG_USULAN, bandingkanUsulan, usulanKosong } from "@/lib/usulanPegawai";
 import { adaPenandaPdf, bacaTanggalInput } from "@/lib/prosesKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
-import type { Session } from "next-auth";
 
 export const runtime = "nodejs";
+
+const PESAN_BUKAN_UPT = "Usulan hanya dapat dikirim akun Admin UPT yang tertaut ke satker.";
 
 /** Surat dan SK jauh lebih kecil dari SK bertanda tangan; batasnya dibuat lebih ketat per berkas. */
 const BATAS_BERKAS_BYTE = 5 * 1024 * 1024;
 const PESAN_TERLALU_BESAR = "Ukuran tiap berkas paling besar 5 MB.";
 
-/** Satker akun yang login; null bila akunnya bukan Admin UPT yang tertaut satker. */
-async function satkerAkun(session: Session | null) {
-  if (!session) return { galat: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  const pengguna = await penggunaLogin(session);
-  if (!pengguna) return { galat: NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 }) };
-  const kode = satkerAkunUpt({ role: pengguna.role, satker: pengguna.satker });
-  if (!kode)
-    return {
-      galat: NextResponse.json(
-        { error: "Usulan hanya dapat dikirim akun Admin UPT yang tertaut ke satker." },
-        { status: 403 },
-      ),
-    };
-  return { pengguna, kode };
-}
-
 /** Usulan yang pernah dikirim satker ini, terbaru lebih dulu. */
 export async function GET() {
   await muatBatasInputSdm();
-  const akun = await satkerAkun(await auth());
+  const akun = await akunUpt(await auth(), PESAN_BUKAN_UPT);
   if ("galat" in akun) return akun.galat;
 
   const [semuaUsulan, semuaPegawai] = await Promise.all([
@@ -81,7 +67,7 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   await muatBatasInputSdm();
-  const akun = await satkerAkun(await auth());
+  const akun = await akunUpt(await auth(), PESAN_BUKAN_UPT);
   if ("galat" in akun) return akun.galat;
   const { pengguna, kode } = akun;
   const satker = SATKER.find((s) => s.kode === kode)!;
@@ -129,6 +115,7 @@ export async function POST(req: Request) {
   let pegawaiId: string | null = null;
   let nipBaru: string | null = null;
   let namaUntukCatatan = "";
+  let nipUntukCatatan = "";
 
   if (jenis === "baru") {
     // Pegawai yang belum tercatat: identitasnya berasal dari usulan ini, jadi wajib lengkap.
@@ -152,6 +139,7 @@ export async function POST(req: Request) {
     if (!pegawai || pegawaiSatker([pegawai], kode).length === 0)
       return NextResponse.json({ error: "Pegawai tidak ditemukan di satker ini" }, { status: 404 });
     namaUntukCatatan = pegawai.nama;
+    nipUntukCatatan = pegawai.nip;
 
     const hukdisAdaCek = teks("hukdisAda") === "true";
     if (usulanKosong(pegawai, { ...isian, hukdisAda: hukdisAdaCek }))
@@ -234,6 +222,20 @@ export async function POST(req: Request) {
   };
 
   await db.usulanPegawai.create(baris);
+
+  // Notifikasi dibuat di sini, bukan menunggu pemeriksaan berkala, supaya Tim SDM Kanwil melihat usulan
+  // pada saat UPT mengirimnya. Kegagalannya tidak boleh membatalkan usulan yang sudah tersimpan:
+  // pemeriksaan berkala membuatkan notifikasinya belakangan.
+  try {
+    await db.notifikasi.create({
+      ...notifikasiUsulanUpt(baris, { nama: namaUntukCatatan, nip: nipUntukCatatan || nipBaru }),
+      id: newId(),
+      dibaca: false,
+      createdAt: new Date(),
+    });
+  } catch {
+    // Usulannya sudah tersimpan; notifikasinya menyusul lewat pemeriksaan berkala.
+  }
 
   logAudit({
     userId: pengguna.id,

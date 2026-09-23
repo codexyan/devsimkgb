@@ -239,6 +239,32 @@ a.dsb-stat:hover, button.dsb-stat:hover { background: rgba(255, 255, 255, 0.05);
 
 .dsb-stat[data-sorot] .dsb-stat-nilai { color: #ffc2bc; }
 
+/* Warna per kartu. Empat angka berjajar di atas latar navy sulit dibedakan bila seragam, jadi tiap
+   sel diberi garis tipis di atasnya dan latar setipis embun dengan warna yang mewakili artinya.
+   Angkanya tetap putih agar tetap yang pertama terbaca; warna hanya menegaskan angka yang disorot. */
+.dsb-stat[data-nada] {
+  position: relative;
+  background: color-mix(in srgb, var(--stat-warna) 8%, transparent);
+}
+.dsb-stat[data-nada]::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--stat-warna);
+}
+.dsb-stat[data-nada="merah"] { --stat-warna: #ff8f86; }
+.dsb-stat[data-nada="kuning"] { --stat-warna: #f5c451; }
+.dsb-stat[data-nada="hijau"] { --stat-warna: #5fe0aa; }
+.dsb-stat[data-nada="ungu"] { --stat-warna: #c1adff; }
+.dsb-stat[data-nada="biru"],
+.dsb-stat[data-nada="navy"] { --stat-warna: #9dbbff; }
+.dsb-stat[data-nada="emas"] { --stat-warna: var(--emas-isi); }
+.dsb-stat[data-nada][data-sorot] .dsb-stat-nilai { color: var(--stat-warna); }
+.dsb-stat[data-nada] .dsb-stat-bar > span { background: var(--stat-warna); }
+a.dsb-stat[data-nada]:hover,
+button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-warna) 16%, transparent); }
+
 @media (max-width: 1023px) {
   .dsb-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dsb-stat:nth-child(odd) { border-left: 0; }

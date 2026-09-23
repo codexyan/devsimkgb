@@ -136,3 +136,37 @@ KGB berstatus selesai. Ini penulisan keempat yang diizinkan peran admin_upt.
 - Akun Admin UPT untuk ke-18 UPT dibuat 23 September 2026 dengan identitas sementara: nama
   "Admin <nama satker>" dan NIP penanda berawalan 9 yang tidak mungkin menjadi NIP asli. Identitas
   operator sebenarnya menggantikannya setelah tersedia; sampai saat itu jejak audit menunjuk nama generik.
+
+## Perluasan 23 September 2026 (lanjutan): draf, pembatalan, dan notifikasi seketika
+
+Dipakai langsung oleh operator UPT pertama, tiga hal terasa kurang.
+
+### 1. Isian yang belum lengkap dapat disimpan sebagai draf
+
+Formulir usulan panjang dan datanya disalin dari SK yang tidak selalu ada di meja. Isiannya kini disimpan
+otomatis sambil diketik, dan ada tombol **Simpan dulu** yang menutup formulir tanpa mengirim. Draf
+disimpan di peramban operator (`lib/drafUsulan.ts`), bukan di server: isian setengah jadi belum menjadi
+dokumen usulan, dan menyimpannya di Kanwil akan membuat antrian tinjauan berisi usulan yang tidak jelas
+boleh diproses atau tidak.
+
+Konsekuensinya disebutkan di layar: draf hanya ada di peramban dan perangkat yang dipakai mengetik, dan
+berkas PDF tidak ikut tersimpan karena peramban tidak mengizinkan berkas dibaca ulang tanpa dipilih
+pengguna. Draf yang lebih tua dari 30 hari dibuang karena datanya kemungkinan sudah berubah di Kanwil.
+
+### 2. Usulan yang telanjur salah dibatalkan, bukan disunting
+
+`DELETE /api/upt/usulan/[id]` menghapus usulan yang **belum ditinjau**, beserta berkas yang sudah
+diunggah dan notifikasinya di Kanwil. UPT lalu mengirim ulang setelah datanya benar. Penyuntingan di
+tempat sengaja tidak disediakan: antrian tinjauan Kanwil tidak boleh berisi dua versi usulan untuk
+pegawai yang sama, dan peninjau harus melihat persis apa yang dikirim UPT. Usulan yang sudah ditinjau
+tidak dapat ditarik kembali, karena hasilnya sudah menjadi riwayat dan, bila disetujui, sudah menempel
+pada data pegawai.
+
+### 3. Notifikasi dibuat saat usulan masuk
+
+Semula notifikasi usulan hanya lahir dari pemeriksaan berkala, sehingga Tim SDM tidak melihat apa pun
+sampai pemeriksaan itu berjalan. Sejak perbaikan CPU halaman publik, pemeriksaan itu tidak lagi ikut
+pada setiap pembacaan notifikasi, jadi jeda tersebut menjadi nyata. `POST /api/upt/usulan` kini membuat
+notifikasinya sendiri lewat `notifikasiUsulanUpt()`. Pemeriksaan berkala tetap ada sebagai jaring
+pengaman dan memakai pembentuk yang sama, sehingga tidak ada notifikasi ganda dan isinya seragam.
+Notifikasi untuk usulan pegawai baru berbunyi berbeda, karena pegawainya memang belum ada di data induk.

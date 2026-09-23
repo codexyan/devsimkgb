@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDashUser } from "@/app/dashboard/components/RoleContext";
 import { PanelNavy, Stat, StripStat, namaSapaan, sapaanWita, tanggalPanjangWita, type Nada } from "@/app/dashboard/components/PanelNavy";
 import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
@@ -9,6 +9,7 @@ import { kunciBulanTmt, type RekapStatusKgb } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 import { BUTIR_KONFIRMASI_UPT, LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { BERKAS_USULAN, BIDANG_USULAN, LABEL_JENIS_USULAN, STATUS_USULAN, type StatusUsulan } from "@/lib/usulanPegawai";
+import { bacaDraf, hapusDraf, idBerdraf, kunciDraf, simpanDraf } from "@/lib/drafUsulan";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
@@ -110,6 +111,18 @@ function keadaan(p: PegawaiUpt): { teks: string; nada?: Nada } {
   return { teks: "Menunggu diproses Kanwil", nada: "kuning" };
 }
 
+const SURAT_KOSONG = { nomorSurat: "", tanggalSurat: "", nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" };
+const HUKDIS_KOSONG = { ada: false, jenis: "", nomorSk: "", tmtMulai: "", tmtBerakhir: "", keterangan: "" };
+
+/** localStorage bila ada; null saat dirender di server atau saat peramban menolak penyimpanan. */
+function penyimpananDraf() {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export default function DashboardUpt() {
   const dashUser = useDashUser();
   const [hariIni] = useState(() => hariIniWita());
@@ -117,6 +130,8 @@ export default function DashboardUpt() {
   const [galat, setGalat] = useState<string | null>(null);
   const [memuat, setMemuat] = useState(true);
   const [segar, setSegar] = useState<Date | null>(null);
+  /** Pegawai yang isian usulannya masih tersimpan sebagai draf di peramban ini; "baru" untuk pegawai baru. */
+  const [berdraf, setBerdraf] = useState<Set<string>>(() => new Set());
   const [saring, setSaring] = useState<Saring>("semua");
   const [cari, setCari] = useState("");
 
@@ -129,6 +144,7 @@ export default function DashboardUpt() {
         setData(d);
         setGalat(null);
         setSegar(new Date());
+        setBerdraf(idBerdraf(penyimpananDraf(), d.satker.kode));
       })
       .catch((e: unknown) => setGalat(e instanceof Error ? e.message : "Data gagal dimuat"))
       .finally(() => setMemuat(false));
@@ -177,8 +193,8 @@ export default function DashboardUpt() {
   // Usulan data: UPT menginventarisir datanya sendiri, Kanwil yang menerapkannya.
   const [dialogUsulan, setDialogUsulan] = useState<PegawaiUpt | null>(null);
   const [isianUsulan, setIsianUsulan] = useState<Record<string, string>>({});
-  const [suratUsulan, setSuratUsulan] = useState({ nomorSurat: "", tanggalSurat: "", nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" });
-  const [hukdisUsulan, setHukdisUsulan] = useState({ ada: false, jenis: "", nomorSk: "", tmtMulai: "", tmtBerakhir: "", keterangan: "" });
+  const [suratUsulan, setSuratUsulan] = useState(SURAT_KOSONG);
+  const [hukdisUsulan, setHukdisUsulan] = useState(HUKDIS_KOSONG);
   const [berkasUsulan, setBerkasUsulan] = useState<Record<string, File | null>>({});
   /** "baru" saat UPT mengusulkan pegawai yang belum tercatat; dialognya sama, isiannya kosong. */
   const [jenisUsulan, setJenisUsulan] = useState<"perubahan" | "baru">("perubahan");
@@ -197,29 +213,97 @@ export default function DashboardUpt() {
     return () => clearTimeout(t);
   }, [muatUsulan]);
 
-  function kosongkanFormulir() {
-    setSuratUsulan({ nomorSurat: "", tanggalSurat: "", nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" });
-    setHukdisUsulan({ ada: false, jenis: "", nomorSk: "", tmtMulai: "", tmtBerakhir: "", keterangan: "" });
+  /** Waktu draf yang baru dipulihkan ke formulir; null bila formulirnya dibuka bersih. */
+  const [drafDipulihkan, setDrafDipulihkan] = useState<string | null>(null);
+  /** Isian sesaat setelah formulir dibuka, sebagai pembanding agar draf tidak ditulis sebelum diketik. */
+  const awalIsian = useRef("");
+
+  const kunciDrafAktif = data && (dialogUsulan || dialogBaru)
+    ? kunciDraf(data.satker.kode, dialogUsulan?.id ?? null)
+    : null;
+
+  function segarkanBerdraf() {
+    if (data) setBerdraf(idBerdraf(penyimpananDraf(), data.satker.kode));
+  }
+
+  /**
+   * Isi formulir dari draf bila ada, selain itu dari data yang tercatat di Kanwil. Berkas PDF tidak
+   * pernah ikut draf: peramban tidak mengizinkan berkas dibaca kembali tanpa dipilih pengguna.
+   */
+  function siapkanFormulir(jenis: "perubahan" | "baru", pegawaiId: string | null, dasar: Record<string, string>) {
+    const kunci = data ? kunciDraf(data.satker.kode, pegawaiId) : null;
+    const draf = kunci ? bacaDraf(penyimpananDraf(), kunci) : null;
+    const isi = draf
+      ? {
+          jenis,
+          nipBaru: draf.nipBaru,
+          surat: { ...SURAT_KOSONG, ...draf.surat },
+          hukdis: { ...HUKDIS_KOSONG, ...draf.hukdis },
+          isian: draf.isian,
+        }
+      : { jenis, nipBaru: "", surat: SURAT_KOSONG, hukdis: HUKDIS_KOSONG, isian: dasar };
+
+    setJenisUsulan(jenis);
+    setNipBaru(isi.nipBaru);
+    setSuratUsulan(isi.surat);
+    setHukdisUsulan(isi.hukdis);
+    setIsianUsulan(isi.isian);
     setBerkasUsulan({});
-    setNipBaru("");
     setGalatKonfirmasi(null);
+    awalIsian.current = JSON.stringify(isi);
+    setDrafDipulihkan(draf?.disimpanAt ?? null);
   }
 
   function bukaUsulanBaru() {
-    setJenisUsulan("baru");
-    setDialogBaru(true);
     setDialogUsulan(null);
-    setIsianUsulan({});
-    kosongkanFormulir();
+    setDialogBaru(true);
+    siapkanFormulir("baru", null, {});
   }
 
   function bukaUsulan(p: PegawaiUpt) {
-    setJenisUsulan("perubahan");
     setDialogBaru(false);
     setDialogUsulan(p);
-    setIsianUsulan({ ...p.dataSekarang });
-    kosongkanFormulir();
+    siapkanFormulir("perubahan", p.id, { ...p.dataSekarang });
   }
+
+  function tutupFormulir() {
+    setDialogUsulan(null);
+    setDialogBaru(false);
+    setDrafDipulihkan(null);
+    segarkanBerdraf();
+  }
+
+  /** Simpan isian tanpa mengirim, untuk data yang belum lengkap atau berkas yang belum siap dipindai. */
+  function simpanDrafDanTutup() {
+    if (!kunciDrafAktif) return;
+    const tersimpan = simpanDraf(penyimpananDraf(), kunciDrafAktif, {
+      jenis: jenisUsulan, nipBaru, surat: suratUsulan, hukdis: hukdisUsulan, isian: isianUsulan,
+    });
+    if (!tersimpan) {
+      setGalatKonfirmasi("Draf tidak dapat disimpan di peramban ini. Catat dulu isian pentingnya sebelum menutup.");
+      return;
+    }
+    setKabar("Draf disimpan di peramban ini. Buka pegawai yang sama untuk melanjutkan; berkas PDF perlu dipilih ulang.");
+    setTimeout(() => setKabar(null), 7000);
+    tutupFormulir();
+  }
+
+  function buangDraf() {
+    if (kunciDrafAktif) hapusDraf(penyimpananDraf(), kunciDrafAktif);
+    if (dialogUsulan) siapkanFormulir("perubahan", dialogUsulan.id, { ...dialogUsulan.dataSekarang });
+    else siapkanFormulir("baru", null, {});
+    segarkanBerdraf();
+  }
+
+  // Draf ditulis diam-diam sambil mengetik, supaya isian tidak hilang bila dialog atau peramban
+  // tertutup sebelum usulan terkirim. Isian yang belum disentuh tidak ditulis.
+  useEffect(() => {
+    if (!kunciDrafAktif) return;
+    const isi = { jenis: jenisUsulan, nipBaru, surat: suratUsulan, hukdis: hukdisUsulan, isian: isianUsulan };
+    if (JSON.stringify(isi) === awalIsian.current) return;
+    const tunda = setTimeout(() => simpanDraf(penyimpananDraf(), kunciDrafAktif, isi), 600);
+    return () => clearTimeout(tunda);
+  }, [kunciDrafAktif, jenisUsulan, nipBaru, suratUsulan, hukdisUsulan, isianUsulan]);
 
   async function kirimUsulan() {
     if (!dialogUsulan && !dialogBaru) return;
@@ -262,13 +346,41 @@ export default function DashboardUpt() {
           : `Usulan data ${namaTerkirim} terkirim ke Kanwil. Anda akan melihat hasilnya di daftar usulan.`,
       );
       setTimeout(() => setKabar(null), 7000);
-      setDialogUsulan(null);
-      setDialogBaru(false);
+      if (kunciDrafAktif) hapusDraf(penyimpananDraf(), kunciDrafAktif);
+      tutupFormulir();
       void muatUsulan();
     } catch {
       setGalatKonfirmasi("Usulan gagal dikirim");
     } finally {
       setMengirim(false);
+    }
+  }
+
+  /**
+   * Usulan yang telanjur salah dibatalkan, bukan disunting di tempat: Kanwil tidak boleh menerima dua
+   * versi usulan untuk pegawai yang sama. Hanya usulan yang belum ditinjau yang bisa ditarik kembali.
+   */
+  const [dialogBatal, setDialogBatal] = useState<UsulanTerkirim | null>(null);
+  const [membatalkan, setMembatalkan] = useState(false);
+
+  async function batalkanUsulan() {
+    if (!dialogBatal) return;
+    setMembatalkan(true);
+    try {
+      const res = await fetch(`/api/upt/usulan/${dialogBatal.id}`, { method: "DELETE" });
+      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setGalat(d.error ?? "Usulan gagal dibatalkan");
+        return;
+      }
+      setKabar(`Usulan ${dialogBatal.nama} dibatalkan. Kirim ulang setelah datanya diperbaiki.`);
+      setTimeout(() => setKabar(null), 6000);
+      setDialogBatal(null);
+      void muatUsulan();
+    } catch {
+      setGalat("Usulan gagal dibatalkan");
+    } finally {
+      setMembatalkan(false);
     }
   }
 
@@ -358,6 +470,7 @@ export default function DashboardUpt() {
       >
         <StripStat>
           <Stat
+            nada="kuning"
             label="Usulan dikirim bulan ini"
             angka={perluDiusulkan.length}
             satuan={`pegawai TMT ${namaBulan(bulanUsulan)}`}
@@ -366,11 +479,13 @@ export default function DashboardUpt() {
             sorot={perluDiusulkan.length > 0}
           />
           <Stat
+            nada="biru"
             label="Sedang diproses Kanwil"
             angka={sedangDiproses.length}
             meta={sedangDiproses.length > 0 ? "SK sedang dibuat atau menunggu keuangan" : "Tidak ada yang sedang diproses"}
           />
           <Stat
+            nada="hijau"
             label={`Selesai TMT ${hariIni.getFullYear()}`}
             angka={tahunIni?.selesai ?? 0}
             satuan={tahunIni ? `/ ${tahunIni.total} · ${pctSelesai}%` : undefined}
@@ -378,6 +493,7 @@ export default function DashboardUpt() {
             meta={skBerkas.length > 0 ? `${skBerkas.length} SK dapat diunduh` : skSelesai.length > 0 ? "Berkas SK belum diunggah Tim SDM" : "Belum ada SK yang terbit"}
           />
           <Stat
+            nada="merah"
             label="KGB ditunda"
             angka={data?.kgbDitunda ?? 0}
             meta={(data?.kgbDitunda ?? 0) > 0 ? "Karena hukuman disiplin yang masih berlaku" : "Tidak ada KGB yang ditunda"}
@@ -396,6 +512,33 @@ export default function DashboardUpt() {
         </div>
       )}
 
+      {dialogBatal && (
+        <KerangkaModal
+          judul="Batalkan usulan"
+          subjudul={`${dialogBatal.nama} · surat ${dialogBatal.nomorSurat}`}
+          nada="merah"
+          ukuran="sm"
+          sibuk={membatalkan}
+          onTutup={() => setDialogBatal(null)}
+          onKirim={() => void batalkanUsulan()}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogBatal(null)} disabled={membatalkan}>
+                Tidak jadi
+              </button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={membatalkan}>
+                {membatalkan ? "Membatalkan…" : "Batalkan usulan"}
+              </button>
+            </>
+          }
+        >
+          <Catatan nada="amber">
+            Usulan ini beserta berkas yang sudah diunggah dihapus dan tidak lagi masuk antrian tinjauan
+            Kanwil. Isinya tidak dapat dikembalikan; bila datanya keliru, kirim usulan baru setelah diperbaiki.
+          </Catatan>
+        </KerangkaModal>
+      )}
+
       {(dialogUsulan || dialogBaru) && (
         <KerangkaModal
           judul={jenisUsulan === "baru" ? "Usulkan pegawai baru" : "Usulkan perbaikan data pegawai"}
@@ -406,12 +549,15 @@ export default function DashboardUpt() {
           }
           ukuran="lg"
           sibuk={mengirim}
-          onTutup={() => { setDialogUsulan(null); setDialogBaru(false); }}
+          onTutup={tutupFormulir}
           onKirim={() => void kirimUsulan()}
           kaki={
             <>
-              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => { setDialogUsulan(null); setDialogBaru(false); }} disabled={mengirim}>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={tutupFormulir} disabled={mengirim}>
                 Batal
+              </button>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={simpanDrafDanTutup} disabled={mengirim}>
+                Simpan dulu
               </button>
               <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
                 {mengirim ? "Mengirim…" : "Kirim usulan ke Kanwil"}
@@ -425,6 +571,13 @@ export default function DashboardUpt() {
               ? "Isi data pegawai sesuai SK pengangkatannya. Pegawai baru ditambahkan ke data induk setelah usulan ini ditinjau dan disetujui Kanwil."
               : "Isian sudah diisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; yang dikosongkan berarti tidak diusulkan berubah. Usulan berlaku setelah ditinjau dan disetujui Kanwil."}
           </Catatan>
+          {drafDipulihkan && (
+            <Catatan nada="amber">
+              Draf yang disimpan {formatTanggalId(drafDipulihkan, { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} dipulihkan.
+              Berkas PDF tidak ikut tersimpan, jadi perlu dipilih ulang sebelum dikirim.{" "}
+              <button type="button" className="dsb-tautan" onClick={buangDraf}>Buang draf, mulai dari data Kanwil</button>
+            </Catatan>
+          )}
 
           <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
             <div className="kgbm-bagian-kepala">
@@ -611,7 +764,7 @@ export default function DashboardUpt() {
               ))}
             </div>
             <button type="button" className="dsb-tombol dsb-tombol-kecil" style={{ marginLeft: "auto" }} onClick={bukaUsulanBaru}>
-              Usulkan pegawai baru
+              {berdraf.has("baru") ? "Lanjutkan draf pegawai baru" : "Usulkan pegawai baru"}
             </button>
             <input
               type="search"
@@ -691,7 +844,7 @@ export default function DashboardUpt() {
                           ) : null}
                           <span className="upt-aksi">
                             <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => bukaUsulan(p)}>
-                              Usulkan perbaikan data
+                              {berdraf.has(p.id) ? "Lanjutkan draf usulan" : "Usulkan perbaikan data"}
                             </button>
                           </span>
                         </td>
@@ -798,6 +951,18 @@ export default function DashboardUpt() {
                           </p>
                           {u.alasanTolak && (
                             <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-red)" }}>Ditolak: {u.alasanTolak}</p>
+                          )}
+                          {u.status === "menunggu" && (
+                            <span className="upt-aksi">
+                              <button
+                                type="button"
+                                className="dsb-tombol dsb-tombol-kecil"
+                                data-jenis="garis"
+                                onClick={() => setDialogBatal(u)}
+                              >
+                                Batalkan usulan
+                              </button>
+                            </span>
                           )}
                         </span>
                       </li>

@@ -124,6 +124,7 @@ export function Stat({
   href,
   onClick,
   sorot = false,
+  nada,
 }: {
   label: string;
   angka: ReactNode;
@@ -136,6 +137,8 @@ export function Stat({
   onClick?: () => void;
   /** Tandai angka yang perlu perhatian. */
   sorot?: boolean;
+  /** Warna sel: garis tipis di atas angka dan latar setipis embun, agar tiap kartu punya identitas. */
+  nada?: Nada;
 }) {
   const isi = (
     <>
@@ -160,18 +163,18 @@ export function Stat({
   const sorotAttr = sorot ? "" : undefined;
   if (href)
     return (
-      <Link href={href} className="dsb-stat" data-sorot={sorotAttr}>
+      <Link href={href} className="dsb-stat" data-nada={nada} data-sorot={sorotAttr}>
         {isi}
       </Link>
     );
   if (onClick)
     return (
-      <button type="button" onClick={onClick} className="dsb-stat" data-sorot={sorotAttr}>
+      <button type="button" onClick={onClick} className="dsb-stat" data-nada={nada} data-sorot={sorotAttr}>
         {isi}
       </button>
     );
   return (
-    <div className="dsb-stat" data-sorot={sorotAttr}>
+    <div className="dsb-stat" data-nada={nada} data-sorot={sorotAttr}>
       {isi}
     </div>
   );

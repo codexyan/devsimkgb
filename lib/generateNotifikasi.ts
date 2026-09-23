@@ -110,7 +110,40 @@ type KgbUntukNotifikasi = Pick<RiwayatKGBRow, "id" | "pegawaiId" | "status" | "t
 type HukdisUntukNotifikasi = Pick<RiwayatHukdisRow, "pegawaiId" | "berdampakKGB" | "tmtBerakhir"> &
   Partial<Pick<RiwayatHukdisRow, "tmtMulai">>;
 /** Usulan data dari UPT yang perlu ditinjau Kanwil (lib/usulanPegawai.ts). */
-type UsulanUntukNotifikasi = { id: string; pegawaiId: string; status: string; nomorSurat: string };
+type UsulanUntukNotifikasi = {
+  id: string;
+  /** Kosong pada usulan pegawai baru: pegawainya belum ada sampai usulan disetujui. */
+  pegawaiId: string | null;
+  status: string;
+  nomorSurat: string;
+  jenis?: string | null;
+  nama?: string | null;
+  nip?: string | null;
+};
+
+/**
+ * Isi notifikasi untuk satu usulan dari UPT. Dipakai dua tempat: saat usulan masuk, supaya Tim SDM
+ * melihatnya seketika, dan saat pemeriksaan berkala, supaya usulan lama tidak ada yang terlewat.
+ */
+export function notifikasiUsulanUpt(
+  usulan: { id: string; jenis?: string | null; nomorSurat: string },
+  pegawai: { nama: string | null; nip: string | null } | null | undefined,
+): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
+  const nama = pegawai?.nama?.trim() || "-";
+  const nip = pegawai?.nip?.trim() || "-";
+  const pegawaiBaru = usulan.jenis === "baru";
+  return {
+    judul: `${pegawaiBaru ? "Usulan Pegawai Baru" : "Usulan Data UPT"}: ${nama}`,
+    pesan: pegawaiBaru
+      ? `UPT mengusulkan pegawai baru ${nama} (${nip}) lewat surat ${usulan.nomorSurat}. Tinjau sebelum pegawainya ditambahkan ke data induk.`
+      : `UPT mengusulkan perbaikan data ${nama} (${nip}) lewat surat ${usulan.nomorSurat}. Tinjau sebelum KGB pegawai ini diproses.`,
+    tipe: T.USULAN_UPT,
+    referenceId: usulan.id,
+    prioritas: "warning",
+    linkHref: "/dashboard/usulan",
+    kategori: "pegawai",
+  };
+}
 
 const STATUS_SIKLUS_SUDAH_DIINPUT = new Set(["sedang_diproses", "menunggu_keuangan", "selesai"]);
 
@@ -319,20 +352,13 @@ export function rencanaNotifikasi(input: {
     });
   }
 
-  // 6. Usulan data dari UPT yang menunggu tinjauan Kanwil, satu kali per usulan.
+  // 6. Usulan data dari UPT yang menunggu tinjauan Kanwil, satu kali per usulan. Notifikasinya biasanya
+  // sudah dibuat rute pengiriman usulan; langkah ini jaring pengaman bila pembuatan itu gagal.
   for (const u of input.usulan ?? []) {
     if (u.status !== "menunggu") continue;
     if (notifUntuk(T.USULAN_UPT, u.id).length > 0) continue;
-    const p = pegawaiById.get(u.pegawaiId);
-    baru.push({
-      judul: `Usulan Data UPT: ${p?.nama ?? "-"}`,
-      pesan: `UPT mengusulkan perbaikan data ${p?.nama ?? "-"} (${p?.nip ?? "-"}) lewat surat ${u.nomorSurat}. Tinjau sebelum KGB pegawai ini diproses.`,
-      tipe: T.USULAN_UPT,
-      referenceId: u.id,
-      prioritas: "warning",
-      linkHref: "/dashboard/usulan",
-      kategori: "pegawai",
-    });
+    const p = u.pegawaiId ? pegawaiById.get(u.pegawaiId) : null;
+    baru.push(notifikasiUsulanUpt(u, p ?? { nama: u.nama ?? null, nip: u.nip ?? null }));
   }
 
   const tandaiDibaca = input.notifikasi
