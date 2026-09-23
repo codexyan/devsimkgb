@@ -8,7 +8,7 @@ import { formatTanggalId, hariIniWita, isoTanggalLokal, tanggalKalender } from "
 import { kunciTanggal, tahunTmt } from "@/lib/rekapKgb";
 import { bulanFokusRekon, jendelaRekonGaji, statusRekonGaji, type StatusRekon } from "@/lib/rekonGaji";
 import { cariSatker } from "@/lib/satker";
-import { namaBulan, namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
+import { namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 
 /* Riwayat Aktivitas Keuangan: jejak konfirmasi (siapa, kapan, rapelan atau tidak), rekap dasar Gaji Web per
    bulan TMT, dan riwayat KGB per pegawai. Rekap memakai /api/keuangan/rekon (lib/rekapKgb.ts), jadi angkanya
@@ -66,9 +66,9 @@ const fmtTgl = (s: string | null | undefined) => (s ? formatTanggalId(s, { day: 
 const fmtJam = (s: string) => formatTanggalId(s, { hour: "2-digit", minute: "2-digit" });
 const fmtRp = (n: number | null | undefined) => (typeof n === "number" ? "Rp " + n.toLocaleString("id-ID") : "-");
 
-function satkerPendek(unitKerja: string | null | undefined): string {
+function satkerLengkap(unitKerja: string | null | undefined): string {
   const s = cariSatker(unitKerja);
-  return s ? namaSingkatSatker(s) : unitKerja?.trim() || "-";
+  return s ? namaTampilSatker(s) : unitKerja?.trim() || "-";
 }
 
 async function bacaJson<T>(res: Response, bawaan: T): Promise<T> {
@@ -482,7 +482,7 @@ export default function RiwayatKeuanganPage() {
                         >
                           <td style={{ maxWidth: "280px" }}>
                             <p className="dsb-nama truncate" style={{ margin: 0 }} title={e.pegawai.jabatan}>{e.pegawai.nama}</p>
-                            <p className="dsb-kecil truncate" style={{ margin: 0 }} title={e.pegawai.unitKerja}>{e.nip} · {satkerPendek(e.pegawai.unitKerja)}</p>
+                            <p className="dsb-kecil truncate" style={{ margin: 0 }} title={e.pegawai.unitKerja}>{e.nip} · {satkerLengkap(e.pegawai.unitKerja)}</p>
                           </td>
                           <td className="whitespace-nowrap">
                             TMT {fmtTgl(akhir.tmtKgbBaru)}

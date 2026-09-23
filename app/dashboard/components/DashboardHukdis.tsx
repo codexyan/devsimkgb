@@ -7,7 +7,7 @@ import { PanelNavy, PanelTindakan, Stat, StripStat, namaSapaan, sapaanWita, tang
 import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { SATKER } from "@/lib/satker";
 import { KODE_SATKER_LAIN, kodeSatkerPegawai } from "@/lib/rekapSatker";
-import { namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
+import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 
 /* Dashboard SDM Hukdis. Sumber sama dengan modul Hukuman Disiplin (/api/hukdis), jadi status aktif dihitung dari
    tanggal berakhir (kalender WITA) dan tidak ada status yang "lupa diperbarui". Yang dipantau: hukdis yang segera
@@ -31,7 +31,7 @@ const LABEL_KATEGORI: Record<string, string> = { ringan: "Ringan", sedang: "Seda
 function namaSatker(kode: string): string {
   if (kode === KODE_SATKER_LAIN) return "Unit belum sesuai daftar";
   const s = SATKER.find((x) => x.kode === kode);
-  return s ? namaSingkatSatker(s) : kode;
+  return s ? namaTampilSatker(s) : kode;
 }
 
 export default function DashboardHukdis() {

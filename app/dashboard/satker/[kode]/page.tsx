@@ -8,7 +8,7 @@ import type { RingkasanSatker } from "@/lib/rekapSatker";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { hitungDeadlineSDM } from "@/lib/tabelGaji";
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
-import { LABEL_JENIS_SATKER, geserBulan, namaBulan, namaTampilSatker } from "../labelSatker";
+import { geserBulan, namaBulan, namaTampilSatker } from "../labelSatker";
 
 /* Rincian satu satker: angka KGB, pegawai dengan siklus KGB berjalan, dan jadwal surat usulan.
    Halaman ini juga menjadi dasar tampilan admin UPT (lihat saja, satker sendiri) di tahap berikutnya. */
@@ -91,7 +91,7 @@ export default function HalamanSatkerDetail() {
         <div className="min-w-0">
           {kembali}
           <p className="dsb-label" style={{ marginTop: "14px" }}>
-            {LABEL_JENIS_SATKER[r.satker.jenis]} · KPPN {r.satker.kppn}
+            KPPN {r.satker.kppn}
           </p>
           <h1 className="dsb-halaman-judul">{namaTampilSatker(r.satker)}</h1>
           <p className="dsb-sub">

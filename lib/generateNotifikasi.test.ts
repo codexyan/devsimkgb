@@ -166,3 +166,54 @@ test("tipe notifikasi per role", () => {
   assert.equal(bolehLihatNotifikasi("peran_lain", "rapelan"), false);
   assert.equal(bolehLihatNotifikasi("superAdminCore", "tipe_lama"), true);
 });
+
+test("pengingat KGB ditutup begitu siklusnya tidak lagi perlu diingatkan", () => {
+  const lama = [
+    notif("n1", "critical", tanggal(2026, 5, 2), "rapelan", "p1"),
+    notif("n2", "warning", tanggal(2026, 4, 25), "kgb_jatuh_tempo", "p1"),
+  ];
+
+  // KGB sudah diinput: kedua pengingat ditandai dibaca dan tidak ada pengingat baru.
+  const diinput = rencana(tanggal(2026, 5, 10), lama, {
+    kgb: [{ id: "k1", pegawaiId: "p1", status: "sedang_diproses", tmtKgbBaru: tanggal(2026, 6), isArsip: false, flagRapelan: false }],
+  });
+  assert.equal(diinput.baru.length, 0);
+  assert.deepEqual(diinput.tandaiDibaca.sort(), ["n1", "n2"]);
+
+  // Masih terlambat: pengingat lama dibiarkan terbuka.
+  const masihTerlambat = rencana(tanggal(2026, 5, 10), lama);
+  assert.deepEqual(masihTerlambat.tandaiDibaca, []);
+
+  // Pegawai tidak aktif lagi: pengingatnya ikut ditutup.
+  const nonaktif = rencana(tanggal(2026, 5, 10), lama, { pegawai: [pegawai({ aktif: false })] });
+  assert.deepEqual(nonaktif.tandaiDibaca.sort(), ["n1", "n2"]);
+});
+
+test("SK yang baru dikonfirmasi keuangan dikabarkan sekali", () => {
+  const kgb = [
+    { id: "k1", pegawaiId: "p1", status: "selesai", tmtKgbBaru: tanggal(2026, 6), isArsip: false, flagRapelan: false, konfirmasiKeuanganAt: tanggal(2026, 6, 10) },
+    // Konfirmasi lebih dari 14 hari lalu tidak dikabarkan lagi.
+    { id: "k2", pegawaiId: "p1", status: "selesai", tmtKgbBaru: tanggal(2024, 6), isArsip: false, flagRapelan: false, konfirmasiKeuanganAt: tanggal(2026, 5, 1) },
+    // Arsip tidak punya berkas SK untuk diunduh.
+    { id: "k3", pegawaiId: "p1", status: "selesai", tmtKgbBaru: tanggal(2026, 6), isArsip: true, flagRapelan: false, konfirmasiKeuanganAt: tanggal(2026, 6, 10) },
+  ];
+  const hariIni = tanggal(2026, 6, 15);
+  const pertama = rencana(hariIni, [], { pegawai: [pegawai({ tmtKgbBerikutnya: tanggal(2028, 6) })], kgb });
+  assert.deepEqual(
+    pertama.baru.filter((n) => n.tipe === "sk_terbit").map((n) => n.referenceId),
+    ["k1"],
+  );
+
+  const kedua = rencana(hariIni, [notif("s1", "info", tanggal(2026, 6, 11), "sk_terbit", "k1")], {
+    pegawai: [pegawai({ tmtKgbBerikutnya: tanggal(2028, 6) })],
+    kgb,
+  });
+  assert.equal(kedua.baru.filter((n) => n.tipe === "sk_terbit").length, 0);
+});
+
+test("Admin UPT hanya menerima pengingat KGB dan kabar SK terbit", () => {
+  assert.deepEqual(tipeNotifikasiUntukRole("admin_upt"), ["kgb_jatuh_tempo", "rapelan", "sk_terbit"]);
+  assert.equal(bolehLihatNotifikasi("admin_upt", "sk_terbit"), true);
+  assert.equal(bolehLihatNotifikasi("admin_upt", "hukdis_berakhir"), false);
+  assert.equal(bolehLihatNotifikasi("admin_upt", "sk_menunggu_keuangan"), false);
+});

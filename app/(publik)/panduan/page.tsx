@@ -23,11 +23,20 @@ const bulanTahun = (d: Date) => formatTanggalId(d, { month: "long", year: "numer
 const rp = (n: number) => "Rp" + new Intl.NumberFormat("id-ID").format(n);
 const mkg = (tahun: number, bulan: number) => `${tahun} tahun ${bulan} bulan`;
 
-/* ── Contoh kasus: usulan Rutan Kelas IIB Rantau (data pribadi disamarkan) ── */
+/* ── Contoh kasus: usulan Rumah Tahanan Negara Kelas IIB Rantau (data pribadi disamarkan) ── */
 const GOLONGAN = "II/a";
 const PANGKAT = `${getPangkat(GOLONGAN)} (${GOLONGAN})`;
 const TMT_CPNS = new Date(2025, 5, 1);
 const TMT_KGB = new Date(2026, 5, 1);
+/* Pengangkatan PNS pada contoh ini terbit tiga bulan setelah KGB pertama; lihat bagian cpns-pns. */
+const TMT_PNS = new Date(2026, 8, 1);
+const PORSI_CPNS = 0.8;
+const PERSEN_CPNS = Math.round(PORSI_CPNS * 100);
+const gajiCpns = (gajiPokok: number) => Math.round(gajiPokok * PORSI_CPNS);
+const selisihBulan = (dari: Date, sampai: Date) =>
+  (sampai.getFullYear() - dari.getFullYear()) * 12 + (sampai.getMonth() - dari.getMonth());
+const akhirBulanSebelum = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 0);
+
 const TANGGAL_SURAT = new Date(2026, 8, 8);
 const TANGGAL_DITERIMA = new Date(2026, 8, 10);
 const TANGGAL_DISPOSISI = new Date(2026, 8, 14);
@@ -431,7 +440,201 @@ export default async function PanduanPage() {
                 <LanjutBagian dari="jadwal" />
               </section>
 
-              {/* 4. Untuk admin UPT */}
+
+              {/* 4. KGB pertama setelah CPNS diangkat PNS */}
+              <section className="pub-prose pg-bagian" data-bagian="cpns-pns" data-peran={peranUntuk("cpns-pns")}>
+                <h2 id="cpns-pns" className="pub-h2">
+                  KGB pertama setelah CPNS diangkat menjadi PNS
+                </h2>
+                <p>
+                  Masa kerja golongan dihitung sejak TMT CPNS, bukan sejak TMT PNS. Karena itu KGB pertama tetap jatuh
+                  pada tanggalnya walaupun surat keputusan pengangkatan menjadi PNS baru terbit belakangan. Pengangkatan
+                  yang melewati satu tahun masa percobaan diproses lebih dahulu oleh instansi ke BKN, dan TMT PNS
+                  mengikuti tanggal pada SK pengangkatan; tanggal itu tidak berlaku surut.
+                </p>
+
+                <h3 className="pub-h3">Tiga hal yang membedakan</h3>
+                <ul>
+                  <li>
+                    <strong>Masa kerja golongan berjalan sejak TMT CPNS.</strong> Untuk {PANGKAT}, KGB pertama jatuh
+                    ketika masa kerja golongan mencapai 1 tahun, yaitu satu tahun setelah TMT CPNS.
+                  </li>
+                  <li>
+                    <strong>Selama berstatus CPNS gaji dibayar {PERSEN_CPNS} persen</strong> dari gaji pokok. Gaji pokok
+                    tetap naik pada TMT KGB, tetapi yang dibayarkan masih {PERSEN_CPNS} persen sampai TMT PNS.
+                  </li>
+                  <li>
+                    <strong>SK pengangkatan PNS memuat gaji pokok penuh.</strong> Periksa angkanya: bila sudah memakai
+                    gaji pokok hasil KGB, sejak TMT PNS tidak ada lagi kekurangan yang harus dirapel.
+                  </li>
+                </ul>
+
+                <h3 className="pub-h3">
+                  Contoh: CPNS {tgl(TMT_CPNS)}, diangkat PNS {tgl(TMT_PNS)}
+                </h3>
+                <div className="pub-table-wrap" tabIndex={0} role="region" aria-label="Tabel gaji CPNS sampai diangkat PNS">
+                  <table className="pub-table">
+                    <caption>Gaji pokok dan gaji yang dibayarkan, {PANGKAT}</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Periode</th>
+                        <th scope="col">Status dan masa kerja</th>
+                        <th scope="col" className="pub-num">Gaji pokok</th>
+                        <th scope="col" className="pub-num">Dibayarkan</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">
+                          {tgl(TMT_CPNS)} – {tgl(akhirBulanSebelum(TMT_KGB))}
+                        </th>
+                        <td>CPNS, masa kerja golongan {mkg(0, 0)}</td>
+                        <td className="pub-num">{rp(GAJI_MKG_0)}</td>
+                        <td className="pub-num">{rp(gajiCpns(GAJI_MKG_0))}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">
+                          {tgl(TMT_KGB)} – {tgl(akhirBulanSebelum(TMT_PNS))}
+                        </th>
+                        <td>CPNS, masa kerja golongan {mkg(1, 0)}, KGB pertama berlaku</td>
+                        <td className="pub-num">{rp(GAJI_MKG_1)}</td>
+                        <td className="pub-num">{rp(gajiCpns(GAJI_MKG_1))}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">mulai {tgl(TMT_PNS)}</th>
+                        <td>PNS, gaji pokok dibayar penuh</td>
+                        <td className="pub-num">{rp(GAJI_MKG_1)}</td>
+                        <td className="pub-num">{rp(GAJI_MKG_1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <h3 className="pub-h3">Berapa yang dibayar sebagai kekurangan gaji</h3>
+                <p>
+                  Yang dirapel hanya bulan yang benar-benar terlanjur dibayar dengan gaji pokok lama. Pada contoh di
+                  atas KGB berlaku {tgl(TMT_KGB)} sementara pengangkatan PNS berlaku {tgl(TMT_PNS)}, sehingga
+                  kekurangannya {selisihBulan(TMT_KGB, TMT_PNS)} bulan.
+                </p>
+                <div className="pub-table-wrap" tabIndex={0} role="region" aria-label="Tabel perhitungan kekurangan gaji">
+                  <table className="pub-table">
+                    <caption>
+                      Kekurangan gaji pokok {bulanTahun(TMT_KGB)} sampai {bulanTahun(akhirBulanSebelum(TMT_PNS))}
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Uraian</th>
+                        <th scope="col" className="pub-num">Jumlah</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">Seharusnya dibayar: {PERSEN_CPNS} persen dari {rp(GAJI_MKG_1)}</th>
+                        <td className="pub-num">{rp(gajiCpns(GAJI_MKG_1))}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Sudah dibayar: {PERSEN_CPNS} persen dari {rp(GAJI_MKG_0)}</th>
+                        <td className="pub-num">{rp(gajiCpns(GAJI_MKG_0))}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Selisih per bulan</th>
+                        <td className="pub-num">{rp(gajiCpns(GAJI_MKG_1) - gajiCpns(GAJI_MKG_0))}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Kekurangan {selisihBulan(TMT_KGB, TMT_PNS)} bulan</th>
+                        <td className="pub-num">
+                          {rp((gajiCpns(GAJI_MKG_1) - gajiCpns(GAJI_MKG_0)) * selisihBulan(TMT_KGB, TMT_PNS))}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="pub-note">
+                  <strong className="pub-note-title">Yang ikut terbawa</strong>
+                  <p>
+                    Tunjangan yang dihitung dari gaji pokok, seperti tunjangan keluarga dan tunjangan beras, ikut
+                    dihitung ulang oleh operator gaji satker. Angka pastinya keluar dari aplikasi Gaji Web setelah SK
+                    KGB direkam, lalu diajukan ke KPPN sebagai SPM-LS kekurangan gaji.
+                  </p>
+                </div>
+
+                <h3 className="pub-h3">KGB berikutnya</h3>
+                <p>
+                  Siklus berikutnya tetap dua tahun setelah KGB pertama, yaitu{" "}
+                  {tgl(new Date(TMT_KGB.getFullYear() + 2, TMT_KGB.getMonth(), 1))} pada masa kerja golongan {mkg(3, 0)}{" "}
+                  dengan gaji pokok {rp(GAJI_MKG_3)}. Pengangkatan PNS yang terlambat tidak menggeser jadwal ini, karena
+                  masa kerja golongan tetap dihitung dari TMT CPNS.
+                </p>
+                <LanjutBagian dari="cpns-pns" />
+              </section>
+
+              {/* 5. Kenaikan pangkat dan dampaknya pada KGB */}
+              <section className="pub-prose pg-bagian" data-bagian="kenaikan-pangkat" data-peran={peranUntuk("kenaikan-pangkat")}>
+                <h2 id="kenaikan-pangkat" className="pub-h2">
+                  Kenaikan pangkat dan dampaknya pada KGB
+                </h2>
+                <p>
+                  Kenaikan pangkat mengubah golongan ruang, dan karena itu mengubah kolom tabel gaji yang dipakai. Yang
+                  sering terlewat: masa kerja golongan tidak dibawa utuh ke golongan baru. Saat pindah ke golongan yang
+                  lebih tinggi, masa kerja golongan dipotong sesuai ketentuan penetapan gaji pokok.
+                </p>
+                <div className="pub-table-wrap" tabIndex={0} role="region" aria-label="Tabel potongan masa kerja golongan">
+                  <table className="pub-table">
+                    <caption>Potongan masa kerja golongan saat naik golongan</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Dari</th>
+                        <th scope="col">Ke</th>
+                        <th scope="col" className="pub-num">Masa kerja golongan dipotong</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">Golongan I</th>
+                        <td>II/a</td>
+                        <td className="pub-num">6 tahun</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Golongan II</th>
+                        <td>III/a</td>
+                        <td className="pub-num">5 tahun</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p>
+                  Kenaikan pangkat di dalam golongan yang sama, misalnya III/a ke III/b, tidak memotong masa kerja
+                  golongan. Yang berubah hanya kolom gaji pokok yang dipakai.
+                </p>
+
+                <h3 className="pub-h3">Yang berubah dan yang tetap</h3>
+                <ul>
+                  <li>
+                    <strong>Berubah:</strong> golongan ruang, masa kerja golongan, dan gaji pokok yang menjadi dasar KGB
+                    berikutnya.
+                  </li>
+                  <li>
+                    <strong>Tetap:</strong> jadwal KGB. Selang dua tahun dihitung dari KGB terakhir, bukan diulang dari
+                    tanggal kenaikan pangkat.
+                  </li>
+                  <li>
+                    <strong>Perlu ditinjau:</strong> KGB yang sedang diproses ketika kenaikan pangkat dicatat. Golongan
+                    dan gaji pokok pada KGB itu masih memakai data lama, sehingga harus diperiksa ulang sebelum SK
+                    dibuat.
+                  </li>
+                </ul>
+
+                <h3 className="pub-h3">Di SIM-KGB</h3>
+                <p>
+                  Kenaikan pangkat dicatat dari halaman Data Pegawai lewat tombol Kenaikan Pangkat pada pegawai yang
+                  bersangkutan. Sistem menghitung masa kerja golongan baru beserta gaji pokoknya, menyimpan riwayat
+                  pangkat, lalu menyelaraskan rencana KGB berikutnya. Bila ada KGB yang sedang berjalan, sistem
+                  menandainya untuk ditinjau Tim SDM.
+                </p>
+                <LanjutBagian dari="kenaikan-pangkat" />
+              </section>
+
+              {/* 6. Untuk admin UPT */}
               <section className="pub-prose pg-bagian" data-bagian="untuk-upt" data-peran={peranUntuk("untuk-upt")}>
                 <h2 id="untuk-upt" className="pub-h2">
                   Untuk admin UPT: menyiapkan surat permohonan
@@ -440,6 +643,15 @@ export default async function PanduanPage() {
                   Bagian ini untuk admin kepegawaian UPT. Pakai daftar periksa berikut setiap kali ada pegawai yang
                   mendekati jadwal KGB.
                 </p>
+                <div className="pub-note">
+                  <strong className="pub-note-title">Akun Admin UPT di SIM-KGB</strong>
+                  <p>
+                    UPT dapat meminta akun Admin UPT kepada Kanwil. Akun ini hanya melihat data pegawai satuan kerjanya
+                    sendiri: jadwal KGB beserta statusnya, dan berkas SK yang sudah dikonfirmasi keuangan. Akun tidak
+                    dapat mengubah data apa pun, dan hukuman disiplin hanya tampil sebagai penanda KGB ditunda, tanpa
+                    jenis maupun keterangannya.
+                  </p>
+                </div>
 
                 <h3 className="pub-h3">Daftar periksa</h3>
                 <ul>
@@ -632,7 +844,7 @@ export default async function PanduanPage() {
                       <tbody>
                         <tr>
                           <th scope="row">Surat dari</th>
-                          <td>Rutan Kelas IIB Rantau</td>
+                          <td>Rumah Tahanan Negara Kelas IIB Rantau</td>
                         </tr>
                         <tr>
                           <th scope="row">Tanggal surat</th>
@@ -1043,10 +1255,10 @@ export default async function PanduanPage() {
               {/* 9. Contoh kasus */}
               <section className="pub-prose pg-bagian" data-bagian="contoh-kasus" data-peran={peranUntuk("contoh-kasus")}>
                 <h2 id="contoh-kasus" className="pub-h2">
-                  Contoh kasus: usulan Rutan Kelas IIB Rantau
+                  Contoh kasus: usulan Rumah Tahanan Negara Kelas IIB Rantau
                 </h2>
                 <p>
-                  Rutan Kelas IIB Rantau mengusulkan KGB untuk lima pegawai dengan data yang sama: {PANGKAT}, jabatan
+                  Rumah Tahanan Negara Kelas IIB Rantau mengusulkan KGB untuk lima pegawai dengan data yang sama: {PANGKAT}, jabatan
                   Penjaga Tahanan, TMT CPNS {tgl(TMT_CPNS)}. Ini adalah KGB pertama mereka. Data pribadi disamarkan.
                 </p>
 
@@ -1080,7 +1292,7 @@ export default async function PanduanPage() {
                       </tr>
                       <tr>
                         <th scope="row">{tgl(TANGGAL_SURAT)}</th>
-                        <td>Tanggal surat permohonan Rutan Kelas IIB Rantau</td>
+                        <td>Tanggal surat permohonan Rumah Tahanan Negara Kelas IIB Rantau</td>
                       </tr>
                       <tr>
                         <th scope="row">{tgl(TANGGAL_DITERIMA)}</th>
@@ -1184,7 +1396,7 @@ export default async function PanduanPage() {
                     konfirmasi, bagian keuangan memilih Rapelan.
                   </li>
                   <li>
-                    Agar KGB berikutnya terbit sebelum TMT, Rutan Kelas IIB Rantau sebaiknya mengirim surat pada{" "}
+                    Agar KGB berikutnya terbit sebelum TMT, Rumah Tahanan Negara Kelas IIB Rantau sebaiknya mengirim surat pada{" "}
                     {bulanTahun(bulanKirim(kasus.tmtKgbBerikutnya))}.
                   </li>
                 </ul>
@@ -1378,6 +1590,24 @@ export default async function PanduanPage() {
                   <li>
                     Peraturan Pemerintah Nomor 53 Tahun 2010 tentang Disiplin Pegawai Negeri Sipil, Pasal 7 ayat (3), yang
                     masih dirujuk oleh Pasal 42 PP 94/2021.
+                  </li>
+                  <li>
+                    <a href="https://peraturan.bpk.go.id/Details/5573/pp-no-11-tahun-2017">
+                      Peraturan Pemerintah Nomor 11 Tahun 2017 tentang Manajemen Pegawai Negeri Sipil
+                    </a>{" "}
+                    sebagaimana diubah dengan{" "}
+                    <a href="https://peraturan.bpk.go.id/Details/135658/pp-no-17-tahun-2020">
+                      Peraturan Pemerintah Nomor 17 Tahun 2020
+                    </a>
+                    . Dipakai untuk masa percobaan calon PNS, pengangkatan menjadi PNS, dan ketentuan kenaikan pangkat.
+                  </li>
+                  <li>
+                    <a href="https://www.bkn.go.id/unggahan/2022/07/Surat-Edaran-Kepala-BKN-Nomor-10-Tahun-2022.pdf">
+                      Surat Edaran Kepala Badan Kepegawaian Negara Nomor 10 Tahun 2022
+                    </a>{" "}
+                    tentang tata cara pengangkatan calon PNS menjadi PNS yang melewati satu tahun masa percobaan:
+                    usul instansi, rekomendasi BKN, lalu keputusan pejabat pembina kepegawaian, dengan TMT mengikuti
+                    keputusan dan tidak berlaku surut.
                   </li>
                   <li>
                     Keputusan Menteri Imigrasi dan Pemasyarakatan Nomor M.IP-01.OT.01.01 Tahun 2025 tentang Wewenang dan

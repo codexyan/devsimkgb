@@ -248,6 +248,8 @@ a.dsb-stat:hover, button.dsb-stat:hover { background: rgba(255, 255, 255, 0.05);
 
 /* ── Titik status dan teks status ──────────────────────────────────────── */
 .dsb-titik {
+  display: inline-block;
+  vertical-align: middle;
   width: 7px;
   height: 7px;
   flex-shrink: 0;
@@ -647,7 +649,7 @@ a.dsb-stat:hover, button.dsb-stat:hover { background: rgba(255, 255, 255, 0.05);
 .dsb-tabel td.kanan { font-variant-numeric: tabular-nums; }
 .dsb-tabel tbody tr.dsb-baris-klik { cursor: pointer; }
 .dsb-tabel .dsb-redup td { color: var(--dt5); }
-.dsb-tabel .dsb-cek { width: 16px; height: 16px; accent-color: var(--navy-solid); }
+.dsb-cek { width: 16px; height: 16px; accent-color: var(--navy-solid); }
 .dsb-baris-pilih td { background: var(--tint-navy); }
 
 .dsb-tabel .dsb-ikon-tombol { width: 30px; height: 30px; }
@@ -1594,4 +1596,108 @@ a.dsb-stat:hover, button.dsb-stat:hover { background: rgba(255, 255, 255, 0.05);
   .dsb-putar {
     animation: none !important;
   }
+}
+
+
+/* ── Notifikasi ────────────────────────────────────────────────────────── */
+/* Daftar notifikasi: dikelompokkan per hari seperti log aktivitas, kepala hari menempel saat
+   bergulir, dan baris yang belum dibaca diberi garis warna di tepi kiri. */
+.dsb-notif > section > ul { margin: 0; padding: 0; list-style: none; }
+
+.dsb-notif-baris {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px 12px;
+  padding: 11px 16px 11px 13px;
+  border-bottom: 1px solid var(--ln2);
+  border-left: 3px solid transparent;
+}
+
+.dsb-notif-baris[data-belum] { background: var(--sub); border-left-color: var(--accent); }
+.dsb-notif-baris:last-child { border-bottom: 0; }
+
+.dsb-notif-ikon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--ln1);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--dt3);
+}
+
+.dsb-notif-ikon[data-nada="merah"]  { border-color: var(--tint-red-ln);    background: var(--tint-red-bg);    color: var(--st-red); }
+.dsb-notif-ikon[data-nada="kuning"] { border-color: var(--tint-amber-ln);  background: var(--tint-amber-bg);  color: var(--st-amber); }
+.dsb-notif-ikon[data-nada="ungu"]   { border-color: var(--tint-violet-ln); background: var(--tint-violet-bg); color: var(--st-violet); }
+.dsb-notif-ikon[data-nada="hijau"]  { border-color: var(--tint-green-ln);  background: var(--tint-green-bg);  color: var(--st-green); }
+.dsb-notif-ikon[data-nada="navy"]   { border-color: var(--ln0);            background: var(--tint-navy);      color: var(--dtn); }
+
+.dsb-notif-judul {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dtn);
+}
+
+.dsb-notif-pesan {
+  margin: 2px 0 3px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dt3);
+}
+
+.dsb-notif-aksi {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .dsb-notif-baris { grid-template-columns: 28px minmax(0, 1fr); }
+  .dsb-notif-aksi { grid-column: 2; justify-content: flex-start; }
+}
+
+/* Saringan jenis di kolom kanan: satu baris penuh, bukan kotak pilihan */
+.dsb-pilih-baris {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -8px -12px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--dt3);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dsb-pilih-baris strong { font-weight: 600; color: var(--dtn); font-variant-numeric: tabular-nums; }
+.dsb-pilih-baris:hover { background: var(--sub); color: var(--dtn); }
+.dsb-pilih-baris[aria-pressed="true"] { background: var(--tint-navy); color: var(--dtn); font-weight: 600; }
+
+/* Label berwarna untuk prioritas dan penanda ringan lain */
+.dsb-tag[data-nada="merah"]  { border-color: var(--tint-red-ln);    color: var(--st-red); }
+.dsb-tag[data-nada="kuning"] { border-color: var(--tint-amber-ln);  color: var(--st-amber); }
+.dsb-tag[data-nada="biru"]   { border-color: var(--tint-blue-ln);   color: var(--st-blue); }
+.dsb-tag[data-nada="ungu"]   { border-color: var(--tint-violet-ln); color: var(--st-violet); }
+.dsb-tag[data-nada="hijau"]  { border-color: var(--tint-green-ln);  color: var(--st-green); }
+.dsb-tag[data-nada="navy"]   { border-color: var(--ln0);            color: var(--dtn); }
+
+/* Log aktivitas dengan kotak pilih: kolom kedua menampung kotak centang, bukan titik warna */
+.dsb-log[data-pilihan] .dsb-log-baris { grid-template-columns: 44px 18px minmax(0, 1fr) auto minmax(90px, 160px); }
+
+@media (max-width: 640px) {
+  .dsb-log[data-pilihan] .dsb-log-baris { grid-template-columns: 44px 18px minmax(0, 1fr); }
 }

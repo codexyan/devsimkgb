@@ -22,6 +22,7 @@ export const TIPE_NOTIFIKASI = {
   RAPELAN: "rapelan",
   FOLLOWUP_KEUANGAN: "followup_keuangan",
   SK_MENUNGGU_KEUANGAN: "sk_menunggu_keuangan",
+  SK_TERBIT: "sk_terbit",
 } as const;
 
 const T = TIPE_NOTIFIKASI;
@@ -40,6 +41,9 @@ export function tipeNotifikasiUntukRole(role: string | null | undefined): readon
       return [T.HUKDIS_BERAKHIR];
     case "keuangan":
       return [T.SK_MENUNGGU_KEUANGAN];
+    case "admin_upt":
+      // Disaring lagi per satker oleh GET /api/notifikasi; di sini hanya jenisnya yang dibatasi.
+      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT];
     default:
       return [];
   }
@@ -87,7 +91,11 @@ type NotifikasiBaru = Omit<NotifikasiRow, "id" | "createdAt" | "dibaca">;
 
 interface RencanaNotifikasi {
   baru: NotifikasiBaru[];
-  /** Notifikasi SK menunggu keuangan yang KGB-nya sudah tidak menunggu keuangan; ditandai dibaca. */
+  /**
+   * Notifikasi yang sudah selesai urusannya, ditandai dibaca: SK yang tidak lagi menunggu keuangan,
+   * serta pengingat/keterlambatan KGB pegawai yang siklusnya sudah diinput, ditahan hukdis, atau
+   * TMT-nya sudah berganti. Tanpa ini pengingat lama menumpuk dan tidak pernah hilang.
+   */
   tandaiDibaca: string[];
 }
 
@@ -95,7 +103,8 @@ type PegawaiUntukNotifikasi = Pick<
   PegawaiRow,
   "id" | "nama" | "nip" | "aktif" | "tmtKgbBerikutnya" | "statusHukdis" | "tanggalHukdisBerakhir" | "jenisHukdis"
 >;
-type KgbUntukNotifikasi = Pick<RiwayatKGBRow, "id" | "pegawaiId" | "status" | "tmtKgbBaru" | "isArsip" | "flagRapelan">;
+type KgbUntukNotifikasi = Pick<RiwayatKGBRow, "id" | "pegawaiId" | "status" | "tmtKgbBaru" | "isArsip" | "flagRapelan"> &
+  Partial<Pick<RiwayatKGBRow, "konfirmasiKeuanganAt">>;
 type HukdisUntukNotifikasi = Pick<RiwayatHukdisRow, "pegawaiId" | "berdampakKGB" | "tmtBerakhir"> &
   Partial<Pick<RiwayatHukdisRow, "tmtMulai">>;
 
@@ -141,6 +150,8 @@ export function rencanaNotifikasi(input: {
   const kgbPerPegawai = kelompokkan(input.kgb, (k) => k.pegawaiId);
   const hukdisPerPegawai = kelompokkan(input.riwayatHukdis, (h) => h.pegawaiId);
   const pegawaiById = new Map(input.pegawai.map((p) => [p.id, p]));
+  /** Pegawai yang pengingat KGB-nya masih berlaku hari ini; sisanya pengingat lamanya ditutup. */
+  const masihPerluDiingatkan = new Set<string>();
 
   for (const p of input.pegawai) {
     if (!p.aktif) continue;
@@ -187,6 +198,7 @@ export function rencanaNotifikasi(input: {
     const selisih = Math.round((deadline.getTime() - hariIni.getTime()) / 86_400_000);
     const tahap = tahapPengingatKgb(selisih, h1, h2);
     if (!tahap) continue;
+    masihPerluDiingatkan.add(p.id);
     const tmtStr = formatTanggalId(tmt);
     const deadlineStr = formatTanggalId(deadline);
 
@@ -251,8 +263,33 @@ export function rencanaNotifikasi(input: {
       kategori: "keuangan",
     });
   }
+  // 4. SK sudah dikonfirmasi keuangan: kabar untuk UPT bahwa SK dapat diunduh.
+  const empatBelasHariLalu = new Date(hariIni.getFullYear(), hariIni.getMonth(), hariIni.getDate() - 14);
+  for (const k of input.kgb) {
+    if (k.status !== "selesai" || k.isArsip) continue;
+    const konfirmasi = tanggalKalender(k.konfirmasiKeuanganAt);
+    if (!konfirmasi || konfirmasi < empatBelasHariLalu) continue;
+    if (notifUntuk(T.SK_TERBIT, k.id).length > 0) continue;
+    const p = pegawaiById.get(k.pegawaiId);
+    baru.push({
+      judul: `SK KGB Terbit: ${p?.nama ?? "-"}`,
+      pesan: `SK kenaikan gaji berkala ${p?.nama ?? "-"} (${p?.nip ?? "-"}) dengan TMT ${formatTanggalId(k.tmtKgbBaru)} sudah dikonfirmasi keuangan. Berkas SK dapat diunduh dari halaman satker.`,
+      tipe: T.SK_TERBIT,
+      referenceId: k.id,
+      prioritas: "info",
+      linkHref: "/dashboard",
+      kategori: "kgb",
+    });
+  }
+
   const tandaiDibaca = input.notifikasi
-    .filter((n) => n.tipe === T.SK_MENUNGGU_KEUANGAN && !n.dibaca && !menunggu.has(n.referenceId ?? ""))
+    .filter((n) => {
+      if (n.dibaca) return false;
+      if (n.tipe === T.SK_MENUNGGU_KEUANGAN) return !menunggu.has(n.referenceId ?? "");
+      // Pengingat dan keterlambatan KGB ditutup begitu pegawainya tidak lagi perlu diingatkan.
+      if (n.tipe === T.KGB_JATUH_TEMPO || n.tipe === T.RAPELAN) return !masihPerluDiingatkan.has(n.referenceId ?? "");
+      return false;
+    })
     .map((n) => n.id);
 
   return { baru, tandaiDibaca };
@@ -301,12 +338,13 @@ export async function generateNotifikasi(sekarang: Date = new Date()): Promise<N
       if (jumlah(T.RAPELAN)) details.push(`KGB terlambat: ${jumlah(T.RAPELAN)} notifikasi`);
       if (jumlah(T.KGB_JATUH_TEMPO)) details.push(`Jatuh tempo: ${jumlah(T.KGB_JATUH_TEMPO)} notifikasi`);
       if (jumlah(T.SK_MENUNGGU_KEUANGAN)) details.push(`SK menunggu keuangan: ${jumlah(T.SK_MENUNGGU_KEUANGAN)} notifikasi`);
+      if (jumlah(T.SK_TERBIT)) details.push(`SK terbit: ${jumlah(T.SK_TERBIT)} notifikasi`);
     }
   }
 
   if (rencana.tandaiDibaca.length > 0) {
     const jumlah = await db.notifikasi.updateMany({ id: { in: rencana.tandaiDibaca } }, { dibaca: true });
-    details.push(`SK sudah dikonfirmasi, notifikasi ditandai dibaca: ${jumlah}`);
+    details.push(`Notifikasi yang urusannya selesai ditandai dibaca: ${jumlah}`);
   }
 
   return { created, details };

@@ -479,7 +479,7 @@ export default function ImportPage() {
                   wajib: false,
                   deskripsi: "Satuan kerja pegawai. SK KGB ditujukan ke KPPN mitra satker ini. Jika kosong, pegawai dicatat pada Kanwil",
                   format: "Nama satker sesuai daftar di bawah tabel ini",
-                  contoh: "Rutan Kelas IIB Barabai",
+                  contoh: "Rumah Tahanan Negara Kelas IIB Barabai",
                 },
                 {
                   kolom: "pangkat",

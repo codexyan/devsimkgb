@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { ROLES } from "@/lib/auth";
 import PenandatanganManager from "./PenandatanganManager";
@@ -10,14 +10,15 @@ import { hitungDeadlineSDM, hitungRekonGaji, hitungUnlockDate } from "@/lib/tabe
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Pengaturan (super admin). Terbagi menjadi beberapa seksi:
-   1. Penandatangan surat KGB   — definitif, Plh, Plt, Dirjen, dengan masa berlaku
-   2. Dasar hukum KGB
-   3. Jadwal proses KGB         — tanggal batas input Tim SDM
-   4. Notifikasi KGB            — ambang H-… peringatan
-   5. Keamanan sesi             — durasi auto-logout
-   6. Kontak                    — nomor WA admin (dipakai tombol lupa password)
-   7. Pemeriksaan data          — temuan data pegawai tidak konsisten (hanya membaca)
+   Pengaturan (Super Admin). Satu bagian tampil sekaligus supaya halaman pas satu layar:
+   daftar bagian di kolom kanan, isinya di panel kiri yang bergulir sendiri.
+     1. Penandatangan surat KGB — definitif, Plh, Plt, Dirjen, dengan masa berlaku
+     2. Dasar hukum KGB
+     3. Jadwal proses KGB       — tanggal batas input Tim SDM
+     4. Notifikasi KGB          — ambang H-… peringatan
+     5. Keamanan sesi           — durasi keluar otomatis
+     6. Kontak WhatsApp         — dipakai tombol lupa password
+     7. Pemeriksaan data        — temuan data pegawai tidak konsisten (hanya membaca)
    ───────────────────────────────────────────────────────────────────────── */
 
 interface Konfigurasi {
@@ -27,54 +28,35 @@ interface Konfigurasi {
   updatedAt?: string; updatedBy?: string | null;
 }
 
-const EMPTY: Konfigurasi = {
+const KOSONG: Konfigurasi = {
   nomorPP: "Nomor 5 Tahun 2024", tahunPP: "2024",
   waAdmin: "", notifKgbH1: 14, notifKgbH2: 7, sesiTimeoutMenit: 60,
   batasInputSdm: BATAS_INPUT_SDM_BAWAAN,
 };
 
-/* Kartu seksi dengan chip ikon — siap masonry (break-inside-avoid) + anchor id */
-function Section({ id, icon, grad, title, desc, children, badge }: {
-  id?: string; icon: React.ReactNode; grad: string; title: string; desc: string;
-  children: React.ReactNode; badge?: React.ReactNode;
+type IdBagian = "pejabat" | "dokumen" | "jadwal" | "notifikasi" | "keamanan" | "kontak" | "pemeriksaan";
+
+function Bidang({ label, petunjuk, nilai, onUbah, contoh, jenis = "text", satuan }: {
+  label: string; petunjuk?: string; nilai: string; onUbah: (v: string) => void;
+  contoh?: string; jenis?: string; satuan?: string;
 }) {
   return (
-    <div id={id} className="bg-white rounded-2xl p-4 space-y-3 break-inside-avoid mb-4" style={{ border: "0.5px solid var(--ln1)", scrollMarginTop: "12px" }}>
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: grad }}>{icon}</div>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>{title}</h2>
-          <p style={{ fontSize: "10.5px", color: "var(--dt4)" }}>{desc}</p>
-        </div>
-        {badge}
-      </div>
-      {children}
-    </div>
-  );
-}
-/* Badge status terisi/belum untuk kepala seksi */
-function StatusBadge({ ok, okLabel = "Terisi", noLabel = "Belum diatur" }: { ok: boolean; okLabel?: string; noLabel?: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium shrink-0" style={{ background: ok ? "var(--tint-green-bg)" : "var(--tint-amber-bg)", color: ok ? "var(--st-green)" : "var(--st-amber2)", fontSize: "10px" }}>
-      <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: ok ? "#22c55e" : "#f59e0b" }} />{ok ? okLabel : noLabel}
-    </span>
-  );
-}
-function Field({ label, hint, value, onChange, placeholder, type = "text", suffix }: {
-  label: string; hint?: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; type?: string; suffix?: string;
-}) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--dt2)" }}>{label}</label>
-      <div className="relative">
-        <input type={type} inputMode={type === "number" ? "numeric" : undefined} value={value}
-          onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-          className="adm-input" style={suffix ? { paddingRight: "58px" } : undefined} />
-        {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--dt5)" }}>{suffix}</span>}
-      </div>
-      {hint && <p className="text-xs mt-1" style={{ color: "var(--dt5)", fontSize: "10px" }}>{hint}</p>}
-    </div>
+    <label className="atr-bidang">
+      <span className="atr-label">{label}</span>
+      <span className="atr-isian">
+        <input
+          type={jenis}
+          inputMode={jenis === "number" ? "numeric" : undefined}
+          value={nilai}
+          onChange={(e) => onUbah(e.target.value)}
+          placeholder={contoh}
+          className="dsb-cari"
+          style={{ width: "100%", paddingRight: satuan ? 62 : undefined }}
+        />
+        {satuan && <span className="atr-satuan">{satuan}</span>}
+      </span>
+      {petunjuk && <span className="dsb-kecil">{petunjuk}</span>}
+    </label>
   );
 }
 
@@ -86,65 +68,84 @@ function ContohJadwal({ batas }: { batas: number }) {
   const rekon = hitungRekonGaji(tmt);
   const baris: [string, string][] = [
     ["Input Tim SDM", `${formatTanggalId(hitungUnlockDate(tmt), { day: "numeric", month: "short" })} – ${formatTanggalId(hitungDeadlineSDM(tmt, batas))}`],
-    ["SK TTE, unggah, konfirmasi keuangan", "sebelum rekon dikirim keuangan"],
+    ["SK TTE, unggah, konfirmasi keuangan", "sebelum rekon dikirim"],
     ["Rekon gaji Gaji Web (keuangan)", `${formatTanggalId(rekon.mulai, { day: "numeric", month: "short" })} – ${formatTanggalId(rekon.batas)}`],
   ];
   return (
-    <div className="rounded-lg px-3 py-2.5" style={{ background: "var(--tint-indigo-bg, #eef0fb)", fontSize: "10.5px", lineHeight: 1.55 }}>
-      <p className="font-semibold mb-1" style={{ color: "var(--dt2)" }}>Contoh untuk TMT {formatTanggalId(tmt)}</p>
-      <dl className="space-y-0.5">
-        {baris.map(([k, v]) => (
-          <div key={k} className="flex justify-between gap-3">
-            <dt style={{ color: "var(--dt4)" }}>{k}</dt>
-            <dd className="font-medium text-right" style={{ color: "var(--dtn)" }}>{v}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="mt-1.5" style={{ color: "var(--dt4)" }}>
-        Keuangan dapat mengirim rekon lebih awal dari tanggal {rekon.batas.getDate()}. SK yang masuk setelah rekon dikirim dibayar sebagai kekurangan gaji (rapel).
-      </p>
+    <div className="dsb-panel" style={{ boxShadow: "none" }}>
+      <div className="dsb-panel-kepala">
+        <h3 className="dsb-panel-judul">Contoh untuk TMT {formatTanggalId(tmt)}</h3>
+      </div>
+      <div className="dsb-panel-isi">
+        <ul className="dsb-jadwal">
+          {baris.map(([k, v]) => (
+            <li key={k}>
+              <strong>{k}</strong>
+              <span>{v}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="dsb-kecil" style={{ marginTop: 8 }}>
+          Keuangan dapat mengirim rekon lebih awal dari tanggal {rekon.batas.getDate()}. SK yang masuk setelah rekon
+          dikirim dibayar sebagai kekurangan gaji (rapel).
+        </p>
+      </div>
     </div>
   );
 }
 
 export default function PengaturanPage() {
   const role = useRole();
-  const [form, setForm]       = useState<Konfigurasi>(EMPTY);
-  const [initial, setInitial] = useState<Konfigurasi | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState("");
-  const [saved, setSaved]     = useState(false);
+  const [form, setForm] = useState<Konfigurasi>(KOSONG);
+  const [awal, setAwal] = useState<Konfigurasi | null>(null);
+  const [memuat, setMemuat] = useState(true);
+  const [menyimpan, setMenyimpan] = useState(false);
+  const [galat, setGalat] = useState("");
+  const [tersimpan, setTersimpan] = useState(false);
   const [adaPenandatangan, setAdaPenandatangan] = useState(false);
+  const [bagian, setBagian] = useState<IdBagian>("pejabat");
 
   useEffect(() => {
+    let batal = false;
     fetch("/api/konfigurasi")
-      .then((r) => r.json() as any)
+      .then((r) => r.json() as Promise<Record<string, unknown> | null>)
       .catch(() => null)
       .then((cfg) => {
+        if (batal) return;
         if (cfg && cfg.id) {
+          const ambilTeks = (k: string, bawaan: string) => (typeof cfg[k] === "string" ? (cfg[k] as string) : bawaan);
+          const ambilAngka = (k: string, bawaan: number) => (typeof cfg[k] === "number" ? (cfg[k] as number) : bawaan);
           const c: Konfigurasi = {
-            nomorPP: cfg.nomorPP ?? EMPTY.nomorPP, tahunPP: cfg.tahunPP ?? EMPTY.tahunPP,
-            waAdmin: cfg.waAdmin ?? "", notifKgbH1: cfg.notifKgbH1 ?? 14,
-            notifKgbH2: cfg.notifKgbH2 ?? 7, sesiTimeoutMenit: cfg.sesiTimeoutMenit ?? 60,
+            nomorPP: ambilTeks("nomorPP", KOSONG.nomorPP),
+            tahunPP: ambilTeks("tahunPP", KOSONG.tahunPP),
+            waAdmin: ambilTeks("waAdmin", ""),
+            notifKgbH1: ambilAngka("notifKgbH1", 14),
+            notifKgbH2: ambilAngka("notifKgbH2", 7),
+            sesiTimeoutMenit: ambilAngka("sesiTimeoutMenit", 60),
             batasInputSdm: normalisasiBatasInputSdm(cfg.batasInputSdm),
-            updatedAt: cfg.updatedAt, updatedBy: cfg.updatedBy,
+            updatedAt: typeof cfg.updatedAt === "string" ? cfg.updatedAt : undefined,
+            updatedBy: typeof cfg.updatedBy === "string" ? cfg.updatedBy : null,
           };
-          setForm(c); setInitial(c);
-        } else setInitial(null);
+          setForm(c);
+          setAwal(c);
+        } else setAwal(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!batal) setMemuat(false); });
+    return () => { batal = true; };
   }, []);
 
-  const isDirty = !initial || (Object.keys(EMPTY) as (keyof Konfigurasi)[]).some((k) => form[k] !== initial[k]);
-  const num = (v: string, fb: number) => { const n = parseInt(v.replace(/\D/g, "")); return Number.isFinite(n) ? n : fb; };
+  const berubah = !awal || (Object.keys(KOSONG) as (keyof Konfigurasi)[]).some((k) => form[k] !== awal[k]);
+  const angka = (v: string, bawaan: number) => {
+    const n = parseInt(v.replace(/\D/g, ""), 10);
+    return Number.isFinite(n) ? n : bawaan;
+  };
 
-  async function handleSave() {
-    setError(""); setSaved(false);
-    setSaving(true);
+  async function simpan() {
+    setGalat(""); setTersimpan(false); setMenyimpan(true);
     try {
       const res = await fetch("/api/konfigurasi", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nomorPP: form.nomorPP.trim(), tahunPP: form.tahunPP.trim(),
           waAdmin: form.waAdmin.trim(), notifKgbH1: form.notifKgbH1,
@@ -152,207 +153,287 @@ export default function PengaturanPage() {
           batasInputSdm: form.batasInputSdm,
         }),
       });
-      const d = await res.json() as any;
-      if (!res.ok) { setError(d.error || "Gagal menyimpan pengaturan"); return; }
+      const d = (await res.json()) as Record<string, unknown> & { error?: string };
+      if (!res.ok) { setGalat(d.error || "Gagal menyimpan pengaturan"); return; }
       const c: Konfigurasi = {
-        nomorPP: d.nomorPP, tahunPP: d.tahunPP,
-        waAdmin: d.waAdmin ?? "", notifKgbH1: d.notifKgbH1, notifKgbH2: d.notifKgbH2,
-        sesiTimeoutMenit: d.sesiTimeoutMenit, batasInputSdm: normalisasiBatasInputSdm(d.batasInputSdm),
-        updatedAt: d.updatedAt, updatedBy: d.updatedBy,
+        nomorPP: String(d.nomorPP ?? ""), tahunPP: String(d.tahunPP ?? ""),
+        waAdmin: typeof d.waAdmin === "string" ? d.waAdmin : "",
+        notifKgbH1: Number(d.notifKgbH1 ?? 14), notifKgbH2: Number(d.notifKgbH2 ?? 7),
+        sesiTimeoutMenit: Number(d.sesiTimeoutMenit ?? 60),
+        batasInputSdm: normalisasiBatasInputSdm(d.batasInputSdm),
+        updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : undefined,
+        updatedBy: typeof d.updatedBy === "string" ? d.updatedBy : null,
       };
       // Halaman dashboard lain di tab ini langsung memakai batas yang baru disimpan.
       aturBatasInputSdm(c.batasInputSdm);
-      setForm(c); setInitial(c); setSaved(true);
-      setTimeout(() => setSaved(false), 4000);
-    } catch { setError("Gagal menghubungi server"); }
-    finally { setSaving(false); }
+      setForm(c); setAwal(c); setTersimpan(true);
+      setTimeout(() => setTersimpan(false), 4000);
+    } catch {
+      setGalat("Gagal menghubungi server");
+    } finally {
+      setMenyimpan(false);
+    }
   }
+
+  const daftarBagian = useMemo(
+    () => [
+      { id: "pejabat" as const, label: "Penandatangan surat", ket: "Dipilih otomatis menurut tanggal surat", lengkap: adaPenandatangan },
+      { id: "dokumen" as const, label: "Dasar hukum KGB", ket: "Peraturan Pemerintah yang dirujuk SK", lengkap: !!form.nomorPP.trim() },
+      { id: "jadwal" as const, label: "Jadwal proses KGB", ket: "Batas input Tim SDM sebelum rekon gaji", lengkap: true },
+      { id: "notifikasi" as const, label: "Notifikasi KGB", ket: "Kapan pengingat mulai dikirim", lengkap: true },
+      { id: "keamanan" as const, label: "Keamanan sesi", ket: "Keluar otomatis saat perangkat menganggur", lengkap: true },
+      { id: "kontak" as const, label: "Kontak WhatsApp", ket: "Tombol lupa password di halaman masuk", lengkap: !!form.waAdmin.trim() },
+      { id: "pemeriksaan" as const, label: "Pemeriksaan data", ket: "Temuan data pegawai yang tidak konsisten", lengkap: true, luar: true },
+    ],
+    [adaPenandatangan, form.nomorPP, form.waAdmin],
+  );
+
+  const bagianAktif = daftarBagian.find((b) => b.id === bagian) ?? daftarBagian[0];
+  const dihitung = daftarBagian.filter((b) => !b.luar);
+  const lengkap = dihitung.filter((b) => b.lengkap).length;
 
   if (role !== ROLES.SUPER_ADMIN) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-2">
-        <p className="text-sm font-semibold" style={{ color: "var(--dtn)" }}>Akses ditolak</p>
-        <p className="text-xs" style={{ color: "var(--dt4)" }}>Halaman ini hanya untuk Super Admin.</p>
+      <div className="dsb-halaman">
+        <section className="dsb-panel">
+          <p className="dsb-kosong">
+            <strong style={{ color: "var(--dtn)" }}>Akses ditolak</strong>
+            Halaman Pengaturan hanya untuk Super Admin.
+          </p>
+        </section>
       </div>
     );
   }
-  if (loading) return <div className="flex items-center justify-center py-24"><p className="text-xs" style={{ color: "var(--dt4)" }}>Memuat pengaturan…</p></div>;
-
-  // Status ringkas per seksi untuk rail navigasi + overview
-  const nav = [
-    { id: "pejabat",    label: "Penandatangan Surat",    ok: adaPenandatangan, grad: "linear-gradient(135deg,#2d5d94,var(--navy-solid))" },
-    { id: "dokumen",    label: "Dasar Hukum KGB",        ok: !!form.nomorPP.trim(), grad: "linear-gradient(135deg,#17a37e,var(--green-solid))" },
-    { id: "jadwal",     label: "Jadwal Proses KGB",      ok: true,           grad: "linear-gradient(135deg,#6b5bd6,#4338ca)" },
-    { id: "notifikasi", label: "Notifikasi KGB",         ok: true,           grad: "linear-gradient(135deg,#d99414,var(--amber-solid))" },
-    { id: "keamanan",   label: "Keamanan Sesi",          ok: true,           grad: "linear-gradient(135deg,#e35d5d,var(--red-solid))" },
-    { id: "kontak",     label: "Kontak WhatsApp",        ok: !!form.waAdmin.trim(), grad: "linear-gradient(135deg,#22c55e,#15803d)" },
-  ];
-  const okCount = nav.filter((n) => n.ok).length;
 
   return (
-    <div className="pb-24 mx-auto" style={{ maxWidth: "1360px" }}>
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="adm-chip" style={{ background: "linear-gradient(135deg, #d9a53a, var(--amber-solid))" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </div>
-        <div>
-          <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--st-amber)" }}>Administrasi</p>
-          <h1 className="text-base font-semibold leading-tight" style={{ color: "var(--dtn)" }}>Pengaturan</h1>
-          <p className="text-xs" style={{ color: "var(--dt4)" }}>Konfigurasi dokumen, notifikasi, keamanan &amp; kontak sistem</p>
-        </div>
-      </div>
+    <div className="dsb-halaman" data-muat-layar="">
+      <style href="sim-kgb-pengaturan" precedence="default">{GAYA}</style>
 
-      {!initial && (
-        <div className="rounded-xl px-3 py-2 flex items-center gap-2.5 mb-4" style={{ background: "var(--tint-amber-bg)", border: "1px solid var(--tint-amber-ln)" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--st-amber)" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <p className="text-xs" style={{ color: "var(--st-amber2)" }}>Dasar hukum, notifikasi, dan kontak belum pernah disimpan, sehingga nilai bawaan yang dipakai.</p>
+      <header className="dsb-halaman-kepala dsb-muncul">
+        <div className="min-w-0">
+          <p className="dsb-label">Administrasi</p>
+          <h1 className="dsb-halaman-judul">Pengaturan</h1>
+          <p className="dsb-sub">
+            Penandatangan surat, dasar hukum, jadwal proses, pengingat, keamanan sesi, dan kontak.
+            Perubahan berlaku untuk seluruh pengguna begitu disimpan.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {tersimpan ? (
+            <span className="dsb-tag" data-garis="" data-nada="hijau">Tersimpan</span>
+          ) : berubah ? (
+            <span className="dsb-tag" data-garis="" data-nada="kuning">Ada perubahan belum disimpan</span>
+          ) : (
+            <span className="dsb-kecil">Semua tersimpan</span>
+          )}
+          <button type="button" className="dsb-tombol" onClick={() => void simpan()} disabled={menyimpan || !berubah}>
+            {menyimpan ? "Menyimpan…" : "Simpan pengaturan"}
+          </button>
+        </div>
+      </header>
+
+      {galat && (
+        <div role="alert" className="dsb-pesan" data-nada="merah">
+          <span className="dsb-pesan-ikon" aria-hidden="true">!</span>
+          <p>{galat}</p>
+          <button type="button" className="dsb-ikon-tombol" aria-label="Tutup pesan" onClick={() => setGalat("")}>
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
         </div>
       )}
 
-      {/* Dua panel: rail navigasi sticky + konten masonry */}
-      <div className="flex gap-5 items-start">
-
-        {/* ── Rail navigasi (desktop) ── */}
-        <aside className="hidden lg:block w-60 shrink-0 sticky top-0 self-start">
-          <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
-            {/* Overview kelengkapan */}
-            <div className="px-4 py-3.5" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>Kelengkapan</p>
-                <span className="text-xs font-bold" style={{ color: okCount === nav.length ? "var(--st-green)" : "var(--st-amber)" }}>{okCount}/{nav.length}</span>
-              </div>
-              <div style={{ height: "5px", borderRadius: "99px", background: "var(--ln1)", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${(okCount / nav.length) * 100}%`, background: okCount === nav.length ? "linear-gradient(90deg,#17a37e,var(--green-solid))" : "linear-gradient(90deg,#d99414,var(--amber-solid))", borderRadius: "99px", transition: "width .5s ease" }} />
-              </div>
-            </div>
-            {/* Tautan seksi */}
-            <nav className="p-2">
-              {nav.map((n) => (
-                <a key={n.id} href={`#${n.id}`} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition"
-                  style={{ textDecoration: "none" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--sub)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                  <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: n.grad }}>
-                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#fff" }} />
-                  </span>
-                  <span className="text-xs flex-1 truncate" style={{ color: "var(--dt2)" }}>{n.label}</span>
-                  <span title={n.ok ? "Terisi" : "Belum diatur"} style={{ width: "7px", height: "7px", borderRadius: "50%", background: n.ok ? "#22c55e" : "#f59e0b", flexShrink: 0 }} />
-                </a>
-              ))}
-              {/* Pemeriksaan data tidak dihitung dalam kelengkapan pengaturan */}
-              <a href="#pemeriksaan" className="flex items-center gap-2.5 px-2.5 py-2 mt-1 rounded-lg transition"
-                style={{ textDecoration: "none", borderTop: "0.5px solid var(--ln2)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--sub)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg,#6d5bd0,var(--navy-solid))" }}>
-                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#fff" }} />
-                </span>
-                <span className="text-xs flex-1 truncate" style={{ color: "var(--dt2)" }}>Pemeriksaan Data</span>
-              </a>
-            </nav>
-          </div>
-        </aside>
-
-        {/* ── Konten (masonry mengisi lebar) ── */}
-        <div className="flex-1 min-w-0">
-        <div className="columns-1 xl:columns-2" style={{ columnGap: "16px" }}>
-
-        {/* 1. Penandatangan surat KGB */}
-        <Section id="pejabat" badge={<StatusBadge ok={adaPenandatangan} okLabel="Berlaku" noLabel="Belum ada" />} grad="linear-gradient(135deg,#2d5d94,var(--navy-solid))" title="Penandatangan Surat KGB" desc="Dipilih otomatis menurut tanggal surat · Plh, Plt, dan Dirjen punya masa berlaku"
-          icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>}>
-          <PenandatanganManager onStatus={setAdaPenandatangan} />
-        </Section>
-
-        {/* 2. Dasar hukum */}
-        <Section id="dokumen" badge={<StatusBadge ok={!!form.nomorPP.trim()} />} grad="linear-gradient(135deg,#17a37e,var(--green-solid))" title="Dasar Hukum KGB" desc="Peraturan Pemerintah yang dirujuk pada SK"
-          icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>}>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Nomor PP" value={form.nomorPP} onChange={(v) => setForm((f) => ({ ...f, nomorPP: v }))} placeholder="Nomor 5 Tahun 2024" />
-            <Field label="Tahun PP" value={form.tahunPP} onChange={(v) => setForm((f) => ({ ...f, tahunPP: v }))} placeholder="2024" />
-          </div>
-        </Section>
-
-        {/* 3. Jadwal proses: batas input Tim SDM sebelum rekon gaji keuangan */}
-        <Section id="jadwal" grad="linear-gradient(135deg,#6b5bd6,#4338ca)" title="Jadwal Proses KGB" desc="Batas input Tim SDM pada bulan kedua sebelum TMT"
-          icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>}>
-          <Field label="Batas input Tim SDM" type="number" suffix="tanggal"
-            value={String(form.batasInputSdm)}
-            onChange={(v) => setForm((f) => ({ ...f, batasInputSdm: Math.min(31, Math.max(1, num(v, BATAS_INPUT_SDM_BAWAAN))) }))}
-            hint="Tanggal 1–31 pada bulan kedua sebelum TMT (31 = akhir bulan). Input setelahnya tetap diterima tetapi ditandai berpotensi rapelan." />
-          <ContohJadwal batas={form.batasInputSdm} />
-        </Section>
-
-        {/* 4. Notifikasi */}
-        <Section id="notifikasi" grad="linear-gradient(135deg,#d99414,var(--amber-solid))" title="Notifikasi KGB" desc="Kapan sistem mulai memperingatkan sebelum deadline SDM"
-          icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>}>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Peringatan awal" type="number" suffix="hari" value={String(form.notifKgbH1)} onChange={(v) => setForm((f) => ({ ...f, notifKgbH1: num(v, 14) }))} hint="prioritas info" />
-            <Field label="Peringatan mendesak" type="number" suffix="hari" value={String(form.notifKgbH2)} onChange={(v) => setForm((f) => ({ ...f, notifKgbH2: num(v, 7) }))} hint="prioritas warning" />
-          </div>
-          <p className="text-xs rounded-lg px-3 py-2" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber2)", fontSize: "10.5px", lineHeight: 1.5 }}>
-            Contoh: H-{form.notifKgbH1 || 14} muncul lebih dulu (info), lalu H-{form.notifKgbH2 || 7} (mendesak). Deadline terlewat otomatis jadi peringatan rapelan (critical).
-          </p>
-        </Section>
-
-        {/* 5. Keamanan */}
-        <Section id="keamanan" grad="linear-gradient(135deg,#e35d5d,var(--red-solid))" title="Keamanan Sesi" desc="Keluar otomatis saat perangkat tidak aktif"
-          icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}>
-          <Field label="Durasi idle sebelum auto-logout" type="number" suffix="menit" value={String(form.sesiTimeoutMenit)} onChange={(v) => setForm((f) => ({ ...f, sesiTimeoutMenit: num(v, 60) }))} hint="Peringatan muncul 2 menit sebelum keluar. Rentang aman 5–480 menit." />
-        </Section>
-
-        {/* 6. Kontak */}
-        <Section id="kontak" badge={<StatusBadge ok={!!form.waAdmin.trim()} okLabel="Aktif" noLabel="Nonaktif" />} grad="linear-gradient(135deg,#22c55e,#15803d)" title="Kontak Admin (WhatsApp)" desc="Dipakai tombol 'Lupa Password' di halaman login"
-          icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>}>
-          <Field label="Nomor WhatsApp" value={form.waAdmin} onChange={(v) => setForm((f) => ({ ...f, waAdmin: v.replace(/[^\d]/g, "") }))} placeholder="6281234567890" hint="Format internasional tanpa + atau spasi (mis. 62812…). Kosongkan untuk menonaktifkan tombol." />
-          {form.waAdmin && (
-            <p className="text-xs" style={{ color: "var(--dt5)", fontSize: "10.5px" }}>Pratinjau: <span style={{ fontFamily: "monospace" }}>wa.me/{form.waAdmin}</span></p>
-          )}
-        </Section>
-
-        </div>{/* end masonry */}
-
-        {/* 6. Pemeriksaan data: hanya membaca, di luar masonry karena daftarnya bisa panjang */}
-        <Section id="pemeriksaan" grad="linear-gradient(135deg,#6d5bd0,var(--navy-solid))" title="Pemeriksaan Data" desc="Menemukan data pegawai yang tidak konsisten · tidak mengubah data"
-          icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><polyline points="8 11 10.5 13.5 14 9"/></svg>}>
-          <PemeriksaanData />
-        </Section>
-
-        {initial?.updatedAt && (
-          <div className="rounded-xl px-3 py-2 flex items-center gap-2" style={{ background: "var(--sub)", border: "0.5px solid var(--ln1)" }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--dt5)" strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-            <p className="text-xs" style={{ color: "var(--dt4)", fontSize: "10.5px" }}>Terakhir diubah {new Date(initial.updatedAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}{initial.updatedBy ? ` · oleh NIP ${initial.updatedBy}` : ""}</p>
-          </div>
-        )}
-
-        {error && (
-          <div className="rounded-xl px-3 py-2 flex items-center gap-2 mt-3" style={{ background: "var(--tint-red-bg)", border: "1px solid var(--tint-red-ln)" }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--st-red)"><path d="M12 2L1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></svg>
-            <p className="text-xs" style={{ color: "var(--st-red)" }}>{error}</p>
-          </div>
-        )}
-
-        {/* Bilah simpan menempel di bawah area konten */}
-        <div className="sticky bottom-0 -mx-1 px-1 pt-2 pb-2 mt-3" style={{ background: "linear-gradient(to top, var(--lavender-wash) 60%, transparent)" }}>
-        <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: "var(--card)", border: "0.5px solid var(--ln1)", boxShadow: "0 4px 16px rgba(9,20,40,0.08)" }}>
-          <button onClick={handleSave} disabled={saving || !isDirty} className="text-xs font-semibold px-5 py-2.5 rounded-xl transition disabled:cursor-not-allowed"
-            style={{ background: saving || !isDirty ? "var(--ln1)" : "var(--accent-solid)", color: saving || !isDirty ? "var(--dt4)" : "#fff", border: "none" }}>
-            {saving ? "Menyimpan…" : "Simpan Pengaturan"}
-          </button>
-          {saved ? (
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: "var(--st-green)" }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              Tersimpan
-            </span>
-          ) : isDirty ? (
-            <span className="text-xs" style={{ color: "var(--st-amber)", fontSize: "10.5px" }}>Ada perubahan yang belum disimpan</span>
-          ) : (
-            <span className="text-xs" style={{ color: "var(--dt5)", fontSize: "10.5px" }}>Semua tersimpan</span>
-          )}
+      {!memuat && !awal && (
+        <div role="status" className="dsb-pesan" data-nada="kuning">
+          <span className="dsb-pesan-ikon" aria-hidden="true">!</span>
+          <p>Dasar hukum, notifikasi, dan kontak belum pernah disimpan, jadi nilai bawaan yang dipakai.</p>
         </div>
-        </div>{/* end sticky save bar */}
-        </div>{/* end content flex-1 */}
-      </div>{/* end two-pane */}
+      )}
+
+      <div className="dsb-angka-kisi dsb-muncul" style={{ "--i": 1 } as React.CSSProperties}>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Kelengkapan</span>
+          <span className="dsb-angka-nilai">
+            {lengkap}
+            <small>/ {dihitung.length} bagian</small>
+          </span>
+          <span className="dsb-angka-meta">
+            <span className="dsb-bar-mini" style={{ width: "100%" }} aria-hidden="true">
+              <span style={{ width: `${Math.round((lengkap / dihitung.length) * 100)}%` }} />
+            </span>
+          </span>
+        </div>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Batas input Tim SDM</span>
+          <span className="dsb-angka-nilai">
+            {form.batasInputSdm}
+            <small>tiap bulan M-2</small>
+          </span>
+          <span className="dsb-angka-meta">
+            {form.batasInputSdm === 31 ? "31 berarti akhir bulan" : "Input setelahnya ditandai berpotensi rapelan"}
+          </span>
+        </div>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Pengingat KGB</span>
+          <span className="dsb-angka-nilai" style={{ fontSize: 22 }}>
+            H-{form.notifKgbH1} &amp; H-{form.notifKgbH2}
+          </span>
+          <span className="dsb-angka-meta">Lalu pengingat mendesak pada hari batas input</span>
+        </div>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Terakhir diubah</span>
+          <span className="dsb-angka-nilai" style={{ fontSize: 20 }}>
+            {awal?.updatedAt ? formatTanggalId(new Date(awal.updatedAt), { day: "numeric", month: "short", year: "numeric" }) : "–"}
+          </span>
+          <span className="dsb-angka-meta">{awal?.updatedBy ? `Oleh NIP ${awal.updatedBy}` : awal?.updatedAt ? "Pelaku tidak tercatat" : "Belum pernah disimpan"}</span>
+        </div>
+      </div>
+
+      <div className="dsb-dasbor-isi">
+        <div className="dsb-kolom">
+          <section className="dsb-panel dsb-penuh">
+            <div className="dsb-panel-kepala">
+              <h2 className="dsb-panel-judul">
+                {bagianAktif.label} <small>{bagianAktif.ket}</small>
+              </h2>
+              {!bagianAktif.luar && (
+                <span className="dsb-tag" data-garis="" data-nada={bagianAktif.lengkap ? "hijau" : "kuning"}>
+                  {bagianAktif.lengkap ? "Terisi" : "Belum diatur"}
+                </span>
+              )}
+            </div>
+
+            {memuat ? (
+              <p className="dsb-kosong">Memuat pengaturan…</p>
+            ) : (
+              <div className="dsb-gulir dsb-panel-isi atr-isi">
+                {bagian === "pejabat" && <PenandatanganManager onStatus={setAdaPenandatangan} />}
+
+                {bagian === "dokumen" && (
+                  <>
+                    <div className="atr-kisi2">
+                      <Bidang label="Nomor PP" nilai={form.nomorPP} onUbah={(v) => setForm((f) => ({ ...f, nomorPP: v }))} contoh="Nomor 5 Tahun 2024" />
+                      <Bidang label="Tahun PP" nilai={form.tahunPP} onUbah={(v) => setForm((f) => ({ ...f, tahunPP: v }))} contoh="2024" />
+                    </div>
+                    <p className="dsb-catatan">
+                      Nilai ini dicetak pada bagian &quot;Mengingat&quot; surat keputusan kenaikan gaji berkala.
+                    </p>
+                  </>
+                )}
+
+                {bagian === "jadwal" && (
+                  <>
+                    <Bidang
+                      label="Batas input Tim SDM"
+                      jenis="number"
+                      satuan="tanggal"
+                      nilai={String(form.batasInputSdm)}
+                      onUbah={(v) => setForm((f) => ({ ...f, batasInputSdm: Math.min(31, Math.max(1, angka(v, BATAS_INPUT_SDM_BAWAAN))) }))}
+                      petunjuk="Tanggal 1–31 pada bulan kedua sebelum TMT (31 berarti akhir bulan). Input setelah tanggal ini tetap diterima, tetapi ditandai berpotensi rapelan."
+                    />
+                    <ContohJadwal batas={form.batasInputSdm} />
+                  </>
+                )}
+
+                {bagian === "notifikasi" && (
+                  <>
+                    <div className="atr-kisi2">
+                      <Bidang label="Peringatan awal" jenis="number" satuan="hari" nilai={String(form.notifKgbH1)} onUbah={(v) => setForm((f) => ({ ...f, notifKgbH1: angka(v, 14) }))} petunjuk="Prioritas informasi" />
+                      <Bidang label="Peringatan mendesak" jenis="number" satuan="hari" nilai={String(form.notifKgbH2)} onUbah={(v) => setForm((f) => ({ ...f, notifKgbH2: angka(v, 7) }))} petunjuk="Prioritas perhatian" />
+                    </div>
+                    <p className="dsb-catatan">
+                      H-{form.notifKgbH1 || 14} muncul lebih dulu, lalu H-{form.notifKgbH2 || 7}. Pada hari batas input
+                      pengingat menjadi mendesak, dan setelah batas lewat berubah menjadi peringatan KGB terlambat yang
+                      diulang tiap 30 hari sampai KGB diinput.
+                    </p>
+                  </>
+                )}
+
+                {bagian === "keamanan" && (
+                  <>
+                    <Bidang
+                      label="Durasi menganggur sebelum keluar otomatis"
+                      jenis="number"
+                      satuan="menit"
+                      nilai={String(form.sesiTimeoutMenit)}
+                      onUbah={(v) => setForm((f) => ({ ...f, sesiTimeoutMenit: angka(v, 60) }))}
+                      petunjuk="Peringatan muncul 2 menit sebelum keluar. Rentang aman 5–480 menit."
+                    />
+                    <p className="dsb-catatan">
+                      Mengganti password pengguna juga mengakhiri sesinya yang masih terbuka.
+                    </p>
+                  </>
+                )}
+
+                {bagian === "kontak" && (
+                  <>
+                    <Bidang
+                      label="Nomor WhatsApp admin"
+                      nilai={form.waAdmin}
+                      onUbah={(v) => setForm((f) => ({ ...f, waAdmin: v.replace(/\D/g, "") }))}
+                      contoh="6281234567890"
+                      petunjuk="Format internasional tanpa tanda plus atau spasi. Kosongkan untuk menyembunyikan tombol lupa password."
+                    />
+                    {form.waAdmin && (
+                      <p className="dsb-catatan">
+                        Pratinjau tautan: <strong style={{ fontFamily: "monospace" }}>wa.me/{form.waAdmin}</strong>
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {bagian === "pemeriksaan" && <PemeriksaanData />}
+              </div>
+            )}
+
+            <div className="dsb-kaki">
+              <span className="dsb-kecil">
+                {awal?.updatedAt
+                  ? `Terakhir diubah ${formatTanggalId(new Date(awal.updatedAt), { day: "numeric", month: "long", year: "numeric" })}`
+                  : "Belum ada perubahan tercatat"}
+              </span>
+              <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => void simpan()} disabled={menyimpan || !berubah}>
+                {menyimpan ? "Menyimpan…" : "Simpan pengaturan"}
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <aside className="dsb-samping" data-urutan="tetap">
+          <section className="dsb-panel dsb-penuh">
+            <div className="dsb-panel-kepala">
+              <h2 className="dsb-panel-judul">
+                Bagian pengaturan <small>{lengkap} dari {dihitung.length} terisi</small>
+              </h2>
+            </div>
+            <div className="dsb-gulir">
+              <ul className="dsb-daftar-ringkas" style={{ maxHeight: "none", border: 0, borderRadius: 0 }}>
+                {daftarBagian.map((b) => (
+                  <li key={b.id}>
+                    <button type="button" className="dsb-pilih-baris" aria-pressed={bagian === b.id} onClick={() => setBagian(b.id)}>
+                      <span>
+                        <span className="dsb-titik" data-nada={b.luar ? "navy" : b.lengkap ? "hijau" : "kuning"} aria-hidden="true" /> {b.label}
+                        <br />
+                        <span className="dsb-kecil">{b.ket}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }
+
+const GAYA = `
+.atr-isi { display: grid; gap: 14px; align-content: start; }
+.atr-kisi2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.atr-bidang { display: grid; gap: 4px; }
+.atr-label { font-size: 13px; font-weight: 600; color: var(--dt2); }
+.atr-isian { position: relative; display: block; }
+.atr-satuan { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--dt5); pointer-events: none; }
+.atr-isi .dsb-jadwal li { grid-template-columns: minmax(0, 1fr) auto; }
+@media (max-width: 640px) { .atr-kisi2 { grid-template-columns: 1fr; } }
+`;

@@ -12,7 +12,7 @@ import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { KerangkaModal } from "@/app/dashboard/components/kgb";
 import { DaftarBulanRekon } from "@/app/dashboard/components/DaftarBulanRekon";
-import { geserBulan, namaBulan, namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
+import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 import { canKonfirmasiKeuangan } from "@/lib/auth";
 
 /* Modul Keuangan: tinjau SK KGB yang sudah ditandatangani, tetapkan rapelan, lalu siapkan dasar input
@@ -71,9 +71,9 @@ const golongan = (k: KGB) => (k.golonganLama && k.golonganLama !== k.golonganBar
 const selisihGaji = (k: KGB) => (k.gajiPokokBaru === null ? 0 : k.gajiPokokBaru - k.gajiPokokLama);
 const tautanSk = (k: KGB) => (k.surat?.pathFile ? `/api/blob/download?url=${encodeURIComponent(k.surat.pathFile)}` : null);
 
-function satkerPendek(unitKerja: string | null | undefined): string {
+function satkerLengkap(unitKerja: string | null | undefined): string {
   const s = cariSatker(unitKerja);
-  return s ? namaSingkatSatker(s) : unitKerja?.trim() || "-";
+  return s ? namaTampilSatker(s) : unitKerja?.trim() || "-";
 }
 
 function sisaHari(tanggal: string, hariIni: Date): number | null {
@@ -459,7 +459,7 @@ export default function KeuanganPage() {
         const tglSk = tanggalKalender(k.surat?.tanggalSurat);
         const tglKonfirmasi = tanggalKalender(k.konfirmasiKeuanganAt);
         return [
-          i + 1, namaPegawai(k), k.pegawai?.nip ?? "", k.pegawai?.unitKerja ?? "", k.golonganBaru,
+          i + 1, namaPegawai(k), k.pegawai?.nip ?? "", satkerLengkap(k.pegawai?.unitKerja), k.golonganBaru,
           k.mkgTahunBaru, k.mkgBulanBaru, k.gajiPokokLama, k.gajiPokokBaru, selisihGaji(k),
           tmt ? isoTanggalLokal(tmt) : "", k.surat?.nomorSurat ?? "", tglSk ? isoTanggalLokal(tglSk) : "",
           k.rapelanDitetapkan ? "Ya" : "Tidak", tglKonfirmasi ? isoTanggalLokal(tglKonfirmasi) : "",
@@ -644,7 +644,7 @@ export default function KeuanganPage() {
                         <td style={{ maxWidth: "220px" }}>
                           <p className="dsb-nama truncate" style={{ margin: 0 }} title={k.pegawai?.jabatan}>{namaPegawai(k)}</p>
                           <p className="dsb-kecil truncate" style={{ margin: 0 }} title={k.pegawai?.unitKerja}>
-                            {k.pegawai?.nip ?? "-"} · {satkerPendek(k.pegawai?.unitKerja)}
+                            {k.pegawai?.nip ?? "-"} · {satkerLengkap(k.pegawai?.unitKerja)}
                           </p>
                         </td>
                         <td className="whitespace-nowrap">
@@ -776,7 +776,7 @@ export default function KeuanganPage() {
                           <td style={{ maxWidth: "220px" }}>
                             <p className="dsb-nama truncate" style={{ margin: 0 }} title={k.pegawai?.jabatan}>{namaPegawai(k)}</p>
                             <p className="dsb-kecil truncate" style={{ margin: 0 }} title={k.pegawai?.unitKerja}>
-                              {k.pegawai?.nip ?? "-"} · {satkerPendek(k.pegawai?.unitKerja)}
+                              {k.pegawai?.nip ?? "-"} · {satkerLengkap(k.pegawai?.unitKerja)}
                             </p>
                           </td>
                           <td className="whitespace-nowrap">
@@ -928,7 +928,7 @@ export default function KeuanganPage() {
                 <dl className="dsb-rincian-data">
                   <dt>NIP</dt><dd>{target.pegawai?.nip ?? "-"}</dd>
                   <dt>Jabatan</dt><dd>{target.pegawai?.jabatan ?? "-"}</dd>
-                  <dt>Unit kerja</dt><dd>{satkerPendek(target.pegawai?.unitKerja)}</dd>
+                  <dt>Unit kerja</dt><dd>{satkerLengkap(target.pegawai?.unitKerja)}</dd>
                   <dt>Golongan</dt><dd>{golongan(target)}</dd>
                   <dt>MKG baru</dt><dd>{fmtMkg(target)}</dd>
                   <dt>Gaji pokok lama</dt><dd>{fmtRp(target.gajiPokokLama)}</dd>

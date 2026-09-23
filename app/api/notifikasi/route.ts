@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { bolehLihatNotifikasi, generateNotifikasi, tipeNotifikasiUntukRole } from "@/lib/generateNotifikasi";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
+import { ROLES } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
@@ -50,6 +52,23 @@ export async function GET(req: NextRequest) {
   if (prioritasFilter) where.prioritas = prioritasFilter;
 
   const all = await db.notifikasi.findMany({ where, orderBy: { field: "createdAt", dir: "desc" } });
+
+  // Admin UPT hanya menerima notifikasi tentang pegawai satkernya sendiri.
+  if (session.user.role === ROLES.ADMIN_UPT) {
+    // Satker dibaca dari baris pengguna, bukan token, agar perubahan oleh Super Admin langsung berlaku.
+    const pengguna = await penggunaLogin(session);
+    const kode = pengguna ? satkerAkunUpt({ role: pengguna.role, satker: pengguna.satker }) : null;
+    if (!kode) return NextResponse.json([]);
+    const [semuaPegawai, semuaKgb] = await Promise.all([db.pegawai.findMany(), db.riwayatKGB.findMany()]);
+    const idPegawai = new Set(pegawaiSatker(semuaPegawai, kode).map((p) => p.id));
+    const idKgb = new Set(semuaKgb.filter((k) => idPegawai.has(k.pegawaiId)).map((k) => k.id));
+    const milikSatker = all.filter((n) => {
+      const ref = n.referenceId ?? "";
+      return n.tipe === "sk_terbit" ? idKgb.has(ref) : idPegawai.has(ref);
+    });
+    return NextResponse.json(milikSatker.slice(0, limit));
+  }
+
   return NextResponse.json(all.slice(0, limit));
 }
 
@@ -69,6 +88,9 @@ export async function PATCH(req: Request) {
   }
 
   const role = session.user.role;
+  // Status dibaca dipakai bersama semua penerima, jadi peran lihat-saja tidak boleh mengubahnya.
+  if (role === ROLES.ADMIN_UPT)
+    return NextResponse.json({ error: "Akun Admin UPT hanya dapat melihat notifikasi" }, { status: 403 });
   if (body.dibacaSemua === true) {
     const tipeRole = tipeNotifikasiUntukRole(role);
     if (tipeRole !== null && tipeRole.length === 0) return NextResponse.json({ success: true });

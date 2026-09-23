@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { bolehLihatNotifikasi } from "@/lib/generateNotifikasi";
+import { ROLES } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,9 @@ export async function PATCH(
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (session.user.role === ROLES.ADMIN_UPT)
+    return NextResponse.json({ error: "Akun Admin UPT hanya dapat melihat notifikasi" }, { status: 403 });
 
   const { id } = await params;
 

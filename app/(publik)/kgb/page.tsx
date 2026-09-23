@@ -129,7 +129,7 @@ export default async function HalamanBeranda() {
           <div className="hr-kisi">
             <div className="hr-teks">
               <p className="pub-eyebrow masuk" style={{ "--d": 0 } as React.CSSProperties}>
-                Kenaikan gaji berkala · Kanwil Ditjenpas Kalsel
+                Kenaikan gaji berkala · Kantor Wilayah Ditjenpas Kalimantan Selatan
               </p>
               <h1 id="hr-judul" className="hr-judul">
                 <span className="hr-judul-a">
@@ -278,6 +278,27 @@ export default async function HalamanBeranda() {
             <li data-muncul="" style={{ "--i": 2 } as React.CSSProperties}>
               <h3>Terlambat tetap diproses</h3>
               <p>TMT tidak berubah. Selisih gaji sejak TMT dibayarkan sebagai kekurangan gaji.</p>
+            </li>
+            <li data-muncul="" style={{ "--i": 3 } as React.CSSProperties}>
+              <h3>Baru diangkat PNS</h3>
+              <p>
+                Masa kerja golongan dihitung sejak TMT CPNS, jadi KGB pertama tidak bergeser walau SK pengangkatan PNS
+                terbit belakangan. <Link href="/panduan#cpns-pns">Cara menghitung dan merapelnya</Link>.
+              </p>
+            </li>
+            <li data-muncul="" style={{ "--i": 4 } as React.CSSProperties}>
+              <h3>Setelah naik pangkat</h3>
+              <p>
+                Golongan baru memotong masa kerja golongan, sehingga dasar gaji KGB berikutnya berubah, tetapi jadwal dua
+                tahunannya tetap. <Link href="/panduan#kenaikan-pangkat">Aturan potongannya</Link>.
+              </p>
+            </li>
+            <li data-muncul="" style={{ "--i": 5 } as React.CSSProperties}>
+              <h3>Akun untuk UPT</h3>
+              <p>
+                UPT dapat meminta akun lihat-saja untuk memantau jadwal KGB pegawainya sendiri dan mengunduh SK yang
+                sudah selesai. <Link href="/panduan#untuk-upt">Cara memintanya</Link>.
+              </p>
             </li>
           </ul>
         </div>

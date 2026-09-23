@@ -49,8 +49,8 @@ test("tanggal kosong dibedakan dari tanggal tidak valid atau ambigu", () => {
 test("unit kerja kosong berarti Kanwil, nama satker diseragamkan, nama asing ditolak", () => {
   assert.equal(bacaUnitKerja(undefined).satker, SATKER_KANWIL);
   assert.equal(bacaUnitKerja("  ").satker, SATKER_KANWIL);
-  assert.equal(bacaUnitKerja("rutan kls 2b rantau").satker?.nama, "Rutan Kelas IIB Rantau");
-  assert.equal(bacaUnitKerja("lapas-kotabaru").satker?.nama, "Lapas Kelas IIA Kotabaru");
+  assert.equal(bacaUnitKerja("rutan kls 2b rantau").satker?.nama, "Rumah Tahanan Negara Kelas IIB Rantau");
+  assert.equal(bacaUnitKerja("lapas-kotabaru").satker?.nama, "Lembaga Pemasyarakatan Kelas IIA Kotabaru");
   assert.match(bacaUnitKerja("Lapas Kelas IIA Rantau").galat ?? "", /tidak ada dalam daftar satker/);
   assert.equal(bacaUnitKerja(12).galat, "Unit kerja tidak valid.");
 });

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { RingkasanSatker } from "@/lib/rekapSatker";
-import { namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
+import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 
 /* Pemantauan per satker (Kanwil dan UPT) di kolom pendamping dashboard Super Admin dan SDM KGB. Data dari
    /api/satker, sama dengan modul Satker & UPT. Satu baris per satker yang punya data, diurutkan dari yang
@@ -57,7 +57,7 @@ export default function PemantauanSatker({ versi, className = "dsb-penuh" }: { v
               return (
                 <li key={r.satker.kode}>
                   <Link href={`/dashboard/satker/${r.satker.kode}`} title={r.satker.nama}>
-                    <span className="dsb-nama">{namaSingkatSatker(r.satker)}</span>
+                    <span className="dsb-nama">{namaTampilSatker(r.satker)}</span>
                     <span className="dsb-satker-angka">
                       <span className="dsb-bar-mini" aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>
                       {r.tahunIni.selesai}/{r.tahunIni.total}

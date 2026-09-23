@@ -38,7 +38,7 @@ import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId, tanggalKalender } from "@/lib/waktu";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { SATKER_KANWIL, cariSatker } from "@/lib/satker";
-import { namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
+import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 /* -----------------------------------------
    Interfaces
    ----------------------------------------- */
@@ -568,7 +568,7 @@ function DashboardMain() {
       id: p.id,
       kolom,
       nama: p.nama,
-      sub: `${p.golonganRuang} · ${satker ? namaSingkatSatker(satker) : p.unitKerja}`,
+      sub: `${p.golonganRuang} · ${satker ? namaTampilSatker(satker) : p.unitKerja}`,
       judulSub: p.unitKerja ?? undefined,
       tmt: `TMT ${formatTanggalId(p.tmtKgbBerikutnya, { month: "short", year: "numeric" })}`,
       catatan,
@@ -789,7 +789,7 @@ function DashboardMain() {
                         <td style={{ maxWidth: "210px" }}>
                           <p className="dsb-nama truncate" style={{ margin: 0 }} title={p.jabatan}>{p.nama}</p>
                           <p className="dsb-kecil truncate" style={{ margin: 0 }} title={p.unitKerja ?? undefined}>
-                            {p.golonganRuang} · {satker ? namaSingkatSatker(satker) : p.unitKerja}
+                            {p.golonganRuang} · {satker ? namaTampilSatker(satker) : p.unitKerja}
                           </p>
                         </td>
                         <td className="whitespace-nowrap">

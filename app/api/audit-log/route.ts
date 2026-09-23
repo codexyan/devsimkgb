@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
+import { hariIniWita, tanggalKalender } from "@/lib/waktu";
 
 export const runtime = "nodejs";
 
@@ -51,6 +52,21 @@ export async function GET(req: NextRequest) {
       return true;
     });
 
+    // Ringkasan dihitung dari seluruh hasil saringan, bukan hanya halaman yang tampil, supaya
+    // panel samping menggambarkan periode yang sedang dilihat.
+    const perAksi = new Map<string, number>();
+    const pelaku = new Set<string>();
+    const kunciHariIni = hariIniWita().getTime();
+    let hariIni = 0;
+    for (const l of filtered) {
+      perAksi.set(l.aksi, (perAksi.get(l.aksi) ?? 0) + 1);
+      pelaku.add(l.userId ? namaById.get(l.userId) ?? "Pengguna dihapus" : "Sistem");
+      if (tanggalKalender(l.waktu)?.getTime() === kunciHariIni) hariIni++;
+    }
+    const ringkasan = [...perAksi.entries()]
+      .map(([aksi, jumlah]) => ({ aksi, jumlah }))
+      .sort((a, b) => b.jumlah - a.jumlah);
+
     const total = filtered.length;
     const totalPages = Math.ceil(total / perPage);
     const pageData = filtered.slice((page - 1) * perPage, (page - 1) * perPage + perPage);
@@ -70,6 +86,9 @@ export async function GET(req: NextRequest) {
       page,
       perPage,
       totalPages,
+      ringkasan,
+      hariIni,
+      jumlahPelaku: pelaku.size,
     });
   } catch (error) {
     console.error("Error fetching audit log:", error);
@@ -88,8 +107,8 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
   }
 
-  const body = (await req.json().catch(() => ({}))) as any;
-  const ids: string[] = Array.isArray(body.ids) ? body.ids : [];
+  const body = (await req.json().catch(() => ({}))) as { ids?: unknown };
+  const ids: string[] = Array.isArray(body.ids) ? body.ids.filter((x): x is string => typeof x === "string") : [];
 
   if (ids.length === 0) {
     return NextResponse.json({ error: "Tidak ada ID yang dipilih" }, { status: 400 });

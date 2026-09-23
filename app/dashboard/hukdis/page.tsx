@@ -10,7 +10,7 @@ import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 import { tmtBerakhirOtomatis } from "@/lib/hukdisJenis";
 import { SATKER } from "@/lib/satker";
 import { KODE_SATKER_LAIN, kodeSatkerPegawai } from "@/lib/rekapSatker";
-import { namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
+import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Modul Hukuman Disiplin (mandiri). Daftar SEMUA catatan hukdis lintas
@@ -56,7 +56,7 @@ const SARINGAN: { v: Saringan; l: string; nada?: "merah" }[] = [
 function namaSatker(kode: string): string {
   if (kode === KODE_SATKER_LAIN) return "Unit belum sesuai daftar";
   const s = SATKER.find((x) => x.kode === kode);
-  return s ? namaSingkatSatker(s) : kode;
+  return s ? namaTampilSatker(s) : kode;
 }
 
 export default function HukdisPage() {
@@ -330,7 +330,7 @@ export default function HukdisPage() {
             </select>
             <select aria-label="Saring satker" className="dsb-pilih" data-aktif={filterSatker ? "" : undefined} value={filterSatker} onChange={(e) => setFilterSatker(e.target.value)}>
               <option value="">Semua satker</option>
-              {SATKER.map((s) => <option key={s.kode} value={s.kode}>{namaSingkatSatker(s)}</option>)}
+              {SATKER.map((s) => <option key={s.kode} value={s.kode}>{namaTampilSatker(s)}</option>)}
               <option value={KODE_SATKER_LAIN}>Unit belum sesuai daftar</option>
             </select>
             {adaSaringanLain && (

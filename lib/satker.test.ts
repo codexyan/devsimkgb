@@ -68,3 +68,23 @@ test("setiap satker masuk tepat satu kelompok KPPN", () => {
     [["Banjarmasin", 8], ["Barabai", 3], ["Tanjung", 4], ["Kotabaru", 3], ["Pelaihari", 1]],
   );
 });
+
+test("nama satker ditulis lengkap, tanpa singkatan", () => {
+  // Permintaan pemilik: nama unit kerja tidak boleh disingkat (Lapas, Rutan, Bapas, LPKA).
+  for (const s of SATKER) {
+    assert.doesNotMatch(s.nama, /\b(Lapas|Rutan|Bapas|LPKA|Kanwil|Ditjenpas|Kalsel)\b/, s.kode);
+  }
+  const awalan = { lapas: "Lembaga Pemasyarakatan", rutan: "Rumah Tahanan Negara", bapas: "Balai Pemasyarakatan", lpka: "Lembaga Pembinaan Khusus Anak", kanwil: "Kantor Wilayah" };
+  for (const s of SATKER) {
+    assert.ok(s.nama.startsWith(awalan[s.jenis]), `${s.kode}: ${s.nama}`);
+  }
+});
+
+test("nama satker yang masih tersingkat tetap dikenali", () => {
+  // Data lama menyimpan unit kerja dalam bentuk singkat; pencocokan tidak boleh putus.
+  assert.equal(cariSatker("Rutan Kelas IIB Rantau")?.kode, "rutan-rantau");
+  assert.equal(cariSatker("Lapas Kelas IIA Banjarmasin")?.kode, "lapas-banjarmasin");
+  assert.equal(cariSatker("Bapas Kelas I Banjarmasin")?.kode, "bapas-banjarmasin");
+  assert.equal(cariSatker("LPKA Kelas I Martapura")?.kode, "lpka-martapura");
+  assert.equal(cariSatker("Lapas Perempuan Kelas IIA Martapura")?.kode, "lapas-perempuan-martapura");
+});

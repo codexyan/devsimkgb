@@ -6,7 +6,7 @@ import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { hitungRekapStatus, rapelanSiklus, satuPerSiklus, type StatusRapelan } from "@/lib/rekapKgb";
 import { SATKER } from "@/lib/satker";
 import { KODE_SATKER_LAIN, kodeSatkerPegawai } from "@/lib/rekapSatker";
-import { namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
+import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 
 /* Laporan dan rekap KGB per tahun TMT. Angkanya memakai definisi yang sama dengan dashboard: KGB yang jatuh
    tempo tetapi belum diinput ikut dihitung sebagai Belum Diproses (baris "belum diinput"). Area bertanda
@@ -62,7 +62,7 @@ function bulanTmt(k: KGBLaporan) {
 function namaSatkerDari(kode: string): string {
   if (kode === KODE_SATKER_LAIN) return "Belum sesuai daftar satker";
   const s = SATKER.find((x) => x.kode === kode);
-  return s ? namaSingkatSatker(s) : kode;
+  return s ? namaTampilSatker(s) : kode;
 }
 
 interface RekapBulanLaporan {
@@ -244,7 +244,7 @@ export default function LaporanPage() {
           </select>
           <select value={satker} onChange={e => setSatker(e.target.value)} aria-label="Satker" className="dsb-pilih" data-aktif={satker ? "" : undefined}>
             <option value="">Semua satker</option>
-            {SATKER.map(s => <option key={s.kode} value={s.kode}>{namaSingkatSatker(s)}</option>)}
+            {SATKER.map(s => <option key={s.kode} value={s.kode}>{namaTampilSatker(s)}</option>)}
             <option value={KODE_SATKER_LAIN}>Belum sesuai daftar satker</option>
           </select>
           {(bulan || status || satker) && (

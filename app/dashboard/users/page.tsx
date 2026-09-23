@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ROLE_LABEL, ROLES } from "@/lib/auth";
 import { SATKER_UPT } from "@/lib/aksesUpt";
-import { namaSingkatSatker } from "@/app/dashboard/satker/labelSatker";
-import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
+import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
+import { useDashUser } from "@/app/dashboard/components/RoleContext";
+import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
+import { formatTanggalId } from "@/lib/waktu";
 
 interface User {
   id: string;
@@ -34,303 +36,360 @@ interface ProfileRequest {
   user: { id: string; nip: string; nama: string; jabatan: string | null; email: string | null; role: string };
 }
 
-/* Konfigurasi warna & ikon per role */
-const ROLE_ICON: Record<string, React.ReactNode> = {
-  superAdminCore: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round"><path d="M12 2l2.4 5.4 5.6.6-4.2 3.9 1.2 5.6L12 14.8 7 17.5l1.2-5.6L4 8l5.6-.6z"/></svg>,
-  sdm_kgb:        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
-  sdm_hukdis:     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
-  keuangan:       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>,
-  admin_upt:      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M10 21v-6h4v6"/></svg>,
-};
-const ROLE_CFG: Record<string, { label: string; bg: string; color: string; grad: string }> = {
-  superAdminCore: { label: "Super Admin", bg: "var(--tint-amber-bg)",  color: "var(--st-amber)",  grad: "linear-gradient(135deg,#d9a53a,var(--amber-solid))" },
-  sdm_kgb:        { label: "SDM KGB",     bg: "var(--tint-navy)",       color: "var(--dtn)",       grad: "linear-gradient(135deg,#2d5d94,var(--navy-solid))" },
-  sdm_hukdis:     { label: "SDM Hukdis",  bg: "var(--tint-red-bg)",     color: "var(--st-red)",    grad: "linear-gradient(135deg,#e35d5d,var(--red-solid))" },
-  keuangan:       { label: "Keuangan",    bg: "var(--tint-violet-bg)",  color: "var(--st-violet)", grad: "linear-gradient(135deg,#9b7ae0,var(--violet-solid))" },
-  admin_upt:      { label: "Admin UPT",   bg: "var(--tint-green-bg)",   color: "var(--st-green)",  grad: "linear-gradient(135deg,#17a37e,var(--green-solid))" },
-};
+/* ─── Peran ────────────────────────────────────────────────────────────── */
+type NadaPeran = "kuning" | "navy" | "merah" | "ungu" | "hijau";
 
-/** Nama satker pendek untuk kolom peran; kode yang tidak dikenal ditampilkan apa adanya. */
+const PERAN: { id: string; label: string; nada: NadaPeran; tugas: string }[] = [
+  { id: ROLES.SUPER_ADMIN, label: "Super Admin",   nada: "kuning", tugas: "Mengatur penandatangan, jadwal proses, pengguna, dan log." },
+  { id: ROLES.SDM_KGB,     label: "SDM KGB",       nada: "navy",   tugas: "Input KGB, membuat dan mengirim SK kenaikan gaji berkala." },
+  { id: ROLES.SDM_HUKDIS,  label: "SDM Hukdis",    nada: "merah",  tugas: "Mencatat hukuman disiplin dan dampaknya pada KGB." },
+  { id: ROLES.KEUANGAN,    label: "Keuangan",      nada: "ungu",   tugas: "Mengonfirmasi SK dan merekon gaji di Gaji Web." },
+  { id: ROLES.ADMIN_UPT,   label: "Admin UPT",     nada: "hijau",  tugas: "Melihat data pegawai satkernya sendiri; tidak dapat mengubah data." },
+];
+
+const cfgPeran = (id: string) => PERAN.find((p) => p.id === id) ?? { id, label: ROLE_LABEL[id] ?? id, nada: "navy" as NadaPeran, tugas: "" };
+const inisial = (nama: string) => nama.split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase();
 const namaSatkerAkun = (kode: string | null | undefined) => {
   const s = SATKER_UPT.find((x) => x.kode === kode);
-  return s ? namaSingkatSatker(s) : kode ?? "";
+  return s ? namaTampilSatker(s) : kode ?? "";
 };
-const roleCfg = (r: string) => ROLE_CFG[r] ?? { label: ROLE_LABEL[r] ?? r, bg: "var(--sub)", color: "var(--dt3)", grad: "linear-gradient(135deg,#8aa0bb,#5f7690)" };
-const initials = (n: string) => n.split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase();
+
+const kosongTambah = { nip: "", nama: "", role: ROLES.SDM_KGB as string, password: "", satker: "" };
 
 export default function UsersPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<"users" | "requests">("users");
+  const saya = useDashUser();
 
   const [users, setUsers] = useState<User[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [memuatUsers, setMemuatUsers] = useState(true);
   const [requests, setRequests] = useState<ProfileRequest[]>([]);
-  const [loadingReq, setLoadingReq] = useState(true);
+  const [memuatReq, setMemuatReq] = useState(true);
 
-  const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
+  const [cari, setCari] = useState("");
+  const [filterPeran, setFilterPeran] = useState("");
 
-  const [showTambah, setShowTambah] = useState(false);
-  const [showReset, setShowReset] = useState<User | null>(null);
-  const [showHapus, setShowHapus] = useState<User | null>(null);
-  const [showTolak, setShowTolak] = useState<ProfileRequest | null>(null);
+  const [dialogTambah, setDialogTambah] = useState(false);
+  const [dialogReset, setDialogReset] = useState<User | null>(null);
+  const [dialogSatker, setDialogSatker] = useState<User | null>(null);
+  const [dialogHapus, setDialogHapus] = useState<User | null>(null);
+  const [dialogTolak, setDialogTolak] = useState<ProfileRequest | null>(null);
   const [reassignCounts, setReassignCounts] = useState<ReassignCounts | null>(null);
   const [reassignTo, setReassignTo] = useState("");
   const [alasanTolak, setAlasanTolak] = useState("");
 
-  const [formTambah, setFormTambah] = useState({ nip: "", nama: "", role: "sdm_kgb", password: "", satker: "" });
+  const [formTambah, setFormTambah] = useState(kosongTambah);
   const [formReset, setFormReset] = useState("");
-  const [showPwd, setShowPwd] = useState(false);
-  const [showPwdReset, setShowPwdReset] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [formSatker, setFormSatker] = useState("");
+  const [lihatSandi, setLihatSandi] = useState(false);
+  const [sibuk, setSibuk] = useState(false);
+  const [galat, setGalat] = useState("");
+  const [berhasil, setBerhasil] = useState("");
 
-  function tutupHapus() {
-    setShowHapus(null); setReassignCounts(null); setReassignTo(""); setError("");
-  }
-
-  // Escape menutup modal teratas, kecuali selama permintaan masih diproses
-  const refTambah = useDialogModal(showTambah, () => setShowTambah(false), submitting);
-  const refReset = useDialogModal(!!showReset, () => setShowReset(null), submitting);
-  const refTolak = useDialogModal(!!showTolak, () => setShowTolak(null), submitting);
-  const refHapus = useDialogModal(!!showHapus, tutupHapus, submitting);
-
-  async function fetchUsers() {
+  const muatUsers = useCallback(async () => {
     const res = await fetch("/api/users");
     if (res.status === 403) { router.push("/dashboard"); return; }
     const d: unknown = await res.json().catch(() => []);
     setUsers(Array.isArray(d) ? (d as User[]) : []);
-    setLoadingUsers(false);
-  }
-  async function fetchRequests() {
+    setMemuatUsers(false);
+  }, [router]);
+
+  const muatRequests = useCallback(async () => {
     const res = await fetch("/api/admin/profile-requests");
     const d: unknown = res.ok ? await res.json().catch(() => []) : [];
     if (Array.isArray(d)) setRequests(d as ProfileRequest[]);
-    setLoadingReq(false);
-  }
-
-  useEffect(() => {
-    const t = setTimeout(() => { fetchUsers(); fetchRequests(); }, 0);
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setMemuatReq(false);
   }, []);
 
-  async function handleTambah() {
-    setError("");
-    // Validasi klien selaras dengan aturan login (NIP 18 digit, pwd >= 6)
-    if (!/^\d{18}$/.test(formTambah.nip.trim())) { setError("NIP harus tepat 18 digit angka"); return; }
-    if (!formTambah.nama.trim()) { setError("Nama lengkap wajib diisi"); return; }
-    if (formTambah.password.length < 6) { setError("Password minimal 6 karakter"); return; }
-    if (formTambah.role === ROLES.ADMIN_UPT && !formTambah.satker) { setError("Pilih satker untuk peran Admin UPT"); return; }
-    setSubmitting(true);
+  useEffect(() => {
+    const t = setTimeout(() => { void muatUsers(); void muatRequests(); }, 0);
+    return () => clearTimeout(t);
+  }, [muatUsers, muatRequests]);
+
+  function kabar(teks: string) {
+    setBerhasil(teks);
+    setTimeout(() => setBerhasil(""), 4000);
+  }
+  function tutupHapus() {
+    setDialogHapus(null); setReassignCounts(null); setReassignTo(""); setGalat("");
+  }
+
+  async function tambahPengguna() {
+    setGalat("");
+    // Validasi klien selaras dengan aturan login (NIP 18 digit, sandi minimal 6 karakter).
+    if (!/^\d{18}$/.test(formTambah.nip.trim())) { setGalat("NIP harus tepat 18 digit angka"); return; }
+    if (!formTambah.nama.trim()) { setGalat("Nama lengkap wajib diisi"); return; }
+    if (formTambah.password.length < 6) { setGalat("Password minimal 6 karakter"); return; }
+    if (formTambah.role === ROLES.ADMIN_UPT && !formTambah.satker) { setGalat("Pilih satuan kerja untuk peran Admin UPT"); return; }
+    setSibuk(true);
     const res = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formTambah) });
     const data = (await res.json().catch(() => ({}))) as { error?: string };
-    setSubmitting(false);
-    if (!res.ok) { setError(data.error ?? "Gagal menambahkan pengguna"); return; }
-    setSuccess("Pengguna berhasil ditambahkan.");
-    setShowTambah(false);
-    setFormTambah({ nip: "", nama: "", role: "sdm_kgb", password: "", satker: "" });
-    fetchUsers();
-    setTimeout(() => setSuccess(""), 3000);
+    setSibuk(false);
+    if (!res.ok) { setGalat(data.error ?? "Gagal menambahkan pengguna"); return; }
+    kabar(`Akun ${formTambah.nama.trim()} berhasil dibuat.`);
+    setDialogTambah(false);
+    setFormTambah(kosongTambah);
+    void muatUsers();
   }
-  async function handleReset() {
-    if (!showReset) return;
-    setError(""); setSubmitting(true);
-    const res = await fetch(`/api/users/${showReset.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: formReset }) });
+
+  async function aturUlangSandi() {
+    if (!dialogReset) return;
+    setGalat("");
+    if (formReset.length < 6) { setGalat("Password minimal 6 karakter"); return; }
+    setSibuk(true);
+    const res = await fetch(`/api/users/${dialogReset.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: formReset }) });
     const data = (await res.json().catch(() => ({}))) as { error?: string };
-    setSubmitting(false);
-    if (!res.ok) { setError(data.error ?? "Gagal mengatur ulang password"); return; }
-    setSuccess(`Password ${showReset.nama} berhasil diatur ulang.`);
-    setShowReset(null); setFormReset("");
-    setTimeout(() => setSuccess(""), 3000);
+    setSibuk(false);
+    if (!res.ok) { setGalat(data.error ?? "Gagal mengatur ulang password"); return; }
+    kabar(`Password ${dialogReset.nama} berhasil diatur ulang. Pengguna harus masuk kembali.`);
+    setDialogReset(null); setFormReset("");
   }
-  async function handleHapus() {
-    if (!showHapus) return;
-    setError(""); setSubmitting(true);
+
+  async function pindahSatker() {
+    if (!dialogSatker) return;
+    setGalat("");
+    if (!formSatker) { setGalat("Pilih satuan kerja tujuan"); return; }
+    setSibuk(true);
+    const res = await fetch(`/api/users/${dialogSatker.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ satker: formSatker }) });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    setSibuk(false);
+    if (!res.ok) { setGalat(data.error ?? "Gagal memindahkan satuan kerja"); return; }
+    kabar(`Akun ${dialogSatker.nama} kini melihat data ${namaSatkerAkun(formSatker)}.`);
+    setDialogSatker(null);
+    void muatUsers();
+  }
+
+  async function hapusPengguna() {
+    if (!dialogHapus) return;
+    setGalat(""); setSibuk(true);
     const body: Record<string, string> = {};
     if (reassignTo) body.reassignTo = reassignTo;
-    const res = await fetch(`/api/users/${showHapus.id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const res = await fetch(`/api/users/${dialogHapus.id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = (await res.json().catch(() => ({}))) as {
       error?: string; needsReassign?: boolean; counts?: ReassignCounts; reassigned?: number;
     };
-    setSubmitting(false);
+    setSibuk(false);
     if (res.status === 409 && data.needsReassign && data.counts) { setReassignCounts(data.counts); return; }
-    if (!res.ok) { setError(data.error ?? "Gagal menghapus pengguna"); return; }
-    setSuccess(data.reassigned ? `Pengguna ${showHapus.nama} dihapus. ${data.reassigned} data dialihkan.` : `Pengguna ${showHapus.nama} berhasil dihapus.`);
-    setShowHapus(null); setReassignCounts(null); setReassignTo("");
-    fetchUsers();
-    setTimeout(() => setSuccess(""), 4000);
-  }
-  async function handleApprove(req: ProfileRequest) {
-    setSubmitting(true);
-    const res = await fetch(`/api/admin/profile-requests/${req.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "approve" }) });
-    setSubmitting(false);
-    if (res.ok) { setSuccess(`Perubahan profil ${req.user.nama} disetujui.`); fetchRequests(); setTimeout(() => setSuccess(""), 3000); }
-  }
-  async function handleTolak() {
-    if (!showTolak) return;
-    setSubmitting(true);
-    const res = await fetch(`/api/admin/profile-requests/${showTolak.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reject", alasanTolak }) });
-    setSubmitting(false);
-    if (res.ok) { setSuccess(`Permintaan profil ${showTolak.user.nama} ditolak.`); setShowTolak(null); setAlasanTolak(""); fetchRequests(); setTimeout(() => setSuccess(""), 3000); }
+    if (!res.ok) { setGalat(data.error ?? "Gagal menghapus pengguna"); return; }
+    kabar(data.reassigned ? `Pengguna ${dialogHapus.nama} dihapus, ${data.reassigned} data dialihkan.` : `Pengguna ${dialogHapus.nama} berhasil dihapus.`);
+    tutupHapus();
+    void muatUsers();
   }
 
-  const roleCounts = useMemo(() => {
+  async function setujuiProfil(req: ProfileRequest) {
+    setSibuk(true);
+    const res = await fetch(`/api/admin/profile-requests/${req.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "approve" }) });
+    setSibuk(false);
+    if (!res.ok) return;
+    kabar(`Perubahan profil ${req.user.nama} disetujui.`);
+    void muatRequests();
+    void muatUsers();
+  }
+
+  async function tolakProfil() {
+    if (!dialogTolak) return;
+    setSibuk(true);
+    const res = await fetch(`/api/admin/profile-requests/${dialogTolak.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reject", alasanTolak }) });
+    setSibuk(false);
+    if (!res.ok) return;
+    kabar(`Permintaan profil ${dialogTolak.user.nama} ditolak.`);
+    setDialogTolak(null); setAlasanTolak("");
+    void muatRequests();
+  }
+
+  const jumlahPeran = useMemo(() => {
     const c: Record<string, number> = {};
     for (const u of users) c[u.role] = (c[u.role] ?? 0) + 1;
     return c;
   }, [users]);
 
-  const filteredUsers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return users.filter((u) =>
-      (!roleFilter || u.role === roleFilter) &&
-      (!q || u.nama.toLowerCase().includes(q) || u.nip.includes(q)),
-    );
-  }, [users, search, roleFilter]);
+  const tersaring = useMemo(() => {
+    const q = cari.trim().toLowerCase();
+    return users
+      .filter((u) => (!filterPeran || u.role === filterPeran) && (!q || u.nama.toLowerCase().includes(q) || u.nip.includes(q)))
+      .sort((a, b) => PERAN.findIndex((p) => p.id === a.role) - PERAN.findIndex((p) => p.id === b.role) || a.nama.localeCompare(b.nama, "id"));
+  }, [users, cari, filterPeran]);
 
-  const inputClass = "adm-input";
-  const usersLain = showHapus ? users.filter((u) => u.id !== showHapus.id) : [];
-
-  const STAT_ORDER = ["superAdminCore", "sdm_kgb", "sdm_hukdis", "keuangan", "admin_upt"];
+  const jumlahUpt = users.filter((u) => u.role === ROLES.ADMIN_UPT).length;
+  const satkerTerpakai = new Set(users.filter((u) => u.role === ROLES.ADMIN_UPT && u.satker).map((u) => u.satker)).size;
+  const usersLain = dialogHapus ? users.filter((u) => u.id !== dialogHapus.id) : [];
 
   return (
-    <div className="space-y-4">
-      <style>{`.u-row { transition: background .12s; } .u-row:hover { background: var(--sub); }`}</style>
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="adm-chip" style={{ background: "linear-gradient(135deg,#2d5d94,var(--navy-solid))" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <div className="dsb-halaman" data-muat-layar="">
+      <header className="dsb-halaman-kepala dsb-muncul">
+        <div className="min-w-0">
+          <p className="dsb-label">Administrasi</p>
+          <h1 className="dsb-halaman-judul">Pengguna</h1>
+          <p className="dsb-sub">
+            Akun beserta perannya menentukan menu yang terbuka dan data yang boleh diubah. Akun Admin UPT hanya
+            melihat pegawai satuan kerjanya sendiri.
+          </p>
         </div>
-        <div className="flex-1">
-          <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--st-amber)" }}>Administrasi</p>
-          <h1 className="text-base font-semibold leading-tight" style={{ color: "var(--dtn)" }}>Pengguna</h1>
-          <p className="text-xs" style={{ color: "var(--dt4)" }}>Buat dan kelola akun, tinjau permintaan perubahan profil</p>
-        </div>
-        {tab === "users" && (
-          <button onClick={() => { setShowTambah(true); setError(""); }} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white transition shrink-0" style={{ background: "var(--navy-solid)" }}>
-            <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Tambah Pengguna
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="dsb-ikon-tombol" onClick={() => { void muatUsers(); void muatRequests(); }} title="Muat ulang" aria-label="Muat ulang daftar pengguna">
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={memuatUsers ? "dsb-putar" : undefined}><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg>
           </button>
-        )}
-      </div>
+          <button type="button" className="dsb-tombol" onClick={() => { setDialogTambah(true); setGalat(""); }}>
+            Tambah pengguna
+          </button>
+        </div>
+      </header>
 
-      {/* Stat per role (klik = filter) */}
-      {tab === "users" && !loadingUsers && (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
-          {STAT_ORDER.map((r) => {
-            const cfg = roleCfg(r);
-            const active = roleFilter === r;
-            return (
-              <button key={r} onClick={() => setRoleFilter(active ? "" : r)} aria-pressed={active} className={`adm-stat clickable ${active ? "active" : ""}`} style={{ textAlign: "left" }}>
-                <span className="adm-stat-strip" style={{ background: cfg.grad }} />
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: cfg.grad }}>
-                    {ROLE_ICON[r] ?? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
-                  </div>
-                  <div>
-                    <p className="font-bold leading-none" style={{ fontSize: "20px", color: "var(--dtn)" }}>{roleCounts[r] ?? 0}</p>
-                    <p style={{ fontSize: "10.5px", color: "var(--dt4)", marginTop: "2px" }}>{cfg.label}</p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+      {berhasil && (
+        <div role="status" className="dsb-pesan" data-nada="hijau">
+          <span className="dsb-pesan-ikon" aria-hidden="true">✓</span>
+          <p>{berhasil}</p>
+          <button type="button" className="dsb-ikon-tombol" aria-label="Tutup pesan" onClick={() => setBerhasil("")}>
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: "var(--ln2)" }}>
-        {([{ key: "users", label: "Akun Pengguna" }, { key: "requests", label: "Permintaan Profil", badge: requests.length }] as { key: "users" | "requests"; label: string; badge?: number }[]).map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)} aria-pressed={tab === t.key} className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-medium transition"
-            style={{ background: tab === t.key ? "var(--card)" : "transparent", color: tab === t.key ? "var(--dtn)" : "var(--dt4)", boxShadow: tab === t.key ? "0 1px 4px rgba(0,0,0,0.07)" : "none" }}>
-            {t.label}
-            {!!t.badge && <span className="min-w-4 h-4 px-1 rounded-full text-white flex items-center justify-center font-bold" style={{ background: "var(--red-solid)", fontSize: "9px" }}>{t.badge}</span>}
-          </button>
-        ))}
+      <div className="dsb-angka-kisi dsb-muncul" style={{ "--i": 1 } as React.CSSProperties}>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Total akun</span>
+          <span className="dsb-angka-nilai">{memuatUsers ? "–" : users.length}</span>
+          <span className="dsb-angka-meta">{users.length - jumlahUpt} akun Kanwil · {jumlahUpt} akun UPT</span>
+        </div>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Satuan kerja terhubung</span>
+          <span className="dsb-angka-nilai">
+            {memuatUsers ? "–" : satkerTerpakai}
+            <small>/ {SATKER_UPT.length} UPT</small>
+          </span>
+          <span className="dsb-angka-meta">
+            <span className="dsb-bar-mini" style={{ width: "100%" }} aria-hidden="true">
+              <span style={{ width: `${SATKER_UPT.length ? Math.round((satkerTerpakai / SATKER_UPT.length) * 100) : 0}%` }} />
+            </span>
+          </span>
+        </div>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Permintaan profil</span>
+          <span className="dsb-angka-nilai" style={{ color: requests.length > 0 ? "var(--st-amber)" : undefined }}>
+            {memuatReq ? "–" : requests.length}
+          </span>
+          <span className="dsb-angka-meta">
+            {requests.length > 0 && <span className="dsb-titik" data-nada="kuning" aria-hidden="true" />}
+            {requests.length > 0 ? "Menunggu ditinjau Super Admin" : "Tidak ada yang menunggu"}
+          </span>
+        </div>
+        <div className="dsb-angka">
+          <span className="dsb-angka-label">Peran tanpa akun</span>
+          <span className="dsb-angka-nilai">{memuatUsers ? "–" : PERAN.filter((p) => !jumlahPeran[p.id]).length}</span>
+          <span className="dsb-angka-meta">
+            {PERAN.filter((p) => !jumlahPeran[p.id]).map((p) => p.label).join(" · ") || "Semua peran sudah terisi"}
+          </span>
+        </div>
       </div>
 
-      {success && (
-        <div role="status" className="px-4 py-3 rounded-xl text-xs font-medium flex items-center gap-2" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", border: "1px solid var(--tint-green-ln)" }}>
-          <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          {success}
-        </div>
-      )}
-
-      {/* -- Tab: Akun -- */}
-      {tab === "users" && (
-        <div className="space-y-3">
-          {/* Search + filter aktif */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-52">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--dt5)" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              </span>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Cari pengguna" placeholder="Cari nama atau NIP…" className="adm-input" style={{ paddingLeft: "34px" }} />
-            </div>
-            {roleFilter && (
-              <button onClick={() => setRoleFilter("")} className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl transition" style={{ background: roleCfg(roleFilter).bg, color: roleCfg(roleFilter).color }}>
-                {roleCfg(roleFilter).label}
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            )}
-          </div>
-
-          <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
-            {loadingUsers ? (
-              <div className="flex items-center justify-center py-16"><p className="text-xs" style={{ color: "var(--dt4)" }}>Memuat data…</p></div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 gap-3">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--dt6)" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                <p className="text-xs" style={{ color: "var(--dt5)" }}>{users.length === 0 ? "Belum ada akun pengguna" : "Tidak ada pengguna yang cocok"}</p>
-                {users.length === 0 ? (
-                  <button onClick={() => { setShowTambah(true); setError(""); }} className="text-xs font-semibold px-4 py-2 rounded-xl text-white transition" style={{ background: "var(--navy-solid)" }}>
-                    Tambah Pengguna Pertama
-                  </button>
-                ) : (
-                  <button onClick={() => { setSearch(""); setRoleFilter(""); }} className="text-xs px-3 py-1.5 rounded-lg transition" style={{ color: "var(--dt3)", border: "0.5px solid var(--ln1)" }}>
-                    Hapus filter
-                  </button>
+      <div className="dsb-dasbor-isi">
+        <div className="dsb-kolom">
+          <section className="dsb-panel dsb-penuh">
+            <div className="dsb-panel-kepala">
+              <h2 className="dsb-panel-judul">
+                Akun pengguna <small>{tersaring.length} dari {users.length}</small>
+              </h2>
+              <div className="dsb-alat">
+                <input
+                  type="search"
+                  className="dsb-cari"
+                  aria-label="Cari pengguna"
+                  placeholder="Cari nama atau NIP…"
+                  value={cari}
+                  onChange={(e) => setCari(e.target.value)}
+                />
+                {(cari || filterPeran) && (
+                  <button type="button" className="dsb-tautan" onClick={() => { setCari(""); setFilterPeran(""); }}>Hapus saringan</button>
                 )}
               </div>
+            </div>
+
+            {memuatUsers ? (
+              <p className="dsb-kosong">Memuat data pengguna…</p>
+            ) : tersaring.length === 0 ? (
+              <p className="dsb-kosong">
+                {users.length === 0 ? "Belum ada akun pengguna." : "Tidak ada pengguna yang cocok dengan saringan ini."}
+              </p>
             ) : (
-              <div className="overflow-x-auto tbl-scroll">
-                <table className="w-full">
+              <div className="dsb-gulir-tabel">
+                <table className="dsb-tabel">
                   <thead>
-                    <tr style={{ background: "var(--sub)", borderBottom: "0.5px solid var(--ln1)" }}>
-                      {["Nama", "NIP", "Peran", "Dibuat"].map((h) => (
-                        <th key={h} className="text-left px-5 py-3 text-xs font-semibold" style={{ color: "var(--dt4)" }}>{h}</th>
-                      ))}
-                      <th className="px-5 py-3"><span className="sr-only">Aksi</span></th>
+                    <tr>
+                      <th scope="col">Nama dan NIP</th>
+                      <th scope="col">Peran</th>
+                      <th scope="col">Satuan kerja</th>
+                      <th scope="col">Dibuat</th>
+                      <th scope="col" className="kanan">Tindakan</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.map((user, i) => {
-                      const cfg = roleCfg(user.role);
+                    {tersaring.map((u) => {
+                      const cfg = cfgPeran(u.role);
+                      const iniSaya = u.nip === saya.nip;
                       return (
-                        <tr key={user.id} className="u-row" style={{ borderBottom: i < filteredUsers.length - 1 ? "0.5px solid var(--ln2)" : "none" }}>
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: cfg.grad, color: "#fff" }}>{initials(user.nama)}</div>
-                              <span className="text-xs font-medium" style={{ color: "var(--dtn)" }}>{user.nama}</span>
+                        <tr key={u.id}>
+                          <td style={{ maxWidth: "230px" }}>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="dsb-avatar" aria-hidden="true">{inisial(u.nama)}</span>
+                              <div className="min-w-0">
+                                <p className="dsb-nama truncate" style={{ margin: 0 }}>
+                                  {u.nama}
+                                  {iniSaya && <span className="dsb-tag" data-garis="" style={{ marginLeft: 6 }}>Akun Anda</span>}
+                                </p>
+                                <p className="dsb-kecil" style={{ margin: 0, fontVariantNumeric: "tabular-nums" }}>{u.nip}</p>
+                              </div>
                             </div>
                           </td>
-                          <td className="px-5 py-3 text-xs" style={{ color: "var(--dt3)", fontFamily: "monospace" }}>{user.nip}</td>
-                          <td className="px-5 py-3">
-                            <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
-                            {user.satker && <p className="text-xs mt-1" style={{ color: "var(--dt5)" }}>{namaSatkerAkun(user.satker)}</p>}
+                          <td className="whitespace-nowrap">
+                            <span className="dsb-tag" data-garis="" data-nada={cfg.nada}>
+                              <span className="dsb-titik" data-nada={cfg.nada} aria-hidden="true" />
+                              {cfg.label}
+                            </span>
                           </td>
-                          <td className="px-5 py-3 text-xs" style={{ color: "var(--dt4)" }}>{new Date(user.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</td>
-                          <td className="px-5 py-3">
-                            <div className="flex items-center justify-end gap-2">
-                              <button onClick={() => { setShowReset(user); setFormReset(""); setError(""); }} title="Atur ulang password" aria-label={`Atur ulang password ${user.nama}`} className="w-8 h-8 rounded-lg flex items-center justify-center transition" style={{ background: "var(--tint-navy)", color: "var(--dtn)", border: "0.5px solid var(--ln0)" }}>
-                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                          <td style={{ maxWidth: "200px" }}>
+                            {u.role === ROLES.ADMIN_UPT ? (
+                              <p style={{ margin: 0, lineHeight: 1.35 }}>{namaSatkerAkun(u.satker) || "Belum ditautkan"}</p>
+                            ) : (
+                              <span className="dsb-kecil">Kantor Wilayah</span>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap dsb-kecil">
+                            {formatTanggalId(new Date(u.createdAt), { day: "numeric", month: "short", year: "2-digit" })}
+                          </td>
+                          <td className="kanan">
+                            <span className="dsb-aksi">
+                              {u.role === ROLES.ADMIN_UPT && (
+                                <button
+                                  type="button"
+                                  className="dsb-ikon-tombol"
+                                  title="Pindah satuan kerja"
+                                  aria-label={`Pindah satuan kerja ${u.nama}`}
+                                  onClick={() => { setDialogSatker(u); setFormSatker(u.satker ?? ""); setGalat(""); }}
+                                >
+                                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M10 21v-6h4v6" /></svg>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="dsb-ikon-tombol"
+                                title={iniSaya ? "Password akun sendiri diganti lewat Profil Saya" : "Atur ulang password"}
+                                aria-label={`Atur ulang password ${u.nama}`}
+                                disabled={iniSaya}
+                                onClick={() => { setDialogReset(u); setFormReset(""); setLihatSandi(false); setGalat(""); }}
+                              >
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
                               </button>
-                              <button onClick={() => { setShowHapus(user); setReassignCounts(null); setReassignTo(""); setError(""); }} title="Hapus pengguna" aria-label={`Hapus pengguna ${user.nama}`} className="w-8 h-8 rounded-lg flex items-center justify-center transition" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", border: "0.5px solid var(--tint-red-ln)" }}>
-                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                              <button
+                                type="button"
+                                className="dsb-ikon-tombol"
+                                data-nada="merah"
+                                title={iniSaya ? "Akun yang sedang login tidak dapat dihapus" : "Hapus pengguna"}
+                                aria-label={`Hapus pengguna ${u.nama}`}
+                                disabled={iniSaya}
+                                onClick={() => { setDialogHapus(u); setReassignCounts(null); setReassignTo(""); setGalat(""); }}
+                              >
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
                               </button>
-                            </div>
+                            </span>
                           </td>
                         </tr>
                       );
@@ -339,257 +398,297 @@ export default function UsersPage() {
                 </table>
               </div>
             )}
-          </div>
+          </section>
         </div>
-      )}
 
-      {/* -- Tab: Permintaan Profil -- */}
-      {tab === "requests" && (
-        <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "0.5px solid var(--ln1)" }}>
-          {loadingReq ? (
-            <div className="flex items-center justify-center py-16"><p className="text-xs" style={{ color: "var(--dt4)" }}>Memuat permintaan…</p></div>
-          ) : requests.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-2">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--dt6)" strokeWidth="1.5"><polyline points="20 6 9 17 4 12"/></svg>
-              <p className="text-xs" style={{ color: "var(--dt5)" }}>Tidak ada permintaan perubahan profil</p>
+        <aside className="dsb-samping" data-urutan="tetap">
+          <section className="dsb-panel dsb-susut">
+            <div className="dsb-panel-kepala">
+              <h2 className="dsb-panel-judul">Peran</h2>
+              {filterPeran && <button type="button" className="dsb-tautan" onClick={() => setFilterPeran("")}>Tampilkan semua</button>}
             </div>
-          ) : (
-            <div className="divide-y" style={{ borderColor: "var(--ln2)" }}>
-              {requests.map((req) => (
-                <div key={req.id} className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: roleCfg(req.user.role).grad, color: "#fff" }}>{initials(req.user.nama)}</div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>{req.user.nama}</p>
-                      <p className="text-xs" style={{ color: "var(--dt4)" }}>{req.user.nip}</p>
-                    </div>
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-xs font-semibold mb-1" style={{ color: "var(--dt3)" }}>Perubahan diminta:</p>
-                    {req.nama && req.nama !== req.user.nama && (
-                      <div className="flex items-center gap-2 text-xs"><span style={{ color: "var(--dt4)" }}>Nama:</span><span className="line-through" style={{ color: "var(--dt6)" }}>{req.user.nama}</span><span aria-hidden="true">→</span><span className="sr-only">menjadi</span><span className="font-medium" style={{ color: "var(--dtn)" }}>{req.nama}</span></div>
-                    )}
-                    {req.jabatan !== null && req.jabatan !== req.user.jabatan && (
-                      <div className="flex items-center gap-2 text-xs"><span style={{ color: "var(--dt4)" }}>Jabatan:</span><span className="line-through" style={{ color: "var(--dt6)" }}>{req.user.jabatan || "-"}</span><span aria-hidden="true">→</span><span className="sr-only">menjadi</span><span className="font-medium" style={{ color: "var(--dtn)" }}>{req.jabatan || "-"}</span></div>
-                    )}
-                    {req.email !== null && req.email !== req.user.email && (
-                      <div className="flex items-center gap-2 text-xs"><span style={{ color: "var(--dt4)" }}>Email:</span><span className="line-through" style={{ color: "var(--dt6)" }}>{req.user.email || "-"}</span><span aria-hidden="true">→</span><span className="sr-only">menjadi</span><span className="font-medium" style={{ color: "var(--dtn)" }}>{req.email || "-"}</span></div>
-                    )}
-                    <p className="text-xs mt-1" style={{ color: "var(--dt5)" }}>Diajukan {new Date(req.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button onClick={() => handleApprove(req)} disabled={submitting} className="text-xs px-4 py-2 rounded-xl font-semibold transition disabled:opacity-50" style={{ background: "var(--tint-green-bg)", color: "var(--st-green)", border: "0.5px solid var(--tint-green-ln)" }}>Setujui</button>
-                    <button onClick={() => { setShowTolak(req); setAlasanTolak(""); setError(""); }} className="text-xs px-4 py-2 rounded-xl font-semibold transition" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)", border: "0.5px solid var(--tint-red-ln)" }}>Tolak</button>
-                  </div>
-                </div>
-              ))}
+            <div className="dsb-gulir">
+              <ul className="dsb-daftar-ringkas" style={{ maxHeight: "none", border: 0, borderRadius: 0 }}>
+                {PERAN.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      className="dsb-pilih-baris"
+                      aria-pressed={filterPeran === p.id}
+                      title={p.tugas}
+                      onClick={() => setFilterPeran(filterPeran === p.id ? "" : p.id)}
+                    >
+                      <span>
+                        <span className="dsb-titik" data-nada={p.nada} aria-hidden="true" /> {p.label}
+                      </span>
+                      <strong>{jumlahPeran[p.id] ?? 0}</strong>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
+          </section>
+
+          <section className="dsb-panel dsb-penuh">
+            <div className="dsb-panel-kepala">
+              <h2 className="dsb-panel-judul">
+                Permintaan perubahan profil <small>{requests.length} menunggu</small>
+              </h2>
+            </div>
+            {memuatReq ? (
+              <p className="dsb-kosong">Memuat permintaan…</p>
+            ) : requests.length === 0 ? (
+              <p className="dsb-kosong">
+                Tidak ada permintaan. Pengguna mengajukan perubahan nama, jabatan, atau email dari menu Profil Saya.
+              </p>
+            ) : (
+              <div className="dsb-gulir">
+                <ul className="dsb-tindakan-daftar">
+                  {requests.map((r) => (
+                    <li key={r.id}>
+                      <p>
+                        <strong>{r.user.nama}</strong> <span className="dsb-kecil">{r.user.nip}</span>
+                      </p>
+                      <p className="dsb-kecil">
+                        {[
+                          r.nama && r.nama !== r.user.nama && `Nama → ${r.nama}`,
+                          r.jabatan && r.jabatan !== r.user.jabatan && `Jabatan → ${r.jabatan}`,
+                          r.email && r.email !== r.user.email && `Email → ${r.email}`,
+                        ].filter(Boolean).join(" · ") || "Tidak ada perubahan nilai"}
+                      </p>
+                      <p className="dsb-kecil">
+                        Diajukan {formatTanggalId(new Date(r.createdAt), { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                      <span className="flex items-center gap-2" style={{ marginTop: 6 }}>
+                        <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" disabled={sibuk} onClick={() => void setujuiProfil(r)}>
+                          Setujui
+                        </button>
+                        <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" disabled={sibuk} onClick={() => { setDialogTolak(r); setAlasanTolak(""); }}>
+                          Tolak
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        </aside>
+      </div>
+
+      {/* ── Tambah pengguna ── */}
+      {dialogTambah && (
+        <KerangkaModal
+          judul="Tambah pengguna"
+          subjudul="Akun baru dapat langsung dipakai masuk dengan NIP dan password ini"
+          ukuran="md"
+          sibuk={sibuk}
+          onTutup={() => setDialogTambah(false)}
+          onKirim={() => void tambahPengguna()}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogTambah(false)} disabled={sibuk}>Batal</button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk}>{sibuk ? "Menyimpan…" : "Simpan akun"}</button>
+            </>
+          }
+        >
+          <PesanGalat pesan={galat || null} />
+          <div className="kgbm-grid2">
+            <label className="kgbm-label">
+              <span className="kgbm-wajib">NIP</span>
+              <input
+                className="kgbm-input"
+                data-autofocus
+                inputMode="numeric"
+                maxLength={18}
+                value={formTambah.nip}
+                onChange={(e) => setFormTambah((f) => ({ ...f, nip: e.target.value.replace(/\D/g, "") }))}
+                placeholder="18 digit angka"
+              />
+            </label>
+            <label className="kgbm-label">
+              <span className="kgbm-wajib">Nama lengkap</span>
+              <input className="kgbm-input" value={formTambah.nama} onChange={(e) => setFormTambah((f) => ({ ...f, nama: e.target.value }))} placeholder="Nama dan gelar" />
+            </label>
+          </div>
+          <label className="kgbm-label">
+            <span className="kgbm-wajib">Peran</span>
+            <select
+              className="kgbm-input"
+              value={formTambah.role}
+              onChange={(e) => setFormTambah((f) => ({ ...f, role: e.target.value, satker: e.target.value === ROLES.ADMIN_UPT ? f.satker : "" }))}
+            >
+              {PERAN.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+          </label>
+          <Catatan>{cfgPeran(formTambah.role).tugas}</Catatan>
+          {formTambah.role === ROLES.ADMIN_UPT && (
+            <label className="kgbm-label">
+              <span className="kgbm-wajib">Satuan kerja</span>
+              <select className="kgbm-input" value={formTambah.satker} onChange={(e) => setFormTambah((f) => ({ ...f, satker: e.target.value }))}>
+                <option value="">Pilih satuan kerja…</option>
+                {SATKER_UPT.map((s) => <option key={s.kode} value={s.kode}>{s.nama}</option>)}
+              </select>
+            </label>
           )}
-        </div>
-      )}
-
-      {/* Modal Tambah Pengguna */}
-      {showTambah && (
-        <div className="adm-overlay" onClick={() => !submitting && setShowTambah(false)}>
-          <div ref={refTambah} role="dialog" aria-modal="true" aria-labelledby="judul-tambah-pengguna" tabIndex={-1} className="adm-modal outline-none" style={{ maxWidth: "26rem" }} onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg,#2d5d94,var(--navy-solid))" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h2 id="judul-tambah-pengguna" className="text-sm font-semibold leading-tight" style={{ color: "var(--dtn)" }}>Tambah Pengguna Baru</h2>
-                <p className="text-xs" style={{ color: "var(--dt4)" }}>Akun masuk untuk tim pengelola SIM-KGB</p>
-              </div>
-              <button onClick={() => setShowTambah(false)} disabled={submitting} aria-label="Tutup" className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--ln2)", color: "var(--dt3)" }}>
-                <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <label className="kgbm-label">
+            <span className="kgbm-wajib">Password awal</span>
+            <span className="flex items-center gap-2">
+              <input
+                className="kgbm-input"
+                type={lihatSandi ? "text" : "password"}
+                value={formTambah.password}
+                onChange={(e) => setFormTambah((f) => ({ ...f, password: e.target.value }))}
+                placeholder="Minimal 6 karakter"
+              />
+              <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" onClick={() => setLihatSandi((v) => !v)}>
+                {lihatSandi ? "Sembunyikan" : "Lihat"}
               </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-5 space-y-3.5">
-              <div>
-                <label htmlFor="nip-pengguna-baru" className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>NIP</label>
-                <input
-                  id="nip-pengguna-baru" aria-describedby="nip-pengguna-baru-hitung"
-                  autoFocus type="text" inputMode="numeric" maxLength={18}
-                  className={inputClass} placeholder="18 digit angka"
-                  value={formTambah.nip}
-                  onChange={(e) => setFormTambah((p) => ({ ...p, nip: e.target.value.replace(/\D/g, "") }))}
-                />
-                <p id="nip-pengguna-baru-hitung" className="text-xs mt-1" style={{ color: formTambah.nip.length === 18 ? "var(--st-green)" : "var(--dt5)", fontSize: "10px" }}>
-                  {formTambah.nip.length}/18 digit{formTambah.nip.length === 18 ? " (lengkap)" : ""}
-                </p>
-              </div>
-              <div>
-                <label htmlFor="nama-pengguna-baru" className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>Nama Lengkap</label>
-                <input id="nama-pengguna-baru" type="text" className={inputClass} placeholder="Nama beserta gelar" value={formTambah.nama} onChange={(e) => setFormTambah((p) => ({ ...p, nama: e.target.value }))} />
-              </div>
-              <div>
-                <label htmlFor="password-pengguna-baru" className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>Password</label>
-                <div className="relative">
-                  <input id="password-pengguna-baru" type={showPwd ? "text" : "password"} className={inputClass} style={{ paddingRight: "38px" }} placeholder="Minimal 6 karakter" value={formTambah.password} onChange={(e) => setFormTambah((p) => ({ ...p, password: e.target.value }))} />
-                  <button type="button" onClick={() => setShowPwd((v) => !v)} aria-label={showPwd ? "Sembunyikan password" : "Tampilkan password"} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--dt5)", display: "flex" }}>
-                    {showPwd
-                      ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                      : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <p id="peran-pengguna-baru" className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>Peran</p>
-                <div role="group" aria-labelledby="peran-pengguna-baru" className="grid grid-cols-2 gap-2">
-                  {(["sdm_kgb", "sdm_hukdis", "keuangan", "superAdminCore", "admin_upt"] as const).map((r) => {
-                    const cfg = roleCfg(r);
-                    const active = formTambah.role === r;
-                    return (
-                      <button key={r} type="button" aria-pressed={active} onClick={() => setFormTambah((p) => ({ ...p, role: r, satker: r === ROLES.ADMIN_UPT ? p.satker : "" }))}
-                        className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition"
-                        style={{
-                          border: active ? "1.5px solid var(--accent)" : "1px solid var(--ln1)",
-                          background: active ? "var(--accent-bg)" : "var(--card)",
-                        }}>
-                        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: cfg.grad }}>
-                          {ROLE_ICON[r]}
-                        </div>
-                        <span className="text-xs font-medium" style={{ color: active ? "var(--dtn)" : "var(--dt3)" }}>{cfg.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              {formTambah.role === ROLES.ADMIN_UPT && (
-                <div>
-                  <label htmlFor="satker-pengguna-baru" className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>Satker</label>
-                  <select
-                    id="satker-pengguna-baru"
-                    className="adm-input"
-                    value={formTambah.satker}
-                    onChange={(e) => setFormTambah((p) => ({ ...p, satker: e.target.value }))}
-                  >
-                    <option value="">Pilih satker…</option>
-                    {SATKER_UPT.map((s) => (
-                      <option key={s.kode} value={s.kode}>{s.nama}</option>
-                    ))}
-                  </select>
-                  <p className="text-xs mt-1" style={{ color: "var(--dt5)" }}>
-                    Akun ini hanya melihat data satker tersebut dan tidak dapat mengubah apa pun.
-                  </p>
-                </div>
-              )}
-              {error && (
-                <div className="rounded-lg px-3 py-2 flex items-center gap-2" style={{ background: "var(--tint-red-bg)", border: "1px solid var(--tint-red-ln)" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--st-red)"><path d="M12 2L1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></svg>
-                  <p className="text-xs" style={{ color: "var(--st-red)" }}>{error}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex gap-2 px-5 py-4" style={{ borderTop: "0.5px solid var(--ln2)" }}>
-              <button onClick={() => setShowTambah(false)} disabled={submitting} className="flex-1 text-xs py-2.5 rounded-xl" style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}>Batal</button>
-              <button onClick={handleTambah} disabled={submitting} className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white disabled:opacity-50" style={{ background: "var(--navy-solid)" }}>{submitting ? "Menyimpan…" : "Simpan Pengguna"}</button>
-            </div>
-          </div>
-        </div>
+            </span>
+          </label>
+        </KerangkaModal>
       )}
 
-      {/* Modal Atur Ulang Password */}
-      {showReset && (
-        <div className="adm-overlay" onClick={() => !submitting && setShowReset(null)}>
-          <div ref={refReset} role="dialog" aria-modal="true" aria-labelledby="judul-atur-ulang-password" tabIndex={-1} className="adm-modal outline-none" style={{ maxWidth: "24rem" }} onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
-              <h2 id="judul-atur-ulang-password" className="text-sm font-semibold mb-3" style={{ color: "var(--dtn)" }}>Atur Ulang Password</h2>
-              {/* Identitas user yang direset */}
-              <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-4" style={{ background: "var(--sub)", border: "0.5px solid var(--ln1)" }}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: roleCfg(showReset.role).grad, color: "#fff" }}>{initials(showReset.nama)}</div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold truncate" style={{ color: "var(--dtn)" }}>{showReset.nama}</p>
-                  <p className="text-xs" style={{ color: "var(--dt4)" }}>{showReset.nip} · {roleCfg(showReset.role).label}</p>
-                </div>
-              </div>
-              <label htmlFor="password-atur-ulang" className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>Password Baru</label>
-              <div className="relative">
-                <input id="password-atur-ulang" autoFocus type={showPwdReset ? "text" : "password"} className={inputClass} style={{ paddingRight: "38px" }} placeholder="Minimal 6 karakter" value={formReset} onChange={(e) => setFormReset(e.target.value)} />
-                <button type="button" onClick={() => setShowPwdReset((v) => !v)} aria-label={showPwdReset ? "Sembunyikan password" : "Tampilkan password"} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--dt5)", display: "flex" }}>
-                  {showPwdReset
-                    ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                    : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
-                </button>
-              </div>
-              {error && <p className="text-xs mt-3" style={{ color: "var(--st-red)" }}>{error}</p>}
-              <div className="flex gap-2 mt-5">
-                <button onClick={() => setShowReset(null)} disabled={submitting} className="flex-1 text-xs py-2.5 rounded-xl" style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}>Batal</button>
-                <button onClick={handleReset} disabled={submitting} className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white disabled:opacity-50" style={{ background: "var(--navy-solid)" }}>{submitting ? "Menyimpan…" : "Atur Ulang Password"}</button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* ── Atur ulang password ── */}
+      {dialogReset && (
+        <KerangkaModal
+          judul="Atur ulang password"
+          subjudul={`${dialogReset.nama} · ${dialogReset.nip}`}
+          nada="amber"
+          ukuran="sm"
+          sibuk={sibuk}
+          onTutup={() => setDialogReset(null)}
+          onKirim={() => void aturUlangSandi()}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogReset(null)} disabled={sibuk}>Batal</button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk}>{sibuk ? "Menyimpan…" : "Atur ulang"}</button>
+            </>
+          }
+        >
+          <PesanGalat pesan={galat || null} />
+          <label className="kgbm-label">
+            <span className="kgbm-wajib">Password baru</span>
+            <input
+              className="kgbm-input"
+              data-autofocus
+              type={lihatSandi ? "text" : "password"}
+              value={formReset}
+              onChange={(e) => setFormReset(e.target.value)}
+              placeholder="Minimal 6 karakter"
+            />
+          </label>
+          <Catatan nada="amber">
+            Sesi yang masih terbuka dengan password lama akan berakhir. Sampaikan password baru ini langsung kepada
+            pemilik akun dan minta ia menggantinya dari menu Profil Saya.
+          </Catatan>
+        </KerangkaModal>
       )}
 
-      {/* Modal Tolak Permintaan */}
-      {showTolak && (
-        <div className="adm-overlay" onClick={() => !submitting && setShowTolak(null)}>
-          <div ref={refTolak} role="dialog" aria-modal="true" aria-labelledby="judul-tolak-permintaan" tabIndex={-1} className="adm-modal outline-none" style={{ maxWidth: "24rem" }} onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: "var(--tint-red-bg)" }}>
-                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--st-red)" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </div>
-              <h2 id="judul-tolak-permintaan" className="text-sm font-semibold mb-1" style={{ color: "var(--dtn)" }}>Tolak Permintaan?</h2>
-              <p className="text-xs mb-4" style={{ color: "var(--dt4)" }}>Tolak perubahan profil dari <strong style={{ color: "var(--dtn)" }}>{showTolak.user.nama}</strong></p>
-              <label htmlFor="alasan-tolak-profil" className="block text-xs font-medium mb-1" style={{ color: "var(--dt2)" }}>Alasan penolakan <span style={{ color: "var(--dt5)" }}>(opsional)</span></label>
-              <textarea id="alasan-tolak-profil" rows={3} className="adm-input resize-none" placeholder="Contoh: Data tidak sesuai, harap lengkapi terlebih dahulu" value={alasanTolak} onChange={(e) => setAlasanTolak(e.target.value)} />
-              {error && <p className="text-xs mt-3" style={{ color: "var(--st-red)" }}>{error}</p>}
-              <div className="flex gap-2 mt-5">
-                <button onClick={() => setShowTolak(null)} disabled={submitting} className="flex-1 text-xs py-2.5 rounded-xl" style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}>Batal</button>
-                <button onClick={handleTolak} disabled={submitting} className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white disabled:opacity-50" style={{ background: "var(--red-solid)" }}>{submitting ? "Memproses…" : "Ya, Tolak"}</button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* ── Pindah satuan kerja ── */}
+      {dialogSatker && (
+        <KerangkaModal
+          judul="Pindah satuan kerja"
+          subjudul={`${dialogSatker.nama} · ${dialogSatker.nip}`}
+          ukuran="sm"
+          sibuk={sibuk}
+          onTutup={() => setDialogSatker(null)}
+          onKirim={() => void pindahSatker()}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogSatker(null)} disabled={sibuk}>Batal</button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk}>{sibuk ? "Menyimpan…" : "Simpan"}</button>
+            </>
+          }
+        >
+          <PesanGalat pesan={galat || null} />
+          <label className="kgbm-label">
+            <span className="kgbm-wajib">Satuan kerja</span>
+            <select className="kgbm-input" data-autofocus value={formSatker} onChange={(e) => setFormSatker(e.target.value)}>
+              <option value="">Pilih satuan kerja…</option>
+              {SATKER_UPT.map((s) => <option key={s.kode} value={s.kode}>{s.nama}</option>)}
+            </select>
+          </label>
+          <Catatan>
+            Seluruh data yang terlihat akun ini langsung mengikuti satuan kerja baru, termasuk berkas SK yang boleh diunduh.
+          </Catatan>
+        </KerangkaModal>
       )}
 
-      {/* Modal Konfirmasi Hapus */}
-      {showHapus && (
-        <div className="adm-overlay" onClick={() => !submitting && tutupHapus()}>
-          <div ref={refHapus} role="alertdialog" aria-modal="true" aria-labelledby="judul-hapus-pengguna" tabIndex={-1} className="adm-modal outline-none" style={{ maxWidth: "24rem" }} onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: "var(--tint-red-bg)" }}>
-                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--st-red)" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-              </div>
-              {!reassignCounts ? (
-                <>
-                  <h2 id="judul-hapus-pengguna" className="text-sm font-semibold mb-1" style={{ color: "var(--dtn)" }}>Hapus Pengguna?</h2>
-                  <p className="text-xs mb-5 leading-relaxed" style={{ color: "var(--dt4)" }}>Yakin ingin menghapus <strong style={{ color: "var(--dtn)" }}>{showHapus.nama}</strong>? Tindakan ini tidak bisa dibatalkan.</p>
-                </>
-              ) : (
-                <>
-                  <h2 id="judul-hapus-pengguna" className="text-sm font-semibold mb-1" style={{ color: "var(--dtn)" }}>Alihkan Data Sebelum Menghapus</h2>
-                  <p className="text-xs mb-3" style={{ color: "var(--dt4)" }}><strong style={{ color: "var(--dtn)" }}>{showHapus.nama}</strong> memiliki data terkait:</p>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {reassignCounts.kgbCount > 0 && <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>{reassignCounts.kgbCount} data KGB</span>}
-                    {reassignCounts.suratCount > 0 && <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>{reassignCounts.suratCount} surat SK</span>}
-                    {reassignCounts.serahTerimaCount > 0 && <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>{reassignCounts.serahTerimaCount} serah terima</span>}
-                    {reassignCounts.hukdisCount > 0 && <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>{reassignCounts.hukdisCount} hukdis</span>}
-                  </div>
-                  <div className="mb-4">
-                    <label htmlFor="alihkan-ke-pengguna" className="block text-xs font-medium mb-1" style={{ color: "var(--dt2)" }}>Alihkan data ke <span style={{ color: "var(--st-red)" }}>*</span></label>
-                    <select id="alihkan-ke-pengguna" className={inputClass} value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
-                      <option value="">Pilih pengguna tujuan</option>
-                      {usersLain.map((u) => <option key={u.id} value={u.id}>{u.nama} ({roleCfg(u.role).label})</option>)}
-                    </select>
-                    <p className="text-xs mt-1.5" style={{ color: "var(--dt4)" }}>Semua data akan dipindahkan ke pengguna yang dipilih.</p>
-                  </div>
-                </>
-              )}
-              {error && <p className="text-xs mb-3" style={{ color: "var(--st-red)" }}>{error}</p>}
-              <div className="flex gap-2">
-                <button onClick={tutupHapus} disabled={submitting} className="flex-1 text-xs py-2.5 rounded-xl" style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}>Batal</button>
-                <button onClick={handleHapus} disabled={submitting || (!!reassignCounts && !reassignTo)} className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white disabled:opacity-40" style={{ background: "var(--red-solid)" }}>{submitting ? "Memproses…" : reassignCounts ? "Alihkan dan Hapus" : "Ya, Hapus"}</button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* ── Hapus pengguna ── */}
+      {dialogHapus && (
+        <KerangkaModal
+          judul="Hapus pengguna"
+          subjudul={`${dialogHapus.nama} · ${dialogHapus.nip}`}
+          nada="merah"
+          ukuran="sm"
+          sibuk={sibuk}
+          onTutup={tutupHapus}
+          onKirim={() => void hapusPengguna()}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={tutupHapus} disabled={sibuk}>Batal</button>
+              <button type="submit" className="kgbm-tombol kgbm-bahaya" disabled={sibuk || (!!reassignCounts && !reassignTo)}>
+                {sibuk ? "Menghapus…" : reassignCounts ? "Alihkan dan hapus" : "Hapus akun"}
+              </button>
+            </>
+          }
+        >
+          <PesanGalat pesan={galat || null} />
+          {reassignCounts ? (
+            <>
+              <Catatan nada="amber">
+                Akun ini tercatat sebagai pembuat {reassignCounts.kgbCount} KGB, {reassignCounts.suratCount} SK,
+                {" "}{reassignCounts.serahTerimaCount} serah terima, dan {reassignCounts.hukdisCount} catatan hukuman disiplin.
+                Pilih pengguna yang akan mewarisi catatan itu agar jejaknya tetap utuh.
+              </Catatan>
+              <label className="kgbm-label">
+                <span className="kgbm-wajib">Alihkan data ke</span>
+                <select className="kgbm-input" data-autofocus value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
+                  <option value="">Pilih pengguna…</option>
+                  {usersLain.map((u) => <option key={u.id} value={u.id}>{u.nama} — {cfgPeran(u.role).label}</option>)}
+                </select>
+              </label>
+            </>
+          ) : (
+            <Catatan nada="merah">
+              Akun dihapus permanen dan pemiliknya tidak dapat masuk lagi. Entri log aktivitas yang pernah dibuatnya tetap
+              tersimpan, lengkap dengan nama dan NIP pada catatan penghapusan ini.
+            </Catatan>
+          )}
+        </KerangkaModal>
+      )}
+
+      {/* ── Tolak permintaan profil ── */}
+      {dialogTolak && (
+        <KerangkaModal
+          judul="Tolak permintaan profil"
+          subjudul={`${dialogTolak.user.nama} · ${dialogTolak.user.nip}`}
+          nada="merah"
+          ukuran="sm"
+          sibuk={sibuk}
+          onTutup={() => setDialogTolak(null)}
+          onKirim={() => void tolakProfil()}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogTolak(null)} disabled={sibuk}>Batal</button>
+              <button type="submit" className="kgbm-tombol kgbm-bahaya" disabled={sibuk}>{sibuk ? "Menyimpan…" : "Tolak permintaan"}</button>
+            </>
+          }
+        >
+          <label className="kgbm-label">
+            Alasan penolakan
+            <textarea
+              className="kgbm-input"
+              data-autofocus
+              rows={3}
+              value={alasanTolak}
+              onChange={(e) => setAlasanTolak(e.target.value)}
+              placeholder="Misalnya: nama tidak sesuai SK terakhir"
+            />
+          </label>
+          <Catatan>Alasan ini ditampilkan kepada pengusul di menu Profil Saya.</Catatan>
+        </KerangkaModal>
       )}
     </div>
   );

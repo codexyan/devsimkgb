@@ -6,7 +6,7 @@ import { PanelNavy, Stat, StripStat, namaSapaan, sapaanWita, tanggalPanjangWita,
 import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { hitungDeadlineSDM } from "@/lib/tabelGaji";
 import { kunciBulanTmt, type RekapStatusKgb } from "@/lib/rekapKgb";
-import { geserBulan, namaBulan, namaTampilSatker, LABEL_JENIS_SATKER } from "@/app/dashboard/satker/labelSatker";
+import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 import type { Satker } from "@/lib/satker";
 
 /* Dashboard Admin UPT: satu halaman berisi jadwal pengiriman surat usulan, daftar pegawai satker dengan status
@@ -159,7 +159,7 @@ export default function DashboardUpt() {
         sub={
           <>
             {tanggalPanjangWita()}
-            {data && <> · {namaTampilSatker(data.satker)} · {LABEL_JENIS_SATKER[data.satker.jenis]} · KPPN {data.satker.kppn}</>}
+            {data && <> · {namaTampilSatker(data.satker)} · KPPN {data.satker.kppn}</>}
           </>
         }
         diperbarui={segar}

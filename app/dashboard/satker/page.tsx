@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { KepalaKartu } from "@/app/dashboard/components/PanelNavy";
 import type { RingkasanSatker } from "@/lib/rekapSatker";
 import { hariIniWita } from "@/lib/waktu";
-import { LABEL_JENIS_SATKER, namaTampilSatker } from "./labelSatker";
+import { namaTampilSatker } from "./labelSatker";
 
 /* Modul Satker & UPT: ringkasan KGB setiap satuan kerja di lingkungan Kanwil (Kanwil dan 18 UPT).
    Satu baris per satker; klik untuk membuka rincian pegawai dan jadwal usulan satker itu. */
@@ -84,7 +84,7 @@ export default function HalamanSatker() {
       <header className="dsb-halaman-kepala dsb-muncul">
         <div className="min-w-0">
           <p className="dsb-label">Satker & UPT</p>
-          <h1 className="dsb-halaman-judul">Satuan kerja Kanwil Ditjenpas Kalsel</h1>
+          <h1 className="dsb-halaman-judul">Satuan kerja Kantor Wilayah Ditjenpas Kalimantan Selatan</h1>
           <p className="dsb-sub">
             {semua.length} satker: Kanwil, 8 Lapas, 6 Rutan, 3 Bapas, dan 1 LPKA, masing-masing dengan KPPN mitra.
             Angka KGB dihitung untuk TMT tahun {tahun}; lewat batas dan rapelan mencakup semua siklus yang belum selesai.
@@ -194,7 +194,7 @@ export default function HalamanSatker() {
                           {namaTampilSatker(r.satker)}
                         </Link>
                         <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>
-                          {LABEL_JENIS_SATKER[r.satker.jenis]} · KPPN {r.satker.kppn}
+                          KPPN {r.satker.kppn}
                         </p>
                       </td>
                       <td className="kanan">{kosong ? "–" : r.pegawai}</td>

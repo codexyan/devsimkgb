@@ -57,11 +57,11 @@ function keIsianTanggal(val: string | null | undefined): string {
   return tanggal ? isoTanggalLokal(tanggal) : "";
 }
 
-/* Label unit kerja untuk daftar; nama Kanwil yang panjang disingkat. Unit kerja kosong berarti Kanwil, sama dengan SK KGB. */
+/* Label unit kerja untuk daftar; nama satker ditulis lengkap. Unit kerja kosong berarti Kanwil, sama dengan SK KGB. */
 function labelUnitKerja(unitKerja: string | null | undefined): { teks: string; dikenal: boolean } {
   const satker = unitKerja?.trim() ? cariSatker(unitKerja) : SATKER_KANWIL;
   if (!satker) return { teks: unitKerja?.trim() || "-", dikenal: false };
-  return { teks: satker.jenis === "kanwil" ? "Kanwil Ditjenpas Kalsel" : satker.nama, dikenal: true };
+  return { teks: satker.nama, dikenal: true };
 }
 
 const inputClass =

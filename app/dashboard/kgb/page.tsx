@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { SATKER } from "@/lib/satker";
+import { namaUnitKerja } from "@/app/dashboard/satker/labelSatker";
 import { KODE_SATKER_LAIN, kodeSatkerPegawai } from "@/lib/rekapSatker";
 import { canProcessKGB, isSuperAdmin } from "@/lib/auth";
 import { useRole } from "@/app/dashboard/components/RoleContext";
@@ -628,7 +629,7 @@ export default function KGBPage() {
           judul="Data Pegawai"
           baris={[
             { label: "Jabatan", nilai: k.pegawai.jabatan || "-" },
-            { label: "Unit kerja", nilai: k.pegawai.unitKerja || "-" },
+            { label: "Unit kerja", nilai: namaUnitKerja(k.pegawai.unitKerja) },
           ]}
         />
 
@@ -806,7 +807,7 @@ export default function KGBPage() {
             <select aria-label="Satker" className="dsb-pilih" data-aktif={filterSatker ? "" : undefined} value={filterSatker} onChange={(e) => setFilterSatker(e.target.value)}>
               <option value="">Semua satker</option>
               {SATKER.map((s) => (
-                <option key={s.kode} value={s.kode}>{s.jenis === "kanwil" ? "Kanwil Ditjenpas Kalsel" : s.nama}</option>
+                <option key={s.kode} value={s.kode}>{s.nama}</option>
               ))}
               <option value={KODE_SATKER_LAIN}>Belum sesuai daftar satker</option>
             </select>
