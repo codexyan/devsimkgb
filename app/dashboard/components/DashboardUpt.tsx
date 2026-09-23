@@ -123,6 +123,35 @@ function penyimpananDraf() {
   }
 }
 
+/**
+ * Isian tanggal beserta tombol pengosongnya. Isian date yang sudah terisi tidak dapat dikosongkan dari
+ * papan ketik ponsel, sedangkan pada formulir usulan isian kosong punya arti tersendiri: tidak diusulkan
+ * berubah. Karena itu pengosongannya disediakan sebagai tombol.
+ */
+function IsianTanggal({
+  label,
+  nilai,
+  onUbah,
+  wajib = false,
+}: {
+  label: string;
+  nilai: string;
+  onUbah: (nilai: string) => void;
+  wajib?: boolean;
+}) {
+  return (
+    <label className="kgbm-label">
+      {wajib ? <span className="kgbm-wajib">{label}</span> : label}
+      <input className="kgbm-input" type="date" value={nilai} onChange={(e) => onUbah(e.target.value)} />
+      {nilai && (
+        <button type="button" className="kgbm-kosongkan" onClick={() => onUbah("")}>
+          Kosongkan
+        </button>
+      )}
+    </label>
+  );
+}
+
 export default function DashboardUpt() {
   const dashUser = useDashUser();
   const [hariIni] = useState(() => hariIniWita());
@@ -196,6 +225,13 @@ export default function DashboardUpt() {
   const [suratUsulan, setSuratUsulan] = useState(SURAT_KOSONG);
   const [hukdisUsulan, setHukdisUsulan] = useState(HUKDIS_KOSONG);
   const [berkasUsulan, setBerkasUsulan] = useState<Record<string, File | null>>({});
+  /** Penghitung pemasangan ulang tiap isian berkas: input file hanya dapat dikosongkan dengan dipasang ulang. */
+  const [ulangBerkas, setUlangBerkas] = useState<Record<string, number>>({});
+
+  function hapusBerkas(medan: string) {
+    setBerkasUsulan((f) => ({ ...f, [medan]: null }));
+    setUlangBerkas((u) => ({ ...u, [medan]: (u[medan] ?? 0) + 1 }));
+  }
   /** "baru" saat UPT mengusulkan pegawai yang belum tercatat; dialognya sama, isiannya kosong. */
   const [jenisUsulan, setJenisUsulan] = useState<"perubahan" | "baru">("perubahan");
   const [dialogBaru, setDialogBaru] = useState(false);
@@ -249,6 +285,7 @@ export default function DashboardUpt() {
     setHukdisUsulan(isi.hukdis);
     setIsianUsulan(isi.isian);
     setBerkasUsulan({});
+    setUlangBerkas((u) => Object.fromEntries(BERKAS_USULAN.map((b) => [b.medan, (u[b.medan] ?? 0) + 1])));
     setGalatKonfirmasi(null);
     awalIsian.current = JSON.stringify(isi);
     setDrafDipulihkan(draf?.disimpanAt ?? null);
@@ -590,31 +627,46 @@ export default function DashboardUpt() {
                 <span className="kgbm-wajib">Nomor surat</span>
                 <input className="kgbm-input" data-autofocus value={suratUsulan.nomorSurat} onChange={(e) => setSuratUsulan((f) => ({ ...f, nomorSurat: e.target.value }))} placeholder="W.17.PAS.7-SA.04.04-1" />
               </label>
-              <label className="kgbm-label">
-                <span className="kgbm-wajib">Tanggal surat</span>
-                <input className="kgbm-input" type="date" value={suratUsulan.tanggalSurat} onChange={(e) => setSuratUsulan((f) => ({ ...f, tanggalSurat: e.target.value }))} />
-              </label>
+              <IsianTanggal
+                label="Tanggal surat"
+                wajib
+                nilai={suratUsulan.tanggalSurat}
+                onUbah={(v) => setSuratUsulan((f) => ({ ...f, tanggalSurat: v }))}
+              />
             </div>
-            {BERKAS_USULAN.map((b) => (
-              <label className="kgbm-label" key={b.medan}>
-                {b.label} (PDF, paling besar 5 MB)
-                <input
-                  className="kgbm-input"
-                  type="file"
-                  accept="application/pdf"
-                  onChange={(e) => setBerkasUsulan((f) => ({ ...f, [b.medan]: e.target.files?.[0] ?? null }))}
-                />
-              </label>
-            ))}
+            {BERKAS_USULAN.map((b) => {
+              const terpilih = berkasUsulan[b.medan];
+              return (
+                <div key={b.medan}>
+                  <label className="kgbm-label">
+                    {b.label} (PDF, paling besar 5 MB)
+                    <input
+                      key={ulangBerkas[b.medan] ?? 0}
+                      className="kgbm-input"
+                      type="file"
+                      accept="application/pdf"
+                      onChange={(e) => setBerkasUsulan((f) => ({ ...f, [b.medan]: e.target.files?.[0] ?? null }))}
+                    />
+                  </label>
+                  {terpilih && (
+                    <p className="kgbm-berkas-terpilih">
+                      <span>{terpilih.name} · {terpilih.size >= 1048576 ? `${(terpilih.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(terpilih.size / 1024))} KB`}</span>
+                      <button type="button" onClick={() => hapusBerkas(b.medan)}>Hapus berkas</button>
+                    </p>
+                  )}
+                </div>
+              );
+            })}
             <div className="kgbm-grid2">
               <label className="kgbm-label">
                 Nomor SK terakhir (dasar gaji pokok)
                 <input className="kgbm-input" value={suratUsulan.nomorSkTerakhir} onChange={(e) => setSuratUsulan((f) => ({ ...f, nomorSkTerakhir: e.target.value }))} />
               </label>
-              <label className="kgbm-label">
-                Tanggal SK terakhir
-                <input className="kgbm-input" type="date" value={suratUsulan.tanggalSkTerakhir} onChange={(e) => setSuratUsulan((f) => ({ ...f, tanggalSkTerakhir: e.target.value }))} />
-              </label>
+              <IsianTanggal
+                label="Tanggal SK terakhir"
+                nilai={suratUsulan.tanggalSkTerakhir}
+                onUbah={(v) => setSuratUsulan((f) => ({ ...f, tanggalSkTerakhir: v }))}
+              />
               </div>
             </div>
           </div>
@@ -643,12 +695,19 @@ export default function DashboardUpt() {
                 </label>
               )}
             <div className="kgbm-grid2">
-              {BIDANG_USULAN.map((bidang) => (
+              {BIDANG_USULAN.map((bidang) => bidang.jenis === "tanggal" ? (
+                <IsianTanggal
+                  key={bidang.kunci}
+                  label={bidang.label}
+                  nilai={isianUsulan[bidang.kunci] ?? ""}
+                  onUbah={(v) => setIsianUsulan((f) => ({ ...f, [bidang.kunci]: v }))}
+                />
+              ) : (
                 <label className="kgbm-label" key={bidang.kunci}>
                   {bidang.label}
                   <input
                     className="kgbm-input"
-                    type={bidang.jenis === "tanggal" ? "date" : bidang.jenis === "teks" ? "text" : "number"}
+                    type={bidang.jenis === "teks" ? "text" : "number"}
                     inputMode={bidang.jenis === "angka" || bidang.jenis === "rupiah" ? "numeric" : undefined}
                     value={isianUsulan[bidang.kunci] ?? ""}
                     onChange={(e) => setIsianUsulan((f) => ({ ...f, [bidang.kunci]: e.target.value }))}
@@ -680,14 +739,16 @@ export default function DashboardUpt() {
                     Nomor SK hukuman
                     <input className="kgbm-input" value={hukdisUsulan.nomorSk} onChange={(e) => setHukdisUsulan((f) => ({ ...f, nomorSk: e.target.value }))} />
                   </label>
-                  <label className="kgbm-label">
-                    TMT mulai
-                    <input className="kgbm-input" type="date" value={hukdisUsulan.tmtMulai} onChange={(e) => setHukdisUsulan((f) => ({ ...f, tmtMulai: e.target.value }))} />
-                  </label>
-                  <label className="kgbm-label">
-                    TMT berakhir
-                    <input className="kgbm-input" type="date" value={hukdisUsulan.tmtBerakhir} onChange={(e) => setHukdisUsulan((f) => ({ ...f, tmtBerakhir: e.target.value }))} />
-                  </label>
+                  <IsianTanggal
+                    label="TMT mulai"
+                    nilai={hukdisUsulan.tmtMulai}
+                    onUbah={(v) => setHukdisUsulan((f) => ({ ...f, tmtMulai: v }))}
+                  />
+                  <IsianTanggal
+                    label="TMT berakhir"
+                    nilai={hukdisUsulan.tmtBerakhir}
+                    onUbah={(v) => setHukdisUsulan((f) => ({ ...f, tmtBerakhir: v }))}
+                  />
                 </div>
                 <label className="kgbm-label">
                   Keterangan

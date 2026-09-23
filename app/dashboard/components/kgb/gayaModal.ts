@@ -56,6 +56,14 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
 .kgbm-bagian-judul { font-size: 12px; font-weight: 600; color: var(--dtn); }
 .kgbm-bagian-ket { font-size: 11px; color: var(--dt4); margin-top: 1px; line-height: 1.4; }
 .kgbm-bagian-isi { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.kgbm-kosongkan { display: block; margin: 3px 0 0 auto; border: 0; padding: 0; background: none; font: inherit;
+  font-size: 11px; font-weight: 500; color: var(--dt4); cursor: pointer; }
+.kgbm-kosongkan:hover { color: var(--st-red); text-decoration: underline; }
+.kgbm-berkas-terpilih { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 11.5px; color: var(--dt4); }
+.kgbm-berkas-terpilih > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kgbm-berkas-terpilih button { margin-left: auto; border: 0; padding: 0; background: none; font: inherit;
+  font-size: 11.5px; font-weight: 600; color: var(--st-red); cursor: pointer; white-space: nowrap; }
+.kgbm-berkas-terpilih button:hover { text-decoration: underline; }
 .kgbm-grid2 { display: grid; grid-template-columns: 1fr; gap: 10px; }
 @media (min-width: 480px) { .kgbm-grid2 { grid-template-columns: 1fr 1fr; } }
 .kgbm-galat { font-size: 12px; line-height: 1.5; padding: 8px 12px; border-radius: 10px; background: var(--tint-red-bg);
