@@ -35,6 +35,15 @@ export interface PegawaiRow {
   createdAt: Date | null; updatedAt: Date | null;
 }
 
+/** Satu kenaikan pangkat: dasar SK-nya dan dampaknya pada MKG serta gaji pokok (lib/kenaikanPangkat.ts). */
+export interface RiwayatPangkatRow {
+  id: string; pegawaiId: string; jenisKp: string; nomorSK: string; tanggalSK: Date | null;
+  tmtPangkat: Date | null; golonganLama: string; golonganBaru: string;
+  mkgTahunLama: number; mkgBulanLama: number; mkgTahunBaru: number; mkgBulanBaru: number;
+  gajiPokokLama: number; gajiPokokBaru: number; keterangan: string | null;
+  createdAt: Date | null; createdBy: string | null;
+}
+
 export interface RiwayatKGBRow {
   id: string; pegawaiId: string; nomorSK: string; tanggalSK: Date | null; tmtSK: Date | null;
   golonganLama: string; gajiPokokLama: number; mkgTahunLama: number; mkgBulanLama: number;
@@ -118,6 +127,15 @@ export const defs = {
     tab: "Notifikasi",
     columns: [s("id"), s("judul"), s("pesan"), s("tipe"), s("referenceId"), b("dibaca"), d("createdAt"), s("prioritas"), s("linkHref"), s("kategori")],
   },
+  RiwayatPangkat: {
+    tab: "RiwayatPangkat",
+    columns: [
+      s("id"), s("pegawaiId"), s("jenisKp"), s("nomorSK"), d("tanggalSK"), d("tmtPangkat"),
+      s("golonganLama"), s("golonganBaru"), i("mkgTahunLama"), i("mkgBulanLama"),
+      i("mkgTahunBaru"), i("mkgBulanBaru"), i("gajiPokokLama"), i("gajiPokokBaru"),
+      s("keterangan"), d("createdAt"), s("createdBy"),
+    ],
+  },
   RiwayatHukdis: {
     tab: "RiwayatHukdis",
     columns: [s("id"), s("pegawaiId"), s("jenisHukdis"), s("nomorSK"), d("tanggalSK"), d("tmtMulai"), d("tmtBerakhir"), b("berdampakKGB"), i("durasiTunda"), s("dasarHukum"), s("keterangan"), d("createdAt"), s("createdBy")],
@@ -157,6 +175,7 @@ export const sheets = {
   penandatangan: new Table<PenandatanganRow>(defs.Penandatangan),
   notifikasi: new Table<NotifikasiRow>(defs.Notifikasi),
   riwayatHukdis: new Table(defs.RiwayatHukdis),
+  riwayatPangkat: new Table<RiwayatPangkatRow>(defs.RiwayatPangkat),
   hukdisJenis: new Table(defs.HukdisJenis),
   hukdisKonfigurasi: new Table(defs.HukdisKonfigurasi),
   regulasi: new Table(defs.Regulasi),

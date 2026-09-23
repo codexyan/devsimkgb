@@ -68,6 +68,24 @@ interface RiwayatKGB {
   alasanBatal?: string | null;
 }
 
+/** Satu kenaikan pangkat dari GET /api/pegawai/[id]/pangkat. */
+interface RiwayatPangkat {
+  id: string;
+  jenisLabel: string;
+  nomorSK: string;
+  tanggalSK: string | null;
+  tmtPangkat: string | null;
+  golonganLama: string;
+  golonganBaru: string;
+  mkgTahunLama: number;
+  mkgBulanLama: number;
+  mkgTahunBaru: number;
+  mkgBulanBaru: number;
+  gajiPokokLama: number;
+  gajiPokokBaru: number;
+  keterangan: string | null;
+}
+
 interface RiwayatHukdis {
   id: string;
   jenisHukdis: string;
@@ -144,8 +162,9 @@ export default function RiwayatKGBPage() {
   const [pegawai, setPegawai] = useState<Pegawai | null>(null);
   const [riwayat, setRiwayat] = useState<RiwayatKGB[]>([]);
   const [hukdisList, setHukdisList] = useState<RiwayatHukdis[]>([]);
+  const [pangkatList, setPangkatList] = useState<RiwayatPangkat[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"kgb" | "hukdis">("kgb");
+  const [activeTab, setActiveTab] = useState<"kgb" | "pangkat" | "hukdis">("kgb");
 
   // Popup Proses KGB dan modal aksi KGB bersama
   const [showKgbPopup, setShowKgbPopup] = useState(false);
@@ -220,14 +239,20 @@ export default function RiwayatKGBPage() {
           .catch(() => [])
       : Promise.resolve([]);
 
+    const pangkatPromise = fetch(`/api/pegawai/${id}/pangkat`)
+      .then(async (r) => (r.ok ? ((await r.json()) as unknown) : []))
+      .catch(() => []);
+
     return Promise.all([
       fetch(`/api/pegawai/${id}/riwayat-kgb`).then((r) => r.json() as Promise<{ pegawai?: Pegawai; riwayat?: RiwayatKGB[] }>),
       hukdisPromise,
+      pangkatPromise,
     ])
-      .then(([kgbData, hukdisData]) => {
+      .then(([kgbData, hukdisData, pangkatData]) => {
         setPegawai(kgbData.pegawai ?? null);
         setRiwayat(Array.isArray(kgbData.riwayat) ? kgbData.riwayat : []);
         setHukdisList(Array.isArray(hukdisData) ? (hukdisData as RiwayatHukdis[]) : []);
+        setPangkatList(Array.isArray(pangkatData) ? (pangkatData as RiwayatPangkat[]) : []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -511,12 +536,12 @@ export default function RiwayatKGBPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-5">
-        {(["kgb", ...(canHukdis ? ["hukdis"] : [])] as const).map((tab) => (
+        {(["kgb", "pangkat", ...(canHukdis ? ["hukdis"] : [])] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             aria-pressed={activeTab === tab}
-            onClick={() => setActiveTab(tab as "kgb" | "hukdis")}
+            onClick={() => setActiveTab(tab as "kgb" | "pangkat" | "hukdis")}
             className="text-xs px-4 py-2 rounded-xl font-semibold transition"
             style={{
               background: activeTab === tab ? "var(--navy-solid)" : "var(--sub)",
@@ -525,10 +550,81 @@ export default function RiwayatKGBPage() {
               borderColor: activeTab === tab ? "var(--dtn)" : "var(--ln1)",
             }}
           >
-            {tab === "kgb" ? `Riwayat KGB (${riwayat.length})` : `Riwayat Hukdis (${hukdisList.length})`}
+            {tab === "kgb"
+              ? `Riwayat KGB (${riwayat.length})`
+              : tab === "pangkat"
+                ? `Riwayat Pangkat (${pangkatList.length})`
+                : `Riwayat Hukdis (${hukdisList.length})`}
           </button>
         ))}
       </div>
+
+      {/* Riwayat pangkat: dasar gaji setiap kali pangkat naik (lib/kenaikanPangkat.ts) */}
+      {activeTab === "pangkat" && (
+        <div>
+          {pangkatList.length === 0 ? (
+            <div
+              className="rounded-2xl flex flex-col items-center justify-center py-16 gap-2"
+              style={{ background: "var(--card)", border: "0.5px solid var(--ln1)" }}
+            >
+              <p className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>Belum ada riwayat kenaikan pangkat</p>
+              <p className="text-xs" style={{ color: "var(--dt5)" }}>
+                Kenaikan pangkat dicatat dari Data Pegawai, dan langsung menyesuaikan golongan, masa kerja golongan, serta gaji pokok.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {pangkatList.map((p) => (
+                <div key={p.id} className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "0.5px solid var(--ln1)" }}>
+                  <div className="px-4 py-3 flex flex-wrap items-center gap-2" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
+                    <span className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>
+                      {p.golonganLama} → {p.golonganBaru}
+                    </span>
+                    <span className="dsb-tag" data-garis="">{p.jenisLabel}</span>
+                    <span className="text-xs" style={{ color: "var(--dt4)", marginLeft: "auto" }}>
+                      TMT {p.tmtPangkat ? formatTanggalId(p.tmtPangkat, { day: "numeric", month: "long", year: "numeric" }) : "-"}
+                    </span>
+                  </div>
+                  <dl className="px-4 py-3 grid gap-x-6 gap-y-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", fontSize: "12px" }}>
+                    <div>
+                      <dt style={{ color: "var(--dt5)" }}>Masa kerja golongan</dt>
+                      <dd style={{ margin: 0, color: "var(--dtn)" }}>
+                        {p.mkgTahunLama} thn {p.mkgBulanLama} bln → {p.mkgTahunBaru} thn {p.mkgBulanBaru} bln
+                        {p.mkgTahunLama - p.mkgTahunBaru > 0 && (
+                          <span style={{ display: "block", color: "var(--st-amber)" }}>
+                            dipotong {p.mkgTahunLama - p.mkgTahunBaru} tahun (pindah jenjang golongan)
+                          </span>
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style={{ color: "var(--dt5)" }}>Gaji pokok</dt>
+                      <dd style={{ margin: 0, color: "var(--dtn)" }}>
+                        Rp {p.gajiPokokLama.toLocaleString("id-ID")} → <span style={{ color: "var(--st-green)" }}>Rp {p.gajiPokokBaru.toLocaleString("id-ID")}</span>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style={{ color: "var(--dt5)" }}>SK kenaikan pangkat</dt>
+                      <dd style={{ margin: 0, color: "var(--dtn)" }}>
+                        {p.nomorSK || "-"}
+                        <span style={{ display: "block", color: "var(--dt5)" }}>
+                          {p.tanggalSK ? formatTanggalId(p.tanggalSK, { day: "numeric", month: "long", year: "numeric" }) : "-"}
+                        </span>
+                      </dd>
+                    </div>
+                    {p.keterangan && (
+                      <div>
+                        <dt style={{ color: "var(--dt5)" }}>Keterangan</dt>
+                        <dd style={{ margin: 0, color: "var(--dt3)" }}>{p.keterangan}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* KGB Tab */}
       {activeTab === "kgb" && (

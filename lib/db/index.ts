@@ -45,6 +45,7 @@ export const db: Db = {
   get penandatangan() { return pilih("penandatangan"); },
   get notifikasi() { return pilih("notifikasi"); },
   get riwayatHukdis() { return pilih("riwayatHukdis"); },
+  get riwayatPangkat() { return pilih("riwayatPangkat"); },
   get hukdisJenis() { return pilih("hukdisJenis"); },
   get hukdisKonfigurasi() { return pilih("hukdisKonfigurasi"); },
   get regulasi() { return pilih("regulasi"); },

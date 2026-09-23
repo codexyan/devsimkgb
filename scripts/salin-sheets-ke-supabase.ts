@@ -39,6 +39,7 @@ const DEF: Record<Kunci, TableDef> = {
   penandatangan: defs.Penandatangan,
   notifikasi: defs.Notifikasi,
   riwayatHukdis: defs.RiwayatHukdis,
+  riwayatPangkat: defs.RiwayatPangkat,
   hukdisJenis: defs.HukdisJenis,
   hukdisKonfigurasi: defs.HukdisKonfigurasi,
   regulasi: defs.Regulasi,
@@ -49,7 +50,7 @@ const DEF: Record<Kunci, TableDef> = {
 /** Urutan tulis: tabel induk lebih dulu. Urutan hapus kebalikannya. */
 const URUTAN_TULIS: Kunci[] = [
   "user", "regulasi", "hukdisJenis", "hukdisKonfigurasi", "konfigurasiKanwil", "penandatangan",
-  "pegawai", "riwayatKGB", "suratKGB", "serahTerima", "riwayatHukdis", "profileChangeRequest",
+  "pegawai", "riwayatKGB", "suratKGB", "serahTerima", "riwayatHukdis", "riwayatPangkat", "profileChangeRequest",
   "notifikasi", "auditLog", "rekonBulanan",
 ];
 

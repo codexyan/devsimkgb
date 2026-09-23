@@ -13,6 +13,7 @@ import {
 } from "@/lib/tabelGaji";
 import { ROLES } from "@/lib/auth";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
+import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 import { useRole } from "@/app/dashboard/components/RoleContext";
@@ -154,6 +155,8 @@ export default function PegawaiPage() {
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState<Pegawai | null>(null);
   const [showHapus, setShowHapus] = useState<Pegawai | null>(null);
+  // Catat SK kenaikan pangkat: mengubah golongan, MKG, dan gaji pokok sebagai dasar KGB berikutnya.
+  const [showPangkat, setShowPangkat] = useState<Pegawai | null>(null);
   const [showHapusPermanent, setShowHapusPermanent] = useState<Pegawai | null>(
     null,
   );
@@ -745,6 +748,9 @@ export default function PegawaiPage() {
                           </Link>
                           {canEdit && filterAktif && (
                             <>
+                              <button type="button" onClick={() => setShowPangkat(p)} className="dsb-ikon-tombol" title="Catat kenaikan pangkat" aria-label={`Catat kenaikan pangkat ${p.nama}`}>
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11" /><polyline points="17 18 12 13 7 18" /></svg>
+                              </button>
                               <button type="button" onClick={() => openEdit(p)} className="dsb-ikon-tombol" title="Ubah data pegawai" aria-label={`Ubah data ${p.nama}`}>
                                 <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>
                               </button>
@@ -1174,6 +1180,27 @@ export default function PegawaiPage() {
       )}
 
       {/* ===================== MODAL NONAKTIFKAN ===================== */}
+      {showPangkat && (
+        <ModalKenaikanPangkat
+          pegawai={{
+            id: showPangkat.id,
+            nama: showPangkat.nama,
+            nip: showPangkat.nip,
+            golonganRuang: showPangkat.golonganRuang,
+            mkgTahun: showPangkat.mkgTahun,
+            mkgBulan: showPangkat.mkgBulan,
+            gajiPokok: showPangkat.gajiPokok,
+          }}
+          onTutup={() => setShowPangkat(null)}
+          onBerhasil={(pesan) => {
+            setShowPangkat(null);
+            setSuccess(pesan);
+            setTimeout(() => setSuccess(""), 8000);
+            void fetchAll();
+          }}
+        />
+      )}
+
       {showHapus && (
         <>
           <div style={overlayStyle} onClick={() => setShowHapus(null)} />
