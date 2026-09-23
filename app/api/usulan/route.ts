@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { canProcessKGB } from "@/lib/auth";
-import { bandingkanUsulan, nilaiUsulan, ringkasHukdisUsulan } from "@/lib/usulanPegawai";
+import { BERKAS_USULAN, bandingkanUsulan, nilaiUsulan, ringkasHukdisUsulan } from "@/lib/usulanPegawai";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
 import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
@@ -31,21 +31,23 @@ export async function GET(req: Request) {
 
   const daftar = semuaUsulan
     .map((u) => {
-      const p = pegawaiById.get(u.pegawaiId);
+      const p = u.pegawaiId ? pegawaiById.get(u.pegawaiId) : null;
       return {
         id: u.id,
         pegawaiId: u.pegawaiId,
-        nama: p?.nama ?? "-",
-        nip: p?.nip ?? "-",
+        jenis: u.jenis,
+        nama: p?.nama ?? u.nama ?? "-",
+        nip: p?.nip ?? u.nip ?? "-",
         unitKerja: namaSatker.get(u.satker) ?? u.satker,
         status: u.status,
         nomorSurat: u.nomorSurat,
         tanggalSurat: u.tanggalSurat ? new Date(u.tanggalSurat).toISOString() : null,
-        berkasAda: !!u.pathBerkas,
+        berkas: BERKAS_USULAN.filter((b) => u[b.kunci]).map((b) => ({ medan: b.medan, label: b.label })),
         // Usulan yang menunggu dibandingkan dengan data induk; yang sudah ditinjau menampilkan nilai
         // yang diusulkan, karena data induk mungkin sudah menyamainya.
+        // Usulan pegawai baru belum punya pembanding, jadi selalu menampilkan nilai yang diusulkan.
         perubahan: u.status === "menunggu" && p ? bandingkanUsulan(p, u) : [],
-        nilaiDiusulkan: u.status === "menunggu" ? [] : nilaiUsulan(u),
+        nilaiDiusulkan: u.status === "menunggu" && p ? [] : nilaiUsulan(u),
         hukdis: ringkasHukdisUsulan(u),
         hukdisKeterangan: u.hukdisKeterangan,
         nomorSkTerakhir: u.nomorSkTerakhir,

@@ -5,6 +5,10 @@ import { canProcessKGB } from "@/lib/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 import { bandingkanUsulan, perubahanPegawai, ringkasHukdisUsulan } from "@/lib/usulanPegawai";
+import { newId } from "@/lib/sheets/id";
+import { getGajiPokok, getPangkat } from "@/lib/tabelGaji";
+import { SATKER } from "@/lib/satker";
+import type { PegawaiRow } from "@/lib/sheets/tables";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
 
@@ -46,8 +50,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (aksi !== "setujui" && aksi !== "tolak")
     return NextResponse.json({ error: "Aksi harus setujui atau tolak" }, { status: 400 });
 
-  const pegawai = await db.pegawai.findUnique({ id: usulan.pegawaiId });
-  if (!pegawai) return NextResponse.json({ error: "Data pegawai tidak ditemukan" }, { status: 404 });
+  const pegawaiLama = usulan.pegawaiId ? await db.pegawai.findUnique({ id: usulan.pegawaiId }) : null;
+  if (usulan.jenis !== "baru" && !pegawaiLama)
+    return NextResponse.json({ error: "Data pegawai tidak ditemukan" }, { status: 404 });
+  const namaUsulan = pegawaiLama?.nama ?? usulan.nama ?? "-";
+  const nipUsulan = pegawaiLama?.nip ?? usulan.nip ?? "-";
 
   const oleh = `${peninjau.nama} (${peninjau.nip})`;
   const sekarang = new Date();
@@ -59,28 +66,89 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     logAudit({
       userId: peninjau.id,
       aksi: "tolak_usulan_pegawai",
-      detail: `Tolak usulan data ${pegawai.nama} (${pegawai.nip}) dari ${usulan.satker}, surat ${usulan.nomorSurat}: ${alasanTolak}`,
-      targetNama: pegawai.nama,
+      detail: `Tolak usulan ${usulan.jenis === "baru" ? "pegawai baru" : "data"} ${namaUsulan} (${nipUsulan}) dari ${usulan.satker}, surat ${usulan.nomorSurat}: ${alasanTolak}`,
+      targetNama: namaUsulan,
     });
     return NextResponse.json({ ok: true, status: "ditolak" });
   }
 
-  const perubahan = bandingkanUsulan(pegawai, usulan);
   const nilaiBaru = perubahanPegawai(usulan);
-  if (Object.keys(nilaiBaru).length > 0) {
-    await db.pegawai.update({ id: pegawai.id }, { ...nilaiBaru, updatedAt: sekarang });
+  let perubahan = pegawaiLama ? bandingkanUsulan(pegawaiLama, usulan) : [];
+  let pegawaiIdHasil = usulan.pegawaiId;
+
+  if (usulan.jenis === "baru") {
+    // Pegawai yang diusulkan UPT baru dibuat di sini, setelah Kanwil menyetujuinya. NIP diperiksa
+    // ulang karena bisa saja sudah ditambahkan Kanwil sendiri sejak usulan dikirim.
+    const nip = usulan.nip ?? "";
+    if (!/^\d{18}$/.test(nip))
+      return NextResponse.json({ error: "Usulan pegawai baru tidak memuat NIP yang sah" }, { status: 409 });
+    const bentrok = await db.pegawai.findUnique({ nip });
+    if (bentrok)
+      return NextResponse.json(
+        { error: `NIP ${nip} sudah tercatat atas nama ${bentrok.nama}. Tolak usulan ini dan minta UPT mengirim usulan perbaikan data.` },
+        { status: 409 },
+      );
+    const golongan = String(nilaiBaru.golonganRuang ?? "");
+    const mkgTahun = Number(nilaiBaru.mkgTahun ?? 0);
+    const mkgBulan = Number(nilaiBaru.mkgBulan ?? 0);
+    const unitKerja = usulan.unitKerja ?? SATKER.find((s) => s.kode === usulan.satker)?.nama ?? "";
+    const pegawaiBaru: PegawaiRow = {
+      id: newId(),
+      nip,
+      nama: String(nilaiBaru.nama ?? ""),
+      tempatLahir: (nilaiBaru.tempatLahir as string | null) ?? null,
+      tanggalLahir: (nilaiBaru.tanggalLahir as Date | null) ?? null,
+      jenisKelamin: (nilaiBaru.jenisKelamin as string | null) ?? null,
+      pendidikanTerakhir: (nilaiBaru.pendidikanTerakhir as string | null) ?? null,
+      jabatan: String(nilaiBaru.jabatan ?? ""),
+      // Pangkat mengikuti golongan bila UPT tidak menuliskannya.
+      pangkat: String(nilaiBaru.pangkat ?? getPangkat(golongan) ?? ""),
+      golonganRuang: golongan,
+      unitKerja,
+      eselon: (nilaiBaru.eselon as string | null) ?? null,
+      jenisJabatan: (nilaiBaru.jenisJabatan as string | null) ?? null,
+      tmtGolongan: (nilaiBaru.tmtGolongan as Date | null) ?? null,
+      mkgTahun,
+      mkgBulan,
+      // Gaji pokok dihitung dari tabel PP 5/2024 bila tidak diisi, sama dengan impor CSV.
+      gajiPokok: Number(nilaiBaru.gajiPokok ?? 0) || getGajiPokok(golongan, mkgTahun, mkgBulan) || 0,
+      tmtKgbTerakhir: (nilaiBaru.tmtKgbTerakhir as Date | null) ?? null,
+      tmtKgbBerikutnya: (nilaiBaru.tmtKgbBerikutnya as Date | null) ?? null,
+      statusHukdis: false,
+      tanggalHukdisBerakhir: null,
+      jenisHukdis: null,
+      keteranganHukdis: null,
+      aktif: true,
+      createdAt: sekarang,
+      updatedAt: sekarang,
+      konfirmasiUptTmt: null,
+      konfirmasiUptAt: null,
+      konfirmasiUptOleh: null,
+    };
+    await db.pegawai.create(pegawaiBaru);
+    pegawaiIdHasil = pegawaiBaru.id;
+    perubahan = [];
+  } else if (pegawaiLama && Object.keys(nilaiBaru).length > 0) {
+    await db.pegawai.update({ id: pegawaiLama.id }, { ...nilaiBaru, updatedAt: sekarang });
   }
-  await db.usulanPegawai.update({ id }, { status: "disetujui", ditinjauOleh: oleh, ditinjauAt: sekarang });
+
+  await db.usulanPegawai.update(
+    { id },
+    { status: "disetujui", ditinjauOleh: oleh, ditinjauAt: sekarang, pegawaiId: pegawaiIdHasil },
+  );
 
   const hukdis = ringkasHukdisUsulan(usulan);
-  const ringkasPerubahan = perubahan.length > 0
-    ? perubahan.map((p) => `${p.label} ${p.sekarang} → ${p.diusulkan}`).join("; ")
-    : "tanpa perubahan kolom";
+  const ringkasPerubahan =
+    usulan.jenis === "baru"
+      ? "pegawai baru ditambahkan ke data induk"
+      : perubahan.length > 0
+        ? perubahan.map((p) => `${p.label} ${p.sekarang} → ${p.diusulkan}`).join("; ")
+        : "tanpa perubahan kolom";
   logAudit({
     userId: peninjau.id,
     aksi: "setujui_usulan_pegawai",
-    detail: `Setujui usulan data ${pegawai.nama} (${pegawai.nip}) dari ${usulan.satker}, surat ${usulan.nomorSurat}: ${ringkasPerubahan}${hukdis ? `. Laporan hukuman disiplin: ${hukdis}` : ""}`,
-    targetNama: pegawai.nama,
+    detail: `Setujui usulan ${usulan.jenis === "baru" ? "pegawai baru" : "data"} ${namaUsulan} (${nipUsulan}) dari ${usulan.satker}, surat ${usulan.nomorSurat}: ${ringkasPerubahan}${hukdis ? `. Laporan hukuman disiplin: ${hukdis}` : ""}`,
+    targetNama: namaUsulan,
   });
 
   return NextResponse.json({

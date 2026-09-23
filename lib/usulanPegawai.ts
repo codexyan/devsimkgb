@@ -40,6 +40,28 @@ export const BIDANG_USULAN = [
 
 export type KunciBidangUsulan = (typeof BIDANG_USULAN)[number]["kunci"];
 
+/**
+ * Berkas dasar yang menyertai usulan. Tim keuangan meminta ketiga berkas selain suratnya agar masa
+ * kerja golongan dan gaji pokok dapat dicocokkan dengan dokumen aslinya, bukan dengan ingatan.
+ * `medan` adalah nama field pada formulir, `kunci` adalah kolom penyimpan jalur berkasnya.
+ */
+export const BERKAS_USULAN = [
+  { medan: "berkas", kunci: "pathBerkas", label: "Surat usulan Srikandi", wajibUntuk: "semua" },
+  { medan: "skTerakhir", kunci: "pathSkTerakhir", label: "SK KGB terakhir", wajibUntuk: "semua" },
+  { medan: "syaratCpns", kunci: "pathSyaratCpns", label: "Syarat pengangkatan PNS", wajibUntuk: "cpns" },
+  { medan: "skPangkat", kunci: "pathSkPangkat", label: "SK kenaikan pangkat terakhir", wajibUntuk: "pernah_naik_pangkat" },
+] as const satisfies readonly {
+  medan: string;
+  kunci: "pathBerkas" | "pathSkTerakhir" | "pathSyaratCpns" | "pathSkPangkat";
+  label: string;
+  wajibUntuk: string;
+}[];
+
+export const LABEL_JENIS_USULAN: Record<string, string> = {
+  perubahan: "Perbaikan data",
+  baru: "Pegawai baru",
+};
+
 const rupiah = (n: number) => "Rp" + new Intl.NumberFormat("id-ID").format(n);
 
 /** Nilai satu kolom sebagai teks yang dapat dibandingkan dan ditampilkan; kosong menjadi "—". */

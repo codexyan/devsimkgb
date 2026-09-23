@@ -49,8 +49,8 @@ UPT mengisi data pegawainya sendiri dan mengirimkannya sebagai **usulan**; Kanwi
 Polanya mengikuti `ProfileChangeRequest` yang sudah ada di aplikasi ini.
 
 - **Cakupan:** biodata lengkap, data KGB (golongan, masa kerja golongan, gaji pokok, TMT), nomor dan
-  tanggal SK terakhir sebagai dasarnya, serta laporan hukuman disiplin. Mengusulkan pegawai baru belum
-  termasuk; pegawai baru tetap ditambahkan Kanwil.
+  tanggal SK terakhir sebagai dasarnya, serta laporan hukuman disiplin. Mengusulkan pegawai baru semula
+  tidak termasuk; ini berubah pada hari yang sama, lihat perluasan di bawah.
 - **Peninjau:** Super Admin dan Tim SDM KGB (`canProcessKGB`), karena merekalah yang memakai datanya.
 - **Surat Srikandi:** nomor dan tanggalnya wajib, salinan PDF-nya diunggah (paling besar 5 MB, disimpan di
   R2 dengan awalan `usulan/`). Berkas hanya dapat dibuka peninjau Kanwil dan UPT pengusulnya.
@@ -85,3 +85,54 @@ berisi Dashboard. Menu **Profil Saya** ditambahkan.
   log aktivitas dengan rincian kolom yang berubah.
 - Hukuman disiplin tetap tidak terbaca UPT. Yang dikirim ke UPT hanya penanda "KGB ditunda", sesuai
   ADR-004; laporan yang mereka kirim sendiri boleh mereka lihat kembali di daftar usulan.
+
+## Perluasan 23 September 2026: pegawai baru, berkas dasar, dan Gaji Web satker
+
+Setelah alur di atas dipakai untuk kasus nyata (CPNS Rutan Rantau yang baru dilantik), pemilik
+menunjukkan tiga hal yang belum tertangani.
+
+### 1. UPT mengusulkan pegawai yang belum tercatat
+
+Usulan semula hanya dapat mengoreksi pegawai yang sudah ada, padahal kasus yang paling butuh jalur ini
+justru pegawai yang belum masuk SIM-KGB sama sekali. `usulan_pegawai` kini punya kolom `jenis`
+("perubahan" atau "baru"), `pegawai_id` boleh kosong, dan `nip` serta `unit_kerja` diisi pada usulan
+baru. Menyetujui usulan "baru" membuat data pegawainya, dengan gaji pokok dihitung dari tabel PP 5/2024
+bila UPT tidak mengisinya, sama dengan impor CSV. NIP diperiksa ulang saat persetujuan, karena Kanwil
+bisa saja sudah menambahkan pegawai itu sendiri sejak usulan dikirim.
+
+Mengusulkan pegawai baru tidak berarti UPT menulis ke data induk: yang membuat tetap Kanwil, lewat
+persetujuan.
+
+### 2. Empat berkas dasar, bukan satu
+
+Tim keuangan meminta dokumen dasarnya ikut, agar masa kerja golongan dapat dicocokkan dengan sumbernya:
+surat usulan Srikandi, SK KGB terakhir, syarat pengangkatan PNS (untuk kasus CPNS yang baru dilantik),
+dan SK kenaikan pangkat terakhir (karena memotong masa kerja golongan). Keempatnya disimpan di R2 dengan
+awalan `usulan/` dan hanya dapat dibuka peninjau Kanwil serta UPT pengusulnya.
+
+### 3. Yang merekam di Gaji Web berbeda antara Kanwil dan UPT
+
+Ini koreksi domain yang paling menentukan. Aplikasi semula memodelkan satu langkah keuangan: keuangan
+Kanwil mengonfirmasi SK lalu merekamnya di Gaji Web. Itu benar untuk pegawai Kanwil, tetapi **tiap UPT
+adalah satker tersendiri dengan DIPA dan operator gajinya sendiri**.
+
+| | Pegawai Kanwil | Pegawai UPT |
+| --- | --- | --- |
+| Pemeriksa SK | Keuangan Kanwil | Keuangan Kanwil (kroscek) |
+| Perekam di Gaji Web | Keuangan Kanwil | Operator gaji UPT |
+| Arti status "selesai" | Sudah direkam di Gaji Web | SK sudah dikirim kembali ke UPT |
+
+Tanggalnya tidak berbeda: kunci SPM gaji induk tanggal 15 bulan M-1 (PMK 62/2023 Pasal 225) berlaku sama
+untuk semua satker. Yang berbeda hanya pelakunya.
+
+Kolom `input_gaji_web_at` dan `input_gaji_web_by` pada `riwayat_kgb` sudah ada sejak awal dan dipakai apa
+adanya: untuk pegawai UPT diisi lewat `POST /api/upt/gaji-web` oleh akun Admin UPT satker itu, setelah
+KGB berstatus selesai. Ini penulisan keempat yang diizinkan peran admin_upt.
+
+## Akibat tambahan
+
+- Peran Admin UPT punya empat penulisan: konfirmasi data, usulan data (termasuk pegawai baru),
+  penandaan Gaji Web, dan ganti password sendiri.
+- Akun Admin UPT untuk ke-18 UPT dibuat 23 September 2026 dengan identitas sementara: nama
+  "Admin <nama satker>" dan NIP penanda berawalan 9 yang tidak mungkin menjadi NIP asli. Identitas
+  operator sebenarnya menggantikannya setelah tersedia; sampai saat itu jejak audit menunjuk nama generik.

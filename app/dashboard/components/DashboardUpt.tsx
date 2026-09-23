@@ -8,7 +8,7 @@ import { hitungDeadlineSDM } from "@/lib/tabelGaji";
 import { kunciBulanTmt, type RekapStatusKgb } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 import { BUTIR_KONFIRMASI_UPT, LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
-import { BIDANG_USULAN, STATUS_USULAN, type StatusUsulan } from "@/lib/usulanPegawai";
+import { BERKAS_USULAN, BIDANG_USULAN, LABEL_JENIS_USULAN, STATUS_USULAN, type StatusUsulan } from "@/lib/usulanPegawai";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
@@ -41,6 +41,7 @@ interface PegawaiUpt {
 
 interface UsulanTerkirim {
   id: string;
+  jenis: string;
   nama: string;
   nip: string;
   status: string;
@@ -71,6 +72,9 @@ interface SkUpt {
   konfirmasiKeuanganAt: string | null;
   rapelan: boolean;
   berkasAda: boolean;
+  /** Penanda KGB sudah direkam di Gaji Web satker oleh operator gaji UPT. */
+  gajiWebAt: string | null;
+  gajiWebOleh: string | null;
 }
 
 interface DataUpt {
@@ -175,7 +179,11 @@ export default function DashboardUpt() {
   const [isianUsulan, setIsianUsulan] = useState<Record<string, string>>({});
   const [suratUsulan, setSuratUsulan] = useState({ nomorSurat: "", tanggalSurat: "", nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" });
   const [hukdisUsulan, setHukdisUsulan] = useState({ ada: false, jenis: "", nomorSk: "", tmtMulai: "", tmtBerakhir: "", keterangan: "" });
-  const [berkasUsulan, setBerkasUsulan] = useState<File | null>(null);
+  const [berkasUsulan, setBerkasUsulan] = useState<Record<string, File | null>>({});
+  /** "baru" saat UPT mengusulkan pegawai yang belum tercatat; dialognya sama, isiannya kosong. */
+  const [jenisUsulan, setJenisUsulan] = useState<"perubahan" | "baru">("perubahan");
+  const [dialogBaru, setDialogBaru] = useState(false);
+  const [nipBaru, setNipBaru] = useState("");
   const [usulan, setUsulan] = useState<UsulanTerkirim[]>([]);
 
   const muatUsulan = useCallback(async () => {
@@ -189,22 +197,39 @@ export default function DashboardUpt() {
     return () => clearTimeout(t);
   }, [muatUsulan]);
 
-  function bukaUsulan(p: PegawaiUpt) {
-    setDialogUsulan(p);
-    setIsianUsulan({ ...p.dataSekarang });
+  function kosongkanFormulir() {
     setSuratUsulan({ nomorSurat: "", tanggalSurat: "", nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" });
     setHukdisUsulan({ ada: false, jenis: "", nomorSk: "", tmtMulai: "", tmtBerakhir: "", keterangan: "" });
-    setBerkasUsulan(null);
+    setBerkasUsulan({});
+    setNipBaru("");
     setGalatKonfirmasi(null);
   }
 
+  function bukaUsulanBaru() {
+    setJenisUsulan("baru");
+    setDialogBaru(true);
+    setDialogUsulan(null);
+    setIsianUsulan({});
+    kosongkanFormulir();
+  }
+
+  function bukaUsulan(p: PegawaiUpt) {
+    setJenisUsulan("perubahan");
+    setDialogBaru(false);
+    setDialogUsulan(p);
+    setIsianUsulan({ ...p.dataSekarang });
+    kosongkanFormulir();
+  }
+
   async function kirimUsulan() {
-    if (!dialogUsulan) return;
+    if (!dialogUsulan && !dialogBaru) return;
     setMengirim(true);
     setGalatKonfirmasi(null);
     try {
       const form = new FormData();
-      form.set("pegawaiId", dialogUsulan.id);
+      form.set("jenis", jenisUsulan);
+      if (dialogUsulan) form.set("pegawaiId", dialogUsulan.id);
+      if (jenisUsulan === "baru") form.set("nip", nipBaru);
       form.set("nomorSurat", suratUsulan.nomorSurat);
       form.set("tanggalSurat", suratUsulan.tanggalSurat);
       form.set("nomorSkTerakhir", suratUsulan.nomorSkTerakhir);
@@ -219,7 +244,10 @@ export default function DashboardUpt() {
         form.set("hukdisTmtBerakhir", hukdisUsulan.tmtBerakhir);
         form.set("hukdisKeterangan", hukdisUsulan.keterangan);
       }
-      if (berkasUsulan) form.set("berkas", berkasUsulan);
+      for (const b of BERKAS_USULAN) {
+        const isi = berkasUsulan[b.medan];
+        if (isi) form.set(b.medan, isi);
+      }
 
       const res = await fetch("/api/upt/usulan", { method: "POST", body: form });
       const d = (await res.json().catch(() => ({}))) as { error?: string; jumlahPerubahan?: number };
@@ -227,14 +255,49 @@ export default function DashboardUpt() {
         setGalatKonfirmasi(d.error ?? "Usulan gagal dikirim");
         return;
       }
-      setKabar(`Usulan data ${dialogUsulan.nama} terkirim ke Kanwil (${d.jumlahPerubahan ?? 0} kolom). Anda akan melihat hasilnya di daftar usulan.`);
+      const namaTerkirim = dialogUsulan?.nama ?? isianUsulan.nama ?? "pegawai baru";
+      setKabar(
+        jenisUsulan === "baru"
+          ? `Usulan pegawai baru ${namaTerkirim} terkirim ke Kanwil. Pegawainya ditambahkan setelah usulan disetujui.`
+          : `Usulan data ${namaTerkirim} terkirim ke Kanwil. Anda akan melihat hasilnya di daftar usulan.`,
+      );
       setTimeout(() => setKabar(null), 7000);
       setDialogUsulan(null);
+      setDialogBaru(false);
       void muatUsulan();
     } catch {
       setGalatKonfirmasi("Usulan gagal dikirim");
     } finally {
       setMengirim(false);
+    }
+  }
+
+  const [menandaiGajiWeb, setMenandaiGajiWeb] = useState<string | null>(null);
+
+  /**
+   * UPT merekam KGB di Gaji Web satkernya sendiri, bukan keuangan Kanwil, karena tiap UPT satker
+   * tersendiri dengan operator gajinya sendiri. Penandaan ini yang menutup pekerjaan di sisi UPT.
+   */
+  async function tandaiGajiWeb(sk: SkUpt) {
+    setMenandaiGajiWeb(sk.id);
+    try {
+      const res = await fetch("/api/upt/gaji-web", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kgbId: sk.id }),
+      });
+      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setGalat(d.error ?? "Penandaan Gaji Web gagal disimpan");
+        return;
+      }
+      setKabar(`KGB ${sk.nama} ditandai sudah direkam di Gaji Web satker.`);
+      setTimeout(() => setKabar(null), 5000);
+      muat();
+    } catch {
+      setGalat("Penandaan Gaji Web gagal disimpan");
+    } finally {
+      setMenandaiGajiWeb(null);
     }
   }
 
@@ -333,17 +396,21 @@ export default function DashboardUpt() {
         </div>
       )}
 
-      {dialogUsulan && (
+      {(dialogUsulan || dialogBaru) && (
         <KerangkaModal
-          judul="Usulkan perbaikan data pegawai"
-          subjudul={`${dialogUsulan.nama} · ${dialogUsulan.nip}`}
+          judul={jenisUsulan === "baru" ? "Usulkan pegawai baru" : "Usulkan perbaikan data pegawai"}
+          subjudul={
+            dialogUsulan
+              ? `${dialogUsulan.nama} · ${dialogUsulan.nip}`
+              : "Pegawai yang belum tercatat di SIM-KGB, misalnya CPNS yang baru dilantik"
+          }
           ukuran="lg"
           sibuk={mengirim}
-          onTutup={() => setDialogUsulan(null)}
+          onTutup={() => { setDialogUsulan(null); setDialogBaru(false); }}
           onKirim={() => void kirimUsulan()}
           kaki={
             <>
-              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogUsulan(null)} disabled={mengirim}>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => { setDialogUsulan(null); setDialogBaru(false); }} disabled={mengirim}>
                 Batal
               </button>
               <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
@@ -354,8 +421,9 @@ export default function DashboardUpt() {
         >
           <PesanGalat pesan={galatKonfirmasi} />
           <Catatan>
-            Isian sudah diisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; yang dikosongkan
-            berarti tidak diusulkan berubah. Usulan baru berlaku setelah ditinjau dan disetujui Kanwil.
+            {jenisUsulan === "baru"
+              ? "Isi data pegawai sesuai SK pengangkatannya. Pegawai baru ditambahkan ke data induk setelah usulan ini ditinjau dan disetujui Kanwil."
+              : "Isian sudah diisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; yang dikosongkan berarti tidak diusulkan berubah. Usulan berlaku setelah ditinjau dan disetujui Kanwil."}
           </Catatan>
 
           <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
@@ -374,10 +442,17 @@ export default function DashboardUpt() {
                 <input className="kgbm-input" type="date" value={suratUsulan.tanggalSurat} onChange={(e) => setSuratUsulan((f) => ({ ...f, tanggalSurat: e.target.value }))} />
               </label>
             </div>
-            <label className="kgbm-label">
-              Berkas surat (PDF, paling besar 5 MB)
-              <input className="kgbm-input" type="file" accept="application/pdf" onChange={(e) => setBerkasUsulan(e.target.files?.[0] ?? null)} />
-            </label>
+            {BERKAS_USULAN.map((b) => (
+              <label className="kgbm-label" key={b.medan}>
+                {b.label} (PDF, paling besar 5 MB)
+                <input
+                  className="kgbm-input"
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => setBerkasUsulan((f) => ({ ...f, [b.medan]: e.target.files?.[0] ?? null }))}
+                />
+              </label>
+            ))}
             <div className="kgbm-grid2">
               <label className="kgbm-label">
                 Nomor SK terakhir (dasar gaji pokok)
@@ -394,9 +469,26 @@ export default function DashboardUpt() {
           <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
             <div className="kgbm-bagian-kepala">
               <p className="kgbm-bagian-judul">Data pegawai</p>
-              <p className="kgbm-bagian-ket">Isian yang dikosongkan berarti tidak diusulkan berubah</p>
+              <p className="kgbm-bagian-ket">
+                {jenisUsulan === "baru"
+                  ? "NIP, nama, golongan, dan TMT KGB berikutnya wajib diisi"
+                  : "Isian yang dikosongkan berarti tidak diusulkan berubah"}
+              </p>
             </div>
             <div className="kgbm-bagian-isi">
+              {jenisUsulan === "baru" && (
+                <label className="kgbm-label">
+                  <span className="kgbm-wajib">NIP</span>
+                  <input
+                    className="kgbm-input"
+                    inputMode="numeric"
+                    maxLength={18}
+                    value={nipBaru}
+                    onChange={(e) => setNipBaru(e.target.value.replace(/\D/g, ""))}
+                    placeholder="18 digit angka"
+                  />
+                </label>
+              )}
             <div className="kgbm-grid2">
               {BIDANG_USULAN.map((bidang) => (
                 <label className="kgbm-label" key={bidang.kunci}>
@@ -518,10 +610,13 @@ export default function DashboardUpt() {
                 </button>
               ))}
             </div>
+            <button type="button" className="dsb-tombol dsb-tombol-kecil" style={{ marginLeft: "auto" }} onClick={bukaUsulanBaru}>
+              Usulkan pegawai baru
+            </button>
             <input
               type="search"
               className="dsb-cari"
-              style={{ flex: "0 1 200px", marginLeft: "auto" }}
+              style={{ flex: "0 1 200px" }}
               aria-label="Cari pegawai"
               placeholder="Cari nama, NIP, jabatan"
               value={cari}
@@ -651,6 +746,23 @@ export default function DashboardUpt() {
                           {s.nomorSurat ? `${s.nomorSurat} · ` : ""}berkas belum diunggah Tim SDM
                         </span>
                       )}
+                      {s.gajiWebAt ? (
+                        <span className="dsb-kecil" style={{ display: "block", marginTop: 2 }} title={s.gajiWebOleh ?? undefined}>
+                          <span className="dsb-titik" data-nada="hijau" aria-hidden="true" /> Sudah direkam di Gaji Web{" "}
+                          {fmtTgl(s.gajiWebAt)}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="dsb-tombol dsb-tombol-kecil"
+                          data-jenis="garis"
+                          style={{ marginTop: 6 }}
+                          disabled={menandaiGajiWeb === s.id}
+                          onClick={() => void tandaiGajiWeb(s)}
+                        >
+                          {menandaiGajiWeb === s.id ? "Menyimpan…" : "Tandai sudah direkam di Gaji Web"}
+                        </button>
+                      )}
                     </span>
                   </li>
                 ))}
@@ -680,7 +792,7 @@ export default function DashboardUpt() {
                         <span className="dsb-titik" data-nada={cfg.nada} aria-hidden="true" />
                         <span className="min-w-0">
                           <span className="dsb-nama">{u.nama}</span>
-                          <span className="dsb-kecil"> · {cfg.label}</span>
+                          <span className="dsb-kecil"> · {LABEL_JENIS_USULAN[u.jenis] ?? u.jenis} · {cfg.label}</span>
                           <p className="dsb-kecil" style={{ margin: 0 }}>
                             Surat {u.nomorSurat} · {u.jumlahPerubahan} kolom{u.hukdisAda ? " · disertai laporan hukdis" : ""}
                           </p>

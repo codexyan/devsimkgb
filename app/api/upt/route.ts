@@ -145,6 +145,9 @@ export async function GET() {
         konfirmasiKeuanganAt: k.konfirmasiKeuanganAt ? new Date(k.konfirmasiKeuanganAt).toISOString() : null,
         rapelan: k.rapelanDitetapkan === true,
         berkasAda: !!surat?.pathFile,
+        // Langkah terakhir milik UPT: merekam KGB di Gaji Web satkernya sendiri.
+        gajiWebAt: k.inputGajiWebAt ? new Date(k.inputGajiWebAt).toISOString() : null,
+        gajiWebOleh: k.inputGajiWebBy ?? null,
       };
     })
     .sort((a, b) => (b.tmtKgbBaru ?? "").localeCompare(a.tmtKgbBaru ?? ""))

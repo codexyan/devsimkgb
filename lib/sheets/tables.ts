@@ -64,8 +64,18 @@ export interface RiwayatKGBRow {
  * perubahan pada kolom itu. Laporan hukuman disiplin ikut di sini karena UPT yang memegang SK-nya.
  */
 export interface UsulanPegawaiRow {
-  id: string; pegawaiId: string; satker: string; status: string;
-  nomorSurat: string; tanggalSurat: Date | null; pathBerkas: string | null;
+  id: string;
+  /** Kosong pada usulan pegawai baru, terisi setelah usulannya disetujui. */
+  pegawaiId: string | null;
+  satker: string; status: string;
+  /** "perubahan" untuk pegawai yang sudah tercatat, "baru" untuk pegawai yang diusulkan UPT. */
+  jenis: string;
+  /** Hanya pada usulan pegawai baru; pegawai lama dikenali dari pegawaiId. */
+  nip: string | null; unitKerja: string | null;
+  nomorSurat: string; tanggalSurat: Date | null;
+  /** Berkas dasar: surat usulan Srikandi, SK KGB terakhir, syarat pengangkatan PNS, SK kenaikan pangkat. */
+  pathBerkas: string | null; pathSkTerakhir: string | null;
+  pathSyaratCpns: string | null; pathSkPangkat: string | null;
   nama: string | null; tempatLahir: string | null; tanggalLahir: Date | null; jenisKelamin: string | null;
   pendidikanTerakhir: string | null; jabatan: string | null; pangkat: string | null; golonganRuang: string | null;
   eselon: string | null; jenisJabatan: string | null; tmtGolongan: Date | null;
@@ -116,8 +126,9 @@ export const defs = {
   UsulanPegawai: {
     tab: "UsulanPegawai",
     columns: [
-      s("id"), s("pegawaiId"), s("satker"), s("status"),
-      s("nomorSurat"), d("tanggalSurat"), s("pathBerkas"),
+      s("id"), s("pegawaiId"), s("satker"), s("status"), s("jenis"), s("nip"), s("unitKerja"),
+      s("nomorSurat"), d("tanggalSurat"),
+      s("pathBerkas"), s("pathSkTerakhir"), s("pathSyaratCpns"), s("pathSkPangkat"),
       s("nama"), s("tempatLahir"), d("tanggalLahir"), s("jenisKelamin"),
       s("pendidikanTerakhir"), s("jabatan"), s("pangkat"), s("golonganRuang"),
       s("eselon"), s("jenisJabatan"), d("tmtGolongan"),

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { canProcessKGB } from "@/lib/auth";
 import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
-import { STATUS_USULAN, type PerubahanUsulan, type StatusUsulan } from "@/lib/usulanPegawai";
+import { LABEL_JENIS_USULAN, STATUS_USULAN, type PerubahanUsulan, type StatusUsulan } from "@/lib/usulanPegawai";
 import { formatTanggalId } from "@/lib/waktu";
 
 interface Usulan {
@@ -15,9 +15,10 @@ interface Usulan {
   nip: string;
   unitKerja: string;
   status: string;
+  jenis: string;
   nomorSurat: string;
   tanggalSurat: string | null;
-  berkasAda: boolean;
+  berkas: { medan: string; label: string }[];
   perubahan: PerubahanUsulan[];
   nilaiDiusulkan: { kunci: string; label: string; nilai: string }[];
   hukdis: string | null;
@@ -247,6 +248,9 @@ export default function UsulanPage() {
                               <span className="dsb-titik" data-nada={cfg.nada} aria-hidden="true" />
                               {cfg.label}
                             </span>
+                            {u.jenis === "baru" && (
+                              <span className="dsb-tag" data-garis="" data-nada="hijau">{LABEL_JENIS_USULAN.baru}</span>
+                            )}
                             <span className="dsb-tag" data-garis="">
                               {(u.status === "menunggu" ? u.perubahan.length : u.nilaiDiusulkan.length)} kolom
                             </span>
@@ -256,6 +260,13 @@ export default function UsulanPage() {
 
                         {terbuka && (
                           <div className="usl-isi">
+                            {u.jenis === "baru" && (
+                              <Catatan nada="hijau">
+                                Pegawai ini belum tercatat di SIM-KGB. Menyetujui usulan akan menambahkannya ke data
+                                induk beserta jadwal KGB-nya, jadi periksa NIP, golongan, masa kerja golongan, dan TMT
+                                terhadap berkas yang dilampirkan.
+                              </Catatan>
+                            )}
                             {u.perubahan.length > 0 ? (
                               <table className="dsb-tabel dsb-tabel-sisip">
                                 <thead>
@@ -317,11 +328,18 @@ export default function UsulanPage() {
                             {u.alasanTolak && <Catatan nada="amber">Alasan penolakan: {u.alasanTolak}</Catatan>}
 
                             <div className="usl-aksi">
-                              {u.berkasAda && (
-                                <a className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" href={`/api/usulan/${u.id}/berkas`} target="_blank" rel="noopener noreferrer">
-                                  Lihat surat
+                              {u.berkas.map((b) => (
+                                <a
+                                  key={b.medan}
+                                  className="dsb-tombol dsb-tombol-kecil"
+                                  data-jenis="garis"
+                                  href={`/api/usulan/${u.id}/berkas?berkas=${b.medan}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {b.label}
                                 </a>
-                              )}
+                              ))}
                               {u.status === "menunggu" && (
                                 <>
                                   <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" disabled={sibuk} onClick={() => void tinjau(u, "setujui")}>

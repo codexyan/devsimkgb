@@ -5,18 +5,19 @@ import { newId } from "@/lib/sheets/id";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 import { pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
-import { BIDANG_USULAN, bandingkanUsulan, usulanKosong } from "@/lib/usulanPegawai";
+import { BERKAS_USULAN, BIDANG_USULAN, bandingkanUsulan, usulanKosong } from "@/lib/usulanPegawai";
 import { adaPenandaPdf, bacaTanggalInput } from "@/lib/prosesKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { SATKER } from "@/lib/satker";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
 import type { Session } from "next-auth";
 
 export const runtime = "nodejs";
 
-/** Surat usulan jauh lebih kecil dari SK; batasnya dibuat lebih ketat agar unggahan salah cepat tertolak. */
+/** Surat dan SK jauh lebih kecil dari SK bertanda tangan; batasnya dibuat lebih ketat per berkas. */
 const BATAS_BERKAS_BYTE = 5 * 1024 * 1024;
-const PESAN_TERLALU_BESAR = "Ukuran berkas surat paling besar 5 MB.";
+const PESAN_TERLALU_BESAR = "Ukuran tiap berkas paling besar 5 MB.";
 
 /** Satker akun yang login; null bila akunnya bukan Admin UPT yang tertaut satker. */
 async function satkerAkun(session: Session | null) {
@@ -48,18 +49,19 @@ export async function GET() {
 
   const daftar = semuaUsulan
     .map((u) => {
-      const p = pegawaiById.get(u.pegawaiId);
+      const p = u.pegawaiId ? pegawaiById.get(u.pegawaiId) : null;
       return {
         id: u.id,
         pegawaiId: u.pegawaiId,
-        nama: p?.nama ?? "-",
-        nip: p?.nip ?? "-",
+        jenis: u.jenis,
+        nama: p?.nama ?? u.nama ?? "-",
+        nip: p?.nip ?? u.nip ?? "-",
         status: u.status,
         nomorSurat: u.nomorSurat,
         tanggalSurat: u.tanggalSurat ? new Date(u.tanggalSurat).toISOString() : null,
-        berkasAda: !!u.pathBerkas,
+        berkas: BERKAS_USULAN.filter((b) => u[b.kunci]).map((b) => b.label),
         hukdisAda: !!u.hukdisAda,
-        jumlahPerubahan: p ? bandingkanUsulan(p, u).length : 0,
+        jumlahPerubahan: u.jenis === "baru" ? BIDANG_USULAN.length : p ? bandingkanUsulan(p, u).length : 0,
         diajukanAt: u.diajukanAt ? new Date(u.diajukanAt).toISOString() : null,
         diajukanOleh: u.diajukanOleh,
         ditinjauAt: u.ditinjauAt ? new Date(u.ditinjauAt).toISOString() : null,
@@ -72,15 +74,20 @@ export async function GET() {
   return NextResponse.json(daftar);
 }
 
-/** Kirim usulan baru. Berkas surat opsional; nomor dan tanggal surat wajib. */
+/**
+ * Kirim usulan baru, untuk pegawai yang sudah tercatat (jenis "perubahan") maupun pegawai yang belum
+ * ada di SIM-KGB (jenis "baru", mis. CPNS yang baru dilantik). Nomor dan tanggal surat wajib; berkas
+ * dasarnya opsional di sisi sistem, tetapi diminta tim keuangan agar masa kerja golongan dapat dicocokkan.
+ */
 export async function POST(req: Request) {
   await muatBatasInputSdm();
   const akun = await satkerAkun(await auth());
   if ("galat" in akun) return akun.galat;
   const { pengguna, kode } = akun;
+  const satker = SATKER.find((s) => s.kode === kode)!;
 
   const panjangIsi = Number(req.headers.get("content-length"));
-  if (Number.isFinite(panjangIsi) && panjangIsi > BATAS_BERKAS_BYTE + 64 * 1024)
+  if (Number.isFinite(panjangIsi) && panjangIsi > BERKAS_USULAN.length * BATAS_BERKAS_BYTE + 64 * 1024)
     return NextResponse.json({ error: PESAN_TERLALU_BESAR }, { status: 413 });
 
   let form: FormData;
@@ -91,29 +98,19 @@ export async function POST(req: Request) {
   }
 
   const teks = (kunci: string) => (form.get(kunci) as string | null)?.trim() || "";
-  const pegawaiId = teks("pegawaiId");
+  const jenis = teks("jenis") === "baru" ? "baru" : "perubahan";
   const nomorSurat = teks("nomorSurat");
-  const tanggalSuratTeks = teks("tanggalSurat");
-  if (!pegawaiId) return NextResponse.json({ error: "Pegawai wajib dipilih" }, { status: 400 });
   if (!nomorSurat) return NextResponse.json({ error: "Nomor surat usulan wajib diisi" }, { status: 400 });
-  const tanggalSurat = tanggalSuratTeks ? bacaTanggalInput(tanggalSuratTeks) : null;
+  const tanggalSurat = teks("tanggalSurat") ? bacaTanggalInput(teks("tanggalSurat")) : null;
   if (!tanggalSurat) return NextResponse.json({ error: "Tanggal surat usulan wajib diisi dan harus valid" }, { status: 400 });
 
-  const pegawai = await db.pegawai.findUnique({ id: pegawaiId });
-  // Pegawai satker lain dijawab sama dengan yang tidak ada, agar keberadaannya tidak terbaca dari luar.
-  if (!pegawai || pegawaiSatker([pegawai], kode).length === 0)
-    return NextResponse.json({ error: "Pegawai tidak ditemukan di satker ini" }, { status: 404 });
-
-  // Isian kosong menjadi null: berarti UPT tidak mengusulkan perubahan pada kolom itu. Angka nol tetap
-  // nilai yang sah, misalnya masa kerja golongan 0 tahun bagi pegawai yang belum pernah KGB.
+  // Isian kosong menjadi null: pada usulan perubahan berarti kolom itu tidak diusulkan berubah.
+  // Angka nol tetap nilai yang sah, misalnya masa kerja golongan 0 tahun bagi pegawai yang belum pernah KGB.
   const isian: Partial<UsulanPegawaiRow> = {};
   const setIsian = (kunci: string, nilai: unknown) => { (isian as Record<string, unknown>)[kunci] = nilai; };
   for (const bidang of BIDANG_USULAN) {
     const mentah = teks(bidang.kunci);
-    if (!mentah) {
-      setIsian(bidang.kunci, null);
-      continue;
-    }
+    if (!mentah) { setIsian(bidang.kunci, null); continue; }
     if (bidang.jenis === "tanggal") {
       const t = bacaTanggalInput(mentah);
       if (!t) return NextResponse.json({ error: `${bidang.label} tidak valid` }, { status: 400 });
@@ -129,50 +126,75 @@ export async function POST(req: Request) {
     setIsian(bidang.kunci, mentah);
   }
 
+  let pegawaiId: string | null = null;
+  let nipBaru: string | null = null;
+  let namaUntukCatatan = "";
+
+  if (jenis === "baru") {
+    // Pegawai yang belum tercatat: identitasnya berasal dari usulan ini, jadi wajib lengkap.
+    nipBaru = teks("nip");
+    if (!/^\d{18}$/.test(nipBaru)) return NextResponse.json({ error: "NIP harus tepat 18 digit angka" }, { status: 400 });
+    if (!isian.nama) return NextResponse.json({ error: "Nama lengkap wajib diisi" }, { status: 400 });
+    if (!isian.golonganRuang) return NextResponse.json({ error: "Golongan ruang wajib diisi" }, { status: 400 });
+    if (!isian.tmtKgbBerikutnya) return NextResponse.json({ error: "TMT KGB berikutnya wajib diisi" }, { status: 400 });
+    const bentrokPegawai = await db.pegawai.findUnique({ nip: nipBaru });
+    if (bentrokPegawai)
+      return NextResponse.json({ error: `NIP ${nipBaru} sudah tercatat atas nama ${bentrokPegawai.nama}` }, { status: 409 });
+    const usulanSama = (await db.usulanPegawai.findMany({ where: { nip: nipBaru, status: "menunggu" } })) as UsulanPegawaiRow[];
+    if (usulanSama.length > 0)
+      return NextResponse.json({ error: `Usulan untuk NIP ${nipBaru} masih menunggu tinjauan Kanwil` }, { status: 409 });
+    namaUntukCatatan = String(isian.nama);
+  } else {
+    pegawaiId = teks("pegawaiId");
+    if (!pegawaiId) return NextResponse.json({ error: "Pegawai wajib dipilih" }, { status: 400 });
+    const pegawai = await db.pegawai.findUnique({ id: pegawaiId });
+    // Pegawai satker lain dijawab sama dengan yang tidak ada, agar keberadaannya tidak terbaca dari luar.
+    if (!pegawai || pegawaiSatker([pegawai], kode).length === 0)
+      return NextResponse.json({ error: "Pegawai tidak ditemukan di satker ini" }, { status: 404 });
+    namaUntukCatatan = pegawai.nama;
+
+    const hukdisAdaCek = teks("hukdisAda") === "true";
+    if (usulanKosong(pegawai, { ...isian, hukdisAda: hukdisAdaCek }))
+      return NextResponse.json(
+        { error: "Tidak ada yang diusulkan: semua isian sama dengan data yang tercatat, dan tidak ada laporan hukuman disiplin." },
+        { status: 400 },
+      );
+    // Satu usulan menunggu per pegawai, agar antrian tinjauan tidak berisi dua versi yang saling menimpa.
+    const menunggu = await db.usulanPegawai.findMany({ where: { pegawaiId, status: "menunggu" } });
+    if (menunggu.length > 0)
+      return NextResponse.json(
+        { error: "Masih ada usulan pegawai ini yang menunggu tinjauan Kanwil. Tunggu hasilnya lebih dulu." },
+        { status: 409 },
+      );
+  }
+
   const hukdisAda = teks("hukdisAda") === "true";
-  const hukdisTmtMulaiTeks = teks("hukdisTmtMulai");
-  const hukdisTmtBerakhirTeks = teks("hukdisTmtBerakhir");
-  const hukdisTmtMulai = hukdisTmtMulaiTeks ? bacaTanggalInput(hukdisTmtMulaiTeks) : null;
-  const hukdisTmtBerakhir = hukdisTmtBerakhirTeks ? bacaTanggalInput(hukdisTmtBerakhirTeks) : null;
-  if (hukdisTmtMulaiTeks && !hukdisTmtMulai)
+  const hukdisTmtMulai = teks("hukdisTmtMulai") ? bacaTanggalInput(teks("hukdisTmtMulai")) : null;
+  const hukdisTmtBerakhir = teks("hukdisTmtBerakhir") ? bacaTanggalInput(teks("hukdisTmtBerakhir")) : null;
+  if (teks("hukdisTmtMulai") && !hukdisTmtMulai)
     return NextResponse.json({ error: "TMT mulai hukuman disiplin tidak valid" }, { status: 400 });
-  if (hukdisTmtBerakhirTeks && !hukdisTmtBerakhir)
+  if (teks("hukdisTmtBerakhir") && !hukdisTmtBerakhir)
     return NextResponse.json({ error: "TMT berakhir hukuman disiplin tidak valid" }, { status: 400 });
 
-  const calon: Partial<UsulanPegawaiRow> = { ...isian, hukdisAda };
-  if (usulanKosong(pegawai, calon))
-    return NextResponse.json(
-      { error: "Tidak ada yang diusulkan: semua isian sama dengan data yang tercatat, dan tidak ada laporan hukuman disiplin." },
-      { status: 400 },
-    );
-
-  // Satu usulan menunggu per pegawai, agar antrian tinjauan tidak berisi dua versi yang saling menimpa.
-  const menunggu = await db.usulanPegawai.findMany({ where: { pegawaiId, status: "menunggu" } });
-  if (menunggu.length > 0)
-    return NextResponse.json(
-      { error: "Masih ada usulan pegawai ini yang menunggu tinjauan Kanwil. Tunggu hasilnya lebih dulu." },
-      { status: 409 },
-    );
-
   // Berkas disimpan setelah semua pemeriksaan lolos, agar permintaan yang ditolak tidak meninggalkan objek di R2.
-  let pathBerkas: string | null = null;
-  const berkas = form.get("berkas");
-  if (berkas instanceof File && berkas.size > 0) {
-    if (berkas.type !== "application/pdf")
-      return NextResponse.json({ error: "Berkas surat harus PDF" }, { status: 400 });
-    if (berkas.size > BATAS_BERKAS_BYTE)
+  const jalurBerkas: Partial<Record<(typeof BERKAS_USULAN)[number]["kunci"], string>> = {};
+  for (const berkas of BERKAS_USULAN) {
+    const isi = form.get(berkas.medan);
+    if (!(isi instanceof File) || isi.size === 0) continue;
+    if (isi.type !== "application/pdf")
+      return NextResponse.json({ error: `${berkas.label} harus berupa PDF` }, { status: 400 });
+    if (isi.size > BATAS_BERKAS_BYTE)
       return NextResponse.json({ error: PESAN_TERLALU_BESAR }, { status: 413 });
-    if (!adaPenandaPdf(new Uint8Array(await berkas.slice(0, 1024).arrayBuffer())))
-      return NextResponse.json({ error: "Berkas yang diunggah bukan PDF yang valid" }, { status: 400 });
-    pathBerkas = `usulan/${kode}_${Date.now()}.pdf`;
+    if (!adaPenandaPdf(new Uint8Array(await isi.slice(0, 1024).arrayBuffer())))
+      return NextResponse.json({ error: `${berkas.label} bukan PDF yang valid` }, { status: 400 });
+    const jalur = `usulan/${kode}_${berkas.medan}_${Date.now()}.pdf`;
     try {
       const { env } = await getCloudflareContext({ async: true });
-      await env.SK_BUCKET.put(pathBerkas, await berkas.arrayBuffer(), {
-        httpMetadata: { contentType: "application/pdf" },
-      });
+      await env.SK_BUCKET.put(jalur, await isi.arrayBuffer(), { httpMetadata: { contentType: "application/pdf" } });
     } catch {
-      return NextResponse.json({ error: "Gagal menyimpan berkas surat. Coba lagi." }, { status: 500 });
+      return NextResponse.json({ error: `Gagal menyimpan ${berkas.label}. Coba lagi.` }, { status: 500 });
     }
+    jalurBerkas[berkas.kunci] = jalur;
   }
 
   const baris: UsulanPegawaiRow = {
@@ -180,9 +202,15 @@ export async function POST(req: Request) {
     pegawaiId,
     satker: kode,
     status: "menunggu",
+    jenis,
+    nip: nipBaru,
+    unitKerja: jenis === "baru" ? satker.nama : null,
     nomorSurat,
     tanggalSurat,
-    pathBerkas,
+    pathBerkas: jalurBerkas.pathBerkas ?? null,
+    pathSkTerakhir: jalurBerkas.pathSkTerakhir ?? null,
+    pathSyaratCpns: jalurBerkas.pathSyaratCpns ?? null,
+    pathSkPangkat: jalurBerkas.pathSkPangkat ?? null,
     nama: null, tempatLahir: null, tanggalLahir: null, jenisKelamin: null,
     pendidikanTerakhir: null, jabatan: null, pangkat: null, golonganRuang: null,
     eselon: null, jenisJabatan: null, tmtGolongan: null,
@@ -207,13 +235,15 @@ export async function POST(req: Request) {
 
   await db.usulanPegawai.create(baris);
 
-  const jumlah = bandingkanUsulan(pegawai, baris).length;
   logAudit({
     userId: pengguna.id,
     aksi: "usul_data_pegawai",
-    detail: `Usulan data ${pegawai.nama} (${pegawai.nip}) dari ${kode}, surat ${nomorSurat}: ${jumlah} kolom diusulkan berubah${hukdisAda ? ", disertai laporan hukuman disiplin" : ""}`,
-    targetNama: pegawai.nama,
+    detail:
+      jenis === "baru"
+        ? `Usulan pegawai baru ${namaUntukCatatan} (${nipBaru}) dari ${satker.nama}, surat ${nomorSurat}${hukdisAda ? ", disertai laporan hukuman disiplin" : ""}`
+        : `Usulan data ${namaUntukCatatan} dari ${satker.nama}, surat ${nomorSurat}${hukdisAda ? ", disertai laporan hukuman disiplin" : ""}`,
+    targetNama: namaUntukCatatan,
   });
 
-  return NextResponse.json({ ok: true, id: baris.id, jumlahPerubahan: jumlah }, { status: 201 });
+  return NextResponse.json({ ok: true, id: baris.id, jenis }, { status: 201 });
 }

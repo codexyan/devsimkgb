@@ -668,14 +668,24 @@ export default async function PanduanPage() {
                   sumber salah masa kerja golongan. Karena itu UPT dapat mengirim datanya sendiri: buka Dashboard,
                   pilih pegawai, lalu tekan Usulkan perbaikan data.
                 </p>
+                <p>
+                  Pegawai yang belum tercatat di SIM-KGB, misalnya CPNS yang baru dilantik, diusulkan lewat tombol
+                  <strong> Usulkan pegawai baru</strong> di kepala daftar pegawai. Isian NIP, nama, golongan ruang, dan
+                  TMT KGB berikutnya wajib; gaji pokok dihitung sendiri dari tabel PP 5/2024 bila dikosongkan. Pegawainya
+                  ditambahkan ke data induk setelah Kanwil menyetujui usulan itu.
+                </p>
                 <ol>
                   <li>
-                    Isian sudah terisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; isian yang
-                    dikosongkan berarti tidak diusulkan berubah.
+                    Pada usulan perbaikan, isian sudah terisi dengan data yang tercatat di Kanwil. Ubah yang perlu
+                    diperbaiki saja; isian yang dikosongkan berarti tidak diusulkan berubah.
                   </li>
                   <li>
-                    Cantumkan nomor dan tanggal surat usulan yang dikirim lewat Srikandi, dan unggah salinan PDF-nya
-                    (paling besar 5 MB) agar Kanwil dapat mencocokkan tanpa membuka Srikandi.
+                    Cantumkan nomor dan tanggal surat usulan yang dikirim lewat Srikandi, lalu unggah berkas dasarnya,
+                    masing-masing PDF paling besar 5 MB: <strong>surat usulan Srikandi</strong>,
+                    <strong> SK KGB terakhir</strong>, <strong>syarat pengangkatan PNS</strong> bila pegawainya CPNS yang
+                    baru dilantik, dan <strong>SK kenaikan pangkat terakhir</strong> bila pernah naik pangkat. Ketiga
+                    berkas terakhir diminta tim keuangan agar masa kerja golongan dapat dicocokkan dengan dokumen
+                    aslinya, bukan dengan ingatan.
                   </li>
                   <li>
                     Sebutkan nomor dan tanggal SK terakhir yang menjadi dasar gaji pokok sekarang, yaitu SK KGB
@@ -691,6 +701,49 @@ export default async function PanduanPage() {
                   menyetujui atau menolak dengan alasan. Hasilnya terlihat di panel Usulan terkirim pada dashboard UPT.
                   Satu pegawai hanya boleh punya satu usulan yang menunggu, agar antrian tinjauan tidak berisi dua
                   versi yang saling menimpa.
+                </p>
+
+                <h3 className="pub-h3">Setelah SK terbit: yang merekam di Gaji Web</h3>
+                <p>
+                  Tiap UPT adalah satuan kerja tersendiri dengan daftar isian pelaksanaan anggaran dan operator gajinya
+                  sendiri. Karena itu, untuk pegawai UPT, keuangan Kanwil hanya <strong>mengkroscek</strong> SK lalu
+                  mengirimkannya kembali ke UPT; yang merekam kenaikan gaji berkala di aplikasi Gaji Web adalah operator
+                  gaji UPT. Untuk pegawai Kanwil, keduanya dikerjakan keuangan Kanwil.
+                </p>
+                <div className="pub-table-wrap" tabIndex={0} role="region" aria-label="Tabel pembagian tugas setelah SK terbit">
+                  <table className="pub-table">
+                    <caption>Siapa mengerjakan apa setelah SK ditandatangani</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Langkah</th>
+                        <th scope="col">Pegawai Kanwil</th>
+                        <th scope="col">Pegawai UPT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">Memeriksa SK</th>
+                        <td>Keuangan Kanwil</td>
+                        <td>Keuangan Kanwil</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Merekam di Gaji Web</th>
+                        <td>Keuangan Kanwil</td>
+                        <td>Operator gaji UPT</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Arti status Selesai</th>
+                        <td>Sudah direkam di Gaji Web</td>
+                        <td>SK sudah dikirim kembali ke UPT</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p>
+                  Setelah merekamnya, UPT menekan <strong>Tandai sudah direkam di Gaji Web</strong> pada daftar SK terbit
+                  di dashboardnya, sehingga Kanwil tahu pekerjaan satu siklus itu benar-benar tuntas. Batas waktunya sama
+                  untuk semua satuan kerja, karena SPM gaji induk bulan berjalan tetap paling lambat tanggal 15 bulan
+                  sebelumnya.
                 </p>
 
                 <h3 className="pub-h3">Yang wajib dipastikan sebelum surat dikirim</h3>
