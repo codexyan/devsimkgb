@@ -91,3 +91,28 @@ Dasar hukum panduan menambah PP 11/2017 jo PP 17/2020 dan SE Kepala BKN Nomor 10
   tetap ada di tab "Semua".
 - Akun Admin UPT tidak dapat menandai notifikasi dibaca. Daftarnya selalu menampilkan keadaan terkini;
   ini konsekuensi status dibaca yang dipakai bersama, sesuai ADR-004 yang menjadikan peran ini lihat-saja.
+
+## Perluasan 23 September 2026: KPPN mitra dapat diatur dari Pengaturan
+
+Daftar satker beserta KPPN mitranya tertanam di `lib/satker.ts`. Untuk namanya itu memang tepat, sebab
+nama satker berubah hanya lewat peraturan. Kemitraan KPPN lain ceritanya: kantor bayar dapat berpindah,
+dan KPPN baru dapat dibuka, tanpa menunggu rilis aplikasi. Selama nilainya hanya ada di kode, satu
+perpindahan menuntut penyuntingan kode dan penggelaran ulang, padahal akibatnya langsung terasa: SK
+kenaikan gaji berkala ditujukan ke KPPN mitra satker, jadi nilai yang usang berarti SK dikirim ke
+kantor bayar yang keliru.
+
+Sekarang Super Admin mengubahnya di Pengaturan, bagian KPPN mitra satker. Yang disimpan di
+`konfigurasi_kanwil.kppn_satker` hanya satker yang berbeda dari bawaannya, dalam bentuk JSON, sehingga
+bawaan di `lib/satker.ts` tetap menjadi sumber kebenaran untuk sisanya dan penyesuaian yang dicabut
+kembali dengan sendirinya.
+
+Penerapannya mengikuti pola batas input SDM: modul murni `lib/kppnSatker.ts` menerapkan penyesuaian ke
+daftar satker, dan `lib/muatKppnSatker.ts` memuatnya dengan cache 60 detik per isolate. Setiap titik
+masuk server yang menampilkan atau memakai KPPN memanggil pemuat itu lebih dulu: rute satker, rute UPT,
+rute pembuatan SK, rute Pengaturan, dan halaman panduan publik. `lib/kppnSatker.test.ts` memeriksa
+bahwa tidak ada berkas server yang memakai KPPN tanpa memanggilnya, sehingga kelalaian ketahuan saat
+uji, bukan saat SK salah alamat.
+
+Nama KPPN disimpan sebagai teks biasa, bukan pilihan tertutup. Pengaturan menawarkan kelima KPPN yang
+sudah dikenal, dan menyediakan isian bebas untuk nama lain: membuka KPPN baru tidak boleh menuntut
+rilis aplikasi.

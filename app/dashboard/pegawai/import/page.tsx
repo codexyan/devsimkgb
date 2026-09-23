@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 import { canEditPegawai } from "@/lib/auth";
@@ -213,6 +213,23 @@ export default function ImportPage() {
   const role = useRole();
   const bolehImpor = canEditPegawai(role);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * KPPN mitra yang berlaku menurut Pengaturan. Daftar satker di bundel peramban hanya memuat KPPN
+   * bawaan, sedangkan penyesuaiannya tersimpan di server.
+   */
+  const [kppnSatker, setKppnSatker] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let batal = false;
+    fetch("/api/satker/kppn")
+      .then((r) => (r.ok ? (r.json() as Promise<{ kode: string; kppn: string }[]>) : []))
+      .catch(() => [])
+      .then((daftar) => {
+        if (!batal && Array.isArray(daftar)) setKppnSatker(Object.fromEntries(daftar.map((s) => [s.kode, s.kppn])));
+      });
+    return () => { batal = true; };
+  }, []);
 
   const [step, setStep] = useState<"upload" | "preview" | "hasil">("upload");
   const [showPanduan, setShowPanduan] = useState(false);
@@ -630,7 +647,7 @@ export default function ImportPage() {
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5">
                 {SATKER.map((s) => (
                   <li key={s.kode} className="text-xs" style={{ color: "var(--dt3)" }}>
-                    {s.nama} <span style={{ color: "var(--dt5)" }}>(KPPN {s.kppn})</span>
+                    {s.nama} <span style={{ color: "var(--dt5)" }}>(KPPN {kppnSatker[s.kode] ?? s.kppn})</span>
                   </li>
                 ))}
               </ul>

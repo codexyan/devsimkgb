@@ -34,7 +34,15 @@ const KOSONG: Konfigurasi = {
   batasInputSdm: BATAS_INPUT_SDM_BAWAAN,
 };
 
-type IdBagian = "pejabat" | "dokumen" | "jadwal" | "notifikasi" | "keamanan" | "kontak" | "pemeriksaan";
+type IdBagian = "pejabat" | "dokumen" | "jadwal" | "kppn" | "notifikasi" | "keamanan" | "kontak" | "pemeriksaan";
+
+/** Satu satker beserta KPPN mitra yang berlaku dan bawaannya, dikirim rute Pengaturan. */
+interface SatkerKppn {
+  kode: string;
+  nama: string;
+  kppn: string;
+  bawaan: string;
+}
 
 function Bidang({ label, petunjuk, nilai, onUbah, contoh, jenis = "text", satuan }: {
   label: string; petunjuk?: string; nilai: string; onUbah: (v: string) => void;
@@ -104,6 +112,11 @@ export default function PengaturanPage() {
   const [tersimpan, setTersimpan] = useState(false);
   const [adaPenandatangan, setAdaPenandatangan] = useState(false);
   const [bagian, setBagian] = useState<IdBagian>("pejabat");
+  // KPPN mitra disimpan terpisah dari isian lain karena bentuknya peta kode satker ke nama KPPN.
+  const [satkerKppn, setSatkerKppn] = useState<SatkerKppn[]>([]);
+  const [opsiKppn, setOpsiKppn] = useState<string[]>([]);
+  const [kppn, setKppn] = useState<Record<string, string>>({});
+  const [kppnAwal, setKppnAwal] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let batal = false;
@@ -129,12 +142,21 @@ export default function PengaturanPage() {
           setForm(c);
           setAwal(c);
         } else setAwal(null);
+        if (cfg) {
+          const daftar = Array.isArray(cfg.satkerKppn) ? (cfg.satkerKppn as SatkerKppn[]) : [];
+          const peta = Object.fromEntries(daftar.map((s) => [s.kode, s.kppn]));
+          setSatkerKppn(daftar);
+          setOpsiKppn(Array.isArray(cfg.pilihanKppn) ? (cfg.pilihanKppn as string[]) : []);
+          setKppn(peta);
+          setKppnAwal(peta);
+        }
       })
       .finally(() => { if (!batal) setMemuat(false); });
     return () => { batal = true; };
   }, []);
 
-  const berubah = !awal || (Object.keys(KOSONG) as (keyof Konfigurasi)[]).some((k) => form[k] !== awal[k]);
+  const kppnBerubah = satkerKppn.some((s) => (kppn[s.kode] ?? s.bawaan) !== (kppnAwal[s.kode] ?? s.bawaan));
+  const berubah = !awal || kppnBerubah || (Object.keys(KOSONG) as (keyof Konfigurasi)[]).some((k) => form[k] !== awal[k]);
   const angka = (v: string, bawaan: number) => {
     const n = parseInt(v.replace(/\D/g, ""), 10);
     return Number.isFinite(n) ? n : bawaan;
@@ -151,6 +173,7 @@ export default function PengaturanPage() {
           waAdmin: form.waAdmin.trim(), notifKgbH1: form.notifKgbH1,
           notifKgbH2: form.notifKgbH2, sesiTimeoutMenit: form.sesiTimeoutMenit,
           batasInputSdm: form.batasInputSdm,
+          kppnSatker: kppn,
         }),
       });
       const d = (await res.json()) as Record<string, unknown> & { error?: string };
@@ -166,6 +189,14 @@ export default function PengaturanPage() {
       };
       // Halaman dashboard lain di tab ini langsung memakai batas yang baru disimpan.
       aturBatasInputSdm(c.batasInputSdm);
+      if (Array.isArray(d.satkerKppn)) {
+        const daftar = d.satkerKppn as SatkerKppn[];
+        const peta = Object.fromEntries(daftar.map((s) => [s.kode, s.kppn]));
+        setSatkerKppn(daftar);
+        setKppn(peta);
+        setKppnAwal(peta);
+        if (Array.isArray(d.pilihanKppn)) setOpsiKppn(d.pilihanKppn as string[]);
+      }
       setForm(c); setAwal(c); setTersimpan(true);
       setTimeout(() => setTersimpan(false), 4000);
     } catch {
@@ -180,6 +211,7 @@ export default function PengaturanPage() {
       { id: "pejabat" as const, label: "Penandatangan surat", ket: "Dipilih otomatis menurut tanggal surat", lengkap: adaPenandatangan },
       { id: "dokumen" as const, label: "Dasar hukum KGB", ket: "Peraturan Pemerintah yang dirujuk SK", lengkap: !!form.nomorPP.trim() },
       { id: "jadwal" as const, label: "Jadwal proses KGB", ket: "Batas input Tim SDM sebelum rekon gaji", lengkap: true },
+      { id: "kppn" as const, label: "KPPN mitra satker", ket: "Kantor bayar tujuan SK tiap satker", lengkap: true },
       { id: "notifikasi" as const, label: "Notifikasi KGB", ket: "Kapan pengingat mulai dikirim", lengkap: true },
       { id: "keamanan" as const, label: "Keamanan sesi", ket: "Keluar otomatis saat perangkat menganggur", lengkap: true },
       { id: "kontak" as const, label: "Kontak WhatsApp", ket: "Tombol lupa password di halaman masuk", lengkap: !!form.waAdmin.trim() },
@@ -334,6 +366,58 @@ export default function PengaturanPage() {
                   </>
                 )}
 
+                {bagian === "kppn" && (
+                  <>
+                    <p className="dsb-catatan">
+                      SK kenaikan gaji berkala ditujukan ke KPPN mitra satker, sehingga daftar ini menentukan ke
+                      kantor bayar mana SK dikirim. Ubah hanya bila kemitraannya memang berpindah; satker yang tidak
+                      diubah mengikuti daftar bawaan aplikasi.
+                    </p>
+                    <ul className="atr-kppn">
+                      {satkerKppn.map((s) => {
+                        const nilai = kppn[s.kode] ?? s.bawaan;
+                        const manual = nilai === "" || !opsiKppn.includes(nilai);
+                        return (
+                          <li key={s.kode}>
+                            <span className="min-w-0">
+                              <span className="dsb-nama">{s.nama}</span>
+                              {nilai !== s.bawaan && (
+                                <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-amber)" }}>
+                                  Disesuaikan, bawaannya KPPN {s.bawaan}
+                                </p>
+                              )}
+                            </span>
+                            <span className="atr-kppn-isian">
+                              <select
+                                className="dsb-pilih"
+                                aria-label={`KPPN mitra ${s.nama}`}
+                                value={manual ? "__lain__" : nilai}
+                                onChange={(e) =>
+                                  setKppn((k) => ({ ...k, [s.kode]: e.target.value === "__lain__" ? "" : e.target.value }))
+                                }
+                              >
+                                {opsiKppn.map((o) => (
+                                  <option key={o} value={o}>KPPN {o}</option>
+                                ))}
+                                <option value="__lain__">KPPN lain, ketik sendiri</option>
+                              </select>
+                              {manual && (
+                                <input
+                                  className="dsb-cari"
+                                  value={nilai}
+                                  placeholder="Nama KPPN"
+                                  aria-label={`Nama KPPN mitra ${s.nama}`}
+                                  onChange={(e) => setKppn((k) => ({ ...k, [s.kode]: e.target.value }))}
+                                />
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </>
+                )}
+
                 {bagian === "notifikasi" && (
                   <>
                     <div className="atr-kisi2">
@@ -435,5 +519,11 @@ const GAYA = `
 .atr-isian { position: relative; display: block; }
 .atr-satuan { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--dt5); pointer-events: none; }
 .atr-isi .dsb-jadwal li { grid-template-columns: minmax(0, 1fr) auto; }
+.atr-kppn { display: grid; gap: 8px; }
+.atr-kppn li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 240px); gap: 10px; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid var(--ln2); }
+.atr-kppn li:last-child { border-bottom: 0; }
+.atr-kppn-isian { display: grid; gap: 6px; }
+@media (max-width: 640px) { .atr-kppn li { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .atr-kisi2 { grid-template-columns: 1fr; } }
 `;

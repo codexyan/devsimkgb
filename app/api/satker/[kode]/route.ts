@@ -8,12 +8,14 @@ import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { isoTanggalKalender, pilihKgbSiklus, rapelanSiklus } from "@/lib/rekapKgb";
 import { kodeSatkerPegawai, rekapPerSatker } from "@/lib/rekapSatker";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { muatKppnSatker } from "@/lib/muatKppnSatker";
 
 export const runtime = "nodejs";
 
 // Satu satker: ringkasan KGB dan daftar pegawai aktifnya dengan status siklus KGB berjalan.
 export async function GET(_req: Request, { params }: { params: Promise<{ kode: string }> }) {
   await muatBatasInputSdm();
+  await muatKppnSatker();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

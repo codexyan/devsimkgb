@@ -209,6 +209,23 @@ export default function PegawaiPage() {
     }
   }
 
+  /**
+   * KPPN mitra yang berlaku menurut Pengaturan. Daftar satker di bundel peramban hanya memuat KPPN
+   * bawaan, sedangkan penyesuaiannya tersimpan di server.
+   */
+  const [kppnSatker, setKppnSatker] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let batal = false;
+    fetch("/api/satker/kppn")
+      .then((r) => (r.ok ? (r.json() as Promise<{ kode: string; kppn: string }[]>) : []))
+      .catch(() => [])
+      .then((daftar) => {
+        if (!batal && Array.isArray(daftar)) setKppnSatker(Object.fromEntries(daftar.map((s) => [s.kode, s.kppn])));
+      });
+    return () => { batal = true; };
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => {
       fetchAll();
@@ -1011,7 +1028,7 @@ export default function PegawaiPage() {
                       </select>
                       <p id="keterangan-unit-kerja" className="text-xs mt-1" style={{ color: satkerTerpilih ? "var(--dt5)" : "var(--st-amber)" }}>
                         {satkerTerpilih
-                          ? `KPPN mitra: ${satkerTerpilih.kppn}. SK KGB pegawai ini ditujukan ke KPPN tersebut.`
+                          ? `KPPN mitra: ${kppnSatker[satkerTerpilih.kode] ?? satkerTerpilih.kppn}. SK KGB pegawai ini ditujukan ke KPPN tersebut.`
                           : "Unit kerja tersimpan tidak cocok dengan daftar satker, sehingga SK KGB pegawai ini tidak dapat dibuat atau diunduh. Pilih satker yang benar lalu simpan."}
                       </p>
                     </div>

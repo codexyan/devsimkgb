@@ -11,6 +11,7 @@ import { statusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { BIDANG_USULAN } from "@/lib/usulanPegawai";
 import { SATKER } from "@/lib/satker";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { muatKppnSatker } from "@/lib/muatKppnSatker";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
 
 /** Kolom hukdis yang dipakai di sini; sisanya sengaja tidak dibaca agar tidak ikut terkirim. */
@@ -28,6 +29,7 @@ const BATAS_SK = 60;
  */
 export async function GET() {
   await muatBatasInputSdm();
+  await muatKppnSatker();
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

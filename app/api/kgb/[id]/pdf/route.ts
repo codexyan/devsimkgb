@@ -12,6 +12,7 @@ import { canProcessKGB, canViewKGB } from "@/lib/auth";
 import { tentukanPenandatangan, type JenisPenandatangan } from "@/lib/penandatangan";
 import { PENETAP_KANWIL } from "@/lib/penetapSk";
 import { cariSatker, SATKER_KANWIL } from "@/lib/satker";
+import { muatKppnSatker } from "@/lib/muatKppnSatker";
 import { tanggalKalender } from "@/lib/waktu";
 import { alasanTolakBuatSk, bacaTanggalInput, type SuratKgbTersimpan } from "@/lib/prosesKgb";
 import type { HukdisUntukKgb } from "@/lib/prosesKgb";
@@ -35,6 +36,9 @@ export async function POST(
   const session = await auth();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // KPPN tujuan SK mengikuti Pengaturan, bukan hanya daftar bawaan di lib/satker.ts.
+  await muatKppnSatker();
 
   const url = new URL(req.url);
   const isPreview = url.searchParams.get("preview") === "true";

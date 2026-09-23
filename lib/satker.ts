@@ -1,7 +1,11 @@
 // Satuan kerja di lingkungan Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan
 // beserta KPPN mitranya. SK kenaikan gaji berkala pegawai satker dikirim ke KPPN ini.
 
-type Kppn = "Banjarmasin" | "Barabai" | "Tanjung" | "Kotabaru" | "Pelaihari";
+/**
+ * KPPN yang sudah dikenal di wilayah ini. Nilai kppn pada satker bertipe string biasa, bukan union ini,
+ * sebab kemitraan KPPN dapat diubah lewat Pengaturan: KPPN baru bisa dibuka, dan satker bisa dipindah.
+ */
+export const KPPN_DIKENAL = ["Banjarmasin", "Barabai", "Tanjung", "Kotabaru", "Pelaihari"] as const;
 
 type JenisSatker ="kanwil" | "lapas" | "rutan" | "bapas" | "lpka";
 
@@ -9,7 +13,8 @@ export interface Satker {
   kode: string;
   nama: string;
   jenis: JenisSatker;
-  kppn: Kppn;
+  /** KPPN mitra yang berlaku; bawaannya di daftar ini, penyesuaiannya lewat Pengaturan (lib/kppnSatker.ts). */
+  kppn: string;
 }
 
 export const SATKER: Satker[] = [
@@ -89,8 +94,13 @@ export function cariSatker(unitKerja: string | null | undefined): Satker | undef
   return SATKER.find((s) => s.kode === teks) ?? SATKER_PER_KUNCI.get(kunciSatker(teks));
 }
 
-/** Satker dikelompokkan per KPPN, urut sesuai daftar SATKER. */
-export function satkerPerKppn(): { kppn: Kppn; satker: Satker[] }[] {
-  const urutan: Kppn[] = ["Banjarmasin", "Barabai", "Tanjung", "Kotabaru", "Pelaihari"];
-  return urutan.map((kppn) => ({ kppn, satker: SATKER.filter((s) => s.kppn === kppn) }));
+/**
+ * Satker dikelompokkan per KPPN. KPPN yang dikenal tampil lebih dulu sesuai urutannya, lalu KPPN lain
+ * yang muncul dari Pengaturan menyusul menurut abjad. KPPN tanpa satker tidak ditampilkan.
+ */
+export function satkerPerKppn(): { kppn: string; satker: Satker[] }[] {
+  const terpakai = [...new Set(SATKER.map((s) => s.kppn))];
+  const dikenal = KPPN_DIKENAL.filter((k) => terpakai.includes(k));
+  const lainnya = terpakai.filter((k) => !KPPN_DIKENAL.includes(k as (typeof KPPN_DIKENAL)[number])).sort();
+  return [...dikenal, ...lainnya].map((kppn) => ({ kppn, satker: SATKER.filter((s) => s.kppn === kppn) }));
 }

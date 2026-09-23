@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getGajiPokok, getPangkat, hitungKirimSurat, hitungRekonGaji, kalkulasiKGB } from "@/lib/tabelGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { satkerPerKppn } from "@/lib/satker";
+import { muatKppnSatker } from "@/lib/muatKppnSatker";
 import { STATUS_KGB, type StatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId } from "@/lib/waktu";
 import Kata from "../Kata";
@@ -95,6 +96,8 @@ export default async function PanduanPage() {
   const { kasus, siklusBerikutnya, rekon } = hitungKasus();
   const selisihGaji = kasus.gajiPokokBaru - GAJI_MKG_0;
   const suratSetelahBatas = TANGGAL_SURAT > kasus.deadlineSDM;
+  // Daftar KPPN mitra mengikuti Pengaturan, sehingga panduan publik tidak menyebut kemitraan yang usang.
+  await muatKppnSatker();
   const kppn = satkerPerKppn();
 
   return (
@@ -1351,7 +1354,9 @@ export default async function PanduanPage() {
                 <p>
                   Gunakan tabel berikut untuk menentukan KPPN mitra setiap satker. SIM-KGB mencetak tujuan SK kepada Kepala
                   Kantor Pelayanan Perbendaharaan Negara di kota KPPN mitra, menurut Unit Kerja pegawai di Data Pegawai.
-                  Bila pegawai pindah satker, perbarui Unit Kerja sebelum Buat SK.
+                  Bila pegawai pindah satker, perbarui Unit Kerja sebelum Buat SK. Bila kemitraan KPPN sebuah satker
+                  berpindah, Super Admin mengubahnya di Pengaturan, bagian KPPN mitra satker; tabel ini dan tujuan SK
+                  langsung mengikuti.
                 </p>
                 <div className="pub-table-wrap" tabIndex={0} role="region" aria-label="Tabel KPPN mitra per satker">
                   <table className="pub-table">
