@@ -252,7 +252,8 @@ export default function UsulanPage() {
                               <span className="dsb-tag" data-garis="" data-nada="hijau">{LABEL_JENIS_USULAN.baru}</span>
                             )}
                             <span className="dsb-tag" data-garis="">
-                              {(u.status === "menunggu" ? u.perubahan.length : u.nilaiDiusulkan.length)} kolom
+                              {/* Usulan pegawai baru tidak punya pembanding, jadi yang dihitung nilai yang diusulkan. */}
+                              {(u.perubahan.length || u.nilaiDiusulkan.length)} kolom
                             </span>
                             {u.hukdis && <span className="dsb-tag" data-garis="" data-nada="merah">Hukdis</span>}
                           </span>
