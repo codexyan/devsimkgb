@@ -4,10 +4,11 @@ import { auth } from "@/auth";
 import { hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { penandaHukdisBerlaku, hukdisMasihBerlaku } from "@/lib/hukdisKedaluwarsa";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
-import { isoTanggalKalender, kunciBulanTmt, pilihKgbSiklus, rapelanSiklus } from "@/lib/rekapKgb";
+import { isoTanggalKalender, kunciBulanTmt, kunciTanggal, pilihKgbSiklus, rapelanSiklus } from "@/lib/rekapKgb";
 import { rekapPerSatker } from "@/lib/rekapSatker";
 import { kgbDitunda, pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
 import { statusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
+import { BIDANG_USULAN } from "@/lib/usulanPegawai";
 import { SATKER } from "@/lib/satker";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
@@ -107,6 +108,16 @@ export async function GET() {
         konfirmasiAt: p.konfirmasiUptAt ? new Date(p.konfirmasiUptAt).toISOString() : null,
         konfirmasiOleh: p.konfirmasiUptOleh ?? null,
         bolehKonfirmasi: !!tmt && status !== "selesai",
+        // Nilai kolom yang boleh diusulkan UPT, sebagai isian awal formulir usulan data.
+        dataSekarang: Object.fromEntries(
+          BIDANG_USULAN.map((bidang) => {
+            const nilai = p[bidang.kunci];
+            if (nilai === null || nilai === undefined) return [bidang.kunci, ""];
+            // Isian <input type="date"> perlu bentuk yyyy-mm-dd, bukan ISO lengkap.
+            if (bidang.jenis === "tanggal") return [bidang.kunci, kunciTanggal(nilai as Date) ?? ""];
+            return [bidang.kunci, String(nilai)];
+          }),
+        ) as Record<string, string>,
       };
     })
     .sort((a, b) => (a.tmtKgb ?? "9999").localeCompare(b.tmtKgb ?? "9999") || a.nama.localeCompare(b.nama, "id"));

@@ -661,6 +661,38 @@ export default async function PanduanPage() {
                 </div>
 
 
+
+                <h3 className="pub-h3">Menginventarisir data pegawai lewat SIM-KGB</h3>
+                <p>
+                  Dokumen aslinya ada di UPT, sedangkan yang mengetik datanya selama ini Kanwil. Pengetikan ganda itu
+                  sumber salah masa kerja golongan. Karena itu UPT dapat mengirim datanya sendiri: buka Dashboard,
+                  pilih pegawai, lalu tekan Usulkan perbaikan data.
+                </p>
+                <ol>
+                  <li>
+                    Isian sudah terisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; isian yang
+                    dikosongkan berarti tidak diusulkan berubah.
+                  </li>
+                  <li>
+                    Cantumkan nomor dan tanggal surat usulan yang dikirim lewat Srikandi, dan unggah salinan PDF-nya
+                    (paling besar 5 MB) agar Kanwil dapat mencocokkan tanpa membuka Srikandi.
+                  </li>
+                  <li>
+                    Sebutkan nomor dan tanggal SK terakhir yang menjadi dasar gaji pokok sekarang, yaitu SK KGB
+                    terakhir, atau SK pengangkatan PNS dan SK kenaikan pangkat bila belum pernah KGB.
+                  </li>
+                  <li>
+                    Bila pegawai sedang atau pernah menjalani hukuman disiplin yang belum dilaporkan, centang
+                    bagiannya dan isi jenis, nomor SK, serta masa berlakunya.
+                  </li>
+                </ol>
+                <p>
+                  Usulan tidak langsung mengubah data. Super Admin atau Tim SDM KGB meninjaunya lebih dulu, lalu
+                  menyetujui atau menolak dengan alasan. Hasilnya terlihat di panel Usulan terkirim pada dashboard UPT.
+                  Satu pegawai hanya boleh punya satu usulan yang menunggu, agar antrian tinjauan tidak berisi dua
+                  versi yang saling menimpa.
+                </p>
+
                 <h3 className="pub-h3">Yang wajib dipastikan sebelum surat dikirim</h3>
                 <p>
                   Permintaan tim keuangan: UPT memastikan sendiri masa kerja golongan dan status hukuman disiplin

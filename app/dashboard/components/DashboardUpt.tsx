@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDashUser } from "@/app/dashboard/components/RoleContext";
 import { PanelNavy, Stat, StripStat, namaSapaan, sapaanWita, tanggalPanjangWita, type Nada } from "@/app/dashboard/components/PanelNavy";
 import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
@@ -8,6 +8,7 @@ import { hitungDeadlineSDM } from "@/lib/tabelGaji";
 import { kunciBulanTmt, type RekapStatusKgb } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 import { BUTIR_KONFIRMASI_UPT, LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
+import { BIDANG_USULAN, STATUS_USULAN, type StatusUsulan } from "@/lib/usulanPegawai";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
@@ -35,6 +36,23 @@ interface PegawaiUpt {
   konfirmasiAt: string | null;
   konfirmasiOleh: string | null;
   bolehKonfirmasi: boolean;
+  dataSekarang: Record<string, string>;
+}
+
+interface UsulanTerkirim {
+  id: string;
+  nama: string;
+  nip: string;
+  status: string;
+  nomorSurat: string;
+  tanggalSurat: string | null;
+  berkasAda: boolean;
+  hukdisAda: boolean;
+  jumlahPerubahan: number;
+  diajukanAt: string | null;
+  ditinjauAt: string | null;
+  ditinjauOleh: string | null;
+  alasanTolak: string | null;
 }
 
 interface SkUpt {
@@ -152,6 +170,74 @@ export default function DashboardUpt() {
     }
   }
 
+  // Usulan data: UPT menginventarisir datanya sendiri, Kanwil yang menerapkannya.
+  const [dialogUsulan, setDialogUsulan] = useState<PegawaiUpt | null>(null);
+  const [isianUsulan, setIsianUsulan] = useState<Record<string, string>>({});
+  const [suratUsulan, setSuratUsulan] = useState({ nomorSurat: "", tanggalSurat: "", nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" });
+  const [hukdisUsulan, setHukdisUsulan] = useState({ ada: false, jenis: "", nomorSk: "", tmtMulai: "", tmtBerakhir: "", keterangan: "" });
+  const [berkasUsulan, setBerkasUsulan] = useState<File | null>(null);
+  const [usulan, setUsulan] = useState<UsulanTerkirim[]>([]);
+
+  const muatUsulan = useCallback(async () => {
+    const res = await fetch("/api/upt/usulan");
+    const d: unknown = res.ok ? await res.json().catch(() => []) : [];
+    if (Array.isArray(d)) setUsulan(d as UsulanTerkirim[]);
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => void muatUsulan(), 0);
+    return () => clearTimeout(t);
+  }, [muatUsulan]);
+
+  function bukaUsulan(p: PegawaiUpt) {
+    setDialogUsulan(p);
+    setIsianUsulan({ ...p.dataSekarang });
+    setSuratUsulan({ nomorSurat: "", tanggalSurat: "", nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" });
+    setHukdisUsulan({ ada: false, jenis: "", nomorSk: "", tmtMulai: "", tmtBerakhir: "", keterangan: "" });
+    setBerkasUsulan(null);
+    setGalatKonfirmasi(null);
+  }
+
+  async function kirimUsulan() {
+    if (!dialogUsulan) return;
+    setMengirim(true);
+    setGalatKonfirmasi(null);
+    try {
+      const form = new FormData();
+      form.set("pegawaiId", dialogUsulan.id);
+      form.set("nomorSurat", suratUsulan.nomorSurat);
+      form.set("tanggalSurat", suratUsulan.tanggalSurat);
+      form.set("nomorSkTerakhir", suratUsulan.nomorSkTerakhir);
+      form.set("tanggalSkTerakhir", suratUsulan.tanggalSkTerakhir);
+      form.set("catatanUpt", suratUsulan.catatanUpt);
+      for (const bidang of BIDANG_USULAN) form.set(bidang.kunci, isianUsulan[bidang.kunci] ?? "");
+      form.set("hukdisAda", String(hukdisUsulan.ada));
+      if (hukdisUsulan.ada) {
+        form.set("hukdisJenis", hukdisUsulan.jenis);
+        form.set("hukdisNomorSk", hukdisUsulan.nomorSk);
+        form.set("hukdisTmtMulai", hukdisUsulan.tmtMulai);
+        form.set("hukdisTmtBerakhir", hukdisUsulan.tmtBerakhir);
+        form.set("hukdisKeterangan", hukdisUsulan.keterangan);
+      }
+      if (berkasUsulan) form.set("berkas", berkasUsulan);
+
+      const res = await fetch("/api/upt/usulan", { method: "POST", body: form });
+      const d = (await res.json().catch(() => ({}))) as { error?: string; jumlahPerubahan?: number };
+      if (!res.ok) {
+        setGalatKonfirmasi(d.error ?? "Usulan gagal dikirim");
+        return;
+      }
+      setKabar(`Usulan data ${dialogUsulan.nama} terkirim ke Kanwil (${d.jumlahPerubahan ?? 0} kolom). Anda akan melihat hasilnya di daftar usulan.`);
+      setTimeout(() => setKabar(null), 7000);
+      setDialogUsulan(null);
+      void muatUsulan();
+    } catch {
+      setGalatKonfirmasi("Usulan gagal dikirim");
+    } finally {
+      setMengirim(false);
+    }
+  }
+
   const bulanUsulan = bulanUsulanSekarang(hariIni);
   const pegawai = useMemo(() => data?.pegawai ?? [], [data]);
   const perluDiusulkan = pegawai.filter((p) => p.bulanTmt === bulanUsulan);
@@ -247,6 +333,132 @@ export default function DashboardUpt() {
         </div>
       )}
 
+      {dialogUsulan && (
+        <KerangkaModal
+          judul="Usulkan perbaikan data pegawai"
+          subjudul={`${dialogUsulan.nama} · ${dialogUsulan.nip}`}
+          ukuran="lg"
+          sibuk={mengirim}
+          onTutup={() => setDialogUsulan(null)}
+          onKirim={() => void kirimUsulan()}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogUsulan(null)} disabled={mengirim}>
+                Batal
+              </button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
+                {mengirim ? "Mengirim…" : "Kirim usulan ke Kanwil"}
+              </button>
+            </>
+          }
+        >
+          <PesanGalat pesan={galatKonfirmasi} />
+          <Catatan>
+            Isian sudah diisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; yang dikosongkan
+            berarti tidak diusulkan berubah. Usulan baru berlaku setelah ditinjau dan disetujui Kanwil.
+          </Catatan>
+
+          <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
+            <div className="kgbm-bagian-kepala">
+              <p className="kgbm-bagian-judul">Surat usulan</p>
+              <p className="kgbm-bagian-ket">Surat yang sudah dikirim lewat Srikandi, beserta dasar gaji pokok sekarang</p>
+            </div>
+            <div className="kgbm-bagian-isi">
+            <div className="kgbm-grid2">
+              <label className="kgbm-label">
+                <span className="kgbm-wajib">Nomor surat</span>
+                <input className="kgbm-input" data-autofocus value={suratUsulan.nomorSurat} onChange={(e) => setSuratUsulan((f) => ({ ...f, nomorSurat: e.target.value }))} placeholder="W.17.PAS.7-SA.04.04-1" />
+              </label>
+              <label className="kgbm-label">
+                <span className="kgbm-wajib">Tanggal surat</span>
+                <input className="kgbm-input" type="date" value={suratUsulan.tanggalSurat} onChange={(e) => setSuratUsulan((f) => ({ ...f, tanggalSurat: e.target.value }))} />
+              </label>
+            </div>
+            <label className="kgbm-label">
+              Berkas surat (PDF, paling besar 5 MB)
+              <input className="kgbm-input" type="file" accept="application/pdf" onChange={(e) => setBerkasUsulan(e.target.files?.[0] ?? null)} />
+            </label>
+            <div className="kgbm-grid2">
+              <label className="kgbm-label">
+                Nomor SK terakhir (dasar gaji pokok)
+                <input className="kgbm-input" value={suratUsulan.nomorSkTerakhir} onChange={(e) => setSuratUsulan((f) => ({ ...f, nomorSkTerakhir: e.target.value }))} />
+              </label>
+              <label className="kgbm-label">
+                Tanggal SK terakhir
+                <input className="kgbm-input" type="date" value={suratUsulan.tanggalSkTerakhir} onChange={(e) => setSuratUsulan((f) => ({ ...f, tanggalSkTerakhir: e.target.value }))} />
+              </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
+            <div className="kgbm-bagian-kepala">
+              <p className="kgbm-bagian-judul">Data pegawai</p>
+              <p className="kgbm-bagian-ket">Isian yang dikosongkan berarti tidak diusulkan berubah</p>
+            </div>
+            <div className="kgbm-bagian-isi">
+            <div className="kgbm-grid2">
+              {BIDANG_USULAN.map((bidang) => (
+                <label className="kgbm-label" key={bidang.kunci}>
+                  {bidang.label}
+                  <input
+                    className="kgbm-input"
+                    type={bidang.jenis === "tanggal" ? "date" : bidang.jenis === "teks" ? "text" : "number"}
+                    inputMode={bidang.jenis === "angka" || bidang.jenis === "rupiah" ? "numeric" : undefined}
+                    value={isianUsulan[bidang.kunci] ?? ""}
+                    onChange={(e) => setIsianUsulan((f) => ({ ...f, [bidang.kunci]: e.target.value }))}
+                  />
+                </label>
+              ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
+            <div className="kgbm-bagian-kepala">
+              <p className="kgbm-bagian-judul">Hukuman disiplin</p>
+              <p className="kgbm-bagian-ket">Hanya laporan; penetapannya tetap dicatat Kanwil di modul Hukuman Disiplin</p>
+            </div>
+            <div className="kgbm-bagian-isi">
+            <label className="kgbm-label" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <input type="checkbox" className="dsb-cek" checked={hukdisUsulan.ada} onChange={(e) => setHukdisUsulan((f) => ({ ...f, ada: e.target.checked }))} />
+              Pegawai ini sedang atau pernah menjalani hukuman disiplin yang belum dilaporkan
+            </label>
+            {hukdisUsulan.ada && (
+              <>
+                <div className="kgbm-grid2">
+                  <label className="kgbm-label">
+                    Jenis hukuman
+                    <input className="kgbm-input" value={hukdisUsulan.jenis} onChange={(e) => setHukdisUsulan((f) => ({ ...f, jenis: e.target.value }))} placeholder="Penundaan kenaikan gaji berkala" />
+                  </label>
+                  <label className="kgbm-label">
+                    Nomor SK hukuman
+                    <input className="kgbm-input" value={hukdisUsulan.nomorSk} onChange={(e) => setHukdisUsulan((f) => ({ ...f, nomorSk: e.target.value }))} />
+                  </label>
+                  <label className="kgbm-label">
+                    TMT mulai
+                    <input className="kgbm-input" type="date" value={hukdisUsulan.tmtMulai} onChange={(e) => setHukdisUsulan((f) => ({ ...f, tmtMulai: e.target.value }))} />
+                  </label>
+                  <label className="kgbm-label">
+                    TMT berakhir
+                    <input className="kgbm-input" type="date" value={hukdisUsulan.tmtBerakhir} onChange={(e) => setHukdisUsulan((f) => ({ ...f, tmtBerakhir: e.target.value }))} />
+                  </label>
+                </div>
+                <label className="kgbm-label">
+                  Keterangan
+                  <textarea className="kgbm-input" rows={2} value={hukdisUsulan.keterangan} onChange={(e) => setHukdisUsulan((f) => ({ ...f, keterangan: e.target.value }))} />
+                </label>
+              </>
+            )}
+            </div>
+          </div>
+
+          <label className="kgbm-label">
+            Catatan untuk Kanwil
+            <textarea className="kgbm-input" rows={2} value={suratUsulan.catatanUpt} onChange={(e) => setSuratUsulan((f) => ({ ...f, catatanUpt: e.target.value }))} placeholder="Misalnya: koreksi masa kerja golongan sesuai SK kenaikan pangkat terakhir" />
+          </label>
+        </KerangkaModal>
+      )}
       {dialogKonfirmasi && (
         <KerangkaModal
           judul="Konfirmasi data pegawai"
@@ -380,6 +592,9 @@ export default function DashboardUpt() {
                               Konfirmasi data pegawai
                             </button>
                           ) : null}
+                          <button type="button" className="dsb-tautan" style={{ marginTop: 2 }} onClick={() => bukaUsulan(p)}>
+                            Usulkan perbaikan data
+                          </button>
                         </td>
                       </tr>
                     );
@@ -440,6 +655,42 @@ export default function DashboardUpt() {
           </section>
 
           {/* Kapan surat usulan dikirim untuk bulan TMT berikutnya */}
+          <section className="dsb-panel dsb-susut" aria-labelledby="judul-usulan-upt">
+            <div className="dsb-panel-kepala">
+              <h2 id="judul-usulan-upt" className="dsb-panel-judul">
+                Usulan terkirim <small>{usulan.filter((u) => u.status === "menunggu").length} menunggu tinjauan</small>
+              </h2>
+            </div>
+            {usulan.length === 0 ? (
+              <p className="dsb-kosong">
+                Belum ada usulan. Pakai tautan Usulkan perbaikan data pada daftar pegawai untuk mengirim data
+                terbaru beserta surat usulannya ke Kanwil.
+              </p>
+            ) : (
+              <div className="dsb-gulir">
+                <ul className="dsb-log-ringkas">
+                  {usulan.slice(0, 20).map((u) => {
+                    const cfg = STATUS_USULAN[u.status as StatusUsulan] ?? { label: u.status, nada: "kuning" as const };
+                    return (
+                      <li key={u.id}>
+                        <span className="dsb-titik" data-nada={cfg.nada} aria-hidden="true" />
+                        <span className="min-w-0">
+                          <span className="dsb-nama">{u.nama}</span>
+                          <span className="dsb-kecil"> · {cfg.label}</span>
+                          <p className="dsb-kecil" style={{ margin: 0 }}>
+                            Surat {u.nomorSurat} · {u.jumlahPerubahan} kolom{u.hukdisAda ? " · disertai laporan hukdis" : ""}
+                          </p>
+                          {u.alasanTolak && (
+                            <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-red)" }}>Ditolak: {u.alasanTolak}</p>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </section>
           <section className="dsb-panel dsb-penuh" aria-labelledby="judul-jadwal-upt">
             <div className="dsb-panel-kepala">
               <h2 id="judul-jadwal-upt" className="dsb-panel-judul">Jadwal usulan <small>enam bulan ke depan</small></h2>

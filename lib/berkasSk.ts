@@ -1,6 +1,8 @@
-// Berkas SK bertanda tangan di Cloudflare R2. Key objek = pathFile yang tersimpan di basis data
-// (mis. "sk/<nip>_<ts>.pdf"). Hanya key di bawah "sk/" yang dilayani, agar objek lain di bucket tidak
-// ikut terbuka. Dipakai /api/blob/download (peran Kanwil) dan /api/upt/sk/[id] (Admin UPT, dibatasi satker).
+// Berkas di Cloudflare R2. Key objek = pathFile yang tersimpan di basis data: "sk/<nip>_<ts>.pdf"
+// untuk SK bertanda tangan, dan "usulan/<satker>_<ts>.pdf" untuk surat usulan UPT. Hanya key di bawah
+// kedua folder itu yang dilayani, agar objek lain di bucket tidak ikut terbuka. Dipakai
+// /api/blob/download (peran Kanwil), /api/upt/sk/[id] (Admin UPT, dibatasi satker), dan
+// /api/usulan/[id]/berkas (peninjau Kanwil serta UPT pengusulnya).
 
 import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
@@ -18,6 +20,15 @@ export function kunciSk(raw: string): string | null {
     key = raw.replace(/^\/+/, "");
   }
   if (key.includes("..") || !POLA_KEY_SK.test(key)) return null;
+  return key;
+}
+
+const POLA_KEY_USULAN = /^usulan\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
+
+/** Normalisasi key berkas surat usulan UPT; null bila di luar folder usulan atau mengandung "..". */
+export function kunciUsulan(raw: string): string | null {
+  const key = raw.replace(/^\/+/, "");
+  if (key.includes("..") || !POLA_KEY_USULAN.test(key)) return null;
   return key;
 }
 

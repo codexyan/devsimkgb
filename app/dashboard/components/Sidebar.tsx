@@ -82,6 +82,7 @@ const grupKepegawaian: Group = {
   children: [
     { href: "/dashboard/pegawai", label: "Data Pegawai", icon: Ic.people    },
     { href: "/dashboard/kgb",     label: "Proses KGB",   icon: Ic.document  },
+    { href: "/dashboard/usulan",  label: "Usulan UPT",   icon: Ic.edit      },
   ],
 };
 

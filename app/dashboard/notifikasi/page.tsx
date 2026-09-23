@@ -26,10 +26,11 @@ interface HasilPeriksa {
 
 /* Server hanya mengirim tipe notifikasi yang boleh dilihat peran pengguna (GET /api/notifikasi),
    jadi daftar saringan disusun dari notifikasi yang benar-benar diterima. */
-type KunciKategori = "tinjau" | "kgb" | "rapelan" | "sk" | "followup" | "hukdis";
+type KunciKategori = "tinjau" | "usulan" | "kgb" | "rapelan" | "sk" | "followup" | "hukdis";
 
 const KATEGORI: { key: KunciKategori; label: string; tipe: readonly string[]; nada: string }[] = [
   { key: "tinjau", label: "Perlu ditinjau", tipe: ["kgb_perlu_ditinjau"], nada: "merah" },
+  { key: "usulan", label: "Usulan UPT", tipe: ["usulan_upt"], nada: "kuning" },
   { key: "rapelan", label: "KGB terlambat", tipe: ["rapelan"], nada: "merah" },
   { key: "kgb", label: "Jatuh tempo", tipe: ["kgb_jatuh_tempo"], nada: "navy" },
   { key: "sk", label: "SK & keuangan", tipe: ["sk_menunggu_keuangan", "sk_terbit"], nada: "ungu" },
@@ -39,6 +40,7 @@ const KATEGORI: { key: KunciKategori; label: string; tipe: readonly string[]; na
 
 const NADA_TIPE: Record<string, string> = {
   kgb_perlu_ditinjau: "merah",
+  usulan_upt: "kuning",
   rapelan: "merah",
   kgb_jatuh_tempo: "navy",
   sk_menunggu_keuangan: "ungu",

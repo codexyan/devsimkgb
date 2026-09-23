@@ -245,3 +245,25 @@ test("KGB berjalan yang keadaan pegawainya berubah ditandai perlu ditinjau", () 
   });
   assert.equal(ulang.baru.filter((n) => n.tipe === "kgb_perlu_ditinjau").length, 0);
 });
+
+test("usulan data dari UPT diingatkan sekali ke Kanwil", () => {
+  const usulan = [{ id: "u1", pegawaiId: "p1", status: "menunggu", nomorSurat: "W.17.PAS.7-1" }];
+  const hariIni = tanggal(2026, 8, 5);
+  const pertama = rencana(hariIni, [], { pegawai: [pegawai({ tmtKgbBerikutnya: tanggal(2028, 6) })], usulan });
+  const baru = pertama.baru.filter((n) => n.tipe === "usulan_upt");
+  assert.equal(baru.length, 1);
+  assert.equal(baru[0].referenceId, "u1");
+  assert.match(baru[0].pesan, /W.17.PAS.7-1/);
+
+  // Sudah pernah diingatkan, dan usulan yang sudah ditinjau tidak diingatkan.
+  const ulang = rencana(hariIni, [notif("n9", "warning", tanggal(2026, 8, 4), "usulan_upt", "u1")], {
+    pegawai: [pegawai({ tmtKgbBerikutnya: tanggal(2028, 6) })],
+    usulan,
+  });
+  assert.equal(ulang.baru.filter((n) => n.tipe === "usulan_upt").length, 0);
+  const sudahDitinjau = rencana(hariIni, [], {
+    pegawai: [pegawai({ tmtKgbBerikutnya: tanggal(2028, 6) })],
+    usulan: [{ ...usulan[0], status: "disetujui" }],
+  });
+  assert.equal(sudahDitinjau.baru.filter((n) => n.tipe === "usulan_upt").length, 0);
+});

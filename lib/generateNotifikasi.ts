@@ -24,6 +24,7 @@ export const TIPE_NOTIFIKASI = {
   SK_MENUNGGU_KEUANGAN: "sk_menunggu_keuangan",
   SK_TERBIT: "sk_terbit",
   KGB_PERLU_DITINJAU: "kgb_perlu_ditinjau",
+  USULAN_UPT: "usulan_upt",
 } as const;
 
 const T = TIPE_NOTIFIKASI;
@@ -37,7 +38,7 @@ export function tipeNotifikasiUntukRole(role: string | null | undefined): readon
     case "superAdminCore":
       return null;
     case "sdm_kgb":
-      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.FOLLOWUP_KEUANGAN, T.HUKDIS_BERAKHIR, T.KGB_PERLU_DITINJAU];
+      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.FOLLOWUP_KEUANGAN, T.HUKDIS_BERAKHIR, T.KGB_PERLU_DITINJAU, T.USULAN_UPT];
     case "sdm_hukdis":
       return [T.HUKDIS_BERAKHIR];
     case "keuangan":
@@ -108,6 +109,8 @@ type KgbUntukNotifikasi = Pick<RiwayatKGBRow, "id" | "pegawaiId" | "status" | "t
   Partial<Pick<RiwayatKGBRow, "konfirmasiKeuanganAt">>;
 type HukdisUntukNotifikasi = Pick<RiwayatHukdisRow, "pegawaiId" | "berdampakKGB" | "tmtBerakhir"> &
   Partial<Pick<RiwayatHukdisRow, "tmtMulai">>;
+/** Usulan data dari UPT yang perlu ditinjau Kanwil (lib/usulanPegawai.ts). */
+type UsulanUntukNotifikasi = { id: string; pegawaiId: string; status: string; nomorSurat: string };
 
 const STATUS_SIKLUS_SUDAH_DIINPUT = new Set(["sedang_diproses", "menunggu_keuangan", "selesai"]);
 
@@ -138,6 +141,7 @@ export function rencanaNotifikasi(input: {
   pegawai: readonly PegawaiUntukNotifikasi[];
   kgb: readonly KgbUntukNotifikasi[];
   riwayatHukdis: readonly HukdisUntukNotifikasi[];
+  usulan?: readonly UsulanUntukNotifikasi[];
 }): RencanaNotifikasi {
   const { hariIni } = input;
   const h1 = Math.max(input.h1, input.h2);
@@ -315,6 +319,22 @@ export function rencanaNotifikasi(input: {
     });
   }
 
+  // 6. Usulan data dari UPT yang menunggu tinjauan Kanwil, satu kali per usulan.
+  for (const u of input.usulan ?? []) {
+    if (u.status !== "menunggu") continue;
+    if (notifUntuk(T.USULAN_UPT, u.id).length > 0) continue;
+    const p = pegawaiById.get(u.pegawaiId);
+    baru.push({
+      judul: `Usulan Data UPT: ${p?.nama ?? "-"}`,
+      pesan: `UPT mengusulkan perbaikan data ${p?.nama ?? "-"} (${p?.nip ?? "-"}) lewat surat ${u.nomorSurat}. Tinjau sebelum KGB pegawai ini diproses.`,
+      tipe: T.USULAN_UPT,
+      referenceId: u.id,
+      prioritas: "warning",
+      linkHref: "/dashboard/usulan",
+      kategori: "pegawai",
+    });
+  }
+
   const tandaiDibaca = input.notifikasi
     .filter((n) => {
       if (n.dibaca) return false;
@@ -333,12 +353,13 @@ export async function generateNotifikasi(sekarang: Date = new Date()): Promise<N
   const { db } = await import("./db");
   const hariIni = hariIniWita(sekarang);
 
-  const [cfg, allNotif, allPegawai, allKgb, allHukdis] = await Promise.all([
+  const [cfg, allNotif, allPegawai, allKgb, allHukdis, allUsulan] = await Promise.all([
     db.konfigurasiKanwil.findUnique({ id: "default" }) as Promise<{ notifKgbH1?: number | null; notifKgbH2?: number | null } | null>,
     db.notifikasi.findMany(),
     db.pegawai.findMany(),
     db.riwayatKGB.findMany(),
     db.riwayatHukdis.findMany() as Promise<RiwayatHukdisRow[]>,
+    db.usulanPegawai.findMany({ where: { status: "menunggu" } }) as Promise<UsulanUntukNotifikasi[]>,
   ]);
 
   const rencana = rencanaNotifikasi({
@@ -349,6 +370,7 @@ export async function generateNotifikasi(sekarang: Date = new Date()): Promise<N
     pegawai: allPegawai,
     kgb: allKgb,
     riwayatHukdis: allHukdis,
+    usulan: allUsulan,
   });
 
   const details: string[] = [];
@@ -373,6 +395,7 @@ export async function generateNotifikasi(sekarang: Date = new Date()): Promise<N
       if (jumlah(T.SK_MENUNGGU_KEUANGAN)) details.push(`SK menunggu keuangan: ${jumlah(T.SK_MENUNGGU_KEUANGAN)} notifikasi`);
       if (jumlah(T.SK_TERBIT)) details.push(`SK terbit: ${jumlah(T.SK_TERBIT)} notifikasi`);
       if (jumlah(T.KGB_PERLU_DITINJAU)) details.push(`KGB perlu ditinjau: ${jumlah(T.KGB_PERLU_DITINJAU)} notifikasi`);
+      if (jumlah(T.USULAN_UPT)) details.push(`Usulan data UPT: ${jumlah(T.USULAN_UPT)} notifikasi`);
     }
   }
 
