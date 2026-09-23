@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 import { GAYA_MODAL_KGB } from "./gayaModal";
 
@@ -26,6 +27,9 @@ interface PropsKerangkaModal {
  * pengembalian fokus ke tombol pemicu memakai useDialogModal; setelah dibuka, fokus pindah ke
  * elemen bertanda data-autofocus bila ada.
  */
+/** Portal baru boleh dipasang setelah komponen terpasang di peramban. */
+const tanpaLangganan = () => () => {};
+
 export default function KerangkaModal({
   judul,
   subjudul,
@@ -40,6 +44,7 @@ export default function KerangkaModal({
 }: PropsKerangkaModal) {
   const idJudul = useId();
   const panelRef = useDialogModal<HTMLDivElement>(true, onTutup, sibuk);
+  const terpasang = useSyncExternalStore(tanpaLangganan, () => true, () => false);
 
   // Berjalan sesudah efek pembuka useDialogModal, yang sudah mencatat pemicu dan memfokuskan panel.
   useEffect(() => {
@@ -58,7 +63,12 @@ export default function KerangkaModal({
     </>
   );
 
-  return (
+  // Latar modal memakai position: fixed. Dirender di tempatnya, ia berada di dalam <main> yang
+  // bergulir; lewat portal ke body ia selalu mengacu ke layar, dan gulir halaman di belakangnya tidak
+  // pernah mencampuri gulir dialognya.
+  if (!terpasang) return null;
+
+  return createPortal(
     <div
       className="kgbm-latar"
       onMouseDown={(e) => {
@@ -104,6 +114,7 @@ export default function KerangkaModal({
           isi
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

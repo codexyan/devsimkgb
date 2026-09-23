@@ -10,6 +10,31 @@ const ELEMEN_FOKUS =
 const tumpukanDialog: object[] = [];
 
 /**
+ * Keadaan gulir halaman sebelum dikunci; null bila tidak ada dialog yang terbuka.
+ *
+ * Selama dialog terbuka, halaman di belakangnya tidak boleh ikut bergulir. Di layar sentuh, gerakan
+ * jari pada dialog yang panjang mudah jatuh ke halaman di belakangnya: yang bergerak halamannya,
+ * sedangkan isi dialognya diam — persis seperti dialog yang tidak dapat digulir. Dasbor menggulir di
+ * dalam <main>, bukan di body, jadi keduanya dikunci.
+ */
+let gulirTerkunci: { body: string; wadah: HTMLElement | null; nilaiWadah: string } | null = null;
+
+function kunciGulirLatar() {
+  if (gulirTerkunci) return;
+  const wadah = document.querySelector<HTMLElement>("main.dsb-main");
+  gulirTerkunci = { body: document.body.style.overflow, wadah, nilaiWadah: wadah?.style.overflow ?? "" };
+  document.body.style.overflow = "hidden";
+  if (wadah) wadah.style.overflow = "hidden";
+}
+
+function lepasGulirLatar() {
+  if (!gulirTerkunci) return;
+  document.body.style.overflow = gulirTerkunci.body;
+  if (gulirTerkunci.wadah) gulirTerkunci.wadah.style.overflow = gulirTerkunci.nilaiWadah;
+  gulirTerkunci = null;
+}
+
+/**
  * Perilaku dialog modal untuk panel yang dirender bersyarat.
  * Saat dibuka fokus pindah ke panel (kecuali isian di dalamnya sudah autoFocus), Tab berputar di
  * dalam panel, Escape menutup kecuali `terkunci` (misalnya selama menyimpan), dan setelah ditutup
@@ -52,6 +77,7 @@ export function useDialogModal<T extends HTMLElement = HTMLDivElement>(
     if (!terbuka) return;
     const kunci = {};
     tumpukanDialog.push(kunci);
+    if (tumpukanDialog.length === 1) kunciGulirLatar();
     const panel = panelRef.current;
     const { sebelumnya, terakhir } = fokusRef.current;
     const diLuarPanel = (el: Element | null): el is HTMLElement =>
@@ -98,6 +124,7 @@ export function useDialogModal<T extends HTMLElement = HTMLDivElement>(
       document.removeEventListener("keydown", onKeyDown);
       const i = tumpukanDialog.indexOf(kunci);
       if (i >= 0) tumpukanDialog.splice(i, 1);
+      if (tumpukanDialog.length === 0) lepasGulirLatar();
       if (pemicu?.isConnected) pemicu.focus();
     };
   }, [terbuka]);
