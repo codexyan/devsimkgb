@@ -81,10 +81,49 @@ async function melebihiBatasCekKgb(ip, env, sekarang) {
   return tambahHitungan(hitunganCekKgb, ip, sekarang) > BATAS_CEK_KGB_PER_MENIT;
 }
 
+/* Halaman publik yang isinya sama untuk semua orang dan hanya berubah harian. */
+const HALAMAN_PUBLIK = new Set(["/kgb", "/panduan", "/tabel-gaji"]);
+/** Berapa lama jawaban halaman publik disimpan di cache tepi. */
+const UMUR_CACHE_PUBLIK_DETIK = 300;
+
+/** true bila permintaan ini boleh dilayani dari cache bersama: GET halaman publik, tanpa sesi. */
+function bolehDariCache(request, pathname) {
+  if (request.method !== "GET") return false;
+  if (!HALAMAN_PUBLIK.has(pathname.replace(/\/+$/, ""))) return false;
+  // Permintaan RSC membawa jawaban berbeda untuk URL yang sama, jadi dibiarkan lewat.
+  if (new URL(request.url).searchParams.has("_rsc")) return false;
+  // Pengguna yang sudah masuk mendapat navigasi yang berbeda; jangan sampai tercampur.
+  const cookie = request.headers.get("cookie") ?? "";
+  return !cookie.includes("authjs.session-token") && !cookie.includes("next-auth.session-token");
+}
+
+/**
+ * Melayani halaman publik dari Cache API. Kunci cache sengaja dibuat dari path saja, tanpa query,
+ * supaya tautan bertanda pelacak tidak memecah cache menjadi banyak entri.
+ */
+async function lewatCachePublik(request, pathname, env, ctx) {
+  const kunci = new Request(new URL(pathname.replace(/\/+$/, ""), request.url).toString(), { method: "GET" });
+  const cache = caches.default;
+  const tersimpan = await cache.match(kunci);
+  if (tersimpan) return tersimpan;
+
+  const asli = await openNextWorker.fetch(request, env, ctx);
+  if (asli.status !== 200) return asli;
+
+  // Jawaban perlu digandakan: satu untuk pemanggil, satu untuk disimpan.
+  const untukCache = new Response(asli.body, asli);
+  untukCache.headers.set("cache-control", `public, max-age=${UMUR_CACHE_PUBLIK_DETIK}`);
+  untukCache.headers.delete("set-cookie");
+  const untukPemanggil = untukCache.clone();
+  ctx.waitUntil(cache.put(kunci, untukCache));
+  return untukPemanggil;
+}
+
 export default {
   ...openNextWorker,
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
+    if (bolehDariCache(request, pathname)) return lewatCachePublik(request, pathname, env, ctx);
     if (pathname.replace(/\/+$/, "") !== PATH_CEK_KGB) return openNextWorker.fetch(request, env, ctx);
 
     const ip = alamatIp(request);
