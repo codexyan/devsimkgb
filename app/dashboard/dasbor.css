@@ -1701,3 +1701,8 @@ a.dsb-stat:hover, button.dsb-stat:hover { background: rgba(255, 255, 255, 0.05);
 @media (max-width: 640px) {
   .dsb-log[data-pilihan] .dsb-log-baris { grid-template-columns: 44px 18px minmax(0, 1fr); }
 }
+
+/* Tindakan pada baris pegawai dashboard UPT: selalu di baris sendiri, termasuk saat baris tabel
+   ditumpuk menjadi blok di layar sempit, agar tidak menempel pada teks status. */
+.upt-aksi { display: block; margin-top: 6px; }
+.upt-aksi + .upt-aksi { margin-top: 4px; }

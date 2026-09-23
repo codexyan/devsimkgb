@@ -583,18 +583,22 @@ export default function DashboardUpt() {
                               {p.konfirmasiAt ? ` ${formatTanggalId(p.konfirmasiAt, { day: "numeric", month: "short" })}` : ""}
                             </p>
                           ) : p.bolehKonfirmasi ? (
-                            <button
-                              type="button"
-                              className="dsb-tautan"
-                              style={{ marginTop: 2 }}
-                              onClick={() => { setDialogKonfirmasi(p); setGalatKonfirmasi(null); }}
-                            >
-                              Konfirmasi data pegawai
-                            </button>
+                            <span className="upt-aksi">
+                              <button
+                                type="button"
+                                className="dsb-tombol dsb-tombol-kecil"
+                                data-jenis="garis"
+                                onClick={() => { setDialogKonfirmasi(p); setGalatKonfirmasi(null); }}
+                              >
+                                Konfirmasi data pegawai
+                              </button>
+                            </span>
                           ) : null}
-                          <button type="button" className="dsb-tautan" style={{ marginTop: 2 }} onClick={() => bukaUsulan(p)}>
-                            Usulkan perbaikan data
-                          </button>
+                          <span className="upt-aksi">
+                            <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => bukaUsulan(p)}>
+                              Usulkan perbaikan data
+                            </button>
+                          </span>
                         </td>
                       </tr>
                     );

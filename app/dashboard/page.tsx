@@ -4,11 +4,17 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRole, useDashUser } from "@/app/dashboard/components/RoleContext";
 import { ROLES, ROLE_LABEL } from "@/lib/auth";
-import DashboardHukdis from "@/app/dashboard/components/DashboardHukdis";
-import DashboardKeuangan from "@/app/dashboard/components/DashboardKeuangan";
-import DashboardUpt from "@/app/dashboard/components/DashboardUpt";
-import PemantauanSatker from "@/app/dashboard/components/PemantauanSatker";
-import PapanAntrian, { type KartuPapan, type KolomPapan } from "@/app/dashboard/components/PapanAntrian";
+import dynamic from "next/dynamic";
+import type { KartuPapan, KolomPapan } from "@/app/dashboard/components/PapanAntrian";
+
+/* Satu akun hanya memakai satu dashboard peran. Memuatnya sesuai kebutuhan menekan kerja server per
+   permintaan dan biaya mulai isolate; tampilan sementaranya memakai kerangka yang sama dengan panel lain. */
+const Memuat = () => <div className="dsb-halaman"><div className="dsb-kerangka" style={{ height: 240 }} /></div>;
+const DashboardHukdis = dynamic(() => import("@/app/dashboard/components/DashboardHukdis"), { ssr: false, loading: Memuat });
+const DashboardKeuangan = dynamic(() => import("@/app/dashboard/components/DashboardKeuangan"), { ssr: false, loading: Memuat });
+const DashboardUpt = dynamic(() => import("@/app/dashboard/components/DashboardUpt"), { ssr: false, loading: Memuat });
+const PemantauanSatker = dynamic(() => import("@/app/dashboard/components/PemantauanSatker"), { ssr: false });
+const PapanAntrian = dynamic(() => import("@/app/dashboard/components/PapanAntrian"), { ssr: false });
 import {
   KerangkaDashboard,
   PanelNavy,
