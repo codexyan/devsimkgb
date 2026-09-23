@@ -8,9 +8,9 @@ import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "@/lib/dataPegawai";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 
-// Kolom wajib yang harus ada di CSV
-// gajiPokok tidak wajib : jika kosong, auto-lookup dari Tabel PP 5/2024
-// unitKerja tidak wajib : jika kosong, pegawai dicatat pada Kanwil
+// Kolom yang harus ada pada baris header CSV.
+// gajiPokok tidak wajib: bila kosong, diambil dari Tabel PP 5/2024 menurut golongan dan masa kerja.
+// unitKerja tidak wajib: bila kosong, pegawai dicatat pada Kanwil.
 const REQUIRED_COLUMNS = [
   "nip",
   "nama",
@@ -23,6 +23,14 @@ const REQUIRED_COLUMNS = [
   "tmtKgbTerakhir",
   "tmtKgbBerikutnya",
 ];
+
+/**
+ * Kolom yang isinya wajib ada di tiap baris. TMT KGB berikutnya tidak termasuk: bila dikosongkan,
+ * sistem menghitungnya dari golongan, masa kerja golongan, dan TMT KGB terakhir. Menghitungnya lebih
+ * dipercaya daripada mengetik, sebab selangnya tidak selalu dua tahun, dan kolomnya tetap boleh diisi
+ * untuk hal yang memang bergeser, misalnya penundaan hukuman disiplin.
+ */
+const KOLOM_ISI_WAJIB = REQUIRED_COLUMNS.filter((kolom) => kolom !== "tmtKgbBerikutnya");
 
 // Template CSV header
 const TEMPLATE_HEADER = [
@@ -123,7 +131,7 @@ function validateRows(rows: RowData[]): ValidationResult {
       return;
     }
 
-    const missing = REQUIRED_COLUMNS.filter((col) => !row[col]?.trim());
+    const missing = KOLOM_ISI_WAJIB.filter((col) => !row[col]?.trim());
 
     if (missing.length > 0) {
       errors.push({
@@ -532,9 +540,9 @@ export default function ImportPage() {
                 },
                 {
                   kolom: "tmtKgbBerikutnya",
-                  wajib: true,
-                  deskripsi: "TMT KGB periode berikutnya (biasanya +2 tahun dari terakhir)",
-                  format: FORMAT_TANGGAL_DITERIMA,
+                  wajib: false,
+                  deskripsi: "TMT KGB periode berikutnya. Jika kosong, dihitung dari golongan, masa kerja golongan, dan TMT KGB terakhir; golongan II/a dari masa kerja 0 naik setelah 1 tahun, selebihnya 2 tahun",
+                  format: `${FORMAT_TANGGAL_DITERIMA} (opsional)`,
                   contoh: "2026-03-01",
                 },
                 {

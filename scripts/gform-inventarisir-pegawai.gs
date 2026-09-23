@@ -12,12 +12,12 @@
  * Pertanyaan disusun mengikuti kolom template impor (lihat TEMPLATE_HEADER di
  * app/dashboard/pegawai/import/page.tsx) supaya jawaban bisa langsung dipakai tanpa diketik ulang.
  *
- * Gaji pokok yang dilaporkan pegawai sengaja tidak ikut diimpor. SIM-KGB menghitungnya sendiri dari
+ * Gaji pokok dan TMT KGB berikutnya yang dilaporkan pegawai sengaja tidak ikut diimpor. SIM-KGB menghitungnya sendiri dari
  * golongan dan masa kerja menurut PP 5/2024; angka yang dilaporkan ditaruh di lembar "cek-gaji"
  * sebagai bahan pembanding, sehingga selisih apa pun terlihat sebelum SK terbit.
  */
 
-var NAMA_FORMULIR = "Inventarisasi Data Pegawai Kanwil — SIM-KGB";
+var NAMA_FORMULIR = "Inventarisasi Data Pegawai Kanwil SIM-KGB";
 var SATKER_KANWIL = "Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan";
 var ZONA = "Asia/Makassar";
 
@@ -83,13 +83,12 @@ var PERTANYAAN = [
   },
   { kolom: "tmtGolongan", judul: "TMT Golongan", tipe: "tanggal", wajib: true, bantuan: "Tanggal mulai berlaku golongan saat ini, ada di SK kenaikan pangkat terakhir." },
   {
-    kolom: "mkgTahun", judul: "Masa Kerja Golongan — tahun", tipe: "angka", wajib: true, min: 0, maks: 40,
+    kolom: "mkgTahun", judul: "Masa Kerja Golongan (tahun)", tipe: "angka", wajib: true, min: 0, maks: 40,
     bantuan: "Lihat SK KGB/kenaikan pangkat terakhir, bagian masa kerja golongan. Contoh: untuk 19 tahun 1 bulan, isi 19.",
   },
-  { kolom: "mkgBulan", judul: "Masa Kerja Golongan — bulan", tipe: "angka", wajib: true, min: 0, maks: 11, bantuan: "Sisa bulannya saja, 0 sampai 11. Contoh: untuk 19 tahun 1 bulan, isi 1." },
+  { kolom: "mkgBulan", judul: "Masa Kerja Golongan (bulan)", tipe: "angka", wajib: true, min: 0, maks: 11, bantuan: "Sisa bulannya saja, 0 sampai 11. Contoh: untuk 19 tahun 1 bulan, isi 1." },
   { kolom: null, judul: "Gaji pokok pada SK terakhir (Rp)", tipe: "angka", wajib: true, min: 0, maks: 99999999, bantuan: "Angka saja tanpa titik. Contoh: 3838300. Dipakai untuk memeriksa silang, bukan untuk menetapkan gaji." },
   { kolom: "tmtKgbTerakhir", judul: "TMT KGB terakhir", tipe: "tanggal", wajib: true, bantuan: "Tanggal mulai berlaku pada SK KGB terakhir. Bila belum pernah KGB, isi TMT CPNS." },
-  { kolom: "tmtKgbBerikutnya", judul: "TMT KGB berikutnya", tipe: "tanggal", wajib: true, bantuan: "Tercantum pada SK KGB terakhir, biasanya dua tahun setelah TMT KGB terakhir." },
   { kolom: null, judul: "Nomor SK KGB/kenaikan pangkat terakhir", tipe: "teks", wajib: true, bantuan: "Salin persis dari SK." },
   { kolom: null, judul: "Tanggal SK terakhir", tipe: "tanggal", wajib: true },
   { kolom: "tempatLahir", judul: "Tempat lahir", tipe: "teks", wajib: true },
@@ -132,7 +131,7 @@ function buatFormulir() {
 
   for (var i = 0; i < PERTANYAAN.length; i++) tambahPertanyaan(form, PERTANYAAN[i]);
 
-  var ss = SpreadsheetApp.create("Jawaban — " + NAMA_FORMULIR);
+  var ss = SpreadsheetApp.create("Jawaban " + NAMA_FORMULIR);
   form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
 
   var simpanan = PropertiesService.getScriptProperties();
@@ -222,7 +221,7 @@ function buatLembarImpor() {
       ambil(isian, "mkgBulan"),
       "", // gaji pokok dihitung SIM-KGB dari PP 5/2024
       tanggal(ambil(isian, "tmtKgbTerakhir")),
-      tanggal(ambil(isian, "tmtKgbBerikutnya")),
+      "", // TMT KGB berikutnya dihitung SIM-KGB dari golongan dan masa kerja golongan
       ambil(isian, "tempatLahir"),
       tanggal(ambil(isian, "tanggalLahir")),
       ambil(isian, "jenisKelamin"),

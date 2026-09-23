@@ -1,8 +1,8 @@
 // Autentikasi Google Sheets API via Service Account (JWT RS256 → access token).
 //
 // Dirancang agar berjalan DI DUA lingkungan tanpa dependensi Node:
-//   • Node.js (dev, `next dev`)      — WebCrypto tersedia sebagai global sejak Node 18.
-//   • Cloudflare Workers (produksi)  — hanya WebCrypto; tidak ada `crypto` Node.
+//   • Node.js (dev, `next dev`):      WebCrypto tersedia sebagai global sejak Node 18.
+//   • Cloudflare Workers (produksi):  hanya WebCrypto; tidak ada `crypto` Node.
 //
 // Alur: bentuk JWT (header.claim) → tanda tangani dengan private key service
 // account (RSASSA-PKCS1-v1_5 / SHA-256) → tukar ke Google OAuth token endpoint.

@@ -21,7 +21,7 @@ const T0 = new Date("2026-01-01T00:00:00.000Z").getTime();
 
 let gagal = 0;
 function periksa(nama: string, ok: boolean, rincian = "") {
-  console.log(`${ok ? "✓" : "✗"} ${nama}${ok || !rincian ? "" : ` — ${rincian}`}`);
+  console.log(`${ok ? "✓" : "✗"} ${nama}${ok || !rincian ? "" : `: ${rincian}`}`);
   if (!ok) gagal++;
 }
 

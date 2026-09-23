@@ -19,11 +19,11 @@ import {
 /** Jenis KP menurut PP 99/2000 jo. PP 12/2002, sesuai Buku Saku KP 2026. */
 export const JENIS_KP = {
   reguler: "Reguler",
-  struktural: "Pilihan — Struktural",
-  fungsional: "Pilihan — Fungsional",
-  penyesuaian_ijazah: "Pilihan — Penyesuaian Ijazah",
-  tugas_belajar: "Pilihan — Tugas Belajar",
-  luar_biasa: "Pilihan — Luar Biasa",
+  struktural: "Pilihan: Struktural",
+  fungsional: "Pilihan: Fungsional",
+  penyesuaian_ijazah: "Pilihan: Penyesuaian Ijazah",
+  tugas_belajar: "Pilihan: Tugas Belajar",
+  luar_biasa: "Pilihan: Luar Biasa",
   anumerta: "Anumerta",
   pengabdian: "Pengabdian",
 } as const;

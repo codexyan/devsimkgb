@@ -251,7 +251,7 @@ function laporkan() {
     kelompok.set(kunci, [...(kelompok.get(kunci) ?? []), m.id]);
   }
   for (const [kunci, ids] of kelompok) {
-    console.log(`  • ${kunci} — ${ids.length} baris (contoh id: ${ids.slice(0, 5).map(String).join(", ")})`);
+    console.log(`  • ${kunci}: ${ids.length} baris (contoh id: ${ids.slice(0, 5).map(String).join(", ")})`);
   }
 }
 

@@ -148,3 +148,40 @@ test("penundaanHukdisSelamaKgb: pergeseran TMT berikutnya dihitung selama hukdis
   assert.equal(penundaanHukdisSelamaKgb({ kgb: { ...kgb, tmtKgbBerikutnya: tambahBulan(tmt, langkah) }, riwayatHukdis: [sesudahTmt] }), 0);
   assert.equal(penundaanHukdisSelamaKgb({ kgb: { ...kgb, tmtKgbBerikutnya: null }, riwayatHukdis: [sesudahTmt] }), 0);
 });
+
+/** Isian yang lolos pemeriksaan; melempar bila ternyata bergalat, supaya pesannya terlihat di uji. */
+function isianSah(hasil: ReturnType<typeof bacaIsianPegawai>) {
+  if (hasil.galat !== undefined) throw new Error("tidak lolos: " + hasil.galat);
+  return hasil.data;
+}
+
+test("TMT KGB berikutnya dihitung dari langkah tabel gaji bila dikosongkan", () => {
+  // CPNS golongan II/a: langkah berikutnya di tabel PP 5/2024 ada pada masa kerja 1 tahun, jadi 12 bulan.
+  const cpns = bacaIsianPegawai(
+    { ...ISIAN_DASAR, golonganRuang: "II/a", mkgTahun: "0", mkgBulan: "0", tmtKgbTerakhir: "2025-06-01", tmtKgbBerikutnya: "" },
+    { denganNip: true },
+  );
+  assert.equal(isianSah(cpns).tmtKgbBerikutnya.getFullYear(), 2026);
+  assert.equal(isianSah(cpns).tmtKgbBerikutnya.getMonth(), 5);
+
+  // Golongan lain memakai siklus dua tahun.
+  const biasa = bacaIsianPegawai(
+    { ...ISIAN_DASAR, golonganRuang: "III/b", mkgTahun: "10", mkgBulan: "0", tmtKgbTerakhir: "2024-03-01", tmtKgbBerikutnya: "" },
+    { denganNip: true },
+  );
+  assert.equal(isianSah(biasa).tmtKgbBerikutnya.getFullYear(), 2026);
+  assert.equal(isianSah(biasa).tmtKgbBerikutnya.getMonth(), 2);
+});
+
+test("TMT KGB berikutnya yang diisi tetap dipakai, misalnya karena penundaan hukdis", () => {
+  const hasil = bacaIsianPegawai(
+    { ...ISIAN_DASAR, golonganRuang: "II/a", mkgTahun: "0", mkgBulan: "0", tmtKgbTerakhir: "2025-06-01", tmtKgbBerikutnya: "2027-06-01" },
+    { denganNip: true },
+  );
+  assert.equal(isianSah(hasil).tmtKgbBerikutnya.getFullYear(), 2027);
+});
+
+test("tanpa TMT KGB terakhir maupun berikutnya, galatnya menyebutkan jalan keluarnya", () => {
+  const hasil = bacaIsianPegawai({ ...ISIAN_DASAR, tmtKgbTerakhir: "", tmtKgbBerikutnya: "" }, { denganNip: true });
+  assert.match(hasil.galat ?? "", /isi TMT KGB Terakhir agar dihitungkan sistem/);
+});

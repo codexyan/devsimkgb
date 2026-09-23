@@ -86,7 +86,7 @@ const grupKepegawaian: Group = {
   ],
 };
 
-// Super Admin: akses penuh, termasuk modul Hukdis. (sdm_kgb TIDAK — hukdis
+// Super Admin: akses penuh, termasuk modul Hukdis. (sdm_kgb TIDAK, sebab hukdis
 // hanya untuk superAdmin & sdm_hukdis, lihat canManageHukdis.)
 // Satker & UPT: ringkasan KGB per satker dan jadwal usulan UPT (peran KGB, lihat PERAN_KGB).
 const menuSatker: Leaf = { href: "/dashboard/satker", label: "Satker & UPT", icon: Ic.building };

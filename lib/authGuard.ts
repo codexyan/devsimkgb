@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 
 // Guard peran sisi-server untuk layout dashboard. Menggantikan proteksi berbasis
-// middleware (proxy.ts) yang tidak didukung OpenNext/Cloudflare Workers — Next 16
+// middleware (proxy.ts) yang tidak didukung OpenNext/Cloudflare Workers; Next 16
 // memaksa proxy ke runtime Node, sedangkan OpenNext hanya menerima Edge middleware.
 // Semua API route sudah memeriksa auth() sendiri, jadi guard ini melindungi
 // halaman dashboard dari akses URL langsung (defense-in-depth; sidebar juga sudah

@@ -283,9 +283,9 @@ export default function FormulirUsulan({
                 value={isian.golonganRuang ?? ""}
                 onChange={(e) => ubah("golonganRuang", e.target.value)}
               >
-                <option value="">— pilih golongan —</option>
+                <option value="">Pilih golongan</option>
                 {Object.entries(GOLONGAN_PANGKAT).map(([golongan, pangkat]) => (
-                  <option key={golongan} value={golongan}>{golongan} — {pangkat}</option>
+                  <option key={golongan} value={golongan}>{golongan} · {pangkat}</option>
                 ))}
               </select>
             </label>
@@ -319,7 +319,7 @@ export default function FormulirUsulan({
                   wajib
                   nilai={isian.tmtKgbTerakhir ?? ""}
                   onUbah={(v) => ubah("tmtKgbTerakhir", v)}
-                  bantuan="TMT pada SK KGB terakhir. Baru naik pangkat? Tanggal ini tetap dari siklus KGB sebelumnya — kenaikan pangkat tidak mengulang hitungan KGB."
+                  bantuan="TMT pada SK KGB terakhir. Baru naik pangkat? Tanggal ini tetap dari siklus KGB sebelumnya, sebab kenaikan pangkat tidak mengulang hitungan KGB."
                 />
                 <div className="kgbm-grid2">
                   <label className="kgbm-label">
@@ -359,7 +359,7 @@ export default function FormulirUsulan({
               </div>
               <Catatan nada="amber">
                 Masa kerja golongan diisi 0 tahun 0 bulan. Bila SK pengangkatan PNS terbit terlambat, SK itu
-                biasanya sudah memuat KGB yang belum dibayarkan — jangan menyalin masa kerja dan gaji pokok
+                biasanya sudah memuat KGB yang belum dibayarkan. Jangan menyalin masa kerja dan gaji pokok
                 dari sana, sebab KGB beserta rapelannya justru yang sedang diusulkan.
               </Catatan>
             </>
@@ -368,14 +368,14 @@ export default function FormulirUsulan({
           <div className="kgbm-hitungan">
             <p className="kgbm-hitungan-judul">Dihitung sistem</p>
             <dl>
-              <div><dt>Pangkat</dt><dd>{hitung.pangkat || "—"}</dd></div>
+              <div><dt>Pangkat</dt><dd>{hitung.pangkat || "-"}</dd></div>
               <div>
                 <dt>Gaji pokok</dt>
-                <dd>{hitung.gajiPokok > 0 ? "Rp" + new Intl.NumberFormat("id-ID").format(hitung.gajiPokok) : "—"}</dd>
+                <dd>{hitung.gajiPokok > 0 ? "Rp" + new Intl.NumberFormat("id-ID").format(hitung.gajiPokok) : "-"}</dd>
               </div>
               <div>
                 <dt>TMT KGB berikutnya</dt>
-                <dd>{hitung.tmtKgbBerikutnya ? formatTanggalId(hitung.tmtKgbBerikutnya) : "—"}</dd>
+                <dd>{hitung.tmtKgbBerikutnya ? formatTanggalId(hitung.tmtKgbBerikutnya) : "-"}</dd>
               </div>
             </dl>
             {hitung.penjelasan && <p className="kgbm-hitungan-ket">{hitung.penjelasan}</p>}

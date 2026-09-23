@@ -39,7 +39,7 @@ export default function DashboardShell({ nama, nip, role, sesiTimeoutMenit = 60,
   const mainRef  = useRef<HTMLElement>(null);
 
   // <main> adalah satu-satunya area gulir dan elemennya persisten lintas
-  // navigasi client-side — tanpa reset, halaman baru terbuka di posisi
+  // navigasi client-side: tanpa reset, halaman baru terbuka di posisi
   // scroll halaman sebelumnya.
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
@@ -144,7 +144,7 @@ export default function DashboardShell({ nama, nip, role, sesiTimeoutMenit = 60,
       {/* Sidebar (self-contained: handles open/collapsed + notifications) */}
       <Sidebar role={role} nama={nama} nip={nip} />
 
-      {/* Main content — satu-satunya area gulir vertikal halaman */}
+      {/* Main content: satu-satunya area gulir vertikal halaman */}
       <main
         ref={mainRef}
         className="dsb-main"

@@ -125,7 +125,7 @@ export default function HukdisPage() {
     });
   }
 
-  // Saat jenis dipilih: isi DEFAULT (bukan mengunci) dari config jenis — dasar
+  // Saat jenis dipilih: isi DEFAULT (bukan mengunci) dari config jenis: dasar
   // hukum, dampak KGB, durasi tunda, tmtBerakhir. PIC bebas mengubah semuanya.
   function pickJenis(kode: string) {
     const j = jenisList.find((x) => x.kode === kode);
@@ -511,9 +511,9 @@ export default function HukdisPage() {
                         className="adm-input">
                         <option value="">Pilih regulasi…</option>
                         {regulasiList.map((r) => (
-                          <option key={r.id} value={regText(r)}>{regText(r)} — {r.tentang}{r.status === "dicabut_sebagian" ? " (dicabut sebagian)" : ""}</option>
+                          <option key={r.id} value={regText(r)}>{regText(r)} · {r.tentang}{r.status === "dicabut_sebagian" ? " (dicabut sebagian)" : ""}</option>
                         ))}
-                        <option value="__manual__">— ketik manual —</option>
+                        <option value="__manual__">Ketik manual</option>
                       </select>
                     ) : (
                       <div className="flex gap-2">
@@ -522,11 +522,11 @@ export default function HukdisPage() {
                       </div>
                     )}
                     <p className="text-xs mt-1" style={{ color: "var(--dt5)", fontSize: "10px" }}>
-                      {regulasiList.length === 0 ? "Belum ada regulasi terdaftar — ketik manual, atau daftarkan lewat Kelola regulasi." : "Dikunci pada catatan ini; peraturan baru tidak mengubahnya."}
+                      {regulasiList.length === 0 ? "Belum ada regulasi terdaftar. Ketik manual, atau daftarkan lewat Kelola regulasi." : "Dikunci pada catatan ini; peraturan baru tidak mengubahnya."}
                     </p>
                   </div>
 
-                  {/* Dampak KGB — ditetapkan PIC */}
+                  {/* Dampak KGB: ditetapkan PIC */}
                   <div className="rounded-xl p-3" style={{ background: "var(--sub)", border: "0.5px solid var(--ln1)" }}>
                     <div className="flex items-center justify-between gap-2">
                       <div>
@@ -561,7 +561,7 @@ export default function HukdisPage() {
                   <div className="rounded-lg px-3 py-2 flex items-start gap-2" style={{ background: "var(--tint-blue-bg)", border: "1px solid var(--tint-blue-ln)" }}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--st-blue)" strokeWidth="2" style={{ marginTop: "1px", flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
                     <p className="text-xs" style={{ color: "var(--st-blue)", fontSize: "10.5px", lineHeight: 1.5 }}>
-                      Patokan: <strong>tanggal SK Hukdis</strong>. Semua nilai di atas dikunci pada catatan ini saat disimpan — perubahan regulasi/konfigurasi berikutnya tidak berlaku surut ke catatan ini.
+                      Patokan: <strong>tanggal SK Hukdis</strong>. Semua nilai di atas dikunci pada catatan ini saat disimpan; perubahan regulasi atau konfigurasi berikutnya tidak berlaku surut ke catatan ini.
                     </p>
                   </div>
                 </>

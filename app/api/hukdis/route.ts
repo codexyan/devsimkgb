@@ -7,7 +7,7 @@ import { hariIniWita, tanggalKalender } from "@/lib/waktu";
 
 export const runtime = "nodejs";
 
-// GET /api/hukdis — daftar SELURUH catatan hukuman disiplin lintas pegawai.
+// GET /api/hukdis: daftar SELURUH catatan hukuman disiplin lintas pegawai.
 export async function GET() {
   const session = await auth();
   if (!session)

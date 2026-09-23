@@ -5,9 +5,9 @@ import { JENIS_HUKDIS_PP94 } from "./jenis-hukdis-pp94";
 
 /* ───────────────────────────────────────────────────────────────────────────
    Seed master data ke Google Sheets (opsional, idempotent):
-     • KonfigurasiKanwil (id "default")  — dasar hukum, notifikasi, sesi; edit via Pengaturan
-     • HukdisJenis (PP 94/2021)          — daftar jenis hukuman disiplin
-     • HukdisKonfigurasi                 — ambang notifikasi hukdis
+     • KonfigurasiKanwil (id "default"):  dasar hukum, notifikasi, sesi; edit via Pengaturan
+     • HukdisJenis (PP 94/2021):          daftar jenis hukuman disiplin
+     • HukdisKonfigurasi:                 ambang notifikasi hukdis
    Penandatangan surat KGB diisi lewat halaman Pengaturan.
 
    Jalankan: npx tsx scripts/seed-sheets-master.ts

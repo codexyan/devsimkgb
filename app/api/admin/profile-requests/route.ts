@@ -19,7 +19,7 @@ export async function GET() {
     const users = await db.user.findMany();
     const userById = new Map(users.map((u) => [u.id, u]));
 
-    // Emulasi `include: user` — gabungkan data user terkait.
+    // Emulasi `include: user`: gabungkan data user terkait.
     const withUser = requests.map((r) => {
       const u = userById.get((r as any).userId);
       return {

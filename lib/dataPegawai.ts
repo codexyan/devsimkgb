@@ -194,12 +194,22 @@ export function bacaIsianPegawai(
     tanggal[kolom] = hasil.status === "valid" ? hasil.tanggal : null;
   }
   if (!tanggal.tmtGolongan) return { galat: "TMT Golongan wajib diisi." };
-  if (!tanggal.tmtKgbBerikutnya) return { galat: "TMT KGB Berikutnya wajib diisi." };
 
   const mkg = bacaMkg(isian.mkgTahun, isian.mkgBulan);
   if (mkg.galat !== undefined) return { galat: mkg.galat };
   const gaji = bacaGajiPokok(isian.gajiPokok, golonganRuang, mkg.mkgTahun, mkg.mkgBulan);
   if (gaji.galat !== undefined) return { galat: gaji.galat };
+
+  // Jatuh tempo berikutnya dihitung dari langkah tabel gaji bila tidak diisi, sama seperti yang
+  // dilakukan formulir UPT. Selangnya tidak selalu dua tahun: golongan II/a dari masa kerja 0 naik
+  // setelah 12 bulan, dan mengetiknya dari ingatan itulah yang membuat KGB pertama CPNS meleset.
+  // Nilai yang diisi tetap dihormati, sebab ada kasus yang memang bergeser, misalnya penundaan hukdis.
+  const tmtKgbBerikutnya = tanggal.tmtKgbBerikutnya
+    ?? (tanggal.tmtKgbTerakhir
+      ? tambahBulan(tanggal.tmtKgbTerakhir, bulanKeKgbBerikutnya(golonganRuang, mkg.mkgTahun, mkg.mkgBulan))
+      : null);
+  if (!tmtKgbBerikutnya)
+    return { galat: "TMT KGB Berikutnya wajib diisi, atau isi TMT KGB Terakhir agar dihitungkan sistem." };
 
   return {
     data: {
@@ -220,7 +230,7 @@ export function bacaIsianPegawai(
       mkgBulan: mkg.mkgBulan,
       gajiPokok: gaji.gajiPokok,
       tmtKgbTerakhir: tanggal.tmtKgbTerakhir ?? null,
-      tmtKgbBerikutnya: tanggal.tmtKgbBerikutnya,
+      tmtKgbBerikutnya,
     },
   };
 }

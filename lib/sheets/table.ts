@@ -3,12 +3,12 @@
 // Konsep: baris 1 tab = HEADER (nama kolom). Baris 2..n = data. Tiap kolom
 // punya tipe agar nilai sel (selalu string di Sheets) di-coerce ke tipe JS yang
 // benar dan sebaliknya. Filter (`where`) dan urut (`orderBy`) dijalankan DI JS
-// setelah menarik seluruh tab — Sheets tidak punya WHERE/ORDER BY.
+// setelah menarik seluruh tab, sebab Sheets tidak punya WHERE/ORDER BY.
 //
 // CATATAN JUJUR soal batasan (sengaja tidak disembunyikan):
 //   • Tanpa transaksi/lock: operasi update = read-modify-write, rawan bentrok
 //     bila dua pengguna menulis baris yang sama nyaris bersamaan.
-//   • findMany menarik seluruh tab tiap panggilan — makin banyak baris makin berat.
+//   • findMany menarik seluruh tab tiap panggilan, jadi makin banyak baris makin berat.
 
 import {
   appendRows,

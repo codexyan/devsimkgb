@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 const VALID_STATUS = ["berlaku", "dicabut_sebagian", "dicabut"];
 
-// GET /api/hukdis/regulasi — daftar semua regulasi (master data)
+// GET /api/hukdis/regulasi: daftar semua regulasi (master data)
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -37,7 +37,7 @@ export async function GET() {
   }
 }
 
-// POST /api/hukdis/regulasi — tambah regulasi
+// POST /api/hukdis/regulasi: tambah regulasi
 export async function POST(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,5 +1,5 @@
 // Klien tingkat-rendah Google Sheets API v4 (values). Hanya operasi mentah
-// atas RANGE sel — pemetaan baris↔objek dilakukan di lib/sheets/table.ts.
+// atas RANGE sel; pemetaan baris↔objek dilakukan di lib/sheets/table.ts.
 //
 // Semua request lewat fetch + access token service account, jadi kompatibel
 // dengan Cloudflare Workers maupun Node.

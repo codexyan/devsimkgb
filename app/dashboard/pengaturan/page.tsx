@@ -12,13 +12,13 @@ import { formatTanggalId, hariIniWita } from "@/lib/waktu";
 /* ─────────────────────────────────────────────────────────────────────────
    Pengaturan (Super Admin). Satu bagian tampil sekaligus supaya halaman pas satu layar:
    daftar bagian di kolom kanan, isinya di panel kiri yang bergulir sendiri.
-     1. Penandatangan surat KGB — definitif, Plh, Plt, Dirjen, dengan masa berlaku
+     1. Penandatangan surat KGB: definitif, Plh, Plt, Dirjen, dengan masa berlaku
      2. Dasar hukum KGB
-     3. Jadwal proses KGB       — tanggal batas input Tim SDM
-     4. Notifikasi KGB          — ambang H-… peringatan
-     5. Keamanan sesi           — durasi keluar otomatis
-     6. Kontak WhatsApp         — dipakai tombol lupa password
-     7. Pemeriksaan data        — temuan data pegawai tidak konsisten (hanya membaca)
+     3. Jadwal proses KGB:       tanggal batas input Tim SDM
+     4. Notifikasi KGB:          ambang H-… peringatan
+     5. Keamanan sesi:           durasi keluar otomatis
+     6. Kontak WhatsApp:         dipakai tombol lupa password
+     7. Pemeriksaan data:        temuan data pegawai tidak konsisten (hanya membaca)
    ───────────────────────────────────────────────────────────────────────── */
 
 interface Konfigurasi {

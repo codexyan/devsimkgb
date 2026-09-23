@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   if (!userLogin)
     return NextResponse.json({ error: "User tidak ditemukan" }, { status: 401 });
 
-  // Kuota Sheets API terbatas (±60 tulis/menit) — import dikerjakan BATCH:
+  // Kuota Sheets API terbatas (±60 tulis/menit), sehingga import dikerjakan BATCH:
   // satu kali baca daftar NIP terdaftar, satu append Pegawai, satu append
   // RiwayatKGB. Per-baris create dulu membuat import besar kena 429.
   const terdaftar = new Set((await db.pegawai.findMany()).map((p) => p.nip));

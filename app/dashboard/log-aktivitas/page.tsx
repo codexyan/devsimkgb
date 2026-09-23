@@ -93,7 +93,7 @@ function waktuRelatif(iso: string) {
   return formatTanggalId(new Date(iso), { day: "numeric", month: "short", year: "numeric" });
 }
 
-/* Tanggal LOKAL (bukan UTC) — toISOString bisa mundur sehari di zona WIB/WITA. */
+/* Tanggal LOKAL (bukan UTC), sebab toISOString bisa mundur sehari di zona WIB/WITA. */
 const isoLokal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const hariLalu = (n: number) => {
   const d = new Date();

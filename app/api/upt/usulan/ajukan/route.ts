@@ -19,7 +19,7 @@ const PESAN_BUKAN_UPT = "Usulan hanya dapat diajukan akun Admin UPT yang tertaut
 /**
  * Ajukan beberapa draf sekaligus dengan satu surat usulan.
  *
- * Satu surat usulan UPT lazimnya memuat beberapa pegawai — surat Rutan Rantau 8 September 2026,
+ * Satu surat usulan UPT lazimnya memuat beberapa pegawai; surat Rutan Rantau 8 September 2026,
  * misalnya, memuat lima. Karena itu nomor surat, tanggalnya, dan salinan suratnya diisi sekali di sini
  * lalu disalin ke setiap baris, bukan diketik ulang per pegawai. Kelengkapan tiap draf diperiksa lebih
  * dulu dan yang kurang disebutkan satu per satu, supaya operator tahu persis apa yang harus dilengkapi.

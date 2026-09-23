@@ -168,7 +168,7 @@ export default function ModalKenaikanPangkat({
           <label htmlFor="kp-golongan" className="kgbm-label">Golongan baru<span className="kgbm-wajib" aria-hidden="true">*</span></label>
           <select id="kp-golongan" className="kgbm-input" value={golonganBaru} onChange={(e) => setGolonganBaru(e.target.value)} data-autofocus>
             <option value="">Pilih golongan…</option>
-            {pilihanGolongan.map((g) => <option key={g} value={g}>{g} — {GOLONGAN_PANGKAT[g]}</option>)}
+            {pilihanGolongan.map((g) => <option key={g} value={g}>{g} · {GOLONGAN_PANGKAT[g]}</option>)}
           </select>
         </div>
       </div>

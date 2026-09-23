@@ -108,7 +108,7 @@ async function utama() {
   }
 
   console.log(`Akan dibuat: ${rencana.length} akun`);
-  for (const r of rencana) console.log(`  ${r.nama} (${r.nip}) — ${r.namaSatker}`);
+  for (const r of rencana) console.log(`  ${r.nama} (${r.nip}) · ${r.namaSatker}`);
   if (dilewati.length > 0) {
     console.log(`\nDilewati: ${dilewati.length}`);
     for (const d of dilewati) console.log(`  ${d}`);

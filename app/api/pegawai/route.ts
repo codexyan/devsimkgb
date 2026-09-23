@@ -47,7 +47,7 @@ export async function GET(req: Request) {
       orderBy: { field: "nama", dir: "asc" },
     });
 
-    // Status KGB terkini (record aktif terbaru per pegawai) — pengganti `include`.
+    // Status KGB terkini (record aktif terbaru per pegawai), pengganti `include`.
     const allKgb = await db.riwayatKGB.findMany({ where: { isArsip: false } });
     const latestByPegawai = new Map<string, { status: string; t: number }>();
     for (const k of allKgb) {

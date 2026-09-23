@@ -646,7 +646,7 @@ export default function UsersPage() {
                 <span className="kgbm-wajib">Alihkan data ke</span>
                 <select className="kgbm-input" data-autofocus value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
                   <option value="">Pilih pengguna…</option>
-                  {usersLain.map((u) => <option key={u.id} value={u.id}>{u.nama} — {cfgPeran(u.role).label}</option>)}
+                  {usersLain.map((u) => <option key={u.id} value={u.id}>{u.nama} · {cfgPeran(u.role).label}</option>)}
                 </select>
               </label>
             </>

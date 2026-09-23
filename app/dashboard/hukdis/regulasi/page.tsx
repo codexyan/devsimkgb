@@ -136,7 +136,7 @@ export default function RegulasiPage() {
         </div>
       )}
 
-      {/* List — grid kartu (memanfaatkan lebar layar) */}
+      {/* List: grid kartu (memanfaatkan lebar layar) */}
       {loading ? (
         <div className="bg-white rounded-2xl flex items-center justify-center py-16" style={{ border: "0.5px solid var(--ln1)" }}><p className="text-xs" style={{ color: "var(--dt4)" }}>Memuat regulasi…</p></div>
       ) : list.length === 0 ? (
@@ -229,8 +229,8 @@ export default function RegulasiPage() {
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>Digantikan oleh <span style={{ color: "var(--dt5)" }}>(opsional)</span></label>
                   <select value={form.digantikanOlehId} onChange={(e) => setForm((f) => ({ ...f, digantikanOlehId: e.target.value }))} className="adm-input">
-                    <option value="">— tidak ditentukan —</option>
-                    {opsiPengganti.map((r) => <option key={r.id} value={r.id}>{regLabel(r)} — {r.tentang}</option>)}
+                    <option value="">Tidak ditentukan</option>
+                    {opsiPengganti.map((r) => <option key={r.id} value={r.id}>{regLabel(r)} · {r.tentang}</option>)}
                   </select>
                 </div>
               )}

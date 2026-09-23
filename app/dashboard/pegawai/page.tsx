@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   GOLONGAN_PANGKAT,
+  bulanKeKgbBerikutnya,
   getMKGOptions,
   getGajiPokok,
   getPangkat,
   hitungMKGKenaikanPangkat,
   jendelaProsesKgb,
+  tambahBulan,
 } from "@/lib/tabelGaji";
 import { ROLES } from "@/lib/auth";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
@@ -133,6 +135,17 @@ function Field({
       {children}
     </div>
   );
+}
+
+/**
+ * TMT KGB berikutnya menurut langkah tabel gaji PP 5/2024; kosong bila TMT KGB terakhir belum diisi.
+ * Selangnya tidak selalu dua tahun: golongan II/a dari masa kerja 0 naik setelah 12 bulan.
+ */
+function tmtBerikutnyaOtomatis(golongan: string, mkgTahun: number, mkgBulan: number, tmtTerakhir: string): string {
+  const bagian = /^(d{4})-(d{2})-(d{2})$/.exec(tmtTerakhir);
+  if (!golongan || !bagian) return "";
+  const awal = new Date(Number(bagian[1]), Number(bagian[2]) - 1, Number(bagian[3]));
+  return isoTanggalLokal(tambahBulan(awal, bulanKeKgbBerikutnya(golongan, mkgTahun, mkgBulan)));
 }
 
 export default function PegawaiPage() {
@@ -1037,7 +1050,15 @@ export default function PegawaiPage() {
                             const kenaikan = hitungMKGKenaikanPangkat(p.golonganRuang, gol, parseInt(p.mkgTahun) || 0, parseInt(p.mkgBulan) || 0);
                             const mkgTahun = kenaikan ? kenaikan.mkgTahun : (mkgOpts[0]?.tahun ?? 0);
                             const mkgBulan = kenaikan ? kenaikan.mkgBulan : (mkgOpts[0]?.bulan ?? 0);
-                            return { ...p, golonganRuang: gol, pangkat, mkgTahun: mkgTahun.toString(), mkgBulan: mkgBulan.toString(), gajiPokok: getGajiPokok(gol, mkgTahun, mkgBulan).toString() };
+                            return {
+                              ...p,
+                              golonganRuang: gol,
+                              pangkat,
+                              mkgTahun: mkgTahun.toString(),
+                              mkgBulan: mkgBulan.toString(),
+                              gajiPokok: getGajiPokok(gol, mkgTahun, mkgBulan).toString(),
+                              tmtKgbBerikutnya: tmtBerikutnyaOtomatis(gol, mkgTahun, mkgBulan, p.tmtKgbTerakhir) || p.tmtKgbBerikutnya,
+                            };
                           });
                         }}
                       >
@@ -1059,7 +1080,13 @@ export default function PegawaiPage() {
                         onChange={(e) => {
                           if (!e.target.value) return;
                           const [tahun, bulan] = e.target.value.split("_").map(Number);
-                          setForm((p) => ({ ...p, mkgTahun: tahun.toString(), mkgBulan: bulan.toString(), gajiPokok: getGajiPokok(form.golonganRuang, tahun, bulan).toString() }));
+                          setForm((p) => ({
+                            ...p,
+                            mkgTahun: tahun.toString(),
+                            mkgBulan: bulan.toString(),
+                            gajiPokok: getGajiPokok(p.golonganRuang, tahun, bulan).toString(),
+                            tmtKgbBerikutnya: tmtBerikutnyaOtomatis(p.golonganRuang, tahun, bulan, p.tmtKgbTerakhir) || p.tmtKgbBerikutnya,
+                          }));
                         }}
                       >
                         <option value="">Pilih MKG</option>
@@ -1087,11 +1114,31 @@ export default function PegawaiPage() {
                   </div>
                   <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-hidden">
                     <Field label="KGB Terakhir Berlaku">
-                      <input type="date" className={inputClass} style={dateInputStyle} value={form.tmtKgbTerakhir} onChange={(e) => f("tmtKgbTerakhir", e.target.value)} />
+                      <input
+                        type="date"
+                        className={inputClass}
+                        style={dateInputStyle}
+                        value={form.tmtKgbTerakhir}
+                        onChange={(e) => {
+                          const nilai = e.target.value;
+                          setForm((p) => ({
+                            ...p,
+                            tmtKgbTerakhir: nilai,
+                            tmtKgbBerikutnya:
+                              tmtBerikutnyaOtomatis(p.golonganRuang, parseInt(p.mkgTahun) || 0, parseInt(p.mkgBulan) || 0, nilai)
+                              || p.tmtKgbBerikutnya,
+                          }));
+                        }}
+                      />
                     </Field>
                     <div className="min-w-0">
                       <label className={labelClass} style={{ color: "var(--dt2)" }}>KGB Berikutnya Berlaku <span style={{ color: "var(--st-red)" }}>*</span></label>
                       <input type="date" className={inputClass} style={dateInputStyle} value={form.tmtKgbBerikutnya} onChange={(e) => f("tmtKgbBerikutnya", e.target.value)} />
+                      <p className="text-xs mt-1" style={{ color: "var(--dt4)" }}>
+                        Terisi sendiri dari golongan, masa kerja, dan KGB terakhir. Golongan II/a dari masa kerja 0
+                        naik setelah 1 tahun, bukan 2. Ubah hanya bila memang bergeser, misalnya karena penundaan
+                        hukuman disiplin.
+                      </p>
                     </div>
                   </div>
                 </div>

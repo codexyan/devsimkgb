@@ -14,7 +14,7 @@ const tumpukanDialog: object[] = [];
  *
  * Selama dialog terbuka, halaman di belakangnya tidak boleh ikut bergulir. Di layar sentuh, gerakan
  * jari pada dialog yang panjang mudah jatuh ke halaman di belakangnya: yang bergerak halamannya,
- * sedangkan isi dialognya diam — persis seperti dialog yang tidak dapat digulir. Dasbor menggulir di
+ * sedangkan isi dialognya diam, persis seperti dialog yang tidak dapat digulir. Dasbor menggulir di
  * dalam <main>, bukan di body, jadi keduanya dikunci.
  */
 let gulirTerkunci: { body: string; wadah: HTMLElement | null; nilaiWadah: string } | null = null;

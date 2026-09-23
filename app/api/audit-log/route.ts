@@ -8,7 +8,7 @@ import { hariIniWita, tanggalKalender } from "@/lib/waktu";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  // Jejak audit hanya untuk Super Admin — data sensitif lintas pengguna.
+  // Jejak audit hanya untuk Super Admin: data sensitif lintas pengguna.
   const session = await auth();
   if (!session || session.user.role !== "superAdminCore") {
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });

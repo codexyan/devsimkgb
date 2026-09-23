@@ -57,7 +57,7 @@ lengkap karena formulir menyimpan `satker.nama`, dan tampilan selalu melewati `n
 ### 3. Tiga halaman administrasi memakai bahasa desain dasbor
 
 Pengguna, Log Aktivitas, dan Pengaturan memakai `dsb-halaman` dengan `data-muat-layar`: kepala halaman,
-strip angka, lalu dua kolom — kolom kerja di kiri dan kolom pendamping di kanan. Yang bergulir hanya isi
+strip angka, lalu dua kolom: kolom kerja di kiri dan kolom pendamping di kanan. Yang bergulir hanya isi
 panel, bukan halamannya.
 
 - **Pengguna:** tabel akun dengan tindakan per baris, kolom kanan berisi saringan peran dan permintaan
@@ -74,10 +74,10 @@ panel, bukan halamannya.
 
 Dua bagian panduan baru, beserta entri di `DAFTAR_ISI` dan pemetaan `PERAN`:
 
-- **`cpns-pns`** — KGB pertama setelah CPNS diangkat PNS: masa kerja golongan dihitung sejak TMT CPNS,
+- **`cpns-pns`**: KGB pertama setelah CPNS diangkat PNS: masa kerja golongan dihitung sejak TMT CPNS,
   gaji CPNS 80 persen, TMT PNS mengikuti SK pengangkatan dan tidak berlaku surut, dan kekurangan gaji hanya
   dihitung untuk bulan yang benar-benar terlanjur dibayar dengan gaji pokok lama.
-- **`kenaikan-pangkat`** — potongan MKG saat pindah golongan, apa yang berubah dan apa yang tetap, serta
+- **`kenaikan-pangkat`**: potongan MKG saat pindah golongan, apa yang berubah dan apa yang tetap, serta
   cara mencatatnya di SIM-KGB.
 
 Beranda `/kgb` menambah tiga catatan jadwal yang menunjuk ke bagian-bagian itu dan ke akun Admin UPT.

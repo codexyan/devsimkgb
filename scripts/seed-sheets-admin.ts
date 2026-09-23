@@ -10,7 +10,7 @@ import { newId } from "../lib/sheets/id";
    Jalankan: npx tsx scripts/seed-sheets-admin.ts
    Butuh env GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_SHEET_ID.
 
-   Aman diulang (idempotent): jika NIP sudah ada, tidak menimpa — cukup lapor.
+   Aman diulang (idempotent): jika NIP sudah ada, tidak menimpa, cukup lapor.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const NIP = "200007082025061017";
@@ -54,7 +54,7 @@ async function main() {
 
   console.log("✓ Super Admin dibuat di Google Sheets (tab User):");
   console.log(`   NIP      : ${NIP}`);
-  console.log(`   Password : ${PASSWORD}  (sama dengan NIP — ganti setelah login)`);
+  console.log(`   Password : ${PASSWORD}  (sama dengan NIP, ganti setelah login)`);
   console.log(`   Role     : ${ROLE}`);
 }
 

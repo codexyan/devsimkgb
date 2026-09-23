@@ -11,7 +11,7 @@ halaman `/dashboard/usulan`, dashboard Admin UPT, dan bagian panduan untuk UPT
 
 Tim keuangan mengingatkan satu hal yang tidak tertangani: UPT harus benar-benar memastikan masa kerja
 golongan dan status hukuman disiplin pegawainya, karena salah data berujung pada kekurangan gaji atau,
-yang lebih berat, kelebihan gaji yang harus disetor kembali ke kas negara. Asimetrinya nyata — rapel
+yang lebih berat, kelebihan gaji yang harus disetor kembali ke kas negara. Asimetrinya nyata: rapel
 diselesaikan dengan SPM-LS kekurangan gaji, sedangkan kelebihan bayar menjadi temuan pemeriksaan.
 
 Dua celah ditemukan saat menelusuri kode:
@@ -41,7 +41,7 @@ penanda, sehingga konfirmasi kedaluwarsa sendiri saat pegawai masuk siklus berik
 Tim SDM pada kartu antrian KGB.
 
 Konfirmasi ini **tidak menghalangi** pembuatan SK. Dari 18 UPT belum semuanya punya akun, dan memblokir
-proses karena alasan administratif akan membuat KGB terlambat — yang justru menimbulkan rapel.
+proses karena alasan administratif akan membuat KGB terlambat, yang justru menimbulkan rapel.
 
 ### 3. Usulan data pegawai dari UPT
 
@@ -65,8 +65,8 @@ Polanya mengikuti `ProfileChangeRequest` yang sudah ada di aplikasi ini.
 
 Sebelumnya surat dikirim pada bulan ketiga sebelum TMT. Yang mengikat sebenarnya bukan bulan suratnya,
 melainkan kunci gaji induk: SPM gaji bulan M paling lambat tanggal 15 bulan M-1 (PMK 62/2023 Pasal 225).
-Surat kini dikirim tanggal 1 sampai 10 bulan kedua sebelum TMT — bulan yang sama dengan dibukanya input di
-SIM-KGB — sehingga tetap selesai sebelum rekon gaji, tanpa memaksa UPT berpikir tiga bulan ke depan.
+Surat kini dikirim tanggal 1 sampai 10 bulan kedua sebelum TMT, bulan yang sama dengan dibukanya input di
+SIM-KGB, sehingga tetap selesai sebelum rekon gaji, tanpa memaksa UPT berpikir tiga bulan ke depan.
 
 Memindahkan seluruh proses ke bulan TMT, seperti sempat diusulkan, ditolak: SK yang diteken akhir bulan TMT
 melewatkan gaji induk bulan itu dan bulan berikutnya, sehingga setiap KGB menjadi rapel dua bulan.
@@ -78,7 +78,7 @@ berisi Dashboard. Menu **Profil Saya** ditambahkan.
 
 ## Akibat
 
-- Peran Admin UPT tidak lagi murni lihat-saja: ada tiga penulisan yang diizinkan — konfirmasi data,
+- Peran Admin UPT tidak lagi murni lihat-saja: ada tiga penulisan yang diizinkan: konfirmasi data,
   usulan data, dan ganti password sendiri. Ketiganya tidak mengubah data induk secara langsung, kecuali
   password akunnya sendiri.
 - Data induk berubah lewat dua jalur: Tim SDM langsung, dan persetujuan usulan UPT. Keduanya tercatat di
@@ -173,8 +173,8 @@ Notifikasi untuk usulan pegawai baru berbunyi berbeda, karena pegawainya memang 
 
 ## Perluasan 23 September 2026 (lanjutan kedua): data dulu, ajukan kemudian
 
-Pemakaian pertama menunjukkan formulir usulan mengerjakan tiga hal sekaligus — data pegawai, surat
-usulan, dan berkas pendukung — padahal ketiganya berbeda sifat. Akibatnya terlihat pada surat Rutan
+Pemakaian pertama menunjukkan formulir usulan mengerjakan tiga hal sekaligus (data pegawai, surat
+usulan, dan berkas pendukung), padahal ketiganya berbeda sifat. Akibatnya terlihat pada surat Rutan
 Rantau 8 September 2026 yang memuat lima pegawai: operator harus mengetik nomor surat yang sama lima
 kali dan mengunggah surat yang sama lima kali, dan datanya tidak bisa disicil.
 
@@ -182,7 +182,7 @@ kali dan mengunggah surat yang sama lima kali, dan datanya tidak bisa disicil.
 
 Draf yang sempat disimpan di peramban diganti draf berstatus `draf` pada tabel `usulan_pegawai`.
 Alasannya dua. Draf peramban hilang begitu operator berpindah perangkat, padahal pendataan berlangsung
-berhari-hari. Dan dua macam draf — satu di peramban, satu di server — justru menambah kebingungan yang
+berhari-hari. Dan dua macam draf, satu di peramban dan satu di server, justru menambah kebingungan yang
 hendak dihilangkan. Status `draf` tidak pernah masuk antrian tinjauan Kanwil maupun notifikasinya, dan
 boleh disunting (`PATCH /api/upt/usulan/[id]`) atau dihapus sesuka UPT.
 
@@ -202,12 +202,12 @@ tersimpan tidak pernah bergantung pada apa yang dikirim peramban.
 
 Dua jebakan yang dulu diam kini bersuara. Golongan II/a naik ke MKG 1 setelah **12 bulan**, bukan 24
 seperti golongan lain, sehingga KGB pertama CPNS II/a jatuh setahun setelah TMT CPNS. Dan kombinasi
-yang tidak ada barisnya di tabel — misalnya II/c dengan masa kerja 0 tahun — dulu menghasilkan gaji
+yang tidak ada barisnya di tabel, misalnya II/c dengan masa kerja 0 tahun, dulu menghasilkan gaji
 pokok nol tanpa peringatan; sekarang ditahan sebagai kekurangan yang harus diperbaiki sebelum diajukan.
 
 Formulirnya juga menanyakan keadaan pegawai lebih dulu: belum pernah KGB, atau sudah. Yang belum cukup
 mengisi TMT CPNS dengan masa kerja 0, disertai peringatan agar tidak menyalin masa kerja dari SK
-pengangkatan PNS yang terbit terlambat — SK semacam itu sudah memuat KGB yang justru sedang diusulkan,
+pengangkatan PNS yang terbit terlambat: SK semacam itu sudah memuat KGB yang justru sedang diusulkan,
 dan menyalinnya berarti menghapus rapelan yang menjadi hak pegawai.
 
 ### 4. Batas berkas 1 MB
@@ -215,4 +215,26 @@ dan menyalinnya berarti menghapus rapelan yang menjadi hak pegawai.
 Batas per berkas diturunkan dari 5 MB menjadi 1 MB. Satu lembar SK yang dipindai sebagai dokumen
 berukuran ratusan kilobyte; yang melampaui satu megabyte hampir selalu foto kamera beresolusi penuh.
 Operator UPT mengunggah lewat data seluler, dan unggahan besar yang putus di tengah jalan lebih
-menyakitkan daripada ditolak sejak awal — karena itu pesan penolakannya menyebutkan cara memperkecil.
+menyakitkan daripada ditolak sejak awal, karena itu pesan penolakannya menyebutkan cara memperkecil.
+
+### 5. Aturan hitungan yang sama berlaku di sisi Kanwil
+
+Setelah formulir UPT berhenti meminta gaji pokok dan jatuh tempo diketik, sisi Kanwil menjadi ganjil:
+formulir Data Pegawai dan impor CSV masih menuntut TMT KGB berikutnya diketik tangan. Justru di situ
+kekeliruan yang menimpa lima pegawai Rutan Rantau bisa terulang, sebab selang KGB tidak selalu dua
+tahun dan yang mengetik biasanya mengingat "dua tahun".
+
+Sekarang `bacaIsianPegawai()` menghitung TMT KGB berikutnya dari golongan, masa kerja golongan, dan TMT
+KGB terakhir bila kolomnya dikosongkan; formulir Data Pegawai mengisikannya sendiri begitu ketiganya
+berubah; dan impor CSV memperlakukan kolom itu sebagai opsional, headernya tetap ada demi bentuk
+template yang sama. Nilai yang memang diisi tetap dihormati, karena ada kasus yang bergeser: penundaan
+KGB akibat hukuman disiplin.
+
+Formulir Google untuk inventarisasi pegawai Kanwil ikut disesuaikan: pertanyaan TMT KGB berikutnya
+dihapus, sebab jawabannya lebih dipercaya dihitung daripada diingat.
+
+### 6. Tanda pisah panjang tidak dipakai lagi
+
+Seluruh teks antarmuka, dokumen, dan komentar tidak lagi memakai tanda pisah panjang. Penggantinya
+tanda baca biasa: titik dua untuk keterangan, koma atau titik koma untuk sisipan, titik tengah untuk
+pemisah pada satu baris pilihan, dan tanda hubung tunggal untuk nilai yang kosong.

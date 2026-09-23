@@ -708,7 +708,7 @@ export default async function PanduanPage() {
                   </li>
                 </ol>
                 <p>
-                  Sesudah diajukan, usulannya tidak lagi dapat disunting — peninjau di Kanwil harus melihat persis apa
+                  Sesudah diajukan, usulannya tidak lagi dapat disunting, sebab peninjau di Kanwil harus melihat persis apa
                   yang dikirim UPT. Yang telanjur salah dapat <strong>dibatalkan</strong> selama belum ditinjau, lalu
                   dikirim ulang setelah diperbaiki.
                 </p>
@@ -1047,8 +1047,10 @@ export default async function PanduanPage() {
                     <p>
                       Cari setiap pegawai pada surat menurut NIP. Bila belum terdaftar, tambahkan dengan tombol Tambah
                       Pegawai, atau Impor CSV untuk banyak pegawai sekaligus. Golongan, masa kerja golongan, dan TMT KGB
-                      berikutnya harus sama dengan SK yang dilampirkan UPT. Pegawai yang baru ditambahkan langsung
-                      mendapat jadwal KGB berstatus <Status status="belum_diproses" />.
+                      terakhir harus sama dengan SK yang dilampirkan UPT; gaji pokok dan TMT KGB berikutnya terisi
+                      sendiri dari ketiganya menurut tabel PP 5/2024, sehingga tidak perlu diketik. Isi TMT KGB
+                      berikutnya hanya bila memang bergeser, misalnya karena penundaan hukuman disiplin. Pegawai yang
+                      baru ditambahkan langsung mendapat jadwal KGB berstatus <Status status="belum_diproses" />.
                     </p>
                     <p>
                       Pada Impor CSV, kolom statusHukdis dan keteranganHukdis hanya dibaca bila impor dilakukan Super

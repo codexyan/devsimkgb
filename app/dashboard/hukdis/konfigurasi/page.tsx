@@ -175,7 +175,7 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
                 {regulasiList.map((r) => (
                   <option key={r.id} value={r.id}>{r.nomor} Tahun {r.tahun}{r.status === "dicabut_sebagian" ? " (dicabut sebagian)" : ""}</option>
                 ))}
-                <option value="__manual__">— ketik manual —</option>
+                <option value="__manual__">Ketik manual</option>
               </select>
             ) : (
               <div style={{ display: "flex", gap: "8px" }}>
@@ -187,7 +187,7 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
               </div>
             )}
             <p style={{ fontSize: "10px", color: "var(--dt5)", margin: "5px 0 0", lineHeight: 1.5 }}>
-              {regulasiList.length === 0 ? "Belum ada regulasi terdaftar — ketik manual atau daftarkan lewat Kelola regulasi." : "Regulasi yang mendasari jenis ini; jadi default dasar hukum saat input hukdis."}
+              {regulasiList.length === 0 ? "Belum ada regulasi terdaftar. Ketik manual, atau daftarkan lewat Kelola regulasi." : "Regulasi yang mendasari jenis ini; jadi default dasar hukum saat input hukdis."}
             </p>
           </div>
 

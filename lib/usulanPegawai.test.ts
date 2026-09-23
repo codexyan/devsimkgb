@@ -56,8 +56,8 @@ test("tanggal dibandingkan sebagai tanggal kalender, bukan sebagai teks", () => 
 });
 
 test("nilai kosong ditampilkan sebagai tanda pisah", () => {
-  assert.equal(nilaiTampil(null, "teks"), "—");
-  assert.equal(nilaiTampil("", "tanggal"), "—");
+  assert.equal(nilaiTampil(null, "teks"), "-");
+  assert.equal(nilaiTampil("", "tanggal"), "-");
   assert.equal(nilaiTampil(0, "angka"), "0");
   assert.equal(nilaiTampil(2184000, "rupiah"), "Rp2.184.000");
 });

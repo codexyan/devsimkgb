@@ -71,12 +71,12 @@ export const LABEL_JENIS_USULAN: Record<string, string> = {
 
 const rupiah = (n: number) => "Rp" + new Intl.NumberFormat("id-ID").format(n);
 
-/** Nilai satu kolom sebagai teks yang dapat dibandingkan dan ditampilkan; kosong menjadi "—". */
+/** Nilai satu kolom sebagai teks yang dapat dibandingkan dan ditampilkan; kosong menjadi "-". */
 export function nilaiTampil(nilai: unknown, jenis: JenisBidang): string {
-  if (nilai === null || nilai === undefined || nilai === "") return "—";
+  if (nilai === null || nilai === undefined || nilai === "") return "-";
   if (jenis === "tanggal") {
     const t = tanggalKalender(nilai as NilaiTanggal);
-    return t ? formatTanggalId(t) : "—";
+    return t ? formatTanggalId(t) : "-";
   }
   if (jenis === "rupiah") return rupiah(Number(nilai));
   return String(nilai);
@@ -159,7 +159,7 @@ export function usulanKosong(pegawai: Partial<PegawaiRow>, usulan: Partial<Usula
  * Gaji pokok, pangkat, dan jatuh tempo KGB berikutnya seluruhnya turunan dari golongan, masa kerja
  * golongan, dan TMT KGB terakhir. Ketiganya dihitung di sini, bukan diketik operator, karena salah
  * ketik pada angka ini langsung menggeser uang: kekurangan rapelan atau kelebihan yang harus
- * dikembalikan ke kas negara. Fungsi ini dipakai dua tempat — peramban untuk memperlihatkan hasilnya
+ * dikembalikan ke kas negara. Fungsi ini dipakai dua tempat: peramban untuk memperlihatkan hasilnya
  * sambil mengetik, dan rute API sebagai penentu nilai yang benar-benar disimpan.
  */
 export interface HitunganUsulan {
@@ -233,7 +233,7 @@ export function hitungUsulan(isian: {
 
 /**
  * Apa yang masih kurang sebelum sebuah draf boleh diajukan ke Kanwil. Draf sengaja boleh disimpan
- * setengah jadi — itu gunanya draf — sehingga pemeriksaan kelengkapan dilakukan di sini, sekali, pada
+ * setengah jadi (itu gunanya draf), sehingga pemeriksaan kelengkapan dilakukan di sini, sekali, pada
  * saat pengajuan. Daftar yang kosong berarti siap diajukan.
  */
 export function kekuranganUsulan(
