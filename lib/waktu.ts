@@ -13,12 +13,11 @@ interface TanggalWita {
   hari: number;
 }
 
-const formatBagianWita = new Intl.DateTimeFormat("en-CA", {
-  timeZone: ZONA_WITA,
-  year: "numeric",
-  month: "numeric",
-  day: "numeric",
-});
+/**
+ * Selisih WITA terhadap UTC. Asia/Makassar tetap UTC+8 sepanjang tahun, tanpa daylight saving,
+ * sehingga tanggal kalendernya dapat dihitung dengan penggeseran biasa, bukan lewat Intl.
+ */
+const OFFSET_WITA_MS = 8 * 60 * 60 * 1000;
 
 const FORMAT_TANGGAL_BAKU: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
 
@@ -29,11 +28,16 @@ function keDate(value: NilaiTanggal): Date | null {
   return Number.isNaN(tanggal.getTime()) ? null : tanggal;
 }
 
-/** Tahun, bulan (0-based), dan hari dari sebuah instan menurut WITA. */
+/**
+ * Tahun, bulan (0-based), dan hari dari sebuah instan menurut WITA.
+ *
+ * Dipanggil sangat sering: tanggalKalender, hariIniWita, dan seluruh rekap jadwal melewatinya, sehingga
+ * satu permintaan dashboard dapat memanggilnya ribuan kali. Karena itu dihitung dengan aritmetika offset
+ * tetap; lib/waktu.test.ts membuktikan hasilnya sama persis dengan Intl pada rentang tanggal yang lebar.
+ */
 export function tanggalWita(sekarang: Date = new Date()): TanggalWita {
-  const bagian = formatBagianWita.formatToParts(sekarang);
-  const ambil = (jenis: Intl.DateTimeFormatPartTypes) => Number(bagian.find((b) => b.type === jenis)?.value);
-  return { tahun: ambil("year"), bulan: ambil("month") - 1, hari: ambil("day") };
+  const geser = new Date(sekarang.getTime() + OFFSET_WITA_MS);
+  return { tahun: geser.getUTCFullYear(), bulan: geser.getUTCMonth(), hari: geser.getUTCDate() };
 }
 
 /** Tanggal hari ini menurut WITA sebagai tengah malam waktu lokal proses, setara new Date(y, m, d). */
