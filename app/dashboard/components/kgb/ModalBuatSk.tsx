@@ -349,7 +349,7 @@ export default function ModalBuatSk({
                 <div>
                   <label htmlFor={idNomorSk} className="kgbm-label">
                     Nomor SK Baru
-                    <span className="kgbm-wajib" aria-hidden="true">*</span>
+                    <span className="kgbm-wajib" aria-hidden="true" />
                   </label>
                   <span className="kgbm-berawalan">
                     <span aria-hidden="true">{AWALAN_NOMOR_SK}</span>

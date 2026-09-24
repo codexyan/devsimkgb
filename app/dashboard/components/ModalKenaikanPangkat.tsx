@@ -165,7 +165,7 @@ export default function ModalKenaikanPangkat({
           </select>
         </div>
         <div>
-          <label htmlFor="kp-golongan" className="kgbm-label">Golongan baru<span className="kgbm-wajib" aria-hidden="true">*</span></label>
+          <label htmlFor="kp-golongan" className="kgbm-label">Golongan baru<span className="kgbm-wajib" aria-hidden="true" /></label>
           <select id="kp-golongan" className="kgbm-input" value={golonganBaru} onChange={(e) => setGolonganBaru(e.target.value)} data-autofocus>
             <option value="">Pilih golongan…</option>
             {pilihanGolongan.map((g) => <option key={g} value={g}>{g} · {GOLONGAN_PANGKAT[g]}</option>)}
@@ -174,17 +174,17 @@ export default function ModalKenaikanPangkat({
       </div>
 
       <div>
-        <label htmlFor="kp-nomor" className="kgbm-label">Nomor SK kenaikan pangkat<span className="kgbm-wajib" aria-hidden="true">*</span></label>
+        <label htmlFor="kp-nomor" className="kgbm-label">Nomor SK kenaikan pangkat<span className="kgbm-wajib" aria-hidden="true" /></label>
         <input id="kp-nomor" className="kgbm-input" value={nomorSK} onChange={(e) => setNomorSK(e.target.value)} placeholder="mis. W.17-KP.03.01-125" />
       </div>
 
       <div className="kgbm-grid2">
         <div>
-          <label htmlFor="kp-tanggal" className="kgbm-label">Tanggal SK<span className="kgbm-wajib" aria-hidden="true">*</span></label>
+          <label htmlFor="kp-tanggal" className="kgbm-label">Tanggal SK<span className="kgbm-wajib" aria-hidden="true" /></label>
           <input id="kp-tanggal" type="date" className="kgbm-input" value={tanggalSK} onChange={(e) => setTanggalSK(e.target.value)} />
         </div>
         <div>
-          <label htmlFor="kp-tmt" className="kgbm-label">TMT pangkat<span className="kgbm-wajib" aria-hidden="true">*</span></label>
+          <label htmlFor="kp-tmt" className="kgbm-label">TMT pangkat<span className="kgbm-wajib" aria-hidden="true" /></label>
           <input id="kp-tmt" type="date" className="kgbm-input" value={tmtPangkat} onChange={(e) => setTmtPangkat(e.target.value)} />
         </div>
       </div>

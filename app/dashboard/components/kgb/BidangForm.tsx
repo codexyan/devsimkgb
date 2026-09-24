@@ -40,9 +40,7 @@ export function BidangTeks({
       <label htmlFor={id} className="kgbm-label">
         {label}
         {wajib && (
-          <span className="kgbm-wajib" aria-hidden="true">
-            *
-          </span>
+          <span className="kgbm-wajib" aria-hidden="true" />
         )}
       </label>
       <input
@@ -103,9 +101,7 @@ export function BidangAlasan({
       <label htmlFor={id} className="kgbm-label">
         {label}
         {wajib && (
-          <span className="kgbm-wajib" aria-hidden="true">
-            *
-          </span>
+          <span className="kgbm-wajib" aria-hidden="true" />
         )}
       </label>
       <textarea
@@ -166,9 +162,7 @@ export function BidangBerkasPdf({
       <p id={idLabel} className="kgbm-label">
         {label}
         {wajib && (
-          <span className="kgbm-wajib" aria-hidden="true">
-            *
-          </span>
+          <span className="kgbm-wajib" aria-hidden="true" />
         )}
       </p>
       <label className="kgbm-berkas" data-terisi={berkas ? "true" : "false"} data-nonaktif={nonaktif ? "true" : "false"}>

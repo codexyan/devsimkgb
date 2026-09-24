@@ -15,6 +15,8 @@ import {
   BELUM_SELESAI,
   DIPEGANG_UPT,
   STATUS_USULAN,
+  BERKAS_USULAN,
+  berkasWajib,
 } from "./usulanPegawai";
 
 const tgl = (tahun: number, bulan: number, hari = 1) => new Date(tahun, bulan - 1, hari);
@@ -165,4 +167,21 @@ test("usulan yang dikembalikan kembali dipegang UPT, tetapi tetap menutup pintu 
   // menunggu Kanwil dan yang lain menunggu UPT.
   assert.equal(STATUS_USULAN.revisi.label, "Dikembalikan untuk revisi");
   assert.notEqual(STATUS_USULAN.revisi.nada, STATUS_USULAN.menunggu.nada);
+});
+
+test("berkas yang wajib bertukar menurut pernah atau belum pernah KGB", () => {
+  const wajibUntuk = (medan: string) => BERKAS_USULAN.find((b) => b.medan === medan)!.wajibUntuk;
+
+  // Belum pernah KGB: dasar gaji pokoknya SK pengangkatan PNS, dan SK KGB terakhir memang tidak ada.
+  assert.equal(berkasWajib(wajibUntuk("syaratCpns"), false), true);
+  assert.equal(berkasWajib(wajibUntuk("skTerakhir"), false), false);
+
+  // Sudah pernah KGB: yang dicocokkan tim keuangan adalah SK KGB terakhirnya.
+  assert.equal(berkasWajib(wajibUntuk("skTerakhir"), true), true);
+  assert.equal(berkasWajib(wajibUntuk("syaratCpns"), true), false);
+
+  // Kenaikan pangkat tidak dapat dipastikan dari isian, jadi tidak pernah diwajibkan.
+  for (const pernah of [true, false]) assert.equal(berkasWajib(wajibUntuk("skPangkat"), pernah), false);
+  // Surat usulan diunggah sekali pada langkah Ajukan, bukan per pegawai.
+  for (const pernah of [true, false]) assert.equal(berkasWajib(wajibUntuk("berkas"), pernah), false);
 });

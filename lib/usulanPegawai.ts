@@ -69,6 +69,13 @@ export const BIDANG_USULAN = [
 export type KunciBidangUsulan = (typeof BIDANG_USULAN)[number]["kunci"];
 
 /**
+ * Kapan sebuah berkas wajib disertakan. Kewajibannya bergantung pada keadaan pegawai, bukan seragam:
+ * pegawai yang belum pernah KGB tidak punya SK KGB terakhir, dan memintanya justru membuat operator
+ * mengunggah SK pengangkatan PNS ke kolom yang salah.
+ */
+export type WajibBerkas = "pernah_kgb" | "belum_pernah_kgb" | "pernah_naik_pangkat" | "saat_mengajukan";
+
+/**
  * Berkas dasar yang menyertai usulan. Tim keuangan meminta ketiga berkas selain suratnya agar masa
  * kerja golongan dan gaji pokok dapat dicocokkan dengan dokumen aslinya, bukan dengan ingatan.
  * `medan` adalah nama field pada formulir, `kunci` adalah kolom penyimpan jalur berkasnya.
@@ -78,8 +85,9 @@ export const BERKAS_USULAN = [
     medan: "berkas",
     kunci: "pathBerkas",
     label: "Surat usulan Srikandi",
-    keterangan: "Surat pengantar dari UPT yang sudah dikirim ke Kanwil lewat Srikandi.",
-    wajibUntuk: "semua",
+    keterangan:
+      "Surat pengantar dari UPT yang sudah dikirim ke Kanwil lewat Srikandi. Tidak perlu di sini: suratnya diunggah sekali pada langkah Ajukan, dan berlaku untuk semua pegawai pada surat itu.",
+    wajibUntuk: "saat_mengajukan",
   },
   {
     medan: "skTerakhir",
@@ -87,7 +95,7 @@ export const BERKAS_USULAN = [
     label: "SK KGB terakhir",
     keterangan:
       "SK kenaikan gaji berkala yang terakhir diterima pegawai. Kosongkan bila pegawai belum pernah menerima KGB.",
-    wajibUntuk: "semua",
+    wajibUntuk: "pernah_kgb",
   },
   {
     medan: "syaratCpns",
@@ -95,7 +103,7 @@ export const BERKAS_USULAN = [
     label: "SK pengangkatan PNS",
     keterangan:
       "Keputusan Menteri tentang pengangkatan CPNS menjadi PNS. Bagi pegawai yang belum pernah KGB, SK inilah dasar gaji pokoknya. Boleh digabung dengan SK CPNS dan SPMT dalam satu berkas.",
-    wajibUntuk: "cpns",
+    wajibUntuk: "belum_pernah_kgb",
   },
   {
     medan: "skPangkat",
@@ -111,8 +119,22 @@ export const BERKAS_USULAN = [
   label: string;
   /** Penjelasan singkat: dokumen apa yang dimaksud dan kapan diperlukan. */
   keterangan: string;
-  wajibUntuk: string;
+  wajibUntuk: WajibBerkas;
 }[];
+
+/**
+ * Apakah berkas ini wajib bagi pegawai dengan keadaan KGB tertentu.
+ *
+ * Dua dari empat berkas bertukar tempat menurut keadaan itu: yang sudah pernah KGB wajib melampirkan
+ * SK KGB terakhirnya, sedangkan yang belum pernah justru wajib melampirkan SK pengangkatan PNS, sebab
+ * di situlah gaji pokok awalnya tertulis. Kenaikan pangkat tidak dapat dipastikan dari isian, jadi
+ * berkasnya tidak pernah diwajibkan, hanya diminta bila ada.
+ */
+export function berkasWajib(wajibUntuk: WajibBerkas, pernahKgb: boolean): boolean {
+  if (wajibUntuk === "pernah_kgb") return pernahKgb;
+  if (wajibUntuk === "belum_pernah_kgb") return !pernahKgb;
+  return false;
+}
 
 export const LABEL_JENIS_USULAN: Record<string, string> = {
   perubahan: "Perbaikan data",

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
-import { BERKAS_USULAN, hitungUsulan } from "@/lib/usulanPegawai";
+import { BERKAS_USULAN, berkasWajib, hitungUsulan, type WajibBerkas } from "@/lib/usulanPegawai";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiSaatIni } from "@/lib/pilihanPegawai";
@@ -54,6 +54,19 @@ const PILIHAN_BIDANG: Record<string, readonly string[]> = {
   jenisJabatan: JENIS_JABATAN,
   eselon: ESELON,
 };
+
+/**
+ * Kalimat singkat tentang kewajiban satu berkas bagi pegawai yang sedang didata. Disebutkan juga
+ * ketika tidak wajib: operator yang melihat kolom kosong tanpa keterangan cenderung mengisinya dengan
+ * dokumen apa saja yang ada di tangan, dan SK yang salah kolom lebih sulit ditemukan daripada kolom
+ * yang memang kosong.
+ */
+function catatanWajib(wajibUntuk: WajibBerkas, wajib: boolean): string {
+  if (wajib) return "Wajib untuk keadaan pegawai ini.";
+  if (wajibUntuk === "pernah_naik_pangkat") return "Lampirkan hanya bila pegawai pernah naik pangkat.";
+  if (wajibUntuk === "saat_mengajukan") return "";
+  return "Tidak wajib untuk keadaan pegawai ini.";
+}
 
 /** Isian pilihan; nilai lama yang di luar daftar tetap ditampilkan agar tidak hilang saat disimpan. */
 function IsianPilihan({
@@ -154,6 +167,15 @@ export default function FormulirUsulan({
   const ubah = (kunci: string, nilai: string) => setIsian((f) => ({ ...f, [kunci]: nilai }));
   /** Usulan yang dilempar kembali Kanwil; isinya utuh, yang berubah hanya kalimat pemandunya. */
   const dikembalikan = draf?.status === "revisi";
+
+  /**
+   * Isian identitas yang wajib, dan hanya pada pegawai baru. Pada usulan perbaikan, isian yang
+   * dikosongkan berarti "tidak diusulkan berubah", jadi menandainya wajib justru menyesatkan: yang
+   * benar-benar wajib di situ hanya yang menentukan uang, yaitu golongan dan hitungan KGB-nya.
+   */
+  const wajibIdentitas = (kunci: string) => jenis === "baru" && (kunci === "nama" || kunci === "jabatan");
+  const label = (kunci: string, teks: string) =>
+    wajibIdentitas(kunci) ? <span className="kgbm-wajib">{teks}</span> : teks;
 
   const hitung = useMemo(
     () => hitungUsulan({
@@ -260,6 +282,14 @@ export default function FormulirUsulan({
           ? "Data disimpan dulu sebagai daftar milik satker, belum dikirim ke Kanwil. Setelah semua pegawai yang akan diusulkan lengkap, kirimkan sekaligus dengan satu surat usulan."
           : "Isian sudah diisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; yang dikosongkan berarti tidak diusulkan berubah. Perubahan berlaku setelah ditinjau dan disetujui Kanwil."}
       </Catatan>
+      <p className="kgbm-legenda">
+        Isian dan berkas bertanda <i>*</i> wajib. Daftarnya berubah menurut keadaan pegawai:{" "}
+        <b>{pernahKgb ? "sudah pernah KGB" : "belum pernah KGB"}</b>
+        {pernahKgb
+          ? " menuntut TMT KGB terakhir, masa kerja golongan yang disalin dari SK KGB itu, dan lampiran SK KGB terakhirnya."
+          : " menuntut TMT CPNS, masa kerja golongan 0 tahun 0 bulan, dan lampiran SK pengangkatan PNS; SK KGB terakhir justru dikosongkan."}{" "}
+        Pilihannya diatur pada bagian Pangkat, gaji pokok, dan KGB di bawah.
+      </p>
 
       {/* ── Identitas ─────────────────────────────────────────────────── */}
       <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
@@ -304,7 +334,7 @@ export default function FormulirUsulan({
                 />
               ) : (
                 <label className="kgbm-label" key={bidang.kunci}>
-                  {bidang.label}
+                  {label(bidang.kunci, bidang.label)}
                   <input
                     className="kgbm-input"
                     value={isian[bidang.kunci] ?? ""}
@@ -335,7 +365,7 @@ export default function FormulirUsulan({
                 />
               ) : (
                 <label className="kgbm-label" key={bidang.kunci}>
-                  {bidang.label}
+                  {label(bidang.kunci, bidang.label)}
                   <input
                     className="kgbm-input"
                     value={isian[bidang.kunci] ?? ""}
@@ -561,10 +591,12 @@ export default function FormulirUsulan({
           )}
           {BERKAS_USULAN.map((b) => {
             const terpilih = berkas[b.medan];
+            const wajib = berkasWajib(b.wajibUntuk, pernahKgb);
+            const judulBerkas = `${b.label} (PDF, paling besar 1 MB)`;
             return (
               <div key={b.medan}>
                 <label className="kgbm-label">
-                  {b.label} (PDF, paling besar 1 MB)
+                  {wajib ? <span className="kgbm-wajib">{judulBerkas}</span> : judulBerkas}
                   <input
                     key={ulangBerkas[b.medan] ?? 0}
                     className="kgbm-input"
@@ -572,7 +604,9 @@ export default function FormulirUsulan({
                     accept="application/pdf"
                     onChange={(e) => setBerkas((f) => ({ ...f, [b.medan]: e.target.files?.[0] ?? null }))}
                   />
-                  <span className="kgbm-bantuan">{b.keterangan}</span>
+                  <span className="kgbm-bantuan">
+                    {b.keterangan} {catatanWajib(b.wajibUntuk, wajib)}
+                  </span>
                 </label>
                 {terpilih && (
                   <p className="kgbm-berkas-terpilih">

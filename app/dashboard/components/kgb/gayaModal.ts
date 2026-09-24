@@ -41,7 +41,12 @@ export const GAYA_MODAL_KGB = `
 .kgbm-amber { background: var(--amber-solid); color: #fff; }
 .kgbm-tombol-kecil { padding: 5px 10px; border-radius: 8px; font-size: 11px; }
 .kgbm-label { display: block; font-size: 12px; font-weight: 500; color: var(--dt2); margin-bottom: 4px; }
-.kgbm-wajib { color: var(--st-red); margin-left: 3px; }
+/* Isian wajib ditandai bintang merah, bukan dengan mewarnai seluruh labelnya: label merah membuat
+   setengah formulir tampak seperti peringatan, sedangkan yang perlu terbaca hanyalah tandanya. */
+.kgbm-wajib::after { content: "*"; color: var(--st-red); margin-left: 3px; font-weight: 700; }
+.kgbm-legenda { font-size: 11px; line-height: 1.45; color: var(--dt5); margin: -2px 0 2px; }
+.kgbm-legenda b { color: var(--dt2); font-weight: 600; }
+.kgbm-legenda i { color: var(--st-red); font-style: normal; font-weight: 700; }
 .kgbm-petunjuk { font-size: 11px; line-height: 1.45; color: var(--dt5); margin-top: 4px; }
 .kgbm-input { width: 100%; border-radius: 10px; padding: 8px 12px; font-size: 13px; line-height: 1.4; border: 1px solid var(--ln0);
   background: var(--sub); color: var(--dtn); outline: none; }
