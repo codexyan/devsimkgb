@@ -138,6 +138,7 @@ async function main() {
         jabatan: (kode === "kanwil" ? JABATAN_KANWIL : JABATAN_UPT)[urut % 6], pangkat: getPangkat(golongan),
         golonganRuang: golongan, unitKerja: satker.nama, eselon: null, jenisJabatan: "Pelaksana",
         konfirmasiUptTmt: null, konfirmasiUptAt: null, konfirmasiUptOleh: null,
+        satkerTugas: null, berhentiTmt: null, berhentiAlasan: null,
         tmtGolongan: tgl(2016 + (urut % 6), 4, 1),
         mkgTahun: selesai ? mkgBaru : mkgLama, mkgBulan: selesai ? selang % 12 : 0,
         gajiPokok: selesai ? gajiBaru : gajiLama,

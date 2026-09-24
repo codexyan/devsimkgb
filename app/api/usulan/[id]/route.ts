@@ -124,6 +124,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       konfirmasiUptTmt: null,
       konfirmasiUptAt: null,
       konfirmasiUptOleh: null,
+      satkerTugas: null,
+      berhentiTmt: null,
+      berhentiAlasan: null,
     };
     await db.pegawai.create(pegawaiBaru);
     pegawaiIdHasil = pegawaiBaru.id;

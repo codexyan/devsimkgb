@@ -119,6 +119,9 @@ export async function POST(req: Request) {
     konfirmasiUptTmt: null,
     konfirmasiUptAt: null,
     konfirmasiUptOleh: null,
+    satkerTugas: null,
+    berhentiTmt: null,
+    berhentiAlasan: null,
     // Tanpa TMT terakhir, masa kerja sekarang dianggap dicapai satu langkah tabel gaji sebelum TMT berikutnya.
     tmtKgbTerakhir:
       isian.tmtKgbTerakhir ??

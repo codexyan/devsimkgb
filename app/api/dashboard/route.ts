@@ -18,6 +18,7 @@ import {
   tahunTmt,
 } from "@/lib/rekapKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { berhakKgb, sudahBerhenti } from "@/lib/mutasiPegawai";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,9 @@ export async function GET() {
     ]);
 
     const pegawaiAktif = allPegawai.filter((p) => p.aktif).map((p) => penandaHukdisBerlaku(p, hariIni));
+    // Pegawai yang sudah berhenti tidak dihitung sebagai pegawai aktif, tetapi tetap boleh muncul pada
+    // antrian bila KGB yang jatuh temponya timbul sebelum ia berhenti.
+    const pegawaiBelumBerhenti = pegawaiAktif.filter((p) => !sudahBerhenti(p, hariIni));
     const suratByKgbId = new Map(allSurat.map((s) => [s.kgbId, s]));
     const kgbByPegawai = new Map<string, KgbDenganSurat[]>();
     for (const k of allKgb) {
@@ -68,6 +72,7 @@ export async function GET() {
 
     // Pipeline: satu kartu per pegawai untuk siklus KGB berjalan (lihat pilihKgbSiklus).
     const pegawaiJatuhTempo = pegawaiAktif
+      .filter((p) => berhakKgb(p, p.tmtKgbBerikutnya))
       .filter((p) => {
         const tmt = tanggalKalender(p.tmtKgbBerikutnya);
         if (tmt && tmt < batasPipeline) return true;
@@ -156,7 +161,7 @@ export async function GET() {
 
     return NextResponse.json({
       stats: {
-        totalPegawai: pegawaiAktif.length,
+        totalPegawai: pegawaiBelumBerhenti.length,
         totalHukdis: pegawaiAktif.filter((p) => p.statusHukdis).length,
         // KGB dengan TMT tahun ini, satu per pegawai per TMT, termasuk yang belum diinput.
         kgbTahunIni: rekapTahunIni.total,

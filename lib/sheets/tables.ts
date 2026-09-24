@@ -35,6 +35,12 @@ export interface PegawaiRow {
   createdAt: Date | null; updatedAt: Date | null;
   /** Konfirmasi data oleh admin UPT untuk satu siklus KGB: TMT yang dikonfirmasi, waktunya, dan pelakunya. */
   konfirmasiUptTmt: Date | null; konfirmasiUptAt: Date | null; konfirmasiUptOleh: string | null;
+  /**
+   * Keadaan mutasi yang berlaku (lib/mutasiPegawai.ts). satkerTugas hanya keterangan tempat bertugas
+   * pegawai BKO; unit kerja dan KPPN tetap di satker asal. berhentiTmt menentukan hak KGB: KGB yang
+   * TMT-nya sebelum tanggal itu tetap sah diproses.
+   */
+  satkerTugas: string | null; berhentiTmt: Date | null; berhentiAlasan: string | null;
 }
 
 /** Satu kenaikan pangkat: dasar SK-nya dan dampaknya pada MKG serta gaji pokok (lib/kenaikanPangkat.ts). */
@@ -43,6 +49,15 @@ export interface RiwayatPangkatRow {
   tmtPangkat: Date | null; golonganLama: string; golonganBaru: string;
   mkgTahunLama: number; mkgBulanLama: number; mkgTahunBaru: number; mkgBulanBaru: number;
   gajiPokokLama: number; gajiPokokBaru: number; keterangan: string | null;
+  createdAt: Date | null; createdBy: string | null;
+}
+
+/** Satu perpindahan atau pemberhentian pegawai beserta dasar SK-nya (lib/mutasiPegawai.ts). */
+export interface RiwayatMutasiRow {
+  id: string; pegawaiId: string; jenis: string;
+  satkerAsal: string | null; satkerTujuan: string | null;
+  tmt: Date | null; nomorSK: string | null; tanggalSK: Date | null;
+  alasan: string | null; keterangan: string | null;
   createdAt: Date | null; createdBy: string | null;
 }
 
@@ -121,6 +136,7 @@ export const defs = {
       d("tmtKgbTerakhir"), d("tmtKgbBerikutnya"), b("statusHukdis"), d("tanggalHukdisBerakhir"),
       s("jenisHukdis"), s("keteranganHukdis"), b("aktif"), d("createdAt"), d("updatedAt"),
       d("konfirmasiUptTmt"), d("konfirmasiUptAt"), s("konfirmasiUptOleh"),
+      s("satkerTugas"), d("berhentiTmt"), s("berhentiAlasan"),
     ],
   },
   UsulanPegawai: {
@@ -181,6 +197,14 @@ export const defs = {
     tab: "Notifikasi",
     columns: [s("id"), s("judul"), s("pesan"), s("tipe"), s("referenceId"), b("dibaca"), d("createdAt"), s("prioritas"), s("linkHref"), s("kategori")],
   },
+  RiwayatMutasi: {
+    tab: "RiwayatMutasi",
+    columns: [
+      s("id"), s("pegawaiId"), s("jenis"), s("satkerAsal"), s("satkerTujuan"),
+      d("tmt"), s("nomorSK"), d("tanggalSK"), s("alasan"), s("keterangan"),
+      d("createdAt"), s("createdBy"),
+    ],
+  },
   RiwayatPangkat: {
     tab: "RiwayatPangkat",
     columns: [
@@ -230,6 +254,7 @@ export const sheets = {
   notifikasi: new Table<NotifikasiRow>(defs.Notifikasi),
   riwayatHukdis: new Table(defs.RiwayatHukdis),
   riwayatPangkat: new Table<RiwayatPangkatRow>(defs.RiwayatPangkat),
+  riwayatMutasi: new Table<RiwayatMutasiRow>(defs.RiwayatMutasi),
   usulanPegawai: new Table<UsulanPegawaiRow>(defs.UsulanPegawai),
   hukdisJenis: new Table(defs.HukdisJenis),
   hukdisKonfigurasi: new Table(defs.HukdisKonfigurasi),

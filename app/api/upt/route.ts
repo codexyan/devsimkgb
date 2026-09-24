@@ -11,6 +11,7 @@ import { statusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { BIDANG_USULAN } from "@/lib/usulanPegawai";
 import { SATKER } from "@/lib/satker";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { berhakKgb } from "@/lib/mutasiPegawai";
 import { muatKppnSatker } from "@/lib/muatKppnSatker";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
 
@@ -68,7 +69,7 @@ export async function GET() {
   for (const k of kgbSatker) kgbPerPegawai.set(k.pegawaiId, [...(kgbPerPegawai.get(k.pegawaiId) ?? []), k]);
 
   const pegawai = milikSatker
-    .filter((p) => p.aktif)
+    .filter((p) => p.aktif && berhakKgb(p, p.tmtKgbBerikutnya))
     .map((p) => {
       const { kgbBerjalan } = pilihKgbSiklus({
         tmtKgbBerikutnya: p.tmtKgbBerikutnya,
