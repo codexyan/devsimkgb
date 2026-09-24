@@ -46,7 +46,7 @@ interface PegawaiUpt {
 interface UsulanTerkirim extends DrafUsulanUpt {
   pegawaiId: string | null;
   status: string;
-  nomorSurat: string;
+  nomorSurat: string | null;
   tanggalSurat: string | null;
   hukdisAda: boolean;
   jumlahPerubahan: number;
@@ -893,7 +893,7 @@ export default function DashboardUpt() {
                           <span className="dsb-nama">{u.nama}</span>
                           <span className="dsb-kecil"> · {LABEL_JENIS_USULAN[u.jenis] ?? u.jenis} · {cfg.label}</span>
                           <p className="dsb-kecil" style={{ margin: 0 }}>
-                            Surat {u.nomorSurat} · {u.jumlahPerubahan} kolom{u.hukdisAda ? " · disertai laporan hukdis" : ""}
+                            {u.nomorSurat ? `Surat ${u.nomorSurat} · ` : ""}{u.jumlahPerubahan} kolom{u.hukdisAda ? " · disertai laporan hukdis" : ""}
                           </p>
                           {u.alasanTolak && (
                             <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-red)" }}>Ditolak: {u.alasanTolak}</p>

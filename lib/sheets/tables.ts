@@ -87,7 +87,8 @@ export interface UsulanPegawaiRow {
   jenis: string;
   /** Hanya pada usulan pegawai baru; pegawai lama dikenali dari pegawaiId. */
   nip: string | null; unitKerja: string | null;
-  nomorSurat: string; tanggalSurat: Date | null;
+  /** Nomor surat usulan; kosong selama masih draf, diisi sekali saat pengajuan. */
+  nomorSurat: string | null; tanggalSurat: Date | null;
   /** Berkas dasar: surat usulan Srikandi, SK KGB terakhir, syarat pengangkatan PNS, SK kenaikan pangkat. */
   pathBerkas: string | null; pathSkTerakhir: string | null;
   pathSyaratCpns: string | null; pathSkPangkat: string | null;

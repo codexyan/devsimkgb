@@ -39,6 +39,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const key = kunciUsulan(jalur);
   if (!key) return NextResponse.json({ error: "Berkas tidak ditemukan" }, { status: 404 });
-  const namaBerkas = `${jenisBerkas!.label.replace(/[^A-Za-z0-9]+/g, "_")}_${usulan.nomorSurat.replace(/[^A-Za-z0-9._-]+/g, "_")}.pdf`;
+  // Draf belum punya nomor surat; namanya memakai nama pegawai atau NIP-nya agar tetap dapat dibedakan.
+  const penanda = (usulan.nomorSurat ?? usulan.nama ?? usulan.nip ?? "draf").replace(/[^A-Za-z0-9._-]+/g, "_");
+  const namaBerkas = `${jenisBerkas!.label.replace(/[^A-Za-z0-9]+/g, "_")}_${penanda}.pdf`;
   return responsBerkasSk(key, namaBerkas);
 }

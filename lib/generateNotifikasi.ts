@@ -115,7 +115,7 @@ type UsulanUntukNotifikasi = {
   /** Kosong pada usulan pegawai baru: pegawainya belum ada sampai usulan disetujui. */
   pegawaiId: string | null;
   status: string;
-  nomorSurat: string;
+  nomorSurat: string | null;
   jenis?: string | null;
   nama?: string | null;
   nip?: string | null;
@@ -126,7 +126,7 @@ type UsulanUntukNotifikasi = {
  * melihatnya seketika, dan saat pemeriksaan berkala, supaya usulan lama tidak ada yang terlewat.
  */
 export function notifikasiUsulanUpt(
-  usulan: { id: string; jenis?: string | null; nomorSurat: string },
+  usulan: { id: string; jenis?: string | null; nomorSurat: string | null },
   pegawai: { nama: string | null; nip: string | null } | null | undefined,
 ): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
   const nama = pegawai?.nama?.trim() || "-";
@@ -135,8 +135,8 @@ export function notifikasiUsulanUpt(
   return {
     judul: `${pegawaiBaru ? "Usulan Pegawai Baru" : "Usulan Data UPT"}: ${nama}`,
     pesan: pegawaiBaru
-      ? `UPT mengusulkan pegawai baru ${nama} (${nip}) lewat surat ${usulan.nomorSurat}. Tinjau sebelum pegawainya ditambahkan ke data induk.`
-      : `UPT mengusulkan perbaikan data ${nama} (${nip}) lewat surat ${usulan.nomorSurat}. Tinjau sebelum KGB pegawai ini diproses.`,
+      ? `UPT mengusulkan pegawai baru ${nama} (${nip}) lewat surat ${usulan.nomorSurat ?? "-"}. Tinjau sebelum pegawainya ditambahkan ke data induk.`
+      : `UPT mengusulkan perbaikan data ${nama} (${nip}) lewat surat ${usulan.nomorSurat ?? "-"}. Tinjau sebelum KGB pegawai ini diproses.`,
     tipe: T.USULAN_UPT,
     referenceId: usulan.id,
     prioritas: "warning",

@@ -159,7 +159,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     aksi: usulan.status === "draf" ? "hapus_draf_pegawai" : "batal_usulan",
     detail: usulan.status === "draf"
       ? `Draf data ${nama} dihapus sebelum diajukan`
-      : `Usulan ${usulan.jenis === "baru" ? "pegawai baru " : "data "}${nama} dibatalkan UPT sebelum ditinjau, surat ${usulan.nomorSurat}`,
+      : `Usulan ${usulan.jenis === "baru" ? "pegawai baru " : "data "}${nama} dibatalkan UPT sebelum ditinjau, surat ${usulan.nomorSurat ?? "-"}`,
     targetNama: nama,
   });
 
