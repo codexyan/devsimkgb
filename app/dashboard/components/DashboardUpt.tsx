@@ -9,6 +9,7 @@ import { kunciBulanTmt, type RekapStatusKgb } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 import { BUTIR_KONFIRMASI_UPT, LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { LABEL_JENIS_USULAN, STATUS_USULAN, type StatusUsulan } from "@/lib/usulanPegawai";
+import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
@@ -392,16 +393,32 @@ export default function DashboardUpt() {
 
   const bulanUsulan = bulanUsulanSekarang(hariIni);
   const pegawai = useMemo(() => data?.pegawai ?? [], [data]);
-  /**
-   * Data yang masih di tangan UPT. Yang dikembalikan Kanwil diletakkan paling atas: itulah yang sedang
-   * ditunggu orang lain, sedangkan draf biasa tidak ditunggu siapa pun.
-   */
-  const draf = usulan
-    .filter((u) => dipegangUpt(u.status))
-    .slice()
-    .sort((a, b) => Number(b.status === "revisi") - Number(a.status === "revisi"));
-  const dikembalikan = draf.filter((u) => u.status === "revisi");
+  /** Data yang masih di tangan UPT: draf yang belum dikirim, dan yang dikembalikan Kanwil. */
+  const draf = usulan.filter((u) => dipegangUpt(u.status));
   const terkirim = usulan.filter((u) => !dipegangUpt(u.status));
+
+  /**
+   * Satu daftar kerja untuk menggantikan empat panel yang dulu terpisah: tiap pegawai muncul sekali,
+   * dengan satu langkah berikutnya yang jelas (lib/tugasUpt.ts). Yang sedang ditinjau Kanwil tidak
+   * masuk, sebab UPT tidak dapat berbuat apa pun atasnya.
+   */
+  const tugas = useMemo(
+    () =>
+      daftarTugasUpt(
+        usulan.map((u) => ({
+          id: u.id, pegawaiId: u.pegawaiId, status: u.status,
+          nama: u.nama, nip: u.nip, kekurangan: u.kekurangan, alasanTolak: u.alasanTolak,
+        })),
+        pegawai.map((p) => ({
+          id: p.id, nama: p.nama, nip: p.nip, tmtKgb: p.tmtKgb, bulanTmt: p.bulanTmt,
+          usulanBerjalan: p.usulanBerjalan, konfirmasi: p.konfirmasi, bolehKonfirmasi: p.bolehKonfirmasi,
+        })),
+        bulanUsulan,
+      ),
+    [usulan, pegawai, bulanUsulan],
+  );
+  const usulanById = (id: string | null) => (id ? usulan.find((u) => u.id === id) ?? null : null);
+  const pegawaiById = (id: string | null) => (id ? pegawai.find((p) => p.id === id) ?? null : null);
   const perluDiusulkan = pegawai.filter((p) => p.bulanTmt === bulanUsulan);
   const sedangDiproses = pegawai.filter((p) => p.statusKGB === "sedang_diproses" || p.statusKGB === "menunggu_keuangan");
 
@@ -668,6 +685,120 @@ export default function DashboardUpt() {
       )}
 
       <div className="dsb-dasbor-isi">
+       <div className="dsb-kolom">
+        {/* Satu daftar kerja menggantikan panel yang dulu terpisah: tiap pegawai muncul sekali, dengan
+            satu langkah berikutnya. Yang sedang ditinjau Kanwil tidak di sini, melainkan di Usulan terkirim. */}
+        <section className="dsb-panel dsb-muncul" style={{ "--i": 0 } as React.CSSProperties} aria-labelledby="judul-tugas-upt">
+          <div className="dsb-panel-kepala">
+            <h2 id="judul-tugas-upt" className="dsb-panel-judul">
+              Perlu dikerjakan <small>{tugas.length === 0 ? "tidak ada" : `${tugas.length} pegawai`}</small>
+            </h2>
+            <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={bukaPegawaiBaru}>
+              Tambah pegawai
+            </button>
+          </div>
+          {tugas.length === 0 ? (
+            <p className="dsb-kosong">
+              {memuat && !data
+                ? "Memuat…"
+                : "Tidak ada yang perlu dikerjakan sekarang. Usulan yang sudah dikirim dan sedang ditinjau Kanwil ada di panel Usulan terkirim."}
+            </p>
+          ) : (
+            <>
+              <div className="dsb-gulir">
+                <ul className="dsb-log-ringkas">
+                  {tugas.map((t) => {
+                    const u = usulanById(t.usulanId);
+                    const p = pegawaiById(t.pegawaiId);
+                    const cfg = TUGAS_UPT[t.jenis];
+                    return (
+                      <li key={t.kunci}>
+                        {u ? (
+                          <input
+                            type="checkbox"
+                            className="dsb-cek"
+                            checked={pilihAjukan.has(u.id)}
+                            onChange={() => pilihDraf(u.id)}
+                            aria-label={`Pilih ${t.nama} untuk diajukan`}
+                          />
+                        ) : (
+                          <span className="dsb-titik" data-nada={cfg.nada} aria-hidden="true" />
+                        )}
+                        <span className="min-w-0">
+                          <span className="dsb-nama">{t.nama}</span>
+                          <span className="dsb-kecil"> · {t.nip}</span>{" "}
+                          <span className="dsb-tag" data-garis="" data-nada={cfg.nada}>{cfg.judul}</span>
+                          <p className="dsb-kecil" style={{ margin: 0 }}>
+                            {t.tmt ? `TMT ${formatTanggalId(t.tmt, { month: "long", year: "numeric" })} · ` : ""}
+                            {t.langkah}
+                          </p>
+                          {t.catatan && (
+                            <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-amber)" }}>
+                              {t.jenis === "perbaiki" ? "Catatan Kanwil: " : "Belum ada: "}
+                              {t.catatan}
+                            </p>
+                          )}
+                          <span className="upt-aksi">
+                            {u ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="dsb-tombol dsb-tombol-kecil"
+                                  data-jenis="garis"
+                                  onClick={() => lanjutkanDraf(u)}
+                                >
+                                  {t.jenis === "perbaiki" ? "Perbaiki" : "Lanjutkan"}
+                                </button>{" "}
+                                <button
+                                  type="button"
+                                  className="dsb-tombol dsb-tombol-kecil"
+                                  data-jenis="garis"
+                                  onClick={() => setDialogBatal(u)}
+                                >
+                                  Hapus
+                                </button>
+                              </>
+                            ) : p ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="dsb-tombol dsb-tombol-kecil"
+                                  data-jenis="garis"
+                                  onClick={() => { setDialogKonfirmasi(p); setGalatKonfirmasi(null); }}
+                                >
+                                  Data sudah benar
+                                </button>{" "}
+                                <button
+                                  type="button"
+                                  className="dsb-tombol dsb-tombol-kecil"
+                                  data-jenis="garis"
+                                  onClick={() => bukaUsulan(p)}
+                                >
+                                  Usulkan perbaikan data
+                                </button>
+                              </>
+                            ) : null}
+                          </span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <div style={{ padding: "10px 16px", borderTop: "1px solid var(--ln2)" }}>
+                <button
+                  type="button"
+                  className="dsb-tombol"
+                  disabled={pilihAjukan.size === 0}
+                  onClick={bukaDialogAjukan}
+                >
+                  {pilihAjukan.size > 0 ? `Ajukan ${pilihAjukan.size} pegawai ke Kanwil` : "Centang dulu yang akan diajukan"}
+                </button>
+              </div>
+            </>
+          )}
+        </section>
+
         {/* Pegawai dan status KGB-nya di Kanwil */}
         <section className="dsb-panel dsb-antrian overflow-hidden dsb-muncul" style={{ "--i": 1 } as React.CSSProperties} aria-labelledby="judul-pegawai-upt">
           <div className="dsb-panel-kepala">
@@ -809,6 +940,7 @@ export default function DashboardUpt() {
             <span>Surat usulan dikirim lewat Srikandi</span>
           </div>
         </section>
+       </div>
 
         <aside className="dsb-samping dsb-muncul" data-urutan="tetap" style={{ "--i": 2 } as React.CSSProperties} aria-label="Jadwal usulan dan SK">
           {/* SK yang sudah selesai; hanya yang sudah dikonfirmasi keuangan yang muncul di sini */}
@@ -869,93 +1001,6 @@ export default function DashboardUpt() {
                   </li>
                 ))}
               </ul>
-            )}
-          </section>
-
-          {/* Data pegawai yang masih disiapkan UPT: belum terlihat Kanwil sampai diajukan */}
-          <section className="dsb-panel dsb-susut" aria-labelledby="judul-draf-upt">
-            <div className="dsb-panel-kepala">
-              <h2 id="judul-draf-upt" className="dsb-panel-judul">
-                Data disiapkan{" "}
-                <small>
-                  {draf.length} belum diajukan
-                  {dikembalikan.length > 0 ? ` · ${dikembalikan.length} dikembalikan Kanwil` : ""}
-                </small>
-              </h2>
-              <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={bukaPegawaiBaru}>
-                Tambah pegawai
-              </button>
-            </div>
-            {draf.length === 0 ? (
-              <p className="dsb-kosong">
-                Belum ada data yang disiapkan. Tambahkan pegawai yang belum tercatat, atau usulkan perbaikan
-                data dari daftar pegawai; keduanya tersimpan di sini sampai diajukan ke Kanwil.
-              </p>
-            ) : (
-              <>
-                <div className="dsb-gulir">
-                  <ul className="dsb-log-ringkas">
-                    {draf.map((u) => (
-                      <li key={u.id}>
-                        <input
-                          type="checkbox"
-                          className="dsb-cek"
-                          checked={pilihAjukan.has(u.id)}
-                          onChange={() => pilihDraf(u.id)}
-                          aria-label={`Pilih ${u.nama} untuk diajukan`}
-                        />
-                        <span className="min-w-0">
-                          <span className="dsb-nama">{u.nama}</span>
-                          <span className="dsb-kecil"> · {LABEL_JENIS_USULAN[u.jenis] ?? u.jenis}</span>
-                          {u.status === "revisi" && (
-                            <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-violet)" }}>
-                              <span className="dsb-titik" data-nada="ungu" aria-hidden="true" /> Dikembalikan Kanwil:{" "}
-                              {u.alasanTolak ?? "tanpa catatan"}
-                            </p>
-                          )}
-                          {u.kekurangan.length > 0 ? (
-                            <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-amber)" }}>
-                              Perlu dilengkapi: {u.kekurangan.join(", ")}
-                            </p>
-                          ) : (
-                            <p className="dsb-kecil" style={{ margin: 0 }}>
-                              Siap diajukan{u.berkas.length > 0 ? ` · ${u.berkas.length} berkas` : ""}
-                            </p>
-                          )}
-                          <span className="upt-aksi">
-                            <button
-                              type="button"
-                              className="dsb-tombol dsb-tombol-kecil"
-                              data-jenis="garis"
-                              onClick={() => lanjutkanDraf(u)}
-                            >
-                              {u.status === "revisi" ? "Perbaiki" : "Lanjutkan"}
-                            </button>{" "}
-                            <button
-                              type="button"
-                              className="dsb-tombol dsb-tombol-kecil"
-                              data-jenis="garis"
-                              onClick={() => setDialogBatal(u)}
-                            >
-                              Hapus
-                            </button>
-                          </span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div style={{ padding: "10px 16px", borderTop: "1px solid var(--ln2)" }}>
-                  <button
-                    type="button"
-                    className="dsb-tombol"
-                    disabled={pilihAjukan.size === 0}
-                    onClick={bukaDialogAjukan}
-                  >
-                    {pilihAjukan.size > 0 ? `Ajukan ${pilihAjukan.size} pegawai ke Kanwil` : "Pilih dulu yang akan diajukan"}
-                  </button>
-                </div>
-              </>
             )}
           </section>
 
