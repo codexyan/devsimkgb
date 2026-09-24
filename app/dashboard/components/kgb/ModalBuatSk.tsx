@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { buatPdfSk, namaFileSk, simpanDasarSk, unduhBlob, type DataDasarSk } from "@/lib/kgbAksi";
 import { alasanTolakBuatSk } from "@/lib/prosesKgb";
 import { formatTanggalId, hariIniWita, isoTanggalLokal, type NilaiTanggal } from "@/lib/waktu";
+import { AWALAN_NOMOR_SK, bagianNomorSk, nomorSkLengkap } from "@/lib/nomorSurat";
 import KerangkaModal from "./KerangkaModal";
 import {
   BagianForm,
@@ -69,6 +70,8 @@ export default function ModalBuatSk({
 }: PropsModalBuatSk) {
   const alasanTolak = status ? alasanTolakBuatSk(status) : null;
   const idTab = useId();
+  const idNomorSk = useId();
+  const idNomorSkPetunjuk = useId();
   const [dasar, setDasar] = useState<DataDasarSk>(() => isianDasarSk(dasarAwal));
   const [skBaru, setSkBaru] = useState(() => ({
     nomorSurat: nomorSkTerisi(skBaruAwal?.nomorSurat),
@@ -341,14 +344,39 @@ export default function ModalBuatSk({
               nada="hijau"
               keterangan="Nomor dan tanggal yang tercetak di bagian atas SK KGB."
             >
-              <BidangTeks
-                label="Nomor SK Baru"
-                wajib
-                nilai={skBaru.nomorSurat}
-                onUbah={(nilai) => ubahSkBaru("nomorSurat", nilai)}
-                placeholder="Nomor dari Tata Usaha"
-                nonaktif={sibuk}
-              />
+              {/* Nomor surat keluar Kanwil berpola tetap; yang diminta ke arsiparis hanya nomornya. */}
+              {bagianNomorSk(skBaru.nomorSurat).berawalan ? (
+                <div>
+                  <label htmlFor={idNomorSk} className="kgbm-label">
+                    Nomor SK Baru
+                    <span className="kgbm-wajib" aria-hidden="true">*</span>
+                  </label>
+                  <span className="kgbm-berawalan">
+                    <span aria-hidden="true">{AWALAN_NOMOR_SK}</span>
+                    <input
+                      id={idNomorSk}
+                      className="kgbm-input"
+                      value={bagianNomorSk(skBaru.nomorSurat).nomor}
+                      onChange={(e) => ubahSkBaru("nomorSurat", nomorSkLengkap(e.target.value))}
+                      placeholder="nomor dari arsiparis"
+                      disabled={sibuk}
+                      aria-describedby={idNomorSkPetunjuk}
+                    />
+                  </span>
+                  <p id={idNomorSkPetunjuk} className="kgbm-bantuan">
+                    Ketik nomor suratnya saja, misalnya 1234. Awalan {AWALAN_NOMOR_SK.replace(/-$/, "")} dipasang aplikasi.
+                  </p>
+                </div>
+              ) : (
+                <BidangTeks
+                  label="Nomor SK Baru"
+                  wajib
+                  nilai={skBaru.nomorSurat}
+                  onUbah={(nilai) => ubahSkBaru("nomorSurat", nilai)}
+                  petunjuk="Nomor ini di luar pola surat keluar Kanwil, jadi ditampilkan utuh."
+                  nonaktif={sibuk}
+                />
+              )}
               <BidangTeks
                 label="Tanggal SK Baru"
                 jenis="date"

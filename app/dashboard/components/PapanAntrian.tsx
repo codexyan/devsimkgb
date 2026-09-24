@@ -17,6 +17,11 @@ export interface KartuPapan {
   nama: string;
   /** Baris kedua: golongan dan satker. */
   sub: string;
+  /**
+   * Asal pegawai: Kanwil atau salah satu UPT. Ditampilkan sebagai penanda berwarna, bukan sebagai
+   * warna kartu, sebab warna kartu sudah dipakai untuk kemendesakan batas input.
+   */
+  asal?: { teks: string; kanwil: boolean };
   judulSub?: string;
   /** Baris ketiga: TMT dan batas input. */
   tmt: string;
@@ -146,7 +151,12 @@ export default function PapanAntrian({
                     onDragEnd={selesaiSeret}
                     aria-label={x.nama}
                   >
-                    <p className="dsb-nama truncate" style={{ margin: 0 }}>{x.nama}</p>
+                    <p className="dsb-kartu-kepala">
+                      <span className="dsb-nama truncate">{x.nama}</span>
+                      {x.asal && (
+                        <span className="dsb-kartu-asal" data-kanwil={x.asal.kanwil ? "" : undefined}>{x.asal.teks}</span>
+                      )}
+                    </p>
                     <p className="dsb-kecil truncate" style={{ margin: 0 }} title={x.judulSub}>{x.sub}</p>
                     <p className="dsb-kecil" style={{ margin: "6px 0 0", color: "var(--dt3)" }}>
                       {x.tmt}

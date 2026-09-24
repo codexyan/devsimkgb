@@ -6,6 +6,7 @@ import Papa from "papaparse";
 import { canEditPegawai } from "@/lib/auth";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "@/lib/dataPegawai";
+import { ESELON, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR } from "@/lib/pilihanPegawai";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 
 // Kolom yang harus ada pada baris header CSV.
@@ -580,21 +581,21 @@ export default function ImportPage() {
                   kolom: "jenisKelamin",
                   wajib: false,
                   deskripsi: "Jenis kelamin",
-                  format: "Laki-laki · Perempuan",
+                  format: JENIS_KELAMIN.join(" · "),
                   contoh: "Laki-laki",
                 },
                 {
                   kolom: "pendidikanTerakhir",
                   wajib: false,
                   deskripsi: "Pendidikan terakhir",
-                  format: "SD · SMP · SMA/SMK · D3 · S1 · S2 · S3",
+                  format: PENDIDIKAN_TERAKHIR.join(" · "),
                   contoh: "S1",
                 },
                 {
                   kolom: "eselon",
                   wajib: false,
                   deskripsi: "Eselon jabatan struktural",
-                  format: "Eselon I · Eselon II · Eselon III · Eselon IV · Non Eselon",
+                  format: ESELON.join(" · "),
                   contoh: "Non Eselon",
                 },
                 {

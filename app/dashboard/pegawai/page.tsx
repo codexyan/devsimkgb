@@ -14,10 +14,13 @@ import {
   tambahBulan,
 } from "@/lib/tabelGaji";
 import { ROLES } from "@/lib/auth";
+import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiSaatIni } from "@/lib/pilihanPegawai";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
 import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
+import ModalMutasiPegawai from "@/app/dashboard/components/ModalMutasiPegawai";
+import { ringkasKeadaanPegawai } from "@/lib/mutasiPegawai";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
-import { formatTanggalId, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
+import { formatTanggalId, hariIniWita, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 
@@ -38,6 +41,10 @@ interface Pegawai {
   jenisHukdis?: string | null;
   aktif: boolean;
   statusKGB?: string | null;
+  /** Keadaan mutasi yang berlaku (lib/mutasiPegawai.ts); kosong berarti pegawai biasa di satkernya. */
+  satkerTugas?: string | null;
+  berhentiTmt?: string | null;
+  berhentiAlasan?: string | null;
 }
 
 /* Data lengkap dari GET /api/pegawai/[id] untuk mengisi form */
@@ -112,13 +119,7 @@ const formInit = {
   aktif: true,
 };
 
-const pendidikanList = ["SD", "SMP", "SMA/SMK", "D3", "S1", "S2", "S3"];
-const eselonList = ["I.a", "I.b", "II.a", "II.b", "III.a", "III.b", "IV.a", "IV.b", "V.a"];
-const jenisJabatanList = [
-  "Jabatan Fungsional Umum/Pelaksana",
-  "Jabatan Fungsional Tertentu",
-  "Struktural",
-];
+
 
 function Field({
   label,
@@ -183,6 +184,8 @@ export default function PegawaiPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showBulkNonaktif, setShowBulkNonaktif] = useState(false);
   const [showBulkHapus, setShowBulkHapus] = useState(false);
+  /** Pencatatan mutasi atau pemberhentian; pegawainya tidak dihapus, hanya dicatat peristiwanya. */
+  const [showMutasi, setShowMutasi] = useState<Pegawai | null>(null);
 
   const refModalPegawai = useDialogModal(showModal, () => setShowModal(false), submitting);
   const refModalNonaktif = useDialogModal(!!showHapus, () => setShowHapus(null), submitting);
@@ -722,6 +725,14 @@ export default function PegawaiPage() {
                           <div className="min-w-0" style={{ lineHeight: 1.35 }}>
                             <p className="dsb-nama" style={{ margin: 0 }}>{p.nama}</p>
                             <p className="dsb-kecil" style={{ margin: 0 }}>{p.nip}</p>
+                            {(() => {
+                              const keadaan = ringkasKeadaanPegawai(p, hariIniWita());
+                              return keadaan ? (
+                                <p className="dsb-kecil" style={{ margin: "2px 0 0", color: keadaan.nada === "merah" ? "var(--st-red)" : "var(--st-amber)" }}>
+                                  {keadaan.teks}
+                                </p>
+                              ) : null;
+                            })()}
                           </div>
                         </div>
                       </td>
@@ -781,6 +792,9 @@ export default function PegawaiPage() {
                               <button type="button" onClick={() => setShowPangkat(p)} className="dsb-ikon-tombol" title="Catat kenaikan pangkat" aria-label={`Catat kenaikan pangkat ${p.nama}`}>
                                 <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11" /><polyline points="17 18 12 13 7 18" /></svg>
                               </button>
+                              <button type="button" onClick={() => setShowMutasi(p)} className="dsb-ikon-tombol" title="Mutasi atau pemberhentian" aria-label={`Catat mutasi atau pemberhentian ${p.nama}`}>
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8" /><line x1="21" y1="3" x2="13" y2="11" /><polyline points="8 21 3 21 3 16" /><line x1="3" y1="21" x2="11" y2="13" /></svg>
+                              </button>
                               <button type="button" onClick={() => openEdit(p)} className="dsb-ikon-tombol" title="Ubah data pegawai" aria-label={`Ubah data ${p.nama}`}>
                                 <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>
                               </button>
@@ -827,6 +841,14 @@ export default function PegawaiPage() {
                       <p className="dsb-kecil" style={{ margin: "2px 0 0", color: uk.dikenal ? undefined : "var(--st-amber)" }}>
                         {uk.teks}{uk.dikenal ? "" : " (belum sesuai daftar satker)"}
                       </p>
+                      {(() => {
+                        const keadaan = ringkasKeadaanPegawai(p, hariIniWita());
+                        return keadaan ? (
+                          <p className="dsb-kecil" style={{ margin: "2px 0 0", color: keadaan.nada === "merah" ? "var(--st-red)" : "var(--st-amber)" }}>
+                            {keadaan.teks}
+                          </p>
+                        ) : null;
+                      })()}
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -977,15 +999,14 @@ export default function PegawaiPage() {
                       <label className={labelClass} style={{ color: "var(--dt2)" }}>Jenis Kelamin <span style={{ color: "var(--st-red)" }}>*</span></label>
                       <select className={inputClass} style={inputStyle} value={form.jenisKelamin} onChange={(e) => f("jenisKelamin", e.target.value)}>
                         <option value="">Pilih</option>
-                        <option value="Laki-laki">Laki-laki</option>
-                        <option value="Perempuan">Perempuan</option>
+                        {denganNilaiSaatIni(JENIS_KELAMIN, form.jenisKelamin).map((j) => <option key={j} value={j}>{j}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className={labelClass} style={{ color: "var(--dt2)" }}>Pendidikan Terakhir <span style={{ color: "var(--st-red)" }}>*</span></label>
                       <select className={inputClass} style={inputStyle} value={form.pendidikanTerakhir} onChange={(e) => f("pendidikanTerakhir", e.target.value)}>
                         <option value="">Pilih</option>
-                        {pendidikanList.map((p) => <option key={p} value={p}>{p}</option>)}
+                        {denganNilaiSaatIni(PENDIDIKAN_TERAKHIR, form.pendidikanTerakhir).map((p) => <option key={p} value={p}>{p}</option>)}
                       </select>
                     </div>
                   </div>
@@ -1006,7 +1027,7 @@ export default function PegawaiPage() {
                       <label className={labelClass} style={{ color: "var(--dt2)" }}>Jenis Jabatan <span style={{ color: "var(--st-red)" }}>*</span></label>
                       <select className={inputClass} style={inputStyle} value={form.jenisJabatan} onChange={(e) => f("jenisJabatan", e.target.value)}>
                         <option value="">Pilih</option>
-                        {jenisJabatanList.map((j) => <option key={j} value={j}>{j}</option>)}
+                        {denganNilaiSaatIni(JENIS_JABATAN, form.jenisJabatan).map((j) => <option key={j} value={j}>{j}</option>)}
                       </select>
                     </div>
                     <div className="col-span-1 sm:col-span-2 min-w-0">
@@ -1035,8 +1056,8 @@ export default function PegawaiPage() {
                     <div className="min-w-0">
                       <label className={labelClass} style={{ color: "var(--dt2)" }}>Eselon</label>
                       <select className={inputClass} style={inputStyle} value={form.eselon} onChange={(e) => f("eselon", e.target.value)}>
-                        <option value="">Tidak Ada</option>
-                        {eselonList.map((e) => <option key={e} value={e}>{e}</option>)}
+                        <option value="">Belum diisi</option>
+                        {denganNilaiSaatIni(ESELON, form.eselon).map((e) => <option key={e} value={e}>{e}</option>)}
                       </select>
                     </div>
                   </div>
@@ -1244,6 +1265,25 @@ export default function PegawaiPage() {
       )}
 
       {/* ===================== MODAL NONAKTIFKAN ===================== */}
+      {showMutasi && (
+        <ModalMutasiPegawai
+          pegawai={{
+            id: showMutasi.id,
+            nama: showMutasi.nama,
+            nip: showMutasi.nip,
+            unitKerja: showMutasi.unitKerja ?? null,
+            satkerTugas: showMutasi.satkerTugas ?? null,
+          }}
+          onTutup={() => setShowMutasi(null)}
+          onBerhasil={(pesan) => {
+            setShowMutasi(null);
+            setSuccess(pesan);
+            fetchAll();
+            setTimeout(() => setSuccess(""), 4000);
+          }}
+        />
+      )}
+
       {showPangkat && (
         <ModalKenaikanPangkat
           pegawai={{

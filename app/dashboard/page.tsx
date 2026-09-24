@@ -328,6 +328,14 @@ function DashboardMain() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
+  /**
+   * Rincian di balik satu angka pada pita ringkasan. Dibuka sebagai jendela agar dasbor tidak
+   * ditinggalkan; daftarnya diambil dari antrian kerja, jadi jumlahnya bisa lebih sedikit daripada
+   * angka setahun penuh pada kartunya, dan subjudulnya menyebut keduanya.
+   */
+  const [rincian, setRincian] = useState<
+    { judul: string; nada: "navy" | "amber" | "hijau"; posisi: PosisiAntrian[]; tahap: Tahap; dariTahun?: string } | null
+  >(null);
   const [showRapelanPopup, setShowRapelanPopup] = useState(false);
   const [rapelanKonfirmasiList, setRapelanKonfirmasiList] = useState<{ id: string; pegawai: { nama: string; nip: string }; tmtKgbBaru: string; golonganBaru: string; gajiPokokBaru: number; konfirmasiKeuanganAt: string | null }[]>([]);
   const [rapelanKonfirmasiLoading, setRapelanKonfirmasiLoading] = useState(false);
@@ -575,6 +583,8 @@ function DashboardMain() {
       kolom,
       nama: p.nama,
       sub: `${p.golonganRuang} · ${satker ? namaTampilSatker(satker) : p.unitKerja}`,
+      // Penanda asal, bukan singkatan nama satker: nama satker tetap utuh pada baris di bawahnya.
+      asal: { teks: satker?.jenis === "kanwil" ? "Kanwil" : "UPT", kanwil: satker?.jenis === "kanwil" },
       judulSub: p.unitKerja ?? undefined,
       tmt: `TMT ${formatTanggalId(p.tmtKgbBerikutnya, { month: "short", year: "numeric" })}`,
       catatan,
@@ -673,7 +683,16 @@ function DashboardMain() {
       >
         <StripStat>
           <Stat
-            href="/dashboard/kgb?status=belum_diproses"
+            nada="kuning"
+            onClick={() =>
+              setRincian({
+                judul: "Belum diproses",
+                nada: "amber",
+                posisi: ["lewat", "siap", "terkunci"],
+                tahap: "perlu",
+                dariTahun: `${stats.belumDiproses} dari ${stats.kgbTahunIni} KGB ${tahunIni}`,
+              })
+            }
             label="Belum diproses"
             angka={stats.belumDiproses}
             satuan={`dari ${stats.kgbTahunIni} KGB ${tahunIni}`}
@@ -681,20 +700,39 @@ function DashboardMain() {
             metaNada={terlambatList.length > 0 ? "merah" : "hijau"}
           />
           <Stat
-            href="/dashboard/kgb?status=sedang_diproses"
+            nada="biru"
+            onClick={() =>
+              setRincian({
+                judul: "Dalam proses",
+                nada: "navy",
+                posisi: ["diproses", "keuangan"],
+                tahap: "keuangan",
+                dariTahun: `${stats.sedangDiproses} sedang berjalan`,
+              })
+            }
             label="Dalam proses"
             angka={stats.sedangDiproses}
             meta={menungguKeuangan > 0 ? `${menungguKeuangan} di keuangan` : "Tidak ada yang di keuangan"}
             metaNada={menungguKeuangan > 0 ? "ungu" : undefined}
           />
           <Stat
-            href="/dashboard/kgb?status=selesai"
+            nada="hijau"
+            onClick={() =>
+              setRincian({
+                judul: "Selesai",
+                nada: "hijau",
+                posisi: ["selesai"],
+                tahap: "selesai",
+                dariTahun: `${stats.selesai} dari ${stats.kgbTahunIni} KGB ${tahunIni}`,
+              })
+            }
             label="Selesai"
             angka={stats.selesai}
             satuan={`/ ${stats.kgbTahunIni} · ${pctKgbSelesai}%`}
             progres={pctKgbSelesai}
           />
           <Stat
+            nada="merah"
             onClick={bukaRapelan}
             label="Berpotensi rapelan"
             angka={stats.rapelanBerisiko}
@@ -859,6 +897,65 @@ function DashboardMain() {
     </div>
 
       {/* ── Status Rapelan ── */}
+      {rincian && (() => {
+        const daftar = pegawaiJatuhTempo.filter((p) => rincian.posisi.includes(posisiAntrian(p)));
+        const tampil = daftar.slice(0, 12);
+        const tutup = () => setRincian(null);
+        return (
+          <KerangkaModal
+            judul={rincian.judul}
+            subjudul={`${daftar.length} pegawai pada antrian kerja${rincian.dariTahun ? ` · ${rincian.dariTahun}` : ""}`}
+            nada={rincian.nada}
+            ukuran="md"
+            onTutup={tutup}
+            kaki={
+              <>
+                <button type="button" className="kgbm-tombol kgbm-kedua" onClick={tutup}>
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  className="kgbm-tombol kgbm-utama"
+                  onClick={() => { tutup(); bukaAntrian(rincian.tahap)(); }}
+                >
+                  Tampilkan di antrian
+                </button>
+              </>
+            }
+          >
+            {daftar.length === 0 ? (
+              <p className="dsb-kosong">Tidak ada pegawai pada tahap ini.</p>
+            ) : (
+              <ul className="dsb-log-ringkas">
+                {tampil.map((p) => {
+                  const satker = p.unitKerja?.trim() ? cariSatker(p.unitKerja) : SATKER_KANWIL;
+                  const pos = posisiAntrian(p);
+                  return (
+                    <li key={p.id}>
+                      <span className="dsb-titik" data-nada={pos === "lewat" ? "merah" : pos === "selesai" ? "hijau" : undefined} aria-hidden="true" />
+                      <span className="min-w-0">
+                        <span className="dsb-nama">{p.nama}</span>
+                        <span className="dsb-kecil"> · {p.golonganRuang}</span>
+                        <p className="dsb-kecil" style={{ margin: 0 }}>
+                          {satker ? namaTampilSatker(satker) : p.unitKerja} · TMT{" "}
+                          {formatTanggalId(p.tmtKgbBerikutnya, { day: "numeric", month: "short", year: "numeric" })}
+                          {pos === "lewat" && <span style={{ color: "var(--st-red)" }}> · lewat batas input</span>}
+                        </p>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {daftar.length > tampil.length && (
+              <p className="dsb-kecil" style={{ margin: 0 }}>
+                dan {daftar.length - tampil.length} pegawai lainnya. Tekan Tampilkan di antrian untuk melihat semuanya.
+              </p>
+            )}
+          </KerangkaModal>
+        );
+      })()}
+
       {showRapelanPopup && (() => {
         const berisiko = pegawaiJatuhTempo.filter((p) => p.flagRapelan);
         const tutupRapelan = () => setShowRapelanPopup(false);

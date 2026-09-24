@@ -56,6 +56,10 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
 .kgbm-bagian-judul { font-size: 12px; font-weight: 600; color: var(--dtn); }
 .kgbm-bagian-ket { font-size: 11px; color: var(--dt4); margin-top: 1px; line-height: 1.4; }
 .kgbm-bagian-isi { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.kgbm-berawalan { display: flex; align-items: stretch; gap: 0; }
+.kgbm-berawalan > span { display: flex; align-items: center; padding: 0 8px; border: 1px solid var(--ln0); border-right: 0;
+  border-radius: 10px 0 0 10px; background: var(--tint-navy); color: var(--dt3); font-size: 12px; white-space: nowrap; }
+.kgbm-berawalan > .kgbm-input { border-radius: 0 10px 10px 0; }
 .kgbm-bantuan { display: block; margin-top: 3px; font-size: 11px; font-weight: 400; line-height: 1.45; color: var(--dt4); }
 /* Pilihan keadaan: dua tombol berdampingan, yang terpilih diberi latar */
 .kgbm-pilihan { display: flex; gap: 6px; padding: 3px; border-radius: 10px; background: var(--sub); border: 1px solid var(--ln1); }

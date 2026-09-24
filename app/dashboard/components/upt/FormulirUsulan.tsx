@@ -5,6 +5,7 @@ import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/k
 import { BERKAS_USULAN, hitungUsulan } from "@/lib/usulanPegawai";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
+import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiSaatIni } from "@/lib/pilihanPegawai";
 import { formatTanggalId } from "@/lib/waktu";
 
 /* Formulir data pegawai UPT: dipakai untuk menyiapkan pegawai baru maupun mengusulkan perbaikan data
@@ -38,6 +39,42 @@ const SK_KOSONG = { nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" }
 
 /** Isian identitas; sisanya dikelompokkan sendiri karena punya pemandu. */
 const BIDANG_IDENTITAS = new Set(["nama", "tempatLahir", "tanggalLahir", "jenisKelamin", "pendidikanTerakhir"]);
+
+/**
+ * Isian yang nilainya terbatas, ditawarkan sebagai pilihan agar seragam dengan data Kanwil. Mengetik
+ * bebas membuat "Non Eselon", "non eselon", dan "Eselon IV" hidup berdampingan pada kolom yang sama.
+ */
+const PILIHAN_BIDANG: Record<string, readonly string[]> = {
+  jenisKelamin: JENIS_KELAMIN,
+  pendidikanTerakhir: PENDIDIKAN_TERAKHIR,
+  jenisJabatan: JENIS_JABATAN,
+  eselon: ESELON,
+};
+
+/** Isian pilihan; nilai lama yang di luar daftar tetap ditampilkan agar tidak hilang saat disimpan. */
+function IsianPilihan({
+  label,
+  daftar,
+  nilai,
+  onUbah,
+}: {
+  label: string;
+  daftar: readonly string[];
+  nilai: string;
+  onUbah: (nilai: string) => void;
+}) {
+  return (
+    <label className="kgbm-label">
+      {label}
+      <select className="kgbm-input" value={nilai} onChange={(e) => onUbah(e.target.value)}>
+        <option value="">Belum diisi</option>
+        {denganNilaiSaatIni(daftar, nilai).map((pilihan) => (
+          <option key={pilihan} value={pilihan}>{pilihan}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 /** Isian tanggal dengan tombol pengosong: isian date yang terisi tidak dapat dikosongkan dari ponsel. */
 export function IsianTanggal({
@@ -80,7 +117,14 @@ export default function FormulirUsulan({
   onTutup: () => void;
   onSelesai: (pesan: string) => void;
 }) {
-  const awal = draf?.nilai ?? pegawai?.dataSekarang ?? {};
+  const tersimpan: Record<string, string> = draf?.nilai ?? pegawai?.dataSekarang ?? {};
+  // Pegawai yang belum pernah KGB memakai TMT CPNS sebagai awal hitungan, dan TMT golongan pertamanya
+  // adalah tanggal yang sama. Isian yang masih kosong diisikan dari sana daripada dibiarkan menebak;
+  // operator tetap dapat menggantinya bila SK-nya berkata lain.
+  const awal: Record<string, string> = {
+    ...tersimpan,
+    tmtKgbTerakhir: tersimpan.tmtKgbTerakhir || tersimpan.tmtGolongan || "",
+  };
   const [isian, setIsian] = useState<Record<string, string>>({ ...awal });
   const [nip, setNip] = useState(draf?.nip && draf.nip !== "-" ? draf.nip : "");
   const [sk, setSk] = useState({
@@ -232,6 +276,14 @@ export default function FormulirUsulan({
                   nilai={isian[bidang.kunci] ?? ""}
                   onUbah={(v) => ubah(bidang.kunci, v)}
                 />
+              ) : PILIHAN_BIDANG[bidang.kunci] ? (
+                <IsianPilihan
+                  key={bidang.kunci}
+                  label={bidang.label}
+                  daftar={PILIHAN_BIDANG[bidang.kunci]}
+                  nilai={isian[bidang.kunci] ?? ""}
+                  onUbah={(v) => ubah(bidang.kunci, v)}
+                />
               ) : (
                 <label className="kgbm-label" key={bidang.kunci}>
                   {bidang.label}
@@ -254,16 +306,27 @@ export default function FormulirUsulan({
         </div>
         <div className="kgbm-bagian-isi">
           <div className="kgbm-grid2">
-            {BIDANG_DIISI.filter((b) => ["jabatan", "jenisJabatan", "eselon"].includes(b.kunci)).map((bidang) => (
-              <label className="kgbm-label" key={bidang.kunci}>
-                {bidang.label}
-                <input
-                  className="kgbm-input"
-                  value={isian[bidang.kunci] ?? ""}
-                  onChange={(e) => ubah(bidang.kunci, e.target.value)}
+            {BIDANG_DIISI.filter((b) => ["jabatan", "jenisJabatan", "eselon"].includes(b.kunci)).map((bidang) =>
+              PILIHAN_BIDANG[bidang.kunci] ? (
+                <IsianPilihan
+                  key={bidang.kunci}
+                  label={bidang.label}
+                  daftar={PILIHAN_BIDANG[bidang.kunci]}
+                  nilai={isian[bidang.kunci] ?? ""}
+                  onUbah={(v) => ubah(bidang.kunci, v)}
                 />
-              </label>
-            ))}
+              ) : (
+                <label className="kgbm-label" key={bidang.kunci}>
+                  {bidang.label}
+                  <input
+                    className="kgbm-input"
+                    value={isian[bidang.kunci] ?? ""}
+                    onChange={(e) => ubah(bidang.kunci, e.target.value)}
+                    placeholder="Penjaga Tahanan, Analis Kepegawaian, dan sebagainya"
+                  />
+                </label>
+              ),
+            )}
           </div>
         </div>
       </div>
@@ -354,7 +417,7 @@ export default function FormulirUsulan({
                   wajib
                   nilai={isian.tmtKgbTerakhir ?? ""}
                   onUbah={(v) => { ubah("tmtKgbTerakhir", v); if (!isian.tmtGolongan) ubah("tmtGolongan", v); }}
-                  bantuan="Dari SK pengangkatan CPNS. Inilah tanggal awal hitungan KGB pertama."
+                  bantuan="Dari SK pengangkatan CPNS. Inilah tanggal awal hitungan KGB pertama, dan bagi CPNS sama dengan TMT golongan."
                 />
               </div>
               <Catatan nada="amber">
