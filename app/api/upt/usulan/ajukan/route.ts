@@ -4,8 +4,8 @@ import { auth } from "@/auth";
 import { newId } from "@/lib/sheets/id";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
-import { notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
-import { kekuranganUsulan } from "@/lib/usulanPegawai";
+import { TIPE_NOTIFIKASI, notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
+import { DIPEGANG_UPT, kekuranganUsulan } from "@/lib/usulanPegawai";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
@@ -51,12 +51,16 @@ export async function POST(req: Request) {
   const idTerpilih = form.getAll("id").map((v) => String(v)).filter(Boolean);
   if (idTerpilih.length === 0) return NextResponse.json({ error: "Pilih dulu data pegawai yang akan diajukan" }, { status: 400 });
 
-  const semua = (await db.usulanPegawai.findMany({ where: { satker: kode, status: "draf" } })) as UsulanPegawaiRow[];
+  // Yang boleh diajukan adalah yang masih dipegang UPT: draf baru maupun usulan yang dikembalikan
+  // Kanwil untuk diperbaiki. Keduanya berangkat lewat jalur yang sama, dengan satu surat.
+  const semua = (await db.usulanPegawai.findMany({
+    where: { satker: kode, status: { in: DIPEGANG_UPT } },
+  })) as UsulanPegawaiRow[];
   const perId = new Map(semua.map((u) => [u.id, u]));
   const draf = idTerpilih.map((id) => perId.get(id)).filter((u): u is UsulanPegawaiRow => !!u);
   if (draf.length !== idTerpilih.length)
     return NextResponse.json(
-      { error: "Ada data yang sudah tidak berstatus draf. Muat ulang halaman, lalu coba lagi." },
+      { error: "Ada data yang sudah tidak dipegang UPT, mungkin sudah terkirim. Muat ulang halaman, lalu coba lagi." },
       { status: 409 },
     );
 
@@ -103,6 +107,10 @@ export async function POST(req: Request) {
       },
     );
     terkirim.push(nama);
+
+    // Usulan yang dikembalikan sudah diperbaiki dan berangkat lagi; tagihan perbaikannya ditutup.
+    if (u.status === "revisi")
+      await db.notifikasi.deleteMany({ tipe: TIPE_NOTIFIKASI.USULAN_REVISI, referenceId: u.id });
 
     try {
       await db.notifikasi.create({

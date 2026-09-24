@@ -6,7 +6,7 @@ import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
 import { pegawaiSatker } from "@/lib/aksesUpt";
-import { BERKAS_USULAN, BIDANG_USULAN, bandingkanUsulan, kekuranganUsulan, usulanKosong } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, usulanKosong } from "@/lib/usulanPegawai";
 import { bacaIsianUsulan, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, simpanBerkasUsulan } from "@/lib/berkasUsulan";
@@ -18,8 +18,15 @@ export const runtime = "nodejs";
 
 const PESAN_BUKAN_UPT = "Usulan hanya dapat dikirim akun Admin UPT yang tertaut ke satker.";
 
-/** Status usulan yang masih dipegang UPT: belum menjadi riwayat, jadi masih boleh diubah atau dihapus. */
-const BELUM_SELESAI = ["draf", "menunggu"];
+/**
+ * Sebab usulan baru ditolak ketika pegawainya masih punya usulan berjalan. Statusnya disebutkan, sebab
+ * ketiganya menuntut langkah yang berbeda: melanjutkan draf, memperbaiki yang dikembalikan, atau menunggu.
+ */
+function pesanMasihBerjalan(status: string, subjek: string): string {
+  if (status === "draf") return `${subjek} sudah disiapkan usulannya dan belum diajukan. Lanjutkan yang itu, jangan membuat yang baru.`;
+  if (status === "revisi") return `${subjek} punya usulan yang dikembalikan Kanwil untuk diperbaiki. Perbaiki yang itu lalu kirim ulang.`;
+  return `${subjek} punya usulan yang masih menunggu tinjauan Kanwil. Tunggu hasilnya lebih dulu.`;
+}
 
 /** Usulan dan draf satker ini, terbaru lebih dulu. */
 export async function GET() {
@@ -49,10 +56,11 @@ export async function GET() {
         hukdisAda: !!u.hukdisAda,
         jumlahPerubahan: u.jenis === "baru" ? BIDANG_USULAN.length : p ? bandingkanUsulan(p, u).length : 0,
         // Apa yang masih kurang sebelum draf ini boleh diajukan; kosong berarti siap.
-        kekurangan: u.status === "draf" ? kekuranganUsulan(u, u.jenis, p) : [],
-        // Isi draf dikirim utuh agar formulirnya dapat dilanjutkan; usulan terkirim tidak perlu.
-        nilai: u.status === "draf" ? nilaiFormulir(u) : null,
-        surat: u.status === "draf"
+        kekurangan: DIPEGANG_UPT.includes(u.status) ? kekuranganUsulan(u, u.jenis, p) : [],
+        // Isi dikirim utuh agar formulirnya dapat dilanjutkan, baik draf maupun usulan yang
+        // dikembalikan Kanwil; usulan yang sedang ditinjau atau sudah selesai tidak perlu.
+        nilai: DIPEGANG_UPT.includes(u.status) ? nilaiFormulir(u) : null,
+        surat: DIPEGANG_UPT.includes(u.status)
           ? {
               nomorSurat: u.nomorSurat ?? "",
               tanggalSurat: tanggalIsian(u.tanggalSurat),
@@ -61,7 +69,7 @@ export async function GET() {
               catatanUpt: u.catatanUpt ?? "",
             }
           : null,
-        hukdis: u.status === "draf"
+        hukdis: DIPEGANG_UPT.includes(u.status)
           ? {
               ada: !!u.hukdisAda,
               jenis: u.hukdisJenis ?? "",
@@ -145,14 +153,7 @@ export async function POST(req: Request) {
       where: { nip: nipBaru, status: { in: BELUM_SELESAI } },
     })) as UsulanPegawaiRow[];
     if (sudahAda.length > 0)
-      return NextResponse.json(
-        {
-          error: sudahAda[0].status === "draf"
-            ? `NIP ${nipBaru} sudah ada pada daftar data yang disiapkan. Lanjutkan draf itu, jangan membuat yang baru.`
-            : `Usulan untuk NIP ${nipBaru} masih menunggu tinjauan Kanwil`,
-        },
-        { status: 409 },
-      );
+      return NextResponse.json({ error: pesanMasihBerjalan(sudahAda[0].status, `NIP ${nipBaru}`) }, { status: 409 });
     namaUntukCatatan = String(dibaca.isian.nama ?? nipBaru);
     nipUntukCatatan = nipBaru;
   } else {
@@ -169,11 +170,7 @@ export async function POST(req: Request) {
     const sudahAda = await db.usulanPegawai.findMany({ where: { pegawaiId, status: { in: BELUM_SELESAI } } });
     if (sudahAda.length > 0)
       return NextResponse.json(
-        {
-          error: (sudahAda[0] as UsulanPegawaiRow).status === "draf"
-            ? "Sudah ada draf usulan untuk pegawai ini. Lanjutkan draf itu, jangan membuat yang baru."
-            : "Masih ada usulan pegawai ini yang menunggu tinjauan Kanwil. Tunggu hasilnya lebih dulu.",
-        },
+        { error: pesanMasihBerjalan((sudahAda[0] as UsulanPegawaiRow).status, "Pegawai ini") },
         { status: 409 },
       );
   }

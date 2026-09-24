@@ -50,8 +50,8 @@ export default function UsulanPage() {
   const [dibuka, setDibuka] = useState<string | null>(null);
   /** Berkas yang sedang dipratinjau; peninjau tidak perlu berpindah tab untuk membacanya. */
   const [pratinjau, setPratinjau] = useState<{ judul: string; subjudul: string; url: string } | null>(null);
-  const [dialogTolak, setDialogTolak] = useState<Usulan | null>(null);
-  const [alasanTolak, setAlasanTolak] = useState("");
+  const [dialogKembali, setDialogKembali] = useState<Usulan | null>(null);
+  const [catatanKembali, setCatatanKembali] = useState("");
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState("");
   const [kabar, setKabar] = useState<string | null>(null);
@@ -70,25 +70,25 @@ export default function UsulanPage() {
     return () => clearTimeout(t);
   }, [muat]);
 
-  async function tinjau(u: Usulan, aksi: "setujui" | "tolak", alasan?: string) {
+  async function tinjau(u: Usulan, aksi: "setujui" | "kembalikan", catatan?: string) {
     setSibuk(true);
     setGalat("");
     try {
       const res = await fetch(`/api/usulan/${u.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aksi, alasanTolak: alasan ?? "" }),
+        body: JSON.stringify({ aksi, catatan: catatan ?? "" }),
       });
       const d = (await res.json().catch(() => ({}))) as { error?: string; jumlahPerubahan?: number; perluCatatHukdis?: boolean };
       if (!res.ok) { setGalat(d.error ?? "Tinjauan gagal disimpan"); return; }
       setKabar(
         aksi === "setujui"
           ? `Usulan ${u.nama} disetujui, ${d.jumlahPerubahan ?? 0} kolom diperbarui.${d.perluCatatHukdis ? " Laporan hukuman disiplinnya masih perlu dicatat di modul Hukuman Disiplin." : ""}`
-          : `Usulan ${u.nama} ditolak. Alasannya terlihat oleh UPT pengusul.`,
+          : `Usulan ${u.nama} dikembalikan ke ${u.unitKerja}. Isian dan berkasnya tetap utuh, dan catatan perbaikannya terbaca di sana.`,
       );
       setTimeout(() => setKabar(null), 7000);
-      setDialogTolak(null);
-      setAlasanTolak("");
+      setDialogKembali(null);
+      setCatatanKembali("");
       void muat();
     } catch {
       setGalat("Tinjauan gagal disimpan");
@@ -188,7 +188,8 @@ export default function UsulanPage() {
           <span className="dsb-angka-label">Sudah ditinjau</span>
           <span className="dsb-angka-nilai">{memuat ? "–" : daftar.filter((u) => u.status !== "menunggu").length}</span>
           <span className="dsb-angka-meta">
-            {daftar.filter((u) => u.status === "disetujui").length} disetujui · {daftar.filter((u) => u.status === "ditolak").length} ditolak
+            {daftar.filter((u) => u.status === "disetujui").length} disetujui ·{" "}
+            {daftar.filter((u) => u.status === "revisi").length} menunggu perbaikan UPT
           </span>
         </div>
       </div>
@@ -328,7 +329,12 @@ export default function UsulanPage() {
                               Diajukan {u.diajukanOleh} · {tgl(u.diajukanAt)}
                               {u.ditinjauAt ? ` · ditinjau ${u.ditinjauOleh} ${tgl(u.ditinjauAt)}` : ""}
                             </p>
-                            {u.alasanTolak && <Catatan nada="amber">Alasan penolakan: {u.alasanTolak}</Catatan>}
+                            {u.alasanTolak && (
+                              <Catatan nada="amber">
+                                {u.status === "revisi" ? "Dikembalikan untuk diperbaiki: " : "Alasan penolakan: "}
+                                {u.alasanTolak}
+                              </Catatan>
+                            )}
 
                             <div className="usl-aksi">
                               {u.berkas.map((b) => (
@@ -353,8 +359,8 @@ export default function UsulanPage() {
                                   <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" disabled={sibuk} onClick={() => void tinjau(u, "setujui")}>
                                     Setujui dan terapkan
                                   </button>
-                                  <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" disabled={sibuk} onClick={() => { setDialogTolak(u); setAlasanTolak(""); }}>
-                                    Tolak
+                                  <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" disabled={sibuk} onClick={() => { setDialogKembali(u); setCatatanKembali(""); }}>
+                                    Kembalikan untuk revisi
                                   </button>
                                 </>
                               )}
@@ -386,8 +392,18 @@ export default function UsulanPage() {
                   <p className="dsb-kecil">Kolom yang diusulkan langsung menimpa data pegawai, dan perubahannya tercatat di log aktivitas.</p>
                 </li>
                 <li>
-                  <strong>Tolak dengan alasan</strong>
-                  <p className="dsb-kecil">Alasannya terlihat oleh UPT pengusul, sehingga mereka dapat memperbaiki dan mengirim ulang.</p>
+                  <strong>Kembalikan bila perlu diperbaiki</strong>
+                  <p className="dsb-kecil">
+                    Usulannya berpindah kembali ke UPT dengan isian dan berkas yang utuh, disertai catatan Anda tentang apa
+                    yang harus dibetulkan. UPT menyunting seperlunya lalu mengirim ulang, tidak menyusun dari nol.
+                  </p>
+                </li>
+                <li>
+                  <strong>Usulan yang memang keliru</strong>
+                  <p className="dsb-kecil">
+                    Kembalikan juga, dengan catatan agar UPT menghapusnya. Mereka yang tahu duduk perkaranya, dan pegawainya
+                    baru bebas diusulkan lagi setelah usulan yang menggantung itu ditutup.
+                  </p>
                 </li>
                 <li>
                   <strong>Hukuman disiplin dicatat terpisah</strong>
@@ -408,37 +424,39 @@ export default function UsulanPage() {
           onTutup={() => setPratinjau(null)}
         />
       )}
-      {dialogTolak && (
+      {dialogKembali && (
         <KerangkaModal
-          judul="Tolak usulan"
-          subjudul={`${dialogTolak.nama} · ${dialogTolak.unitKerja}`}
-          nada="merah"
+          judul="Kembalikan untuk revisi"
+          subjudul={`${dialogKembali.nama} · ${dialogKembali.unitKerja}`}
           ukuran="sm"
           sibuk={sibuk}
-          onTutup={() => setDialogTolak(null)}
-          onKirim={() => void tinjau(dialogTolak, "tolak", alasanTolak)}
+          onTutup={() => setDialogKembali(null)}
+          onKirim={() => void tinjau(dialogKembali, "kembalikan", catatanKembali)}
           kaki={
             <>
-              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogTolak(null)} disabled={sibuk}>Batal</button>
-              <button type="submit" className="kgbm-tombol kgbm-bahaya" disabled={sibuk || !alasanTolak.trim()}>
-                {sibuk ? "Menyimpan…" : "Tolak usulan"}
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogKembali(null)} disabled={sibuk}>Batal</button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk || !catatanKembali.trim()}>
+                {sibuk ? "Menyimpan…" : "Kembalikan"}
               </button>
             </>
           }
         >
           <PesanGalat pesan={galat || null} />
           <label className="kgbm-label">
-            <span className="kgbm-wajib">Alasan penolakan</span>
+            <span className="kgbm-wajib">Apa yang harus diperbaiki</span>
             <textarea
               className="kgbm-input"
               data-autofocus
               rows={3}
-              value={alasanTolak}
-              onChange={(e) => setAlasanTolak(e.target.value)}
+              value={catatanKembali}
+              onChange={(e) => setCatatanKembali(e.target.value)}
               placeholder="Misalnya: gaji pokok tidak sesuai SK terakhir yang dilampirkan"
             />
           </label>
-          <Catatan>Alasan ini ditampilkan kepada UPT pengusul agar dapat diperbaiki dan dikirim ulang.</Catatan>
+          <Catatan>
+            Usulan ini kembali ke daftar kerja UPT dengan isian dan berkas yang utuh. Catatan di atas yang mereka baca,
+            jadi sebutkan kolom atau berkas yang keliru, bukan sekadar bahwa usulannya belum sesuai.
+          </Catatan>
         </KerangkaModal>
       )}
 

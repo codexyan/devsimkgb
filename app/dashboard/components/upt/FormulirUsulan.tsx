@@ -21,6 +21,10 @@ export interface DrafUsulanUpt {
   jenis: string;
   nama: string;
   nip: string;
+  /** "draf" untuk yang belum pernah dikirim, "revisi" untuk yang dikembalikan Kanwil. */
+  status?: string;
+  /** Catatan peninjau Kanwil pada usulan yang dikembalikan; kolomnya dipakai bersama alasan penolakan lama. */
+  alasanTolak?: string | null;
   nilai: Record<string, string> | null;
   surat: { nomorSurat: string; tanggalSurat: string; nomorSkTerakhir: string; tanggalSkTerakhir: string; catatanUpt: string } | null;
   hukdis: { ada: boolean; jenis: string; nomorSk: string; tmtMulai: string; tmtBerakhir: string; keterangan: string } | null;
@@ -148,6 +152,8 @@ export default function FormulirUsulan({
   const [pratinjau, setPratinjau] = useState<{ judul: string; url: string } | null>(null);
 
   const ubah = (kunci: string, nilai: string) => setIsian((f) => ({ ...f, [kunci]: nilai }));
+  /** Usulan yang dilempar kembali Kanwil; isinya utuh, yang berubah hanya kalimat pemandunya. */
+  const dikembalikan = draf?.status === "revisi";
 
   const hitung = useMemo(
     () => hitungUsulan({
@@ -200,9 +206,11 @@ export default function FormulirUsulan({
       }
       const nama = isian.nama || pegawai?.nama || "pegawai";
       onSelesai(
-        draf
-          ? `Draf data ${nama} diperbarui. Ajukan ke Kanwil bila sudah lengkap.`
-          : `Data ${nama} tersimpan sebagai draf. Lengkapi kapan saja, lalu ajukan bersama pegawai lain dalam satu surat.`,
+        dikembalikan
+          ? `Perbaikan data ${nama} tersimpan. Kirim ulang ke Kanwil dari panel Data disiapkan.`
+          : draf
+            ? `Draf data ${nama} diperbarui. Ajukan ke Kanwil bila sudah lengkap.`
+            : `Data ${nama} tersimpan sebagai draf. Lengkapi kapan saja, lalu ajukan bersama pegawai lain dalam satu surat.`,
       );
     } catch {
       setGalat("Data gagal disimpan");
@@ -211,9 +219,11 @@ export default function FormulirUsulan({
     }
   }
 
-  const judul = jenis === "baru"
-    ? (draf ? "Lanjutkan data pegawai baru" : "Tambah data pegawai")
-    : (draf ? "Lanjutkan usulan perbaikan data" : "Usulkan perbaikan data pegawai");
+  const judul = dikembalikan
+    ? "Perbaiki usulan yang dikembalikan"
+    : jenis === "baru"
+      ? (draf ? "Lanjutkan data pegawai baru" : "Tambah data pegawai")
+      : (draf ? "Lanjutkan usulan perbaikan data" : "Usulkan perbaikan data pegawai");
 
   return (
     <KerangkaModal
@@ -233,12 +243,18 @@ export default function FormulirUsulan({
             Batal
           </button>
           <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
-            {mengirim ? "Menyimpan…" : draf ? "Simpan perubahan" : "Simpan data"}
+            {mengirim ? "Menyimpan…" : dikembalikan ? "Simpan perbaikan" : draf ? "Simpan perubahan" : "Simpan data"}
           </button>
         </>
       }
     >
       <PesanGalat pesan={galat} />
+      {dikembalikan && (
+        <Catatan nada="amber">
+          Kanwil mengembalikan usulan ini untuk diperbaiki: {draf?.alasanTolak ?? "tanpa catatan"}. Betulkan yang
+          disebut lalu simpan; usulannya belum kembali ke Kanwil sampai dikirim ulang dari panel Data disiapkan.
+        </Catatan>
+      )}
       <Catatan>
         {jenis === "baru"
           ? "Data disimpan dulu sebagai daftar milik satker, belum dikirim ke Kanwil. Setelah semua pegawai yang akan diusulkan lengkap, kirimkan sekaligus dengan satu surat usulan."

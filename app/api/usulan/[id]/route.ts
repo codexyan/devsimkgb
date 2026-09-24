@@ -5,6 +5,7 @@ import { canProcessKGB } from "@/lib/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 import { bandingkanUsulan, perubahanPegawai, ringkasHukdisUsulan } from "@/lib/usulanPegawai";
+import { TIPE_NOTIFIKASI, notifikasiUsulanRevisi } from "@/lib/generateNotifikasi";
 import { newId } from "@/lib/sheets/id";
 import { getGajiPokok, getPangkat } from "@/lib/tabelGaji";
 import { SATKER } from "@/lib/satker";
@@ -15,12 +16,17 @@ import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
 export const runtime = "nodejs";
 
 /**
- * Tinjauan satu usulan data pegawai: setujui atau tolak.
+ * Tinjauan satu usulan data pegawai: setujui, atau kembalikan ke UPT untuk diperbaiki.
  *
  * Menyetujui menyalin kolom yang diusulkan ke data pegawai. Laporan hukuman disiplin tidak ikut
  * membuat catatan hukdis secara otomatis: penetapannya ada pada SDM Hukdis lewat modul Hukuman
  * Disiplin, karena butuh nomor SK dan penilaian dampaknya pada KGB. Usulan yang disetujui tetap
  * menyimpan laporan itu sebagai rujukan.
+ *
+ * Mengembalikan tidak menghapus apa pun: isian dan berkasnya tetap, statusnya menjadi "revisi", dan
+ * usulan itu berpindah kembali ke daftar kerja UPT beserta catatan peninjau. Penolakan yang dulu ada
+ * di sini dihapus karena selalu berujung sama: UPT mengetik ulang seluruh usulan dari nol. Usulan yang
+ * memang tidak boleh lanjut pun dikembalikan, dengan catatan agar UPT menghapusnya.
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   await muatBatasInputSdm();
@@ -39,16 +45,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Usulan ini sudah ditinjau" }, { status: 409 });
 
   let aksi = "";
-  let alasanTolak = "";
+  let catatan = "";
   try {
-    const body = (await req.json()) as { aksi?: unknown; alasanTolak?: unknown };
+    const body = (await req.json()) as { aksi?: unknown; catatan?: unknown };
     if (typeof body.aksi === "string") aksi = body.aksi;
-    if (typeof body.alasanTolak === "string") alasanTolak = body.alasanTolak.trim();
+    if (typeof body.catatan === "string") catatan = body.catatan.trim();
   } catch {
     // body tidak valid diperlakukan sebagai aksi kosong
   }
-  if (aksi !== "setujui" && aksi !== "tolak")
-    return NextResponse.json({ error: "Aksi harus setujui atau tolak" }, { status: 400 });
+  if (aksi !== "setujui" && aksi !== "kembalikan")
+    return NextResponse.json({ error: "Aksi harus setujui atau kembalikan" }, { status: 400 });
 
   const pegawaiLama = usulan.pegawaiId ? await db.pegawai.findUnique({ id: usulan.pegawaiId }) : null;
   if (usulan.jenis !== "baru" && !pegawaiLama)
@@ -59,17 +65,34 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const oleh = `${peninjau.nama} (${peninjau.nip})`;
   const sekarang = new Date();
 
-  if (aksi === "tolak") {
-    if (!alasanTolak)
-      return NextResponse.json({ error: "Alasan penolakan wajib diisi" }, { status: 400 });
-    await db.usulanPegawai.update({ id }, { status: "ditolak", ditinjauOleh: oleh, ditinjauAt: sekarang, alasanTolak });
+  if (aksi === "kembalikan") {
+    if (!catatan)
+      return NextResponse.json({ error: "Catatan perbaikan wajib diisi" }, { status: 400 });
+    // Catatan peninjau menumpang kolom alasanTolak: isinya memang sama, yaitu sebab usulan tidak
+    // diterima apa adanya, dan UPT membacanya di tempat yang sama pula.
+    await db.usulanPegawai.update(
+      { id },
+      { status: "revisi", ditinjauOleh: oleh, ditinjauAt: sekarang, alasanTolak: catatan },
+    );
+    // Usulan ini tidak lagi menunggu Kanwil, jadi loncengnya ditutup di sini dan diganti lonceng UPT.
+    await db.notifikasi.deleteMany({ tipe: TIPE_NOTIFIKASI.USULAN_UPT, referenceId: id });
+    try {
+      await db.notifikasi.create({
+        ...notifikasiUsulanRevisi({ id, satker: usulan.satker, nomorSurat: usulan.nomorSurat }, { nama: namaUsulan, nip: nipUsulan }, catatan),
+        id: newId(),
+        dibaca: false,
+        createdAt: sekarang,
+      });
+    } catch {
+      // Usulannya sudah kembali ke UPT dan tampak pada dasbornya; loncengnya saja yang tidak jadi.
+    }
     logAudit({
       userId: peninjau.id,
-      aksi: "tolak_usulan_pegawai",
-      detail: `Tolak usulan ${usulan.jenis === "baru" ? "pegawai baru" : "data"} ${namaUsulan} (${nipUsulan}) dari ${usulan.satker}, surat ${usulan.nomorSurat}: ${alasanTolak}`,
+      aksi: "kembalikan_usulan_pegawai",
+      detail: `Kembalikan usulan ${usulan.jenis === "baru" ? "pegawai baru" : "data"} ${namaUsulan} (${nipUsulan}) ke ${usulan.satker} untuk diperbaiki, surat ${usulan.nomorSurat ?? "-"}: ${catatan}`,
       targetNama: namaUsulan,
     });
-    return NextResponse.json({ ok: true, status: "ditolak" });
+    return NextResponse.json({ ok: true, status: "revisi" });
   }
 
   const nilaiBaru = perubahanPegawai(usulan);
@@ -153,6 +176,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     { id },
     { status: "disetujui", ditinjauOleh: oleh, ditinjauAt: sekarang, pegawaiId: pegawaiIdHasil },
   );
+  // Usulan yang sudah ditinjau tidak perlu lagi menagih tinjauan; loncengnya ditutup seperti pada
+  // pembatalan oleh UPT, supaya daftar notifikasi Kanwil hanya berisi yang benar-benar tersisa.
+  await db.notifikasi.deleteMany({ tipe: TIPE_NOTIFIKASI.USULAN_UPT, referenceId: id });
 
   const hukdis = ringkasHukdisUsulan(usulan);
   const ringkasPerubahan =

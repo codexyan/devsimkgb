@@ -25,6 +25,7 @@ export const TIPE_NOTIFIKASI = {
   SK_TERBIT: "sk_terbit",
   KGB_PERLU_DITINJAU: "kgb_perlu_ditinjau",
   USULAN_UPT: "usulan_upt",
+  USULAN_REVISI: "usulan_revisi",
 } as const;
 
 const T = TIPE_NOTIFIKASI;
@@ -45,7 +46,7 @@ export function tipeNotifikasiUntukRole(role: string | null | undefined): readon
       return [T.SK_MENUNGGU_KEUANGAN, T.KGB_PERLU_DITINJAU];
     case "admin_upt":
       // Disaring lagi per satker oleh GET /api/notifikasi; di sini hanya jenisnya yang dibatasi.
-      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT];
+      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT, T.USULAN_REVISI];
     default:
       return [];
   }
@@ -141,6 +142,29 @@ export function notifikasiUsulanUpt(
     referenceId: usulan.id,
     prioritas: "warning",
     linkHref: "/dashboard/usulan",
+    kategori: "pegawai",
+  };
+}
+
+/**
+ * Isi notifikasi untuk usulan yang dikembalikan Kanwil ke UPT. Penanda rujukannya adalah id usulan,
+ * bukan id pegawai, sebab usulan pegawai baru belum punya pegawai; penyaringan per satker karena itu
+ * ditangani tersendiri di GET /api/notifikasi.
+ */
+export function notifikasiUsulanRevisi(
+  usulan: { id: string; satker: string | null; nomorSurat: string | null },
+  pegawai: { nama: string | null; nip: string | null } | null | undefined,
+  catatan: string,
+): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
+  const nama = pegawai?.nama?.trim() || "-";
+  const nip = pegawai?.nip?.trim() || "-";
+  return {
+    judul: `Usulan Dikembalikan: ${nama}`,
+    pesan: `Kanwil mengembalikan usulan ${nama} (${nip}) pada surat ${usulan.nomorSurat ?? "-"} untuk diperbaiki: ${catatan}. Isian dan berkasnya masih utuh, tinggal dibetulkan lalu dikirim ulang.`,
+    tipe: T.USULAN_REVISI,
+    referenceId: usulan.id,
+    prioritas: "warning",
+    linkHref: "/dashboard",
     kategori: "pegawai",
   };
 }
@@ -374,7 +398,11 @@ export function rencanaNotifikasi(input: {
   return { baru, tandaiDibaca };
 }
 
-/** Buat notifikasi otomatis. Dipanggil cron harian dan, paling sering tiap 15 menit, oleh GET /api/notifikasi. */
+/**
+ * Buat notifikasi otomatis. Dipanggil cron harian (/api/cron/notifikasi) dan tombol "Periksa sekarang"
+ * (/api/notifikasi/periksa). GET /api/notifikasi sengaja tidak memanggilnya: bilah samping memanggil GET
+ * dari setiap halaman, dan menjalankan generator di jalur itu membuat Worker melampaui batas sumber daya.
+ */
 export async function generateNotifikasi(sekarang: Date = new Date()): Promise<NotifikasiResult> {
   const { db } = await import("./db");
   const hariIni = hariIniWita(sekarang);

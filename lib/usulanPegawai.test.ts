@@ -12,6 +12,9 @@ import {
   usulanKosong,
   hitungUsulan,
   kekuranganUsulan,
+  BELUM_SELESAI,
+  DIPEGANG_UPT,
+  STATUS_USULAN,
 } from "./usulanPegawai";
 
 const tgl = (tahun: number, bulan: number, hari = 1) => new Date(tahun, bulan - 1, hari);
@@ -146,4 +149,20 @@ test("kekuranganUsulan: usulan perbaikan boleh bersandar pada data pegawai yang 
   assert.deepEqual(kekuranganUsulan({ jabatan: "Analis Kepegawaian" }, "perubahan", pegawai), []);
   // Masa kerja yang tidak ada barisnya di tabel ditahan di sini, sebelum uangnya salah.
   assert.deepEqual(kekuranganUsulan({ golonganRuang: "II/c", mkgTahun: 0, mkgBulan: 0 }, "perubahan", pegawai).length, 1);
+});
+
+test("usulan yang dikembalikan kembali dipegang UPT, tetapi tetap menutup pintu usulan baru", () => {
+  // Boleh disunting dan dihapus UPT: draf yang belum pernah dikirim, dan yang dilempar kembali Kanwil.
+  assert.deepEqual([...DIPEGANG_UPT], ["draf", "revisi"]);
+  assert.equal(DIPEGANG_UPT.includes("menunggu"), false);
+
+  // Ketiganya menghalangi usulan kedua untuk pegawai yang sama, supaya antrian Kanwil tidak
+  // pernah memuat dua versi orang yang sama.
+  for (const status of ["draf", "menunggu", "revisi"]) assert.equal(BELUM_SELESAI.includes(status), true);
+  for (const status of ["disetujui", "ditolak"]) assert.equal(BELUM_SELESAI.includes(status), false);
+
+  // Warnanya harus berbeda dari "menunggu": keduanya sama-sama belum selesai, tetapi yang satu
+  // menunggu Kanwil dan yang lain menunggu UPT.
+  assert.equal(STATUS_USULAN.revisi.label, "Dikembalikan untuk revisi");
+  assert.notEqual(STATUS_USULAN.revisi.nada, STATUS_USULAN.menunggu.nada);
 });

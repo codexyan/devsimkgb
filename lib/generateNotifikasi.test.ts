@@ -7,6 +7,7 @@ import { test } from "node:test";
 import { aturBatasInputSdm } from "./batasInputSdm";
 import {
   bolehLihatNotifikasi,
+  notifikasiUsulanRevisi,
   rencanaNotifikasi,
   tahapPengingatKgb,
   tipeNotifikasiUntukRole,
@@ -211,11 +212,14 @@ test("SK yang baru dikonfirmasi keuangan dikabarkan sekali", () => {
   assert.equal(kedua.baru.filter((n) => n.tipe === "sk_terbit").length, 0);
 });
 
-test("Admin UPT hanya menerima pengingat KGB dan kabar SK terbit", () => {
-  assert.deepEqual(tipeNotifikasiUntukRole("admin_upt"), ["kgb_jatuh_tempo", "rapelan", "sk_terbit"]);
+test("Admin UPT hanya menerima pengingat KGB, kabar SK terbit, dan usulan yang dikembalikan", () => {
+  assert.deepEqual(tipeNotifikasiUntukRole("admin_upt"), ["kgb_jatuh_tempo", "rapelan", "sk_terbit", "usulan_revisi"]);
   assert.equal(bolehLihatNotifikasi("admin_upt", "sk_terbit"), true);
+  assert.equal(bolehLihatNotifikasi("admin_upt", "usulan_revisi"), true);
   assert.equal(bolehLihatNotifikasi("admin_upt", "hukdis_berakhir"), false);
   assert.equal(bolehLihatNotifikasi("admin_upt", "sk_menunggu_keuangan"), false);
+  // Usulan yang masih menunggu tinjauan adalah urusan Kanwil; UPT tidak ditagih meninjau kirimannya sendiri.
+  assert.equal(bolehLihatNotifikasi("admin_upt", "usulan_upt"), false);
 });
 
 test("KGB berjalan yang keadaan pegawainya berubah ditandai perlu ditinjau", () => {
@@ -266,4 +270,20 @@ test("usulan data dari UPT diingatkan sekali ke Kanwil", () => {
     usulan: [{ ...usulan[0], status: "disetujui" }],
   });
   assert.equal(sudahDitinjau.baru.filter((n) => n.tipe === "usulan_upt").length, 0);
+});
+
+test("usulan yang dikembalikan menunjuk ke usulannya, dan membawa catatan peninjau", () => {
+  const n = notifikasiUsulanRevisi(
+    { id: "u1", satker: "rutan-rantau", nomorSurat: "WP.19.PAS.7-SA.04.04-1" },
+    { nama: "DERA KALISTANINGSIH", nip: "200509182025062002" },
+    "gaji pokok tidak sesuai SK terakhir",
+  );
+  assert.equal(n.tipe, "usulan_revisi");
+  // Rujukannya id usulan, bukan id pegawai: usulan pegawai baru belum punya pegawai sampai disetujui.
+  assert.equal(n.referenceId, "u1");
+  // Catatan peninjau harus ikut terbawa; tanpa itu UPT hanya tahu ditolak, bukan apa yang salah.
+  assert.match(n.pesan, /gaji pokok tidak sesuai SK terakhir/);
+  assert.match(n.pesan, /DERA KALISTANINGSIH/);
+  // Tautannya ke dasbor UPT, tempat usulan itu menunggu diperbaiki, bukan ke antrian tinjauan Kanwil.
+  assert.equal(n.linkHref, "/dashboard");
 });

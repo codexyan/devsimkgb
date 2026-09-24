@@ -238,3 +238,30 @@ dihapus, sebab jawabannya lebih dipercaya dihitung daripada diingat.
 Seluruh teks antarmuka, dokumen, dan komentar tidak lagi memakai tanda pisah panjang. Penggantinya
 tanda baca biasa: titik dua untuk keterangan, koma atau titik koma untuk sisipan, titik tengah untuk
 pemisah pada satu baris pilihan, dan tanda hubung tunggal untuk nilai yang kosong.
+
+### 7. Kanwil mengembalikan usulan, tidak lagi menolaknya
+
+Peninjau semula punya dua vonis: setujui atau tolak. Praktiknya, hampir setiap penolakan berpangkal
+pada hal yang kecil, misalnya gaji pokok yang tidak cocok dengan SK yang dilampirkan. Tetapi usulan
+yang ditolak menjadi riwayat mati: UPT harus menyusun ulang dari nol, mengetik seluruh isian sekali
+lagi, dan mengunggah ulang setiap pindaian SK. Hukuman yang tidak sepadan dengan satu salah ketik.
+
+Sejak sekarang vonisnya tetap dua, tetapi yang kedua diganti: **Kembalikan untuk revisi**. Statusnya
+menjadi `revisi`, isian dan berkasnya tidak disentuh, dan yang berpindah hanya siapa yang memegangnya.
+Catatan peninjau wajib diisi dan itulah yang dibaca UPT, karena "belum sesuai" tidak memberi tahu apa
+pun. Usulan yang dikembalikan tetap menutup pintu usulan baru untuk pegawai yang sama, sehingga antrian
+tinjauan tidak pernah memuat dua versi orang yang sama.
+
+Penolakan dihapus sama sekali, termasuk untuk usulan yang memang tidak boleh lanjut, misalnya
+pegawainya sudah pindah satker atau usulannya kembar. Perkara itu pun dikembalikan, dengan catatan agar
+UPT menghapusnya sendiri: UPT yang tahu duduk perkaranya, dan pegawainya baru bebas diusulkan lagi
+setelah usulan yang menggantung ditutup. Status `ditolak` tetap dikenali agar usulan lama terbaca.
+
+Pengiriman ulang memakai nomor surat yang lama, yang sudah terisi di dialog pengajuan dan masih boleh
+diubah. Ralat kecil tidak sepatutnya menuntut nomor surat baru dari arsiparis.
+
+Dua akibat sampingan ikut dibereskan. Pertama, tombol "Usulkan perbaikan data" dulu tetap hidup pada
+pegawai yang usulannya sedang ditinjau; operator mengisi seluruh formulir dan baru ditolak pada langkah
+terakhir. Tombol itu kini tidak ditawarkan selama usulannya di meja Kanwil. Kedua, notifikasi "usulan
+menunggu tinjauan" tidak pernah ditutup setelah usulannya disetujui; sekarang ditutup pada saat
+ditinjau, sebagaimana pada pembatalan oleh UPT.

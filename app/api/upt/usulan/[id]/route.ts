@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
-import { BERKAS_USULAN } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, BERKAS_USULAN, DIPEGANG_UPT } from "@/lib/usulanPegawai";
 import { bacaIsianUsulan, isiHitungan } from "@/lib/usulanFormulir";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, hapusBerkasUsulan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
@@ -31,12 +31,13 @@ async function namaUsulan(usulan: UsulanPegawaiRow): Promise<{ nama: string; peg
 }
 
 /**
- * Sunting draf yang belum diajukan.
+ * Sunting usulan yang sedang dipegang UPT: draf yang belum diajukan, atau usulan yang dikembalikan
+ * Kanwil untuk diperbaiki.
  *
- * Hanya draf yang boleh disunting. Usulan yang sudah dikirim tidak, karena peninjau di Kanwil harus
- * melihat persis apa yang dikirim UPT; yang telanjur salah dibatalkan lalu dikirim ulang. Berkas yang
- * tidak disertakan pada permintaan ini dibiarkan apa adanya, sehingga menyunting satu isian tidak
- * menuntut mengunggah ulang seluruh PDF-nya.
+ * Usulan yang sedang menunggu tinjauan tidak boleh disunting, karena peninjau di Kanwil harus melihat
+ * persis apa yang dikirim UPT; yang telanjur salah dibatalkan lalu dikirim ulang, atau dikembalikan
+ * peninjaunya. Berkas yang tidak disertakan pada permintaan ini dibiarkan apa adanya, sehingga
+ * menyunting satu isian tidak menuntut mengunggah ulang seluruh PDF-nya.
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   await muatBatasInputSdm();
@@ -51,7 +52,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const ditemukan = await usulanSatker(id, akun.kode);
   if ("galat" in ditemukan) return ditemukan.galat;
   const { usulan } = ditemukan;
-  if (usulan.status !== "draf")
+  if (!DIPEGANG_UPT.includes(usulan.status))
     return NextResponse.json(
       { error: "Usulan ini sudah dikirim ke Kanwil, jadi tidak dapat disunting. Batalkan dulu bila datanya keliru." },
       { status: 409 },
@@ -95,8 +96,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const perubahan: Partial<UsulanPegawaiRow> = {
     ...isian,
-    nomorSurat: teks("nomorSurat"),
-    tanggalSurat,
     nomorSkTerakhir: teks("nomorSkTerakhir") || null,
     tanggalSkTerakhir,
     hukdisAda: teks("hukdisAda") === "true",
@@ -112,13 +111,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   for (const b of BERKAS_USULAN) {
     if (berkas.jalur[b.kunci]) perubahan[b.kunci] = berkas.jalur[b.kunci] ?? null;
   }
+  // Surat hanya disentuh bila formulirnya memang mengirimkannya. Formulir data pegawai tidak memuat
+  // isian surat, dan usulan yang dikembalikan Kanwil harus tetap membawa nomor surat aslinya.
+  if (form.has("nomorSurat")) perubahan.nomorSurat = teks("nomorSurat") || null;
+  if (form.has("tanggalSurat")) perubahan.tanggalSurat = tanggalSurat;
 
   await db.usulanPegawai.update({ id }, perubahan);
 
   logAudit({
     userId: akun.pengguna.id,
-    aksi: "simpan_draf_pegawai",
-    detail: `Draf data ${isian.nama ?? nama} diperbarui sebelum diajukan`,
+    aksi: usulan.status === "revisi" ? "perbaiki_usulan_pegawai" : "simpan_draf_pegawai",
+    detail: usulan.status === "revisi"
+      ? `Usulan ${isian.nama ?? nama} yang dikembalikan Kanwil diperbaiki, belum dikirim ulang`
+      : `Draf data ${isian.nama ?? nama} diperbarui sebelum diajukan`,
     targetNama: String(isian.nama ?? nama),
   });
 
@@ -142,7 +147,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const ditemukan = await usulanSatker(id, akun.kode);
   if ("galat" in ditemukan) return ditemukan.galat;
   const { usulan } = ditemukan;
-  if (usulan.status !== "menunggu" && usulan.status !== "draf")
+  if (!BELUM_SELESAI.includes(usulan.status))
     return NextResponse.json(
       { error: "Usulan ini sudah ditinjau Kanwil, jadi tidak dapat dibatalkan. Kirim usulan perbaikan baru bila datanya keliru." },
       { status: 409 },
@@ -151,15 +156,22 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { nama } = await namaUsulan(usulan);
   await hapusBerkasUsulan(BERKAS_USULAN.map((b) => usulan[b.kunci]).filter((jalur): jalur is string => !!jalur));
   await db.usulanPegawai.delete({ id });
-  // Notifikasi "usulan menunggu tinjauan" ikut hilang, supaya Kanwil tidak membuka usulan yang sudah tiada.
+  // Notifikasi yang menunjuk usulan ini ikut hilang, supaya Kanwil tidak membuka usulan yang sudah
+  // tiada dan UPT tidak ditagih memperbaiki yang sudah dihapusnya sendiri.
   await db.notifikasi.deleteMany({ tipe: TIPE_NOTIFIKASI.USULAN_UPT, referenceId: id });
+  await db.notifikasi.deleteMany({ tipe: TIPE_NOTIFIKASI.USULAN_REVISI, referenceId: id });
 
+  const aksiHapus =
+    usulan.status === "draf" ? "hapus_draf_pegawai" : usulan.status === "revisi" ? "hapus_usulan_dikembalikan" : "batal_usulan";
   logAudit({
     userId: akun.pengguna.id,
-    aksi: usulan.status === "draf" ? "hapus_draf_pegawai" : "batal_usulan",
-    detail: usulan.status === "draf"
-      ? `Draf data ${nama} dihapus sebelum diajukan`
-      : `Usulan ${usulan.jenis === "baru" ? "pegawai baru " : "data "}${nama} dibatalkan UPT sebelum ditinjau, surat ${usulan.nomorSurat ?? "-"}`,
+    aksi: aksiHapus,
+    detail:
+      usulan.status === "draf"
+        ? `Draf data ${nama} dihapus sebelum diajukan`
+        : usulan.status === "revisi"
+          ? `Usulan ${usulan.jenis === "baru" ? "pegawai baru " : "data "}${nama} yang dikembalikan Kanwil dihapus UPT, surat ${usulan.nomorSurat ?? "-"}`
+          : `Usulan ${usulan.jenis === "baru" ? "pegawai baru " : "data "}${nama} dibatalkan UPT sebelum ditinjau, surat ${usulan.nomorSurat ?? "-"}`,
     targetNama: nama,
   });
 

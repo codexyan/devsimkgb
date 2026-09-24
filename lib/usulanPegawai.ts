@@ -9,19 +9,40 @@ import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
 import { bulanKeKgbBerikutnya, getGajiPokok, getPangkat, isGolonganDikenal, tambahBulan } from "./tabelGaji";
 
-export type StatusUsulan = "draf" | "menunggu" | "disetujui" | "ditolak";
+export type StatusUsulan = "draf" | "menunggu" | "revisi" | "disetujui" | "ditolak";
 
 /**
  * Daur hidup usulan. "draf" hanya ada di tangan UPT: belum menjadi dokumen usulan, tidak pernah masuk
  * antrian tinjauan Kanwil, dan boleh disunting atau dihapus sesukanya. Sesudah diajukan barulah ia
- * mengikat, karena itu perubahannya hanya lewat pembatalan lalu pengiriman ulang.
+ * mengikat.
+ *
+ * "revisi" adalah usulan terkirim yang dilempar Kanwil kembali ke UPT. Isinya utuh, berkasnya tetap
+ * menempel, dan yang berpindah hanya siapa yang memegangnya. Tanpa status ini satu salah ketik menuntut
+ * UPT menyusun ulang usulan dari nol beserta seluruh pindaian SK-nya.
+ *
+ * "ditolak" tidak lagi dihasilkan peninjau: usulan yang memang tidak boleh lanjut dikembalikan dengan
+ * catatan agar UPT yang menghapusnya, sebab UPT yang tahu duduk perkaranya. Labelnya tetap ada supaya
+ * usulan lama yang telanjur ditolak masih terbaca.
  */
-export const STATUS_USULAN: Record<StatusUsulan, { label: string; nada: "biru" | "kuning" | "hijau" | "merah" }> = {
+export const STATUS_USULAN: Record<
+  StatusUsulan,
+  { label: string; nada: "biru" | "kuning" | "hijau" | "merah" | "ungu" }
+> = {
   draf: { label: "Disiapkan UPT", nada: "biru" },
   menunggu: { label: "Menunggu tinjauan", nada: "kuning" },
+  revisi: { label: "Dikembalikan untuk revisi", nada: "ungu" },
   disetujui: { label: "Disetujui", nada: "hijau" },
   ditolak: { label: "Ditolak", nada: "merah" },
 };
+
+/** Status yang isinya masih boleh disunting dan dihapus UPT; keduanya belum ada di meja Kanwil. */
+export const DIPEGANG_UPT: readonly string[] = ["draf", "revisi"];
+
+/**
+ * Status yang membuat pegawai tidak boleh menerima usulan baru. Satu pegawai hanya boleh punya satu
+ * usulan yang belum selesai, supaya antrian tinjauan Kanwil tidak pernah memuat dua versi orang yang sama.
+ */
+export const BELUM_SELESAI: readonly string[] = ["draf", "menunggu", "revisi"];
 
 export type JenisBidang = "teks" | "tanggal" | "angka" | "rupiah";
 

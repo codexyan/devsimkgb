@@ -37,9 +37,43 @@ interface PegawaiUpt {
   konfirmasiAt: string | null;
   konfirmasiOleh: string | null;
   bolehKonfirmasi: boolean;
-  /** "draf" atau "menunggu" bila ada usulan berjalan untuk pegawai ini; konfirmasi tidak diminta lagi. */
+  /** "draf", "menunggu", atau "revisi" bila ada usulan berjalan; konfirmasi tidak diminta lagi. */
   usulanBerjalan?: string | null;
   dataSekarang: Record<string, string>;
+}
+
+/**
+ * Usulan yang masih dipegang UPT dan boleh disunting: draf yang belum pernah dikirim, dan usulan yang
+ * dikembalikan Kanwil untuk diperbaiki. Keduanya muncul di panel yang sama dan berangkat lewat satu surat.
+ */
+const dipegangUpt = (status: string) => status === "draf" || status === "revisi";
+
+/**
+ * Kalimat dialog penghapusan menurut status usulannya. Ketiganya menghapus baris yang sama, tetapi
+ * akibatnya berbeda di mata UPT: draf belum pernah dilihat siapa pun, usulan terkirim sedang ditunggu
+ * Kanwil, dan yang dikembalikan justru sedang ditunggu perbaikannya.
+ */
+function salinanHapusUsulan(status: string) {
+  if (status === "draf")
+    return {
+      judul: "Hapus data yang disiapkan",
+      tombol: "Hapus data",
+      peringatan:
+        "Data yang sudah diketik beserta berkas yang diunggah hilang dan tidak dapat dikembalikan. Kanwil belum pernah melihat data ini.",
+    };
+  if (status === "revisi")
+    return {
+      judul: "Hapus usulan yang dikembalikan",
+      tombol: "Hapus usulan",
+      peringatan:
+        "Usulan ini beserta berkasnya hilang dan tidak dapat dikembalikan. Hapus hanya bila Kanwil memang meminta demikian; bila datanya cuma perlu diralat, tekan Perbaiki agar isinya tidak perlu diketik ulang.",
+    };
+  return {
+    judul: "Batalkan usulan",
+    tombol: "Batalkan usulan",
+    peringatan:
+      "Usulan ini beserta berkas yang sudah diunggah dihapus dan tidak lagi masuk antrian tinjauan Kanwil. Isinya tidak dapat dikembalikan; bila datanya keliru, kirim usulan baru setelah diperbaiki.",
+  };
 }
 
 /** Satu baris pada daftar usulan UPT: draf yang masih disiapkan maupun usulan yang sudah dikirim. */
@@ -202,9 +236,9 @@ export default function DashboardUpt() {
     return () => clearTimeout(t);
   }, [muatUsulan]);
 
-  /** Draf yang tersimpan untuk pegawai ini, bila ada. */
+  /** Usulan pegawai ini yang masih di tangan UPT, bila ada: draf, atau yang dikembalikan Kanwil. */
   function drafPegawai(pegawaiId: string): UsulanTerkirim | null {
-    return usulan.find((u) => u.status === "draf" && u.pegawaiId === pegawaiId) ?? null;
+    return usulan.find((u) => dipegangUpt(u.status) && u.pegawaiId === pegawaiId) ?? null;
   }
 
   function bukaUsulan(p: PegawaiUpt) {
@@ -242,6 +276,24 @@ export default function DashboardUpt() {
       else baru.add(id);
       return baru;
     });
+  }
+
+  /**
+   * Buka dialog pengiriman, dengan surat yang lama sudah terisi bila memang ada.
+   *
+   * Usulan yang dikembalikan Kanwil sudah pernah berangkat dengan satu surat, dan surat itulah yang
+   * dipakai lagi: satu salah ketik tidak sepatutnya menuntut nomor surat baru dari arsiparis. Nomornya
+   * tetap boleh diubah, dan hanya diisikan bila seluruh yang dipilih memang berasal dari surat yang sama.
+   */
+  function bukaDialogAjukan() {
+    setGalatAjukan(null);
+    const terpilih = draf.filter((u) => pilihAjukan.has(u.id));
+    const nomor = [...new Set(terpilih.map((u) => u.surat?.nomorSurat?.trim()).filter((n): n is string => !!n))];
+    if (nomor.length === 1) {
+      const asal = terpilih.find((u) => u.surat?.nomorSurat?.trim() === nomor[0]);
+      setSuratAjukan({ nomorSurat: nomor[0], tanggalSurat: asal?.surat?.tanggalSurat ?? "" });
+    }
+    setDialogAjukan(true);
   }
 
   /** Kirim draf terpilih ke Kanwil dengan satu surat usulan untuk semuanya. */
@@ -295,7 +347,9 @@ export default function DashboardUpt() {
       setKabar(
         dialogBatal.status === "draf"
           ? `Data ${dialogBatal.nama} yang disiapkan sudah dihapus.`
-          : `Usulan ${dialogBatal.nama} dibatalkan. Kirim ulang setelah datanya diperbaiki.`,
+          : dialogBatal.status === "revisi"
+            ? `Usulan ${dialogBatal.nama} yang dikembalikan Kanwil sudah dihapus.`
+            : `Usulan ${dialogBatal.nama} dibatalkan. Kirim ulang setelah datanya diperbaiki.`,
       );
       setTimeout(() => setKabar(null), 6000);
       setDialogBatal(null);
@@ -338,9 +392,16 @@ export default function DashboardUpt() {
 
   const bulanUsulan = bulanUsulanSekarang(hariIni);
   const pegawai = useMemo(() => data?.pegawai ?? [], [data]);
-  /** Data yang masih disiapkan UPT; belum terlihat Kanwil sampai diajukan. */
-  const draf = usulan.filter((u) => u.status === "draf");
-  const terkirim = usulan.filter((u) => u.status !== "draf");
+  /**
+   * Data yang masih di tangan UPT. Yang dikembalikan Kanwil diletakkan paling atas: itulah yang sedang
+   * ditunggu orang lain, sedangkan draf biasa tidak ditunggu siapa pun.
+   */
+  const draf = usulan
+    .filter((u) => dipegangUpt(u.status))
+    .slice()
+    .sort((a, b) => Number(b.status === "revisi") - Number(a.status === "revisi"));
+  const dikembalikan = draf.filter((u) => u.status === "revisi");
+  const terkirim = usulan.filter((u) => !dipegangUpt(u.status));
   const perluDiusulkan = pegawai.filter((p) => p.bulanTmt === bulanUsulan);
   const sedangDiproses = pegawai.filter((p) => p.statusKGB === "sedang_diproses" || p.statusKGB === "menunggu_keuangan");
 
@@ -449,11 +510,11 @@ export default function DashboardUpt() {
 
       {dialogBatal && (
         <KerangkaModal
-          judul={dialogBatal.status === "draf" ? "Hapus data yang disiapkan" : "Batalkan usulan"}
+          judul={salinanHapusUsulan(dialogBatal.status).judul}
           subjudul={
             dialogBatal.status === "draf"
               ? `${dialogBatal.nama} · belum diajukan ke Kanwil`
-              : `${dialogBatal.nama} · surat ${dialogBatal.nomorSurat}`
+              : `${dialogBatal.nama} · surat ${dialogBatal.nomorSurat}${dialogBatal.status === "revisi" ? " · dikembalikan Kanwil" : ""}`
           }
           nada="merah"
           ukuran="sm"
@@ -466,16 +527,12 @@ export default function DashboardUpt() {
                 Tidak jadi
               </button>
               <button type="submit" className="kgbm-tombol kgbm-utama" disabled={membatalkan}>
-                {membatalkan ? "Menghapus…" : dialogBatal.status === "draf" ? "Hapus data" : "Batalkan usulan"}
+                {membatalkan ? "Menghapus…" : salinanHapusUsulan(dialogBatal.status).tombol}
               </button>
             </>
           }
         >
-          <Catatan nada="amber">
-            {dialogBatal.status === "draf"
-              ? "Data yang sudah diketik beserta berkas yang diunggah hilang dan tidak dapat dikembalikan. Kanwil belum pernah melihat data ini."
-              : "Usulan ini beserta berkas yang sudah diunggah dihapus dan tidak lagi masuk antrian tinjauan Kanwil. Isinya tidak dapat dikembalikan; bila datanya keliru, kirim usulan baru setelah diperbaiki."}
-          </Catatan>
+          <Catatan nada="amber">{salinanHapusUsulan(dialogBatal.status).peringatan}</Catatan>
         </KerangkaModal>
       )}
 
@@ -514,6 +571,12 @@ export default function DashboardUpt() {
             pegawai yang dipilih. Setelah terkirim, datanya masuk antrian tinjauan Kanwil dan tidak lagi dapat
             disunting; yang keliru dibatalkan lalu dikirim ulang.
           </Catatan>
+          {draf.some((u) => pilihAjukan.has(u.id) && u.status === "revisi") && (
+            <Catatan nada="amber">
+              Ada usulan yang dikembalikan Kanwil di antara pilihan ini. Nomor surat lamanya sudah terisi dan
+              boleh dipakai lagi, jadi tidak perlu meminta nomor baru ke arsiparis untuk sekadar ralat.
+            </Catatan>
+          )}
           <ul className="dsb-log-ringkas">
             {draf.filter((u) => pilihAjukan.has(u.id)).map((u) => (
               <li key={u.id}>
@@ -661,6 +724,11 @@ export default function DashboardUpt() {
                 <tbody>
                   {tampil.map((p) => {
                     const k = keadaan(p);
+                    // Usulan yang sedang ditinjau Kanwil tidak boleh disentuh UPT, jadi tombolnya pun
+                    // tidak ditawarkan: dulu tombol itu tetap hidup dan penolakannya baru muncul setelah
+                    // operator mengisi seluruh formulir.
+                    const milikSendiri = drafPegawai(p.id);
+                    const sedangDitinjau = p.usulanBerjalan === "menunggu";
                     const bulanKirim = p.bulanTmt ? geserBulan(p.bulanTmt, -2) : null;
                     const tmt = tanggalKalender(p.tmtKgb);
                     const batas = tmt ? hitungDeadlineSDM(tmt) : null;
@@ -694,10 +762,16 @@ export default function DashboardUpt() {
                             </p>
                           ) : p.usulanBerjalan ? (
                             <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>
-                              <span className="dsb-titik" data-nada="biru" aria-hidden="true" />{" "}
+                              <span
+                                className="dsb-titik"
+                                data-nada={p.usulanBerjalan === "revisi" ? "ungu" : "biru"}
+                                aria-hidden="true"
+                              />{" "}
                               {p.usulanBerjalan === "draf"
                                 ? "Sedang disiapkan usulannya, konfirmasi tidak diperlukan"
-                                : "Sudah diusulkan, menunggu tinjauan Kanwil"}
+                                : p.usulanBerjalan === "revisi"
+                                  ? "Dikembalikan Kanwil, perlu diperbaiki lalu dikirim ulang"
+                                  : "Sudah diusulkan, menunggu tinjauan Kanwil"}
                             </p>
                           ) : p.bolehKonfirmasi ? (
                             <span className="upt-aksi">
@@ -711,11 +785,17 @@ export default function DashboardUpt() {
                               </button>
                             </span>
                           ) : null}
-                          <span className="upt-aksi">
-                            <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => bukaUsulan(p)}>
-                              {drafPegawai(p.id) ? "Lanjutkan draf" : "Usulkan perbaikan data"}
-                            </button>
-                          </span>
+                          {!sedangDitinjau && (
+                            <span className="upt-aksi">
+                              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => bukaUsulan(p)}>
+                                {milikSendiri?.status === "revisi"
+                                  ? "Perbaiki usulan"
+                                  : milikSendiri
+                                    ? "Lanjutkan draf"
+                                    : "Usulkan perbaikan data"}
+                              </button>
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -796,7 +876,11 @@ export default function DashboardUpt() {
           <section className="dsb-panel dsb-susut" aria-labelledby="judul-draf-upt">
             <div className="dsb-panel-kepala">
               <h2 id="judul-draf-upt" className="dsb-panel-judul">
-                Data disiapkan <small>{draf.length} belum diajukan</small>
+                Data disiapkan{" "}
+                <small>
+                  {draf.length} belum diajukan
+                  {dikembalikan.length > 0 ? ` · ${dikembalikan.length} dikembalikan Kanwil` : ""}
+                </small>
               </h2>
               <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={bukaPegawaiBaru}>
                 Tambah pegawai
@@ -823,6 +907,12 @@ export default function DashboardUpt() {
                         <span className="min-w-0">
                           <span className="dsb-nama">{u.nama}</span>
                           <span className="dsb-kecil"> · {LABEL_JENIS_USULAN[u.jenis] ?? u.jenis}</span>
+                          {u.status === "revisi" && (
+                            <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-violet)" }}>
+                              <span className="dsb-titik" data-nada="ungu" aria-hidden="true" /> Dikembalikan Kanwil:{" "}
+                              {u.alasanTolak ?? "tanpa catatan"}
+                            </p>
+                          )}
                           {u.kekurangan.length > 0 ? (
                             <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-amber)" }}>
                               Perlu dilengkapi: {u.kekurangan.join(", ")}
@@ -839,7 +929,7 @@ export default function DashboardUpt() {
                               data-jenis="garis"
                               onClick={() => lanjutkanDraf(u)}
                             >
-                              Lanjutkan
+                              {u.status === "revisi" ? "Perbaiki" : "Lanjutkan"}
                             </button>{" "}
                             <button
                               type="button"
@@ -860,7 +950,7 @@ export default function DashboardUpt() {
                     type="button"
                     className="dsb-tombol"
                     disabled={pilihAjukan.size === 0}
-                    onClick={() => { setGalatAjukan(null); setDialogAjukan(true); }}
+                    onClick={bukaDialogAjukan}
                   >
                     {pilihAjukan.size > 0 ? `Ajukan ${pilihAjukan.size} pegawai ke Kanwil` : "Pilih dulu yang akan diajukan"}
                   </button>

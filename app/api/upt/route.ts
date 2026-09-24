@@ -8,7 +8,7 @@ import { isoTanggalKalender, kunciBulanTmt, kunciTanggal, pilihKgbSiklus, rapela
 import { rekapPerSatker } from "@/lib/rekapSatker";
 import { kgbDitunda, pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
 import { statusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
-import { BIDANG_USULAN } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, BIDANG_USULAN } from "@/lib/usulanPegawai";
 import { SATKER } from "@/lib/satker";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { berhakKgb } from "@/lib/mutasiPegawai";
@@ -52,7 +52,7 @@ export async function GET() {
     db.riwayatHukdis.findMany() as Promise<HukdisBaris[]>,
     // Usulan yang sedang berjalan: menyiapkan atau mengirim usulan sudah menjadi pernyataan UPT
     // tentang pegawai itu, sehingga konfirmasi terpisah tidak diminta lagi.
-    db.usulanPegawai.findMany({ where: { satker: kode, status: { in: ["draf", "menunggu"] } } }),
+    db.usulanPegawai.findMany({ where: { satker: kode, status: { in: BELUM_SELESAI } } }),
   ]);
   const jenisUsulanPegawai = new Map<string, string>();
   for (const u of usulanBerjalan as { pegawaiId: string | null; status: string }[]) {
