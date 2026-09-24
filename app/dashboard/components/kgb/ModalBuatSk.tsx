@@ -335,7 +335,7 @@ export default function ModalBuatSk({
                 wajib
                 nilai={dasar.penetapSkDasar}
                 onUbah={(nilai) => ubahDasar("penetapSkDasar", nilai)}
-                petunjuk="Pejabat yang menetapkan SK terakhir; tercetak pada baris Oleh."
+                petunjuk="Tercetak pada baris Oleh di surat. Periksa terhadap SK terakhirnya: SK pengangkatan PNS ditetapkan Menteri, SK KGB sebelumnya oleh pejabat yang menandatanganinya."
                 nonaktif={sibuk}
               />
             </BagianForm>

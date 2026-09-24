@@ -79,7 +79,7 @@ export function BidangPenetap(props: Omit<PropsBidangTeks, "saran" | "jenis" | "
   return (
     <BidangTeks
       {...props}
-      label={props.label ?? "Ditetapkan oleh"}
+      label={props.label ?? "Oleh (pejabat penetap SK terakhir)"}
       saran={SARAN_PENETAP_SK}
       placeholder={props.placeholder ?? "Pilih atau ketik jabatan penetap"}
     />

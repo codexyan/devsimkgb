@@ -53,14 +53,43 @@ export type KunciBidangUsulan = (typeof BIDANG_USULAN)[number]["kunci"];
  * `medan` adalah nama field pada formulir, `kunci` adalah kolom penyimpan jalur berkasnya.
  */
 export const BERKAS_USULAN = [
-  { medan: "berkas", kunci: "pathBerkas", label: "Surat usulan Srikandi", wajibUntuk: "semua" },
-  { medan: "skTerakhir", kunci: "pathSkTerakhir", label: "SK KGB terakhir", wajibUntuk: "semua" },
-  { medan: "syaratCpns", kunci: "pathSyaratCpns", label: "Syarat pengangkatan PNS", wajibUntuk: "cpns" },
-  { medan: "skPangkat", kunci: "pathSkPangkat", label: "SK kenaikan pangkat terakhir", wajibUntuk: "pernah_naik_pangkat" },
+  {
+    medan: "berkas",
+    kunci: "pathBerkas",
+    label: "Surat usulan Srikandi",
+    keterangan: "Surat pengantar dari UPT yang sudah dikirim ke Kanwil lewat Srikandi.",
+    wajibUntuk: "semua",
+  },
+  {
+    medan: "skTerakhir",
+    kunci: "pathSkTerakhir",
+    label: "SK KGB terakhir",
+    keterangan:
+      "SK kenaikan gaji berkala yang terakhir diterima pegawai. Kosongkan bila pegawai belum pernah menerima KGB.",
+    wajibUntuk: "semua",
+  },
+  {
+    medan: "syaratCpns",
+    kunci: "pathSyaratCpns",
+    label: "SK pengangkatan PNS",
+    keterangan:
+      "Keputusan Menteri tentang pengangkatan CPNS menjadi PNS. Bagi pegawai yang belum pernah KGB, SK inilah dasar gaji pokoknya. Boleh digabung dengan SK CPNS dan SPMT dalam satu berkas.",
+    wajibUntuk: "cpns",
+  },
+  {
+    medan: "skPangkat",
+    kunci: "pathSkPangkat",
+    label: "SK kenaikan pangkat terakhir",
+    keterangan:
+      "SK kenaikan pangkat yang terakhir diterima, bila pegawai pernah naik pangkat. Diperlukan karena kenaikan pangkat memotong masa kerja golongan.",
+    wajibUntuk: "pernah_naik_pangkat",
+  },
 ] as const satisfies readonly {
   medan: string;
   kunci: "pathBerkas" | "pathSkTerakhir" | "pathSyaratCpns" | "pathSkPangkat";
   label: string;
+  /** Penjelasan singkat: dokumen apa yang dimaksud dan kapan diperlukan. */
+  keterangan: string;
   wajibUntuk: string;
 }[];
 

@@ -11,7 +11,7 @@ import { BUTIR_KONFIRMASI_UPT, LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } 
 import { LABEL_JENIS_USULAN, STATUS_USULAN, type StatusUsulan } from "@/lib/usulanPegawai";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
-import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
+import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
 
 /* Dashboard Admin UPT: satu halaman berisi jadwal pengiriman surat usulan, daftar pegawai satker dengan status
@@ -188,6 +188,8 @@ export default function DashboardUpt() {
   const [berkasAjukan, setBerkasAjukan] = useState<File | null>(null);
   const [mengajukan, setMengajukan] = useState(false);
   const [galatAjukan, setGalatAjukan] = useState<string | null>(null);
+  /** Berkas usulan yang sedang dibuka; UPT dapat memastikan yang terkirim memang benar. */
+  const [pratinjau, setPratinjau] = useState<{ judul: string; subjudul: string; url: string } | null>(null);
 
   const muatUsulan = useCallback(async () => {
     const res = await fetch("/api/upt/usulan");
@@ -434,6 +436,15 @@ export default function DashboardUpt() {
             <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
+      )}
+
+      {pratinjau && (
+        <ModalPratinjauBerkas
+          judul={pratinjau.judul}
+          subjudul={pratinjau.subjudul}
+          url={pratinjau.url}
+          onTutup={() => setPratinjau(null)}
+        />
       )}
 
       {dialogBatal && (
@@ -886,6 +897,27 @@ export default function DashboardUpt() {
                           </p>
                           {u.alasanTolak && (
                             <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-red)" }}>Ditolak: {u.alasanTolak}</p>
+                          )}
+                          {u.berkas.length > 0 && (
+                            <span className="upt-aksi">
+                              {u.berkas.map((b) => (
+                                <button
+                                  key={b.medan}
+                                  type="button"
+                                  className="dsb-tombol dsb-tombol-kecil"
+                                  data-jenis="garis"
+                                  onClick={() =>
+                                    setPratinjau({
+                                      judul: b.label,
+                                      subjudul: `${u.nama} · surat ${u.nomorSurat}`,
+                                      url: `/api/usulan/${u.id}/berkas?berkas=${b.medan}`,
+                                    })
+                                  }
+                                >
+                                  {b.label}
+                                </button>
+                              ))}
+                            </span>
                           )}
                           {u.status === "menunggu" && (
                             <span className="upt-aksi">

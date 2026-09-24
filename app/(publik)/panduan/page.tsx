@@ -692,12 +692,18 @@ export default async function PanduanPage() {
                     TMT CPNS, bukan dua tahun seperti golongan lain.
                   </li>
                   <li>
-                    <strong>Unggah berkas dasarnya</strong>, masing-masing PDF paling besar 1 MB: <strong>surat usulan
-                    Srikandi</strong>, <strong>SK KGB terakhir</strong>, <strong>syarat pengangkatan PNS</strong> bila
-                    pegawainya CPNS yang baru dilantik, dan <strong>SK kenaikan pangkat terakhir</strong> bila pernah
-                    naik pangkat. Pindai sebagai dokumen, bukan foto kamera, agar ukurannya muat. Ketiga berkas terakhir
-                    diminta tim keuangan agar masa kerja golongan dapat dicocokkan dengan dokumen aslinya, bukan dengan
-                    ingatan.
+                    <strong>Unggah berkas dasarnya</strong>, masing-masing PDF paling besar 1 MB. Pindai sebagai
+                    dokumen, bukan foto kamera, agar ukurannya muat. Berkas yang sudah tersimpan dapat dibuka kembali
+                    dari formulirnya untuk dipastikan tidak tertukar.
+                  </li>
+                  <li>
+                    Keempat berkas itu: <strong>surat usulan Srikandi</strong>, yaitu surat pengantar UPT yang sudah
+                    dikirim ke Kanwil; <strong>SK KGB terakhir</strong>, dikosongkan bila pegawai belum pernah menerima
+                    KGB; <strong>SK pengangkatan PNS</strong>, yaitu Keputusan Menteri tentang pengangkatan CPNS
+                    menjadi PNS yang bagi pegawai baru menjadi dasar gaji pokoknya, boleh digabung dengan SK CPNS dan
+                    SPMT dalam satu berkas; dan <strong>SK kenaikan pangkat terakhir</strong> bila pegawai pernah naik
+                    pangkat, sebab kenaikan pangkat memotong masa kerja golongan. Ketiga berkas terakhir diminta tim
+                    keuangan agar masa kerja golongan dapat dicocokkan dengan dokumen aslinya, bukan dengan ingatan.
                   </li>
                   <li>
                     Bila pegawai sedang atau pernah menjalani hukuman disiplin yang belum dilaporkan, centang bagiannya
@@ -1097,7 +1103,10 @@ export default async function PanduanPage() {
                     </p>
                     <p>
                       Isi bagian Atas Dasar SK Terakhir dari SK dasar yang dilampirkan. Nomor SK Terakhir, Tanggal SK
-                      Terakhir, dan TMT SK Terakhir wajib diisi; Ditetapkan oleh wajib dilengkapi paling lambat saat Buat SK.
+                      Terakhir, dan TMT SK Terakhir wajib diisi; Oleh wajib dilengkapi paling lambat saat Buat SK. Isian Oleh
+                      adalah pejabat yang menetapkan SK terakhir itu, bukan yang menandatangani SK KGB yang sedang
+                      dibuat: SK pengangkatan PNS ditetapkan Menteri, sedangkan SK KGB sebelumnya oleh pejabat yang
+                      menandatanganinya.
                       Pilih Simpan Input KGB. Status berubah menjadi <Status status="sedang_diproses" />.
                     </p>
                     <p>SIM-KGB menolak Input KGB bila:</p>
@@ -1121,7 +1130,7 @@ export default async function PanduanPage() {
                     <p>
                       Buat SK hanya tersedia setelah Input KGB, yaitu untuk KGB berstatus{" "}
                       <Status status="sedang_diproses" />. Pilih Buat SK untuk membuka jendela Buat Surat Keputusan KGB.
-                      Periksa bagian Atas Dasar SK Terakhir; keempat isiannya wajib, termasuk Ditetapkan oleh. Lalu isi
+                      Periksa bagian Atas Dasar SK Terakhir; keempat isiannya wajib, termasuk Oleh. Lalu isi
                       bagian SK KGB Baru: Nomor SK Baru dari Tata Usaha dan Tanggal SK Baru. Penandatangan dipilih menurut
                       Tanggal SK Baru sesuai data di Pengaturan.
                     </p>
@@ -1197,7 +1206,7 @@ export default async function PanduanPage() {
                     <strong>SK sudah terbit di luar SIM-KGB.</strong> Catat dengan Arsip KGB. Tombol ini ada pada kartu
                     Belum Diproses yang terlambat di Dashboard, pada baris Belum Diproses di menu Proses KGB setelah batas
                     proses lewat, dan sebagai tautan di jendela Input KGB bila data SK terakhir belum tercatat. Isi Nomor
-                    SK, Tanggal SK, TMT SK, dan Ditetapkan oleh bila diketahui, pilih Berkas SK (PDF) paling besar 10 MB,
+                    SK, Tanggal SK, TMT SK, dan Oleh bila diketahui, pilih Berkas SK (PDF) paling besar 10 MB,
                     lalu pilih Simpan Arsip. KGB langsung berstatus <Status status="selesai" /> tanpa konfirmasi keuangan, data gaji pegawai
                     diperbarui, dan jadwal KGB berikutnya dibuat. Arsip KGB mengikuti jendela proses yang sama dengan
                     Input KGB. Bila berkas SK gagal terunggah, unggah dari Detail KGB dengan Unggah SK TTE.

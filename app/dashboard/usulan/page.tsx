@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { canProcessKGB } from "@/lib/auth";
-import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
+import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import { LABEL_JENIS_USULAN, STATUS_USULAN, type PerubahanUsulan, type StatusUsulan } from "@/lib/usulanPegawai";
 import { formatTanggalId } from "@/lib/waktu";
 
@@ -48,6 +48,8 @@ export default function UsulanPage() {
   const [saring, setSaring] = useState<"menunggu" | "semua">("menunggu");
   const [cari, setCari] = useState("");
   const [dibuka, setDibuka] = useState<string | null>(null);
+  /** Berkas yang sedang dipratinjau; peninjau tidak perlu berpindah tab untuk membacanya. */
+  const [pratinjau, setPratinjau] = useState<{ judul: string; subjudul: string; url: string } | null>(null);
   const [dialogTolak, setDialogTolak] = useState<Usulan | null>(null);
   const [alasanTolak, setAlasanTolak] = useState("");
   const [sibuk, setSibuk] = useState(false);
@@ -330,16 +332,21 @@ export default function UsulanPage() {
 
                             <div className="usl-aksi">
                               {u.berkas.map((b) => (
-                                <a
+                                <button
                                   key={b.medan}
+                                  type="button"
                                   className="dsb-tombol dsb-tombol-kecil"
                                   data-jenis="garis"
-                                  href={`/api/usulan/${u.id}/berkas?berkas=${b.medan}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                  onClick={() =>
+                                    setPratinjau({
+                                      judul: b.label,
+                                      subjudul: `${u.nama} · surat ${u.nomorSurat}`,
+                                      url: `/api/usulan/${u.id}/berkas?berkas=${b.medan}`,
+                                    })
+                                  }
                                 >
                                   {b.label}
-                                </a>
+                                </button>
                               ))}
                               {u.status === "menunggu" && (
                                 <>
@@ -392,6 +399,15 @@ export default function UsulanPage() {
         </aside>
       </div>
 
+
+      {pratinjau && (
+        <ModalPratinjauBerkas
+          judul={pratinjau.judul}
+          subjudul={pratinjau.subjudul}
+          url={pratinjau.url}
+          onTutup={() => setPratinjau(null)}
+        />
+      )}
       {dialogTolak && (
         <KerangkaModal
           judul="Tolak usulan"

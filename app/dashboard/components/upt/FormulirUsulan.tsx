@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
+import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import { BERKAS_USULAN, hitungUsulan } from "@/lib/usulanPegawai";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
@@ -24,7 +24,7 @@ export interface DrafUsulanUpt {
   nilai: Record<string, string> | null;
   surat: { nomorSurat: string; tanggalSurat: string; nomorSkTerakhir: string; tanggalSkTerakhir: string; catatanUpt: string } | null;
   hukdis: { ada: boolean; jenis: string; nomorSk: string; tmtMulai: string; tmtBerakhir: string; keterangan: string } | null;
-  berkas: string[];
+  berkas: { medan: string; label: string }[];
 }
 
 export interface PegawaiUntukUsulan {
@@ -144,6 +144,8 @@ export default function FormulirUsulan({
   });
   const [mengirim, setMengirim] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
+  /** Berkas tersimpan yang sedang dibuka, agar operator dapat memastikan yang diunggah memang benar. */
+  const [pratinjau, setPratinjau] = useState<{ judul: string; url: string } | null>(null);
 
   const ubah = (kunci: string, nilai: string) => setIsian((f) => ({ ...f, [kunci]: nilai }));
 
@@ -526,7 +528,20 @@ export default function FormulirUsulan({
         </div>
         <div className="kgbm-bagian-isi">
           {draf && draf.berkas.length > 0 && (
-            <p className="kgbm-bantuan">Sudah tersimpan: {draf.berkas.join(", ")}. Mengunggah ulang akan menggantikannya.</p>
+            <p className="kgbm-baris-tombol">
+              <span className="kgbm-bantuan">Sudah tersimpan, tekan untuk memeriksanya:</span>
+              {draf.berkas.map((b) => (
+                <button
+                  key={b.medan}
+                  type="button"
+                  className="dsb-tombol dsb-tombol-kecil"
+                  data-jenis="garis"
+                  onClick={() => setPratinjau({ judul: b.label, url: `/api/usulan/${draf.id}/berkas?berkas=${b.medan}` })}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </p>
           )}
           {BERKAS_USULAN.map((b) => {
             const terpilih = berkas[b.medan];
@@ -541,6 +556,7 @@ export default function FormulirUsulan({
                     accept="application/pdf"
                     onChange={(e) => setBerkas((f) => ({ ...f, [b.medan]: e.target.files?.[0] ?? null }))}
                   />
+                  <span className="kgbm-bantuan">{b.keterangan}</span>
                 </label>
                 {terpilih && (
                   <p className="kgbm-berkas-terpilih">
@@ -566,6 +582,14 @@ export default function FormulirUsulan({
           </label>
         </div>
       </div>
+      {pratinjau && (
+        <ModalPratinjauBerkas
+          judul={pratinjau.judul}
+          subjudul={`${isian.nama || pegawai?.nama || "Pegawai"} · berkas tersimpan`}
+          url={pratinjau.url}
+          onTutup={() => setPratinjau(null)}
+        />
+      )}
     </KerangkaModal>
   );
 }

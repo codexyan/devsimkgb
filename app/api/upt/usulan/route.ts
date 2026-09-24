@@ -45,7 +45,7 @@ export async function GET() {
         status: u.status,
         nomorSurat: u.nomorSurat,
         tanggalSurat: u.tanggalSurat ? new Date(u.tanggalSurat).toISOString() : null,
-        berkas: BERKAS_USULAN.filter((b) => u[b.kunci]).map((b) => b.label),
+        berkas: BERKAS_USULAN.filter((b) => u[b.kunci]).map((b) => ({ medan: b.medan, label: b.label })),
         hukdisAda: !!u.hukdisAda,
         jumlahPerubahan: u.jenis === "baru" ? BIDANG_USULAN.length : p ? bandingkanUsulan(p, u).length : 0,
         // Apa yang masih kurang sebelum draf ini boleh diajukan; kosong berarti siap.
