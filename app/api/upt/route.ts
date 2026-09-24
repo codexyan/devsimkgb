@@ -45,12 +45,19 @@ export async function GET() {
   const satker = SATKER.find((s) => s.kode === kode)!;
 
   const hariIni = hariIniWita();
-  const [semuaPegawai, semuaKgb, semuaSurat, semuaHukdis] = await Promise.all([
+  const [semuaPegawai, semuaKgb, semuaSurat, semuaHukdis, usulanBerjalan] = await Promise.all([
     db.pegawai.findMany(),
     db.riwayatKGB.findMany(),
     db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
     db.riwayatHukdis.findMany() as Promise<HukdisBaris[]>,
+    // Usulan yang sedang berjalan: menyiapkan atau mengirim usulan sudah menjadi pernyataan UPT
+    // tentang pegawai itu, sehingga konfirmasi terpisah tidak diminta lagi.
+    db.usulanPegawai.findMany({ where: { satker: kode, status: { in: ["draf", "menunggu"] } } }),
   ]);
+  const jenisUsulanPegawai = new Map<string, string>();
+  for (const u of usulanBerjalan as { pegawaiId: string | null; status: string }[]) {
+    if (u.pegawaiId) jenisUsulanPegawai.set(u.pegawaiId, u.status);
+  }
 
   const pegawaiBertanda = semuaPegawai.map((p) => penandaHukdisBerlaku(p, hariIni));
   const milikSatker = pegawaiSatker(pegawaiBertanda, kode);
@@ -110,7 +117,10 @@ export async function GET() {
         konfirmasi: statusKonfirmasiUpt(p, tmt),
         konfirmasiAt: p.konfirmasiUptAt ? new Date(p.konfirmasiUptAt).toISOString() : null,
         konfirmasiOleh: p.konfirmasiUptOleh ?? null,
-        bolehKonfirmasi: !!tmt && status !== "selesai",
+        // Usulan yang sedang berjalan menggantikan konfirmasi; setelah disetujui, konfirmasinya
+        // ditulis sendiri oleh rute tinjauan (app/api/usulan/[id]/route.ts).
+        usulanBerjalan: jenisUsulanPegawai.get(p.id) ?? null,
+        bolehKonfirmasi: !!tmt && status !== "selesai" && !jenisUsulanPegawai.has(p.id),
         // Nilai kolom yang boleh diusulkan UPT, sebagai isian awal formulir usulan data.
         dataSekarang: Object.fromEntries(
           BIDANG_USULAN.map((bidang) => {

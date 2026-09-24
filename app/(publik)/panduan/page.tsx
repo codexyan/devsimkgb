@@ -779,11 +779,17 @@ export default async function PanduanPage() {
                   ))}
                 </ol>
                 <div className="pub-note">
-                  <strong className="pub-note-title">Konfirmasi di SIM-KGB</strong>
+                  <strong className="pub-note-title">Menyatakannya di SIM-KGB</strong>
                   <p>
-                    UPT yang sudah punya akun Admin UPT dapat menekan tombol Konfirmasi data pegawai pada dashboardnya.
-                    Konfirmasi itu tercatat beserta nama dan waktunya, dan terlihat oleh Tim SDM saat memproses KGB.
-                    Konfirmasi berlaku untuk satu siklus KGB, jadi diulang setiap kali pegawai masuk jadwal berikutnya.
+                    Pada dashboard Admin UPT, tiap pegawai punya dua kemungkinan jawaban yang saling melengkapi.
+                    Bila ada yang perlu diperbaiki, pilih <strong>Usulkan perbaikan data</strong>. Bila setelah
+                    diperiksa ternyata sudah sesuai, pilih <strong>Data sudah benar</strong>.
+                  </p>
+                  <p>
+                    Keduanya dicatat beserta nama dan waktunya, dan terlihat oleh Tim SDM saat memproses KGB.
+                    Mengusulkan perbaikan sekaligus dihitung sebagai pernyataan itu, jadi pegawai yang sedang
+                    diusulkan tidak perlu dinyatakan dua kali. Pernyataannya berlaku untuk satu siklus KGB, jadi
+                    diulang setiap kali pegawai masuk jadwal berikutnya.
                   </p>
                 </div>
 

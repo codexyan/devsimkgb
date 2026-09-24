@@ -121,9 +121,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       aktif: true,
       createdAt: sekarang,
       updatedAt: sekarang,
-      konfirmasiUptTmt: null,
-      konfirmasiUptAt: null,
-      konfirmasiUptOleh: null,
+      // Usulan yang disetujui sekaligus menjadi konfirmasi UPT untuk siklus ini: mengusulkan data
+      // adalah pernyataan yang lebih kuat daripada sekadar menyatakan data yang ada sudah benar.
+      konfirmasiUptTmt: (nilaiBaru.tmtKgbBerikutnya as Date | null) ?? null,
+      konfirmasiUptAt: sekarang,
+      konfirmasiUptOleh: usulan.diajukanOleh,
       satkerTugas: null,
       berhentiTmt: null,
       berhentiAlasan: null,
@@ -131,8 +133,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     await db.pegawai.create(pegawaiBaru);
     pegawaiIdHasil = pegawaiBaru.id;
     perubahan = [];
-  } else if (pegawaiLama && Object.keys(nilaiBaru).length > 0) {
-    await db.pegawai.update({ id: pegawaiLama.id }, { ...nilaiBaru, updatedAt: sekarang });
+  } else if (pegawaiLama) {
+    // Konfirmasi ikut ditulis walau tidak ada kolom yang berubah: UPT tetap sudah memeriksa pegawai
+    // ini untuk siklus berjalan, dan itulah yang perlu diketahui Kanwil saat memproses KGB.
+    const tmtSiklus = (nilaiBaru.tmtKgbBerikutnya as Date | null) ?? pegawaiLama.tmtKgbBerikutnya ?? null;
+    await db.pegawai.update(
+      { id: pegawaiLama.id },
+      {
+        ...nilaiBaru,
+        konfirmasiUptTmt: tmtSiklus,
+        konfirmasiUptAt: sekarang,
+        konfirmasiUptOleh: usulan.diajukanOleh,
+        updatedAt: sekarang,
+      },
+    );
   }
 
   await db.usulanPegawai.update(

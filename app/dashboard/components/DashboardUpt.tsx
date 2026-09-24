@@ -37,6 +37,8 @@ interface PegawaiUpt {
   konfirmasiAt: string | null;
   konfirmasiOleh: string | null;
   bolehKonfirmasi: boolean;
+  /** "draf" atau "menunggu" bila ada usulan berjalan untuk pegawai ini; konfirmasi tidak diminta lagi. */
+  usulanBerjalan?: string | null;
   dataSekarang: Record<string, string>;
 }
 
@@ -553,7 +555,7 @@ export default function DashboardUpt() {
 
       {dialogKonfirmasi && (
         <KerangkaModal
-          judul="Konfirmasi data pegawai"
+          judul="Data sudah benar"
           subjudul={`${dialogKonfirmasi.nama} · ${dialogKonfirmasi.nip}${dialogKonfirmasi.tmtKgb ? ` · TMT KGB ${formatTanggalId(dialogKonfirmasi.tmtKgb)}` : ""}`}
           ukuran="md"
           sibuk={mengirim}
@@ -572,7 +574,9 @@ export default function DashboardUpt() {
         >
           <PesanGalat pesan={galatKonfirmasi} />
           <p className="dsb-sub" style={{ marginTop: 0 }}>
-            Dengan menekan tombol di bawah, UPT menyatakan hal berikut untuk siklus KGB ini:
+            Dengan menekan tombol di bawah, UPT menyatakan hal berikut untuk siklus KGB ini. Bila ternyata ada
+            yang perlu diperbaiki, tutup jendela ini lalu pilih Usulkan perbaikan data; usulan itu sekaligus
+            menjadi pernyataan yang sama.
           </p>
           <ol className="dsb-jadwal" style={{ paddingLeft: 18, listStyle: "decimal" }}>
             {BUTIR_KONFIRMASI_UPT.map((butir) => (
@@ -677,6 +681,13 @@ export default function DashboardUpt() {
                               {LABEL_KONFIRMASI_UPT.berlaku}
                               {p.konfirmasiAt ? ` ${formatTanggalId(p.konfirmasiAt, { day: "numeric", month: "short" })}` : ""}
                             </p>
+                          ) : p.usulanBerjalan ? (
+                            <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>
+                              <span className="dsb-titik" data-nada="biru" aria-hidden="true" />{" "}
+                              {p.usulanBerjalan === "draf"
+                                ? "Sedang disiapkan usulannya, konfirmasi tidak diperlukan"
+                                : "Sudah diusulkan, menunggu tinjauan Kanwil"}
+                            </p>
                           ) : p.bolehKonfirmasi ? (
                             <span className="upt-aksi">
                               <button
@@ -685,7 +696,7 @@ export default function DashboardUpt() {
                                 data-jenis="garis"
                                 onClick={() => { setDialogKonfirmasi(p); setGalatKonfirmasi(null); }}
                               >
-                                Konfirmasi data pegawai
+                                Data sudah benar
                               </button>
                             </span>
                           ) : null}
