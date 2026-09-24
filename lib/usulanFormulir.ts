@@ -23,7 +23,23 @@ export const BIDANG_DIISI = BIDANG_USULAN.filter((b) => !KOLOM_HITUNGAN.includes
  * pegawai yang belum pernah KGB.
  */
 export function bacaIsianUsulan(form: FormData): { isian: Partial<UsulanPegawaiRow> } | { galat: string } {
-  const teks = (kunci: string) => (form.get(kunci) as string | null)?.trim() || "";
+  return bacaIsian((kunci) => (form.get(kunci) as string | null)?.trim() || "");
+}
+
+/**
+ * Isian pegawai dari satu baris berkas unggahan massal. Nama kolomnya sama dengan nama isian pada
+ * formulir, sehingga berkas yang sama dapat dipakai UPT maupun Kanwil tanpa dua templat yang berbeda.
+ */
+export function bacaIsianBaris(baris: Record<string, unknown>): { isian: Partial<UsulanPegawaiRow> } | { galat: string } {
+  return bacaIsian((kunci) => {
+    const nilai = baris[kunci];
+    if (nilai === null || nilai === undefined) return "";
+    return String(nilai).trim();
+  });
+}
+
+/** Inti pembacaan isian; sumbernya boleh formulir maupun satu baris berkas. */
+function bacaIsian(teks: (kunci: string) => string): { isian: Partial<UsulanPegawaiRow> } | { galat: string } {
   const isian: Record<string, unknown> = {};
 
   for (const bidang of BIDANG_DIISI) {

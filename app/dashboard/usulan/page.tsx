@@ -52,6 +52,8 @@ export default function UsulanPage() {
   const [pratinjau, setPratinjau] = useState<{ judul: string; subjudul: string; url: string } | null>(null);
   const [dialogKembali, setDialogKembali] = useState<Usulan | null>(null);
   const [catatanKembali, setCatatanKembali] = useState("");
+  /** Persetujuan seluruh usulan pada satu surat; dikonfirmasi dulu karena tidak dapat dibatalkan. */
+  const [dialogMassal, setDialogMassal] = useState<{ nomorSurat: string; satker: string; isi: Usulan[] } | null>(null);
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState("");
   const [kabar, setKabar] = useState<string | null>(null);
@@ -97,7 +99,55 @@ export default function UsulanPage() {
     }
   }
 
+  /** Setujui seluruh usulan pada satu surat lewat satu permintaan. */
+  async function setujuiSurat(sasaran: { nomorSurat: string; isi: Usulan[] }) {
+    setSibuk(true);
+    setGalat("");
+    try {
+      const res = await fetch("/api/usulan/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: sasaran.isi.map((u) => u.id) }),
+      });
+      const d = (await res.json().catch(() => ({}))) as { error?: string; berhasil?: number; gagal?: number; galat?: string[] };
+      if (!res.ok) { setGalat(d.error ?? "Persetujuan gagal disimpan"); return; }
+      setKabar(
+        `${d.berhasil ?? 0} usulan pada surat ${sasaran.nomorSurat} disetujui dan diterapkan ke data pegawai.` +
+          (d.gagal ? ` ${d.gagal} gagal: ${(d.galat ?? []).slice(0, 3).join("; ")}` : ""),
+      );
+      setTimeout(() => setKabar(null), 9000);
+      setDialogMassal(null);
+      void muat();
+    } catch {
+      setGalat("Persetujuan gagal disimpan");
+    } finally {
+      setSibuk(false);
+    }
+  }
+
   const menunggu = daftar.filter((u) => u.status === "menunggu");
+
+  /**
+   * Usulan menunggu yang datang pada satu surat yang sama. UPT mengirim satu surat memuat banyak
+   * pegawai, dan sejak daftar pegawai dapat diunggah sekaligus jumlahnya bisa ratusan. Meninjau satu
+   * per satu tetap tersedia; yang ditambahkan di sini hanya cara menyetujui seluruh surat sekali jalan.
+   */
+  const perSurat = useMemo(() => {
+    const peta = new Map<string, Usulan[]>();
+    for (const u of menunggu) {
+      const kunci = u.nomorSurat?.trim();
+      if (!kunci) continue;
+      peta.set(kunci, [...(peta.get(kunci) ?? []), u]);
+    }
+    return [...peta.entries()]
+      .filter(([, isi]) => isi.length > 1)
+      .map(([nomorSurat, isi]) => ({
+        nomorSurat,
+        isi,
+        satker: [...new Set(isi.map((u) => u.unitKerja))].join(", "),
+      }))
+      .sort((a, b) => b.isi.length - a.isi.length);
+  }, [menunggu]);
   const satkerPengusul = new Set(menunggu.map((u) => u.unitKerja)).size;
   const adaHukdis = menunggu.filter((u) => u.hukdis).length;
 
@@ -196,6 +246,42 @@ export default function UsulanPage() {
 
       <div className="dsb-dasbor-isi">
         <div className="dsb-kolom">
+          {perSurat.length > 0 && (
+            <section className="dsb-panel dsb-penuh" aria-labelledby="judul-surat-usulan">
+              <div className="dsb-panel-kepala">
+                <h2 id="judul-surat-usulan" className="dsb-panel-judul">
+                  Setujui sekaligus <small>{perSurat.length} surat</small>
+                </h2>
+              </div>
+              <ul className="dsb-log-ringkas">
+                {perSurat.map((s) => (
+                  <li key={s.nomorSurat}>
+                    <span className="dsb-titik" data-nada="kuning" aria-hidden="true" />
+                    <span className="min-w-0">
+                      <span className="dsb-nama">{s.satker}</span>
+                      <p className="dsb-kecil" style={{ margin: 0 }}>
+                        Surat {s.nomorSurat} · {s.isi.length} usulan menunggu
+                      </p>
+                      <span className="usl-aksi" style={{ marginTop: 6 }}>
+                        <button
+                          type="button"
+                          className="dsb-tombol dsb-tombol-kecil"
+                          data-nada="hijau"
+                          disabled={sibuk}
+                          onClick={() => setDialogMassal(s)}
+                        >
+                          Setujui {s.isi.length} usulan surat ini
+                        </button>
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="dsb-kaki">
+                <span>Periksa berkasnya lebih dulu; persetujuan langsung menimpa data pegawai</span>
+              </div>
+            </section>
+          )}
           <section className="dsb-panel dsb-penuh">
             <div className="dsb-panel-kepala">
               <h2 className="dsb-panel-judul">
@@ -424,6 +510,48 @@ export default function UsulanPage() {
           onTutup={() => setPratinjau(null)}
         />
       )}
+      {dialogMassal && (
+        <KerangkaModal
+          judul="Setujui seluruh usulan pada surat ini"
+          subjudul={`${dialogMassal.satker} · surat ${dialogMassal.nomorSurat}`}
+          ukuran="sm"
+          sibuk={sibuk}
+          onTutup={() => setDialogMassal(null)}
+          onKirim={() => void setujuiSurat(dialogMassal)}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogMassal(null)} disabled={sibuk}>
+                Batal
+              </button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk}>
+                {sibuk ? "Menerapkan…" : `Setujui ${dialogMassal.isi.length} usulan`}
+              </button>
+            </>
+          }
+        >
+          <PesanGalat pesan={galat || null} />
+          <Catatan nada="amber">
+            Seluruh {dialogMassal.isi.length} usulan pada surat ini langsung diterapkan ke data pegawai dan tidak
+            dapat dibatalkan. Pastikan berkas suratnya sudah diperiksa. Usulan yang perlu diperbaiki lebih baik
+            dikembalikan satu per satu lebih dulu, sebab persetujuan ini tidak memilah.
+          </Catatan>
+          <ul className="dsb-log-ringkas">
+            {dialogMassal.isi.slice(0, 8).map((u) => (
+              <li key={u.id}>
+                <span className="dsb-titik" data-nada="kuning" aria-hidden="true" />
+                <span className="min-w-0">
+                  <span className="dsb-nama">{u.nama}</span>
+                  <span className="dsb-kecil"> · {u.nip}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {dialogMassal.isi.length > 8 && (
+            <p className="dsb-kecil">dan {dialogMassal.isi.length - 8} pegawai lainnya.</p>
+          )}
+        </KerangkaModal>
+      )}
+
       {dialogKembali && (
         <KerangkaModal
           judul="Kembalikan untuk revisi"

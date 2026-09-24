@@ -11,6 +11,7 @@ import { BUTIR_KONFIRMASI_UPT, LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } 
 import { LABEL_JENIS_USULAN, STATUS_USULAN, type StatusUsulan } from "@/lib/usulanPegawai";
 import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
+import ModalImporUpt from "@/app/dashboard/components/upt/ModalImporUpt";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
@@ -219,6 +220,8 @@ export default function DashboardUpt() {
   const [usulan, setUsulan] = useState<UsulanTerkirim[]>([]);
   const [pilihAjukan, setPilihAjukan] = useState<Set<string>>(() => new Set());
   const [dialogAjukan, setDialogAjukan] = useState(false);
+  /** Unggahan massal: satu berkas menjadi banyak draf sekaligus. */
+  const [dialogImpor, setDialogImpor] = useState(false);
   const [suratAjukan, setSuratAjukan] = useState({ nomorSurat: "", tanggalSurat: "" });
   const [berkasAjukan, setBerkasAjukan] = useState<File | null>(null);
   const [mengajukan, setMengajukan] = useState(false);
@@ -553,6 +556,13 @@ export default function DashboardUpt() {
         </KerangkaModal>
       )}
 
+      {dialogImpor && (
+        <ModalImporUpt
+          onTutup={() => setDialogImpor(false)}
+          onSelesai={(pesan) => { setDialogImpor(false); selesaiFormulir(pesan); }}
+        />
+      )}
+
       {formulir && (
         <FormulirUsulan
           jenis={formulir.jenis}
@@ -693,9 +703,14 @@ export default function DashboardUpt() {
             <h2 id="judul-tugas-upt" className="dsb-panel-judul">
               Perlu dikerjakan <small>{tugas.length === 0 ? "tidak ada" : `${tugas.length} pegawai`}</small>
             </h2>
-            <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={bukaPegawaiBaru}>
-              Tambah pegawai
-            </button>
+            <span className="upt-aksi">
+              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setDialogImpor(true)}>
+                Unggah daftar
+              </button>{" "}
+              <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={bukaPegawaiBaru}>
+                Tambah pegawai
+              </button>
+            </span>
           </div>
           {tugas.length === 0 ? (
             <p className="dsb-kosong">
