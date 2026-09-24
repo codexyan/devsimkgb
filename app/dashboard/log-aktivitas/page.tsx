@@ -60,6 +60,10 @@ const AKSI_CONFIG: Record<string, { label: string; nada: NadaAksi; kelompok: str
   // Peninjau tidak lagi dapat menolak; labelnya tetap agar jejak lama terbaca.
   tolak_usulan_pegawai:     { label: "Tolak usulan UPT",       nada: "merah",  kelompok: "Pegawai" },
   mutasi_pegawai:           { label: "Mutasi dan pemberhentian", nada: "kuning", kelompok: "Pegawai" },
+  lapor_mutasi_upt:         { label: "Laporan mutasi UPT",    nada: "navy",   kelompok: "Pegawai" },
+  batal_lapor_mutasi:       { label: "Batal laporan mutasi",  nada: "merah",  kelompok: "Pegawai" },
+  terima_lapor_mutasi:      { label: "Terima laporan mutasi", nada: "hijau",  kelompok: "Pegawai" },
+  kembalikan_lapor_mutasi:  { label: "Kembalikan laporan",    nada: "ungu",   kelompok: "Pegawai" },
   kenaikan_pangkat:         { label: "Kenaikan pangkat",       nada: "hijau",  kelompok: "Pegawai" },
   input_hukdis:             { label: "Input hukuman disiplin", nada: "kuning", kelompok: "Hukuman disiplin" },
   hapus_hukdis:             { label: "Hapus hukuman disiplin", nada: "merah",  kelompok: "Hukuman disiplin" },

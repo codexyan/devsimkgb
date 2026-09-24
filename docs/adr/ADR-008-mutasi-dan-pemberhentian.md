@@ -56,3 +56,29 @@ berdasar SK yang diterbitkan di luar UPT, dan data induk tetap satu pintu.
   haknya tetap dapat diproses.
 - Menghapus pegawai tetap ada sebagai tindakan terpisah, tetapi tidak lagi menjadi satu-satunya cara
   menyatakan seseorang berhenti.
+
+## Perubahan 24 September 2026: UPT melapor, Kanwil tetap menetapkan
+
+Keputusan nomor 4 di atas benar pada pokoknya dan keliru pada akibatnya. Data induk memang harus satu
+pintu, tetapi satker yang paling dulu tahu pegawainya pindah, pensiun, atau meninggal. Selama Kanwil
+belum mendengarnya, pegawai itu tetap muncul di antrian KGB dan tetap dihitung jatuh tempo, sehingga
+Kanwil menyiapkan SK untuk orang yang sudah tidak di sana. Satu-satunya jalan yang tersedia bagi UPT
+adalah menelepon, dan yang tidak tercatat mudah terlewat.
+
+Karena itu UPT kini dapat melapor, bukan mencatat. Tabel `laporan_mutasi` menyimpan laporannya dengan
+status menunggu, lalu diterima atau dikembalikan dengan catatan, meniru daur hidup usulan data sebab
+persoalannya sama: UPT memegang dokumennya, Kanwil memegang penanya. Laporan yang diterima menerbitkan
+barisnya sendiri di `riwayat_mutasi` lewat jalur yang sama dengan pencatatan langsung
+(`lib/catatMutasi.ts`), dan `riwayat_id` pada laporan menunjuk ke baris itu sehingga asal usulnya tetap
+terbaca.
+
+Pemberhentian ikut boleh dilaporkan UPT, termasuk pensiun dan meninggal dunia, dengan alasan yang sama:
+satkernya yang lebih dulu tahu. Penetapannya tetap di Kanwil.
+
+Yang tidak berubah: laporan tidak mengubah apa pun pada data pegawai. Sampai Kanwil menerimanya,
+pegawainya tetap ada di daftar satker asal dan tetap dapat diusulkan KGB-nya. Pegawai yang salah
+dilaporkan karena itu tidak telanjur hilang dari antrian.
+
+Satu pegawai hanya boleh punya satu laporan yang belum selesai, supaya satu kepindahan tidak tercatat
+dua kali. Laporan yang sudah diterima justru membuka pintu lagi, sebab pegawai yang selesai BKO memang
+perlu dilaporkan kedua kalinya.

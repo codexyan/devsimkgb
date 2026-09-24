@@ -4,8 +4,8 @@ import { auth } from "@/auth";
 import { canEditPegawai } from "@/lib/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
-import { newId } from "@/lib/sheets/id";
-import { LABEL_JENIS_MUTASI, kekuranganMutasi, perubahanPegawaiMutasi, type JenisMutasi } from "@/lib/mutasiPegawai";
+import { LABEL_JENIS_MUTASI, kekuranganMutasi, type JenisMutasi } from "@/lib/mutasiPegawai";
+import { catatMutasi } from "@/lib/catatMutasi";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { SATKER, cariSatker } from "@/lib/satker";
 import { muatKppnSatker } from "@/lib/muatKppnSatker";
@@ -92,27 +92,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Satker tujuan sama dengan satker sekarang" }, { status: 400 });
 
   await muatKppnSatker();
-  const asal = cariSatker(pegawai.unitKerja);
-  const perubahan = perubahanPegawaiMutasi(isian, tujuan?.nama ?? null);
-
-  const baris: RiwayatMutasiRow = {
-    id: newId(),
-    pegawaiId: id,
-    jenis,
-    satkerAsal: asal?.nama ?? pegawai.unitKerja ?? null,
-    satkerTujuan: tujuan?.nama ?? null,
-    tmt,
-    nomorSK: isian.nomorSk,
-    tanggalSK,
-    alasan: isian.alasan,
-    keterangan: teks("keterangan") || null,
-    createdAt: new Date(),
-    createdBy: `${pengguna.nama} (${pengguna.nip})`,
-  };
-  await db.riwayatMutasi.create(baris);
-  if (Object.keys(perubahan).length > 0) await db.pegawai.update({ id }, perubahan);
-
-  const label = LABEL_JENIS_MUTASI[jenis];
+  const { baris, label } = await catatMutasi(
+    pegawai,
+    { ...isian, tanggalSk: tanggalSK, keterangan: teks("keterangan") || null },
+    `${pengguna.nama} (${pengguna.nip})`,
+    new Date(),
+  );
   logAudit({
     userId: pengguna.id,
     aksi: "mutasi_pegawai",

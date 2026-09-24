@@ -26,6 +26,8 @@ export const TIPE_NOTIFIKASI = {
   KGB_PERLU_DITINJAU: "kgb_perlu_ditinjau",
   USULAN_UPT: "usulan_upt",
   USULAN_REVISI: "usulan_revisi",
+  MUTASI_UPT: "mutasi_upt",
+  MUTASI_DIKEMBALIKAN: "mutasi_dikembalikan",
 } as const;
 
 const T = TIPE_NOTIFIKASI;
@@ -39,14 +41,14 @@ export function tipeNotifikasiUntukRole(role: string | null | undefined): readon
     case "superAdminCore":
       return null;
     case "sdm_kgb":
-      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.FOLLOWUP_KEUANGAN, T.HUKDIS_BERAKHIR, T.KGB_PERLU_DITINJAU, T.USULAN_UPT];
+      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.FOLLOWUP_KEUANGAN, T.HUKDIS_BERAKHIR, T.KGB_PERLU_DITINJAU, T.USULAN_UPT, T.MUTASI_UPT];
     case "sdm_hukdis":
       return [T.HUKDIS_BERAKHIR];
     case "keuangan":
       return [T.SK_MENUNGGU_KEUANGAN, T.KGB_PERLU_DITINJAU];
     case "admin_upt":
       // Disaring lagi per satker oleh GET /api/notifikasi; di sini hanya jenisnya yang dibatasi.
-      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT, T.USULAN_REVISI];
+      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT, T.USULAN_REVISI, T.MUTASI_DIKEMBALIKAN];
     default:
       return [];
   }
@@ -163,6 +165,51 @@ export function notifikasiUsulanRevisi(
     pesan: `Kanwil mengembalikan usulan ${nama} (${nip}) pada surat ${usulan.nomorSurat ?? "-"} untuk diperbaiki: ${catatan}. Isian dan berkasnya masih utuh, tinggal dibetulkan lalu dikirim ulang.`,
     tipe: T.USULAN_REVISI,
     referenceId: usulan.id,
+    prioritas: "warning",
+    linkHref: "/dashboard",
+    kategori: "pegawai",
+  };
+}
+
+/**
+ * Isi notifikasi untuk laporan mutasi atau pemberhentian dari UPT. Rujukannya id laporan; Kanwil
+ * melihat seluruh satker sehingga tidak perlu disaring.
+ */
+export function notifikasiMutasiUpt(
+  laporan: { id: string; label: string; satkerAsal: string | null; satkerTujuan: string | null },
+  pegawai: { nama: string | null; nip: string | null } | null | undefined,
+): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
+  const nama = pegawai?.nama?.trim() || "-";
+  const nip = pegawai?.nip?.trim() || "-";
+  return {
+    judul: `Laporan Mutasi UPT: ${nama}`,
+    pesan:
+      `${laporan.satkerAsal ?? "UPT"} melaporkan ${laporan.label.toLowerCase()} ${nama} (${nip})` +
+      (laporan.satkerTujuan ? ` ke ${laporan.satkerTujuan}` : "") +
+      ". Tinjau sebelum KGB pegawai ini diproses, sebab yang sudah pindah atau berhenti tidak lagi diusulkan dari sini.",
+    tipe: T.MUTASI_UPT,
+    referenceId: laporan.id,
+    prioritas: "warning",
+    linkHref: "/dashboard/usulan",
+    kategori: "pegawai",
+  };
+}
+
+/**
+ * Isi notifikasi untuk laporan mutasi yang dikembalikan ke UPT. Rujukannya id pegawai, bukan id
+ * laporan, supaya penyaringan per satker yang sudah ada di GET /api/notifikasi langsung berlaku.
+ */
+export function notifikasiMutasiDikembalikan(
+  pegawai: { id: string; nama: string | null; nip: string | null },
+  catatan: string,
+): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
+  const nama = pegawai.nama?.trim() || "-";
+  const nip = pegawai.nip?.trim() || "-";
+  return {
+    judul: `Laporan Mutasi Dikembalikan: ${nama}`,
+    pesan: `Kanwil mengembalikan laporan mutasi ${nama} (${nip}) untuk diperbaiki: ${catatan}`,
+    tipe: T.MUTASI_DIKEMBALIKAN,
+    referenceId: pegawai.id,
     prioritas: "warning",
     linkHref: "/dashboard",
     kategori: "pegawai",

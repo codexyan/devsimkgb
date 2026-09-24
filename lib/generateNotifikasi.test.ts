@@ -212,10 +212,15 @@ test("SK yang baru dikonfirmasi keuangan dikabarkan sekali", () => {
   assert.equal(kedua.baru.filter((n) => n.tipe === "sk_terbit").length, 0);
 });
 
-test("Admin UPT hanya menerima pengingat KGB, kabar SK terbit, dan usulan yang dikembalikan", () => {
-  assert.deepEqual(tipeNotifikasiUntukRole("admin_upt"), ["kgb_jatuh_tempo", "rapelan", "sk_terbit", "usulan_revisi"]);
+test("Admin UPT hanya menerima pengingat KGB, kabar SK terbit, dan yang dikembalikan kepadanya", () => {
+  assert.deepEqual(tipeNotifikasiUntukRole("admin_upt"), [
+    "kgb_jatuh_tempo", "rapelan", "sk_terbit", "usulan_revisi", "mutasi_dikembalikan",
+  ]);
   assert.equal(bolehLihatNotifikasi("admin_upt", "sk_terbit"), true);
   assert.equal(bolehLihatNotifikasi("admin_upt", "usulan_revisi"), true);
+  assert.equal(bolehLihatNotifikasi("admin_upt", "mutasi_dikembalikan"), true);
+  // Laporan mutasi yang masih menunggu adalah urusan Kanwil, bukan tagihan bagi pelapornya.
+  assert.equal(bolehLihatNotifikasi("admin_upt", "mutasi_upt"), false);
   assert.equal(bolehLihatNotifikasi("admin_upt", "hukdis_berakhir"), false);
   assert.equal(bolehLihatNotifikasi("admin_upt", "sk_menunggu_keuangan"), false);
   // Usulan yang masih menunggu tinjauan adalah urusan Kanwil; UPT tidak ditagih meninjau kirimannya sendiri.

@@ -9,6 +9,7 @@ import {
   type RiwayatKGBRow,
   type RiwayatPangkatRow,
   type RiwayatMutasiRow,
+  type LaporanMutasiRow,
   type UsulanPegawaiRow,
   type UserRow,
 } from "../../sheets/tables";
@@ -27,6 +28,7 @@ export const supabase = {
   riwayatHukdis: new SupabaseTable(defs.RiwayatHukdis),
   riwayatPangkat: new SupabaseTable<RiwayatPangkatRow>(defs.RiwayatPangkat),
   riwayatMutasi: new SupabaseTable<RiwayatMutasiRow>(defs.RiwayatMutasi),
+  laporanMutasi: new SupabaseTable<LaporanMutasiRow>(defs.LaporanMutasi),
   usulanPegawai: new SupabaseTable<UsulanPegawaiRow>(defs.UsulanPegawai),
   hukdisJenis: new SupabaseTable(defs.HukdisJenis),
   hukdisKonfigurasi: new SupabaseTable(defs.HukdisKonfigurasi),

@@ -10,8 +10,10 @@ import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/
 import { BUTIR_KONFIRMASI_UPT, LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { LABEL_JENIS_USULAN, STATUS_USULAN, type StatusUsulan } from "@/lib/usulanPegawai";
 import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
+import { STATUS_LAPORAN_MUTASI, type StatusLaporanMutasi } from "@/lib/laporanMutasi";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
 import ModalImporUpt from "@/app/dashboard/components/upt/ModalImporUpt";
+import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
@@ -92,6 +94,22 @@ interface UsulanTerkirim extends DrafUsulanUpt {
   ditinjauAt: string | null;
   ditinjauOleh: string | null;
   alasanTolak: string | null;
+}
+
+/** Satu laporan mutasi atau pemberhentian yang dikirim satker ini (lib/laporanMutasi.ts). */
+interface LaporanUpt {
+  id: string;
+  pegawaiId: string;
+  nama: string;
+  nip: string;
+  label: string;
+  satkerTujuan: string | null;
+  tmt: string | null;
+  nomorSK: string | null;
+  alasan: string | null;
+  status: string;
+  catatanKanwil: string | null;
+  ditinjauOleh: string | null;
 }
 
 interface SkUpt {
@@ -218,6 +236,9 @@ export default function DashboardUpt() {
     { jenis: "perubahan" | "baru"; pegawai: PegawaiUntukUsulan | null; draf: DrafUsulanUpt | null } | null
   >(null);
   const [usulan, setUsulan] = useState<UsulanTerkirim[]>([]);
+  /** Laporan mutasi satker ini beserta hasil tinjauan Kanwil. */
+  const [laporan, setLaporan] = useState<LaporanUpt[]>([]);
+  const [laporMutasi, setLaporMutasi] = useState<PegawaiUpt | null>(null);
   const [pilihAjukan, setPilihAjukan] = useState<Set<string>>(() => new Set());
   const [dialogAjukan, setDialogAjukan] = useState(false);
   /** Unggahan massal: satu berkas menjadi banyak draf sekaligus. */
@@ -233,7 +254,23 @@ export default function DashboardUpt() {
     const res = await fetch("/api/upt/usulan");
     const d: unknown = res.ok ? await res.json().catch(() => []) : [];
     if (Array.isArray(d)) setUsulan(d as UsulanTerkirim[]);
+    const resMutasi = await fetch("/api/upt/mutasi");
+    const m: unknown = resMutasi.ok ? await resMutasi.json().catch(() => []) : [];
+    if (Array.isArray(m)) setLaporan(m as LaporanUpt[]);
   }, []);
+
+  /** Batalkan laporan yang belum ditetapkan Kanwil. */
+  async function batalkanLaporan(l: LaporanUpt) {
+    const res = await fetch(`/api/upt/mutasi/${l.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      setGalat(d.error ?? "Laporan gagal dibatalkan");
+      return;
+    }
+    setKabar(`Laporan ${l.label.toLowerCase()} ${l.nama} dibatalkan.`);
+    setTimeout(() => setKabar(null), 6000);
+    void muatUsulan();
+  }
 
   useEffect(() => {
     const t = setTimeout(() => void muatUsulan(), 0);
@@ -420,6 +457,9 @@ export default function DashboardUpt() {
       ),
     [usulan, pegawai, bulanUsulan],
   );
+  /** Laporan mutasi pegawai ini yang belum ditetapkan Kanwil; selama ada, laporan kedua tidak ditawarkan. */
+  const laporanBerjalan = (pegawaiId: string) =>
+    laporan.find((l) => l.pegawaiId === pegawaiId && l.status !== "diterima") ?? null;
   const usulanById = (id: string | null) => (id ? usulan.find((u) => u.id === id) ?? null : null);
   const pegawaiById = (id: string | null) => (id ? pegawai.find((p) => p.id === id) ?? null : null);
   const perluDiusulkan = pegawai.filter((p) => p.bulanTmt === bulanUsulan);
@@ -554,6 +594,14 @@ export default function DashboardUpt() {
         >
           <Catatan nada="amber">{salinanHapusUsulan(dialogBatal.status).peringatan}</Catatan>
         </KerangkaModal>
+      )}
+
+      {laporMutasi && (
+        <ModalLaporMutasi
+          pegawai={{ id: laporMutasi.id, nama: laporMutasi.nama, nip: laporMutasi.nip }}
+          onTutup={() => setLaporMutasi(null)}
+          onSelesai={(pesan) => { setLaporMutasi(null); selesaiFormulir(pesan); }}
+        />
       )}
 
       {dialogImpor && (
@@ -942,6 +990,13 @@ export default function DashboardUpt() {
                               </button>
                             </span>
                           )}
+                          {!laporanBerjalan(p.id) && (
+                            <span className="upt-aksi">
+                              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setLaporMutasi(p)}>
+                                Laporkan mutasi
+                              </button>
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1018,6 +1073,59 @@ export default function DashboardUpt() {
               </ul>
             )}
           </section>
+
+          {/* Laporan mutasi dan pemberhentian; penetapannya tetap di Kanwil */}
+          {laporan.length > 0 && (
+            <section className="dsb-panel dsb-susut" aria-labelledby="judul-mutasi-upt">
+              <div className="dsb-panel-kepala">
+                <h2 id="judul-mutasi-upt" className="dsb-panel-judul">
+                  Laporan mutasi <small>{laporan.filter((l) => l.status === "menunggu").length} menunggu tinjauan</small>
+                </h2>
+              </div>
+              <div className="dsb-gulir">
+                <ul className="dsb-log-ringkas">
+                  {laporan.slice(0, 20).map((l) => {
+                    const cfg = STATUS_LAPORAN_MUTASI[l.status as StatusLaporanMutasi] ?? { label: l.status, nada: "kuning" as const };
+                    return (
+                      <li key={l.id}>
+                        <span className="dsb-titik" data-nada={cfg.nada} aria-hidden="true" />
+                        <span className="min-w-0">
+                          <span className="dsb-nama">{l.nama}</span>
+                          <span className="dsb-kecil"> · {l.label}</span>
+                          <p className="dsb-kecil" style={{ margin: 0 }}>
+                            {cfg.label}
+                            {l.satkerTujuan ? ` · ke ${l.satkerTujuan}` : ""}
+                            {l.alasan ? ` · ${l.alasan}` : ""}
+                            {l.tmt ? ` · TMT ${fmtTgl(l.tmt)}` : ""}
+                          </p>
+                          {l.status === "dikembalikan" && l.catatanKanwil && (
+                            <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-violet)" }}>
+                              Catatan Kanwil: {l.catatanKanwil}
+                            </p>
+                          )}
+                          {l.status !== "diterima" && (
+                            <span className="upt-aksi">
+                              <button
+                                type="button"
+                                className="dsb-tombol dsb-tombol-kecil"
+                                data-jenis="garis"
+                                onClick={() => void batalkanLaporan(l)}
+                              >
+                                Batalkan laporan
+                              </button>
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <div className="dsb-kaki">
+                <span>Pegawainya baru berpindah atau berhenti setelah Kanwil menetapkan</span>
+              </div>
+            </section>
+          )}
 
           {/* Kapan surat usulan dikirim untuk bulan TMT berikutnya */}
           <section className="dsb-panel dsb-susut" aria-labelledby="judul-usulan-upt">

@@ -33,6 +33,24 @@ interface Usulan {
   alasanTolak: string | null;
 }
 
+/** Satu laporan mutasi atau pemberhentian dari UPT (lib/laporanMutasi.ts). */
+interface LaporanMutasi {
+  id: string;
+  nama: string;
+  nip: string;
+  unitKerja: string;
+  label: string;
+  satkerTujuan: string | null;
+  tmt: string | null;
+  nomorSK: string | null;
+  alasan: string | null;
+  keterangan: string | null;
+  status: string;
+  catatanKanwil: string | null;
+  dilaporkanOleh: string | null;
+  dilaporkanAt: string | null;
+}
+
 const tgl = (iso: string | null, opsi?: Intl.DateTimeFormatOptions) =>
   iso ? formatTanggalId(new Date(iso), opsi ?? { day: "numeric", month: "short", year: "numeric" }) : "-";
 
@@ -54,6 +72,10 @@ export default function UsulanPage() {
   const [catatanKembali, setCatatanKembali] = useState("");
   /** Persetujuan seluruh usulan pada satu surat; dikonfirmasi dulu karena tidak dapat dibatalkan. */
   const [dialogMassal, setDialogMassal] = useState<{ nomorSurat: string; satker: string; isi: Usulan[] } | null>(null);
+  /** Laporan mutasi dan pemberhentian dari UPT, beserta laporan yang sedang dikembalikan. */
+  const [laporan, setLaporan] = useState<LaporanMutasi[]>([]);
+  const [dialogLaporan, setDialogLaporan] = useState<LaporanMutasi | null>(null);
+  const [catatanLaporan, setCatatanLaporan] = useState("");
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState("");
   const [kabar, setKabar] = useState<string | null>(null);
@@ -64,8 +86,39 @@ export default function UsulanPage() {
     if (res.status === 403) { router.push("/dashboard"); return; }
     const d: unknown = await res.json().catch(() => []);
     setDaftar(Array.isArray(d) ? (d as Usulan[]) : []);
+    const resMutasi = await fetch("/api/mutasi/laporan");
+    const m: unknown = resMutasi.ok ? await resMutasi.json().catch(() => []) : [];
+    setLaporan(Array.isArray(m) ? (m as LaporanMutasi[]) : []);
     setMemuat(false);
   }, [router]);
+
+  /** Tetapkan atau kembalikan satu laporan mutasi dari UPT. */
+  async function tinjauLaporan(l: LaporanMutasi, aksi: "terima" | "kembalikan", catatan?: string) {
+    setSibuk(true);
+    setGalat("");
+    try {
+      const res = await fetch(`/api/mutasi/laporan/${l.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi, catatan: catatan ?? "" }),
+      });
+      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) { setGalat(d.error ?? "Laporan gagal ditinjau"); return; }
+      setKabar(
+        aksi === "terima"
+          ? `${l.label} ${l.nama} dicatat pada data pegawai.`
+          : `Laporan ${l.nama} dikembalikan ke ${l.unitKerja}.`,
+      );
+      setTimeout(() => setKabar(null), 7000);
+      setDialogLaporan(null);
+      setCatatanLaporan("");
+      void muat();
+    } catch {
+      setGalat("Laporan gagal ditinjau");
+    } finally {
+      setSibuk(false);
+    }
+  }
 
   useEffect(() => {
     const t = setTimeout(() => void muat(), 0);
@@ -246,6 +299,60 @@ export default function UsulanPage() {
 
       <div className="dsb-dasbor-isi">
         <div className="dsb-kolom">
+          {laporan.filter((l) => l.status === "menunggu").length > 0 && (
+            <section className="dsb-panel dsb-penuh" aria-labelledby="judul-laporan-mutasi">
+              <div className="dsb-panel-kepala">
+                <h2 id="judul-laporan-mutasi" className="dsb-panel-judul">
+                  Laporan mutasi dari UPT{" "}
+                  <small>{laporan.filter((l) => l.status === "menunggu").length} menunggu tinjauan</small>
+                </h2>
+              </div>
+              <ul className="dsb-log-ringkas">
+                {laporan.filter((l) => l.status === "menunggu").map((l) => (
+                  <li key={l.id}>
+                    <span className="dsb-titik" data-nada="kuning" aria-hidden="true" />
+                    <span className="min-w-0">
+                      <span className="dsb-nama">{l.nama}</span>
+                      <span className="dsb-kecil"> · {l.nip} · {l.unitKerja}</span>
+                      <p className="dsb-kecil" style={{ margin: 0 }}>
+                        <strong style={{ color: "var(--dtn)" }}>{l.label}</strong>
+                        {l.satkerTujuan ? ` ke ${l.satkerTujuan}` : ""}
+                        {l.alasan ? ` · ${l.alasan}` : ""}
+                        {l.tmt ? ` · TMT ${tgl(l.tmt)}` : ""} · SK {l.nomorSK ?? "-"}
+                      </p>
+                      {l.keterangan && <p className="dsb-kecil" style={{ margin: 0 }}>{l.keterangan}</p>}
+                      <p className="dsb-kecil" style={{ margin: 0 }}>
+                        Dilaporkan {l.dilaporkanOleh} · {tgl(l.dilaporkanAt)}
+                      </p>
+                      <span className="usl-aksi" style={{ marginTop: 6 }}>
+                        <button
+                          type="button"
+                          className="dsb-tombol dsb-tombol-kecil"
+                          data-nada="hijau"
+                          disabled={sibuk}
+                          onClick={() => void tinjauLaporan(l, "terima")}
+                        >
+                          Catat pada data pegawai
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="dsb-tombol dsb-tombol-kecil"
+                          data-jenis="garis"
+                          disabled={sibuk}
+                          onClick={() => { setDialogLaporan(l); setCatatanLaporan(""); }}
+                        >
+                          Kembalikan
+                        </button>
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="dsb-kaki">
+                <span>Mencatat langsung mengubah data pegawai; yang pindah tidak lagi diusulkan dari satker asal</span>
+              </div>
+            </section>
+          )}
           {perSurat.length > 0 && (
             <section className="dsb-panel dsb-penuh" aria-labelledby="judul-surat-usulan">
               <div className="dsb-panel-kepala">
@@ -510,6 +617,44 @@ export default function UsulanPage() {
           onTutup={() => setPratinjau(null)}
         />
       )}
+      {dialogLaporan && (
+        <KerangkaModal
+          judul="Kembalikan laporan mutasi"
+          subjudul={`${dialogLaporan.nama} · ${dialogLaporan.unitKerja}`}
+          ukuran="sm"
+          sibuk={sibuk}
+          onTutup={() => setDialogLaporan(null)}
+          onKirim={() => void tinjauLaporan(dialogLaporan, "kembalikan", catatanLaporan)}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogLaporan(null)} disabled={sibuk}>
+                Batal
+              </button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk || !catatanLaporan.trim()}>
+                {sibuk ? "Menyimpan…" : "Kembalikan"}
+              </button>
+            </>
+          }
+        >
+          <PesanGalat pesan={galat || null} />
+          <label className="kgbm-label">
+            <span className="kgbm-wajib">Apa yang harus diperbaiki</span>
+            <textarea
+              className="kgbm-input"
+              data-autofocus
+              rows={3}
+              value={catatanLaporan}
+              onChange={(e) => setCatatanLaporan(e.target.value)}
+              placeholder="Misalnya: nomor SK tidak sesuai, atau TMT berlakunya berbeda dengan SK"
+            />
+          </label>
+          <Catatan>
+            Data pegawai tidak berubah. Laporannya kembali ke daftar UPT beserta catatan ini, dan mereka dapat
+            membatalkannya lalu mengirim ulang setelah dibetulkan.
+          </Catatan>
+        </KerangkaModal>
+      )}
+
       {dialogMassal && (
         <KerangkaModal
           judul="Setujui seluruh usulan pada surat ini"

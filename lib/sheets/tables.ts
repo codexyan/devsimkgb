@@ -52,6 +52,21 @@ export interface RiwayatPangkatRow {
   createdAt: Date | null; createdBy: string | null;
 }
 
+/**
+ * Laporan perpindahan atau pemberhentian dari UPT, sebelum ditetapkan Kanwil (lib/laporanMutasi.ts).
+ * Satker yang paling dulu tahu pegawainya pindah atau berhenti; yang menetapkan tetap Kanwil.
+ */
+export interface LaporanMutasiRow {
+  id: string; pegawaiId: string; satker: string; jenis: string;
+  satkerTujuan: string | null; tmt: Date | null; nomorSK: string | null; tanggalSK: Date | null;
+  alasan: string | null; keterangan: string | null;
+  status: string; catatanKanwil: string | null;
+  dilaporkanOleh: string | null; dilaporkanAt: Date | null;
+  ditinjauOleh: string | null; ditinjauAt: Date | null;
+  /** Baris riwayat mutasi yang terbit dari laporan ini; null selama belum diterima. */
+  riwayatId: string | null;
+}
+
 /** Satu perpindahan atau pemberhentian pegawai beserta dasar SK-nya (lib/mutasiPegawai.ts). */
 export interface RiwayatMutasiRow {
   id: string; pegawaiId: string; jenis: string;
@@ -206,6 +221,15 @@ export const defs = {
       d("createdAt"), s("createdBy"),
     ],
   },
+  LaporanMutasi: {
+    tab: "LaporanMutasi",
+    columns: [
+      s("id"), s("pegawaiId"), s("satker"), s("jenis"), s("satkerTujuan"),
+      d("tmt"), s("nomorSK"), d("tanggalSK"), s("alasan"), s("keterangan"),
+      s("status"), s("catatanKanwil"), s("dilaporkanOleh"), d("dilaporkanAt"),
+      s("ditinjauOleh"), d("ditinjauAt"), s("riwayatId"),
+    ],
+  },
   RiwayatPangkat: {
     tab: "RiwayatPangkat",
     columns: [
@@ -256,6 +280,7 @@ export const sheets = {
   riwayatHukdis: new Table(defs.RiwayatHukdis),
   riwayatPangkat: new Table<RiwayatPangkatRow>(defs.RiwayatPangkat),
   riwayatMutasi: new Table<RiwayatMutasiRow>(defs.RiwayatMutasi),
+  laporanMutasi: new Table<LaporanMutasiRow>(defs.LaporanMutasi),
   usulanPegawai: new Table<UsulanPegawaiRow>(defs.UsulanPegawai),
   hukdisJenis: new Table(defs.HukdisJenis),
   hukdisKonfigurasi: new Table(defs.HukdisKonfigurasi),
