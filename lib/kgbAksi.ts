@@ -3,6 +3,7 @@
 // dengan pesan galat dari API, sehingga modal cukup punya satu jalur tampilan galat.
 
 import { BATAS_UKURAN_SK_BYTE, PESAN_SK_TERLALU_BESAR } from "./prosesKgb";
+import type { DataSuratKGB } from "./generateSuratKGB";
 
 export type HasilAksi<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -79,18 +80,23 @@ async function kirimJson<T>(url: string, init: RequestInit, cadangan: string): P
   }
 }
 
-async function kirimPdf(url: string, init: RequestInit, cadangan: string): Promise<HasilAksi<Blob>> {
-  let res: Response;
+/**
+ * Server memeriksa dan mengirim isi surat; PDF-nya disusun di peramban. Pustaka PDF (±1 MB) dimuat
+ * hanya saat surat pertama diminta, bukan bersama halaman dashboard.
+ */
+async function kirimPdf(
+  url: string,
+  init: RequestInit,
+  srikandi: boolean,
+  cadangan: string,
+): Promise<HasilAksi<Blob>> {
+  const hasil = await kirimJson<{ surat: DataSuratKGB }>(url, init, cadangan);
+  if (!hasil.ok) return hasil;
   try {
-    res = await fetch(url, init);
+    const { buatPdfSuratKgb } = await import("./generateSuratKGB");
+    return { ok: true, data: await buatPdfSuratKgb(hasil.data.surat, srikandi) };
   } catch {
-    return { ok: false, error: PESAN_GAGAL_JARINGAN };
-  }
-  if (!res.ok) return { ok: false, error: await pesanGalat(res, cadangan) };
-  try {
-    return { ok: true, data: await res.blob() };
-  } catch {
-    return { ok: false, error: PESAN_GAGAL_JARINGAN };
+    return { ok: false, error: "PDF surat gagal disusun di peramban. Muat ulang halaman, lalu coba lagi." };
   }
 }
 
@@ -203,18 +209,18 @@ export function buatPdfSk(
 ): Promise<HasilAksi<Blob>> {
   const params = new URLSearchParams();
   if (opsi.pratinjau || opsi.srikandi) params.set("preview", "true");
-  if (opsi.srikandi) params.set("srikandi", "true");
   const query = params.size ? `?${params.toString()}` : "";
   return kirimPdf(
     `/api/kgb/${encodeURIComponent(kgbId)}/pdf${query}`,
     { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(skBaru) },
+    opsi.srikandi,
     opsi.srikandi ? "SK versi Srikandi gagal dibuat." : "SK gagal dibuat.",
   );
 }
 
 /** Unduh ulang SK yang pernah dibuat di SIM-KGB, apa adanya (tanpa nomor dan tanggal baru). */
 export function unduhUlangSk(kgbId: string): Promise<HasilAksi<Blob>> {
-  return kirimPdf(`/api/kgb/${encodeURIComponent(kgbId)}/pdf?preview=true`, { method: "POST" }, "SK gagal diunduh.");
+  return kirimPdf(`/api/kgb/${encodeURIComponent(kgbId)}/pdf?preview=true`, { method: "POST" }, false, "SK gagal diunduh.");
 }
 
 /** Tautan berkas SK yang tersimpan (SK bertanda tangan atau berkas arsip). */

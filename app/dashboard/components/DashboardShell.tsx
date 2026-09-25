@@ -8,6 +8,10 @@ import { RoleContext, UserContext } from "./RoleContext";
 import { useDialogModal } from "./useDialogModal";
 import { useThemeMode } from "@/lib/ui/themeMode";
 import { aturBatasInputSdm } from "@/lib/batasInputSdm";
+import { pasangFetchTangguh } from "@/lib/fetchTangguh";
+
+// Dipasang saat modul dimuat, sebelum halaman di dalam shell mulai memanggil API.
+pasangFetchTangguh();
 
 const TICK_INTERVAL = 10 * 1000;
 const WARN_LEAD     = 2 * 60 * 1000; // peringatan muncul 2 menit sebelum logout

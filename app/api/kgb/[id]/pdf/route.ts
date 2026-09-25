@@ -3,11 +3,7 @@ import { db } from "@/lib/db";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
-import { renderToBuffer } from "@react-pdf/renderer";
-import { siapkanAsetSurat, SuratKGBDocument } from "@/lib/generateSuratKGB";
-import { ReactElement } from "react";
-import { DocumentProps } from "@react-pdf/renderer";
-import React from "react";
+import type { DataSuratKGB } from "@/lib/generateSuratKGB";
 import { canProcessKGB, canViewKGB } from "@/lib/auth";
 import { tentukanPenandatangan, type JenisPenandatangan } from "@/lib/penandatangan";
 import { PENETAP_KANWIL } from "@/lib/penetapSk";
@@ -52,7 +48,6 @@ export async function POST(
 
   const url = new URL(req.url);
   const isPreview = url.searchParams.get("preview") === "true";
-  const isSrikandi = url.searchParams.get("srikandi") === "true";
   const role = session.user.role!;
   // Daftar peran yang boleh: SDM Hukdis dan Admin UPT tidak pernah membuka SK di sini.
   if (!canViewKGB(role))
@@ -187,47 +182,44 @@ export async function POST(
     };
   }
 
-  const aset = await siapkanAsetSurat(isSrikandi);
-  const pdfBuffer = await renderToBuffer(
-    React.createElement(SuratKGBDocument, {
-      nomorSurat,
-      tanggalSurat,
-      kppn,
-      satker: { nama: satker.nama, kanwil: satker.jenis === "kanwil" },
-      pegawai: {
-        nama: pegawai.nama,
-        nip: pegawai.nip,
-        pangkat: pegawai.pangkat,
-        golonganRuang: pegawai.golonganRuang,
-      },
-      kgb: {
-        gajiPokokLama: kgb.gajiPokokLama,
-        nomorSK: kgb.nomorSK,
-        tanggalSK: kgb.tanggalSK,
-        tmtSK: kgb.tmtSK,
-        // Surat lama (sebelum kolom ini ada) selalu mencetak penetap Kanwil.
-        penetapSkDasar: kgb.penetapSkDasar?.trim() || PENETAP_KANWIL,
-        mkgTahunLama: kgb.mkgTahunLama,
-        mkgBulanLama: kgb.mkgBulanLama,
-        gajiPokokBaru: kgb.gajiPokokBaru,
-        mkgTahunBaru: kgb.mkgTahunBaru,
-        mkgBulanBaru: kgb.mkgBulanBaru,
-        pangkatGolonganBaru: teksPangkatGolongan(kgb.golonganBaru, pegawai),
-        tmtKgbBaru: kgb.tmtKgbBaru,
-        tmtKgbBerikutnya: kgb.tmtKgbBerikutnya,
-      },
-      penandatangan: {
-        jenis: penandatangan.jenis,
-        jabatan: penandatangan.jabatan,
-        nama: penandatangan.nama,
-      },
-      dasarHukum: teksDasarHukum(kanwil?.nomorPP, kanwil?.tahunPP),
-      srikandi: isSrikandi,
-      aset,
-    }) as ReactElement<DocumentProps>,
-  );
+  // PDF disusun di peramban (lib/generateSuratKGB.tsx); di sini hanya isinya, karena menyusun PDF
+  // di Worker memakan ±1 detik CPU per surat.
+  const surat: DataSuratKGB = {
+    nomorSurat,
+    tanggalSurat,
+    kppn,
+    satker: { nama: satker.nama, kanwil: satker.jenis === "kanwil" },
+    pegawai: {
+      nama: pegawai.nama,
+      nip: pegawai.nip,
+      pangkat: pegawai.pangkat,
+      golonganRuang: pegawai.golonganRuang,
+    },
+    kgb: {
+      gajiPokokLama: kgb.gajiPokokLama,
+      nomorSK: kgb.nomorSK,
+      tanggalSK: kgb.tanggalSK,
+      tmtSK: kgb.tmtSK,
+      // Surat lama (sebelum kolom ini ada) selalu mencetak penetap Kanwil.
+      penetapSkDasar: kgb.penetapSkDasar?.trim() || PENETAP_KANWIL,
+      mkgTahunLama: kgb.mkgTahunLama,
+      mkgBulanLama: kgb.mkgBulanLama,
+      gajiPokokBaru: kgb.gajiPokokBaru,
+      mkgTahunBaru: kgb.mkgTahunBaru,
+      mkgBulanBaru: kgb.mkgBulanBaru,
+      pangkatGolonganBaru: teksPangkatGolongan(kgb.golonganBaru, pegawai),
+      tmtKgbBaru: kgb.tmtKgbBaru,
+      tmtKgbBerikutnya: kgb.tmtKgbBerikutnya,
+    },
+    penandatangan: {
+      jenis: penandatangan.jenis,
+      jabatan: penandatangan.jabatan,
+      nama: penandatangan.nama,
+    },
+    dasarHukum: teksDasarHukum(kanwil?.nomorPP, kanwil?.tahunPP),
+  };
 
-  // Preview mode hanya render PDF. Status sudah Sedang Diproses (dijaga di atas), jadi tidak diubah.
+  // Preview mode hanya mengirim isi surat. Status sudah Sedang Diproses (dijaga di atas), jadi tidak diubah.
   if (!isPreview) {
     // Salinan penandatangan diperbarui setiap kali surat dibuat, agar unduhan ulang sama persis.
     const salinanPenandatangan = {
@@ -263,10 +255,5 @@ export async function POST(
     });
   }
 
-  return new NextResponse(pdfBuffer.buffer as ArrayBuffer, {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${isSrikandi ? "Srikandi_" : ""}KGB_${pegawai.nip}_${pegawai.nama.replace(/ /g, "_")}.pdf"`,
-    },
-  });
+  return NextResponse.json({ surat });
 }

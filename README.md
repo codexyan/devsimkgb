@@ -9,7 +9,7 @@ Aplikasi web tunggal untuk mengelola data pegawai Kanwil dan UPT, proses KGB (In
 - **Next.js 16** (App Router, Turbopack) · **React 19** · **TypeScript 5**
 - **Tailwind CSS v4** (dashboard sebagian besar memakai gaya inline dan token CSS di `app/globals.css`)
 - **NextAuth v5** (masuk dengan NIP dan password, peran di `lib/auth/roles.ts`)
-- **@react-pdf/renderer** (SK KGB biasa dan versi Srikandi, `lib/generateSuratKGB.tsx`)
+- **@react-pdf/renderer** (SK KGB biasa dan versi Srikandi, disusun di peramban: `lib/generateSuratKGB.tsx`)
 - Deploy: **Cloudflare Workers** via [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare), berkas SK di **Cloudflare R2** (`SK_BUCKET`)
 
 ## Penyimpanan data

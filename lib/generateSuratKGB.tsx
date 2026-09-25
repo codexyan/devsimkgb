@@ -6,54 +6,52 @@ import {
   StyleSheet,
   Font,
   Image,
+  pdf,
 } from "@react-pdf/renderer";
 import type { JenisPenandatangan } from "./penandatangan";
 import { formatTanggalId, type NilaiTanggal } from "./waktu";
-import { dataUrlAsetPublik } from "./asetPublik";
+
+// Surat KGB disusun di peramban, bukan di Worker: satu PDF memakan ±1 detik CPU, jauh di atas batas
+// CPU per permintaan Cloudflare Workers Free. Server hanya memeriksa dan mengirim datanya lewat
+// POST /api/kgb/[id]/pdf; modul ini dimuat dinamis oleh lib/kgbAksi.ts saat PDF diminta.
 
 // Nonaktifkan hyphenation otomatis, cegah pemisahan kata seperti "Kali-mantan"
 Font.registerHyphenationCallback((word) => [word]);
 
-/** Logo dan label Srikandi sebagai data URL, disiapkan oleh siapkanAsetSurat(). */
+/** Logo dan label Srikandi: URL (peramban) atau path berkas (skrip Node). */
 export interface AsetSurat {
   logoSrc: string;
   labelSrikandiSrc: string | null;
 }
 
-let fontTerdaftar: Promise<void> | null = null;
+let fontTerdaftar = false;
 
-// Font didaftarkan sebagai data URL, bukan path disk, karena Cloudflare Workers tidak punya
-// filesystem. Cukup sekali per isolate; @react-pdf menyimpan hasil parsing font di memori.
-function daftarkanFont(): Promise<void> {
-  fontTerdaftar ??= Promise.all([
-    dataUrlAsetPublik("fonts/arial.ttf", "font/ttf"),
-    dataUrlAsetPublik("fonts/arialbd.ttf", "font/ttf"),
-    dataUrlAsetPublik("fonts/ariali.ttf", "font/ttf"),
-  ]).then(([biasa, tebal, miring]) => {
-    Font.register({
-      family: "Arial",
-      fonts: [
-        { src: biasa },
-        { src: tebal, fontWeight: "bold" },
-        { src: miring, fontStyle: "italic" },
-      ],
-    });
+/**
+ * Daftarkan Arial sekali per halaman. `akar` adalah asal situs di peramban, atau folder public/
+ * saat dirender dari skrip Node; @react-pdf memuat berkasnya sendiri saat PDF pertama disusun.
+ */
+export function daftarkanFontSurat(akar: string): void {
+  if (fontTerdaftar) return;
+  Font.register({
+    family: "Arial",
+    fonts: [
+      { src: `${akar}/fonts/arial.ttf` },
+      { src: `${akar}/fonts/arialbd.ttf`, fontWeight: "bold" },
+      { src: `${akar}/fonts/ariali.ttf`, fontStyle: "italic" },
+    ],
   });
-  // Gagal memuat font tidak di-cache, agar permintaan berikutnya mencoba lagi.
-  fontTerdaftar.catch(() => {
-    fontTerdaftar = null;
-  });
-  return fontTerdaftar;
+  fontTerdaftar = true;
 }
 
-/** Wajib dipanggil sebelum merender SuratKGBDocument: mendaftarkan font dan memuat gambar. */
-export async function siapkanAsetSurat(srikandi: boolean): Promise<AsetSurat> {
-  const [, logoSrc, labelSrikandiSrc] = await Promise.all([
-    daftarkanFont(),
-    dataUrlAsetPublik("logo-imipas.png", "image/png"),
-    srikandi ? dataUrlAsetPublik("label-srikandi.png", "image/png") : Promise.resolve(null),
-  ]);
-  return { logoSrc, labelSrikandiSrc };
+/** PDF surat KGB dari data yang dikirim server. Hanya dipanggil di peramban. */
+export async function buatPdfSuratKgb(data: DataSuratKGB, srikandi: boolean): Promise<Blob> {
+  const akar = window.location.origin;
+  daftarkanFontSurat(akar);
+  const aset: AsetSurat = {
+    logoSrc: `${akar}/logo-imipas.png`,
+    labelSrikandiSrc: srikandi ? `${akar}/label-srikandi.png` : null,
+  };
+  return pdf(<SuratKGBDocument {...data} srikandi={srikandi} aset={aset} />).toBlob();
 }
 
 // Ukuran dalam pt, diambil dari template Word "Template KGB.docx": Arial 10,5 pt berspasi 1,15,
@@ -130,7 +128,8 @@ function masaKerja(tahun: number, bulan: number): string {
   return `${tahun} Tahun ${String(bulan).padStart(2, "0")} Bulan`;
 }
 
-interface SuratKGBProps {
+/** Isi surat yang disusun server (POST /api/kgb/[id]/pdf); tanggal tiba sebagai string ISO. */
+export interface DataSuratKGB {
   nomorSurat: string;
   tanggalSurat: NilaiTanggal;
   /**
@@ -171,9 +170,12 @@ interface SuratKGBProps {
   };
   /** Nomor peraturan gaji yang dirujuk, mis. "Nomor 5 Tahun 2024". */
   dasarHukum: string;
+}
+
+interface SuratKGBProps extends DataSuratKGB {
   /** Render versi Srikandi: placeholder ${ttd_pengirim} + label Srikandi di area TTD */
   srikandi?: boolean;
-  /** Hasil siapkanAsetSurat() dengan nilai srikandi yang sama. */
+  /** Logo dan label Srikandi; label hanya dipakai pada versi Srikandi. */
   aset: AsetSurat;
 }
 

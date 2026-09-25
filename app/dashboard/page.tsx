@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRole, useDashUser } from "@/app/dashboard/components/RoleContext";
 import { ROLES, ROLE_LABEL } from "@/lib/auth";
@@ -316,6 +316,8 @@ function DashboardMain() {
   const dashUser = useDashUser();
   const role = useRole();
   const [data, setData] = useState<DashboardData | null>(null);
+  // Dibaca penyegaran latar, yang berjalan di luar siklus render.
+  const dataRef = useRef<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [tahap, setTahap] = useState<Tahap>("perlu");
@@ -346,16 +348,22 @@ function DashboardMain() {
       .then((r) => r.json() as Promise<(Partial<DashboardData> & { error?: string }) | null>)
       .then((d) => {
         if (d && d.stats && Array.isArray(d.pegawaiJatuhTempo)) {
+          dataRef.current = d as DashboardData;
           setData(d as DashboardData);
           setApiError(null);
           setLastRefresh(new Date());
-        } else {
+        } else if (!silent || !dataRef.current) {
+          // Penyegaran latar yang gagal tidak menghapus dasbor yang sudah tampil; berikutnya dicoba lagi.
           setApiError(d?.error ?? "Respons tidak valid dari server");
         }
         setLoading(false);
         setRefreshing(false);
       })
-      .catch((e) => { setApiError(e?.message ?? "Gagal menghubungi server"); setLoading(false); setRefreshing(false); });
+      .catch((e) => {
+        if (!silent || !dataRef.current) setApiError(e?.message ?? "Gagal menghubungi server");
+        setLoading(false);
+        setRefreshing(false);
+      });
   };
 
   function handleManualRefresh() {
