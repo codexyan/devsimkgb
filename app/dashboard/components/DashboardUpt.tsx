@@ -746,7 +746,7 @@ export default function DashboardUpt() {
        <div className="dsb-kolom">
         {/* Satu daftar kerja menggantikan panel yang dulu terpisah: tiap pegawai muncul sekali, dengan
             satu langkah berikutnya. Yang sedang ditinjau Kanwil tidak di sini, melainkan di Usulan terkirim. */}
-        <section className="dsb-panel dsb-muncul" style={{ "--i": 0 } as React.CSSProperties} aria-labelledby="judul-tugas-upt">
+        <section className="dsb-panel dsb-susut dsb-muncul" style={{ "--i": 0 } as React.CSSProperties} aria-labelledby="judul-tugas-upt">
           <div className="dsb-panel-kepala">
             <h2 id="judul-tugas-upt" className="dsb-panel-judul">
               Perlu dikerjakan <small>{tugas.length === 0 ? "tidak ada" : `${tugas.length} pegawai`}</small>
@@ -863,7 +863,7 @@ export default function DashboardUpt() {
         </section>
 
         {/* Pegawai dan status KGB-nya di Kanwil */}
-        <section className="dsb-panel dsb-antrian overflow-hidden dsb-muncul" style={{ "--i": 1 } as React.CSSProperties} aria-labelledby="judul-pegawai-upt">
+        <section className="dsb-panel dsb-antrian dsb-penuh overflow-hidden dsb-muncul" style={{ "--i": 1 } as React.CSSProperties} aria-labelledby="judul-pegawai-upt">
           <div className="dsb-panel-kepala">
             <h2 id="judul-pegawai-upt" className="dsb-panel-judul">
               Pegawai dan KGB <small>{tampil.length} dari {pegawai.length}</small>

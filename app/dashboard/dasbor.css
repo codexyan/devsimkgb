@@ -776,6 +776,10 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
   .dsb-halaman[data-muat-layar] :is(.dsb-kolom, .dsb-samping) > .dsb-penuh { min-height: 200px; }
   .dsb-halaman[data-muat-layar] .dsb-susut { flex: 0 1 auto; min-height: 120px; }
   .dsb-halaman[data-muat-layar] .dsb-kolom > .dsb-susut { max-height: 55%; }
+  /* Antrian di bawah panel penyusut: kepala, saringan, dan kaki saja sudah ±220 px, jadi 200 px tidak
+     menyisakan satu baris pun saat daftar di atasnya panjang. Pada layar kerja terpendek (1280 x 720) kolomnya
+     hanya ±410 px, jadi batasnya ikut menyusut agar halaman tetap pas satu layar. */
+  .dsb-halaman[data-muat-layar] .dsb-kolom > .dsb-penuh.dsb-antrian { min-height: min(300px, 60%); }
 
   /* Tinggi minimum diatur di atas per peran; di sini hanya susunan isi panel */
   .dsb-halaman[data-muat-layar] :is(.dsb-penuh, .dsb-susut).dsb-panel,
@@ -805,6 +809,12 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
     max-height: none;
     overflow: auto;
     overscroll-behavior: contain;
+  }
+
+  /* Panel penyusut tanpa bagian bergulir (mis. keadaan kosong) tidak boleh menyusut: isinya akan terpotong
+     tanpa bisa digulir. Kolom pendampingnya yang bergulir bila ruang kurang. */
+  .dsb-halaman[data-muat-layar] .dsb-susut.dsb-panel:not(:has(> :is(.dsb-gulir, .dsb-gulir-tabel, .dsb-antrian-gulir))) {
+    flex-shrink: 0;
   }
 
   /* Keadaan kosong di panel pengisi berada di tengah ruangnya, bukan menempel di atas */
