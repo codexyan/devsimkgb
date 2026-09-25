@@ -14,6 +14,7 @@ import { PENETAP_KANWIL } from "@/lib/penetapSk";
 import { cariSatker, SATKER_KANWIL } from "@/lib/satker";
 import { muatKppnSatker } from "@/lib/muatKppnSatker";
 import { tanggalKalender } from "@/lib/waktu";
+import { getPangkat } from "@/lib/tabelGaji";
 import { alasanTolakBuatSk, bacaTanggalInput, type SuratKgbTersimpan } from "@/lib/prosesKgb";
 import type { HukdisUntukKgb } from "@/lib/prosesKgb";
 import { periksaUlangKgb } from "@/lib/pemeriksaanUlangKgb";
@@ -27,6 +28,15 @@ function teksDasarHukum(nomorPP?: string | null, tahunPP?: string | null): strin
   const tahun = tahunPP?.trim() || "2024";
   if (!nomor) return `Nomor 5 Tahun ${tahun}`;
   return /^\d+$/.test(nomor) ? `Nomor ${nomor} Tahun ${tahun}` : nomor;
+}
+
+/**
+ * "Penata (III/c)" untuk golongan KGB baru. Nama pangkat diambil dari tabel golongan; pangkat yang
+ * tercatat pada pegawai hanya dipakai bila golongannya sama dan tabel tidak mengenalnya.
+ */
+function teksPangkatGolongan(golongan: string, pegawai: { pangkat: string; golonganRuang: string }): string {
+  const pangkat = getPangkat(golongan) || (golongan === pegawai.golonganRuang ? pegawai.pangkat?.trim() : "");
+  return pangkat ? `${pangkat} (${golongan})` : golongan;
 }
 
 export async function POST(
@@ -183,13 +193,12 @@ export async function POST(
       nomorSurat,
       tanggalSurat,
       kppn,
+      satker: { nama: satker.nama, kanwil: satker.jenis === "kanwil" },
       pegawai: {
         nama: pegawai.nama,
         nip: pegawai.nip,
-        jabatan: pegawai.jabatan,
         pangkat: pegawai.pangkat,
         golonganRuang: pegawai.golonganRuang,
-        unitKerja: pegawai.unitKerja,
       },
       kgb: {
         gajiPokokLama: kgb.gajiPokokLama,
@@ -203,16 +212,14 @@ export async function POST(
         gajiPokokBaru: kgb.gajiPokokBaru,
         mkgTahunBaru: kgb.mkgTahunBaru,
         mkgBulanBaru: kgb.mkgBulanBaru,
-        golonganBaru: kgb.golonganBaru,
+        pangkatGolonganBaru: teksPangkatGolongan(kgb.golonganBaru, pegawai),
         tmtKgbBaru: kgb.tmtKgbBaru,
         tmtKgbBerikutnya: kgb.tmtKgbBerikutnya,
-        flagRapelan: kgb.flagRapelan,
       },
       penandatangan: {
         jenis: penandatangan.jenis,
         jabatan: penandatangan.jabatan,
         nama: penandatangan.nama,
-        nip: penandatangan.nip,
       },
       dasarHukum: teksDasarHukum(kanwil?.nomorPP, kanwil?.tahunPP),
       srikandi: isSrikandi,

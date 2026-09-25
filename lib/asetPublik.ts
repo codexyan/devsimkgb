@@ -26,7 +26,7 @@ async function muat(pathRelatif: string): Promise<Uint8Array> {
   return new Uint8Array(await readFile(path.join(process.cwd(), "public", pathRelatif)));
 }
 
-/** Isi berkas public/<pathRelatif>, mis. "fonts/times.ttf". */
+/** Isi berkas public/<pathRelatif>, mis. "fonts/arial.ttf". */
 export function bacaAsetPublik(pathRelatif: string): Promise<Uint8Array> {
   let hasil = cache.get(pathRelatif);
   if (!hasil) {

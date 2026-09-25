@@ -13,7 +13,7 @@ test("bacaAsetPublik membaca berkas public/ dari disk di Node", async () => {
 });
 
 test("bacaAsetPublik memakai cache untuk path yang sama", () => {
-  assert.equal(bacaAsetPublik("fonts/times.ttf"), bacaAsetPublik("fonts/times.ttf"));
+  assert.equal(bacaAsetPublik("fonts/arial.ttf"), bacaAsetPublik("fonts/arial.ttf"));
 });
 
 test("bacaAsetPublik tidak meng-cache kegagalan", async () => {

@@ -132,10 +132,9 @@ export default function PenandatanganManager({ onStatus }: { onStatus?: (adaHari
       {hariIni.ok ? (
         <div className="rounded-xl px-4 py-3" style={{ background: "var(--sub)", border: "1px dashed var(--ln0)" }}>
           <p className="text-xs font-semibold mb-1.5" style={{ color: "var(--dt2)" }}>Tercetak pada surat bertanggal hari ini</p>
-          <div style={{ fontFamily: "'Times New Roman', Times, serif", fontSize: "12.5px", color: "var(--dt1)", width: "fit-content", marginLeft: "auto" }}>
-            <p style={{ margin: 0 }}>{hariIni.jabatan}</p><div style={{ height: "34px" }} />
-            <p style={{ margin: 0, fontWeight: 700, textDecoration: "underline" }}>{hariIni.penandatangan.nama}</p>
-            <p style={{ margin: 0 }}>NIP. {hariIni.penandatangan.nip}</p>
+          <div style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "12px", color: "var(--dt1)", width: "fit-content", marginLeft: "auto" }}>
+            <p style={{ margin: 0 }}>{hariIni.jabatan},</p><div style={{ height: "34px" }} />
+            <p style={{ margin: 0 }}>{hariIni.penandatangan.nama}</p>
           </div>
         </div>
       ) : (
