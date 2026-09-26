@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { periksaImporUpt, ringkasImpor } from "./imporUsulanUpt";
+import { KOLOM_IMPOR_UPT, periksaImporUpt, ringkasImpor, templatCsvUpt } from "./imporUsulanUpt";
 
 const kosong = { nipPegawai: new Set<string>(), nipUsulan: new Set<string>() };
 
@@ -83,4 +83,20 @@ test("ringkasan memisahkan yang gagal dari yang sekadar belum lengkap", () => {
     kosong,
   );
   assert.deepEqual(ringkasImpor(hasil), { sah: 2, gagal: 1, belumLengkap: 1 });
+});
+
+test("templat yang diunduh terbaca kembali: kepalanya lengkap dan baris contohnya siap diajukan", () => {
+  const [kepala, contoh] = templatCsvUpt().replace(/^\uFEFF/, "").trim().split("\r\n").map((b) => b.split(","));
+  for (const k of KOLOM_IMPOR_UPT) assert.ok(kepala.includes(k), `kolom ${k} ada di templat`);
+  const row = Object.fromEntries(kepala.map((k, i) => [k, contoh[i]]));
+  const [h] = periksaImporUpt([row], kosong);
+  assert.equal(h.galat, null);
+  assert.deepEqual(h.kurang, []);
+});
+
+test("tanggal dd/mm/yyyy dari Excel berlokal Indonesia dibaca sama dengan yyyy-mm-dd", () => {
+  const [h] = periksaImporUpt([baris({ tmtGolongan: "01/06/2025", tmtKgbTerakhir: "1/6/2025" })], kosong);
+  assert.equal(h.galat, null);
+  assert.deepEqual(h.isian?.tmtKgbTerakhir, new Date(Date.UTC(2025, 5, 1)));
+  assert.deepEqual(h.isian?.tmtGolongan, new Date(Date.UTC(2025, 5, 1)));
 });

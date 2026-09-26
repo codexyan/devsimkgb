@@ -122,6 +122,14 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
 .kgbm-data-baris dt { width: 132px; flex-shrink: 0; color: var(--dt4); }
 .kgbm-data-baris dd { margin: 0; font-weight: 500; color: var(--dtn); overflow-wrap: anywhere; }
 .kgbm-data-baris dd[data-nada="hijau"] { color: var(--st-green); }
+.kgbm-panduan > summary { padding: 8px 12px; font-size: 12px; font-weight: 500; color: var(--accent); cursor: pointer; }
+.kgbm-panduan[open] > summary { border-bottom: .5px solid var(--ln2); }
+.kgbm-panduan dl { margin: 0; }
+.kgbm-panduan code { font-size: 11.5px; color: var(--dtn); overflow-wrap: anywhere; }
+.kgbm-panduan dt span { font-size: 11px; color: var(--dt5); }
+.kgbm-panduan dt span[data-peran="wajib"] { color: var(--st-red); font-weight: 600; }
+.kgbm-panduan dt span[data-peran="diajukan"] { color: var(--st-amber); }
+.kgbm-panduan > .kgbm-bantuan { margin: 0; padding: 8px 12px 10px; border-top: .5px solid var(--ln2); }
 .kgbm-lencana { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 10px; font-weight: 600;
   white-space: nowrap; background: var(--ln2); color: var(--dt3); }
 .kgbm-lencana[data-nada="amber"] { background: var(--tint-amber-bg); color: var(--st-amber); }

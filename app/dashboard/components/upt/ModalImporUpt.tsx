@@ -3,13 +3,29 @@
 import { useState } from "react";
 import Papa from "papaparse";
 import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
-import { BATAS_BARIS_IMPOR, KOLOM_IMPOR_UPT } from "@/lib/imporUsulanUpt";
+import { BATAS_BARIS_IMPOR, KOLOM_IMPOR_UPT, KOLOM_TEMPLAT_UPT, templatCsvUpt, type PeranKolomTemplat } from "@/lib/imporUsulanUpt";
+import { FORMAT_TANGGAL_DITERIMA } from "@/lib/dataPegawai";
 
 /* Unggah daftar pegawai sekaligus.
    Berkasnya diuraikan di peramban, tetapi yang menilai isinya tetap server: baris diperiksa lebih dulu
    lewat periksaSaja, hasilnya ditunjukkan, dan penyimpanan baru terjadi setelah operator menekan
    tombol kedua. Dengan begitu aturannya hanya ada satu tempat, dan tidak ada berkas yang telanjur
    tersimpan separuh karena operator salah memilih berkas. */
+
+const LABEL_PERAN: Record<PeranKolomTemplat, string> = {
+  wajib: "wajib",
+  diajukan: "wajib saat diajukan",
+  opsional: "boleh kosong",
+};
+
+function unduhTemplat() {
+  const url = URL.createObjectURL(new Blob([templatCsvUpt()], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "templat_data_pegawai_upt.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 interface Ringkas {
   sah: number;
@@ -49,7 +65,7 @@ export default function ModalImporUpt({
         const kepala = Object.keys(data[0] ?? {});
         const hilang = KOLOM_IMPOR_UPT.filter((k) => !kepala.includes(k));
         if (hilang.length > 0) {
-          setGalat(`Baris kepala berkas tidak memuat kolom: ${hilang.join(", ")}. Pakai templat dari Kanwil.`);
+          setGalat(`Baris kepala berkas tidak memuat kolom: ${hilang.join(", ")}. Unduh templatnya dari dialog ini.`);
           return;
         }
         if (data.length > BATAS_BARIS_IMPOR) {
@@ -116,10 +132,42 @@ export default function ModalImporUpt({
     >
       <PesanGalat pesan={galat} />
       <Catatan>
-        Pakai templat CSV dari Kanwil. Isinya masuk sebagai data yang disiapkan, belum terkirim: setelah
-        ini lengkapi yang masih kurang, lalu ajukan bersama satu surat usulan. Kolom unit kerja pada
-        berkas diabaikan, sebab satkernya mengikuti akun ini.
+        Isi templat CSV di bawah, satu baris untuk satu pegawai. Isinya masuk sebagai data yang disiapkan,
+        belum terkirim: setelah ini lengkapi yang masih kurang, lalu ajukan bersama satu surat usulan. Kolom
+        unit kerja pada berkas diabaikan, sebab satkernya mengikuti akun ini.
       </Catatan>
+
+      <div className="kgbm-data">
+        <div className="kgbm-data-kepala">
+          <span>Templat CSV</span>
+          <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" onClick={unduhTemplat}>
+            Unduh templat
+          </button>
+        </div>
+        <details className="kgbm-panduan">
+          <summary>Panduan kolom ({KOLOM_TEMPLAT_UPT.length} kolom)</summary>
+          <dl>
+            {KOLOM_TEMPLAT_UPT.map((k) => (
+              <div className="kgbm-data-baris" key={k.kolom}>
+                <dt>
+                  <code>{k.kolom}</code>
+                  <br />
+                  <span data-peran={k.peran}>{LABEL_PERAN[k.peran]}</span>
+                </dt>
+                <dd>
+                  {k.keterangan}
+                  {k.contoh && <> Contoh: <code>{k.contoh}</code></>}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p className="kgbm-bantuan">
+            Tanggal ditulis {FORMAT_TANGGAL_DITERIMA}. Baris contoh di templat fiktif: hapus sebelum mengunggah.
+            Nomor SK dan pindaian berkas tidak lewat CSV; keduanya dilengkapi per pegawai sebelum diajukan.
+            Berkas yang disimpan Excel dengan pemisah titik koma tetap terbaca.
+          </p>
+        </details>
+      </div>
 
       <label className="kgbm-label">
         Berkas CSV
@@ -131,8 +179,8 @@ export default function ModalImporUpt({
           onChange={(e) => pilihBerkas(e.target.files?.[0] ?? null)}
         />
         <span className="kgbm-bantuan">
-          Paling banyak {BATAS_BARIS_IMPOR} baris sekali unggah. Gaji pokok dan TMT KGB berikutnya tidak perlu
-          diisi: keduanya dihitung sistem dari golongan, masa kerja golongan, dan TMT KGB terakhir.
+          Paling banyak {BATAS_BARIS_IMPOR} baris sekali unggah. Pangkat, gaji pokok, dan TMT KGB berikutnya tidak
+          perlu diisi: ketiganya dihitung sistem dari golongan, masa kerja golongan, dan TMT KGB terakhir.
         </span>
       </label>
 

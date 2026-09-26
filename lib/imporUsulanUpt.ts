@@ -12,12 +12,105 @@
 // ditagih saat diajukan; menolaknya di sini berarti memaksa operator menyempurnakan seluruh berkas di
 // Excel lebih dulu, padahal dokumennya sering baru terkumpul belakangan.
 
-import { bacaIsianBaris } from "./usulanFormulir";
+import { BIDANG_DIISI, bacaIsianBaris } from "./usulanFormulir";
 import { kekuranganUsulan } from "./usulanPegawai";
+import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "./dataPegawai";
+import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR } from "./pilihanPegawai";
 import type { UsulanPegawaiRow } from "./sheets/tables";
 
 /** Kolom yang harus ada pada baris kepala berkas; isinya boleh kosong kecuali NIP dan nama. */
 export const KOLOM_IMPOR_UPT = ["nip", "nama"] as const;
+
+/**
+ * "wajib": baris ditolak bila kosong. "diajukan": boleh kosong di draf, tetapi ditagih saat diajukan ke
+ * Kanwil (kekuranganUsulan). "opsional": boleh kosong seterusnya.
+ */
+export type PeranKolomTemplat = "wajib" | "diajukan" | "opsional";
+
+/**
+ * Kolom templat unggahan UPT: yang dibaca bacaIsianBaris, tanpa kolom hitungan (pangkat, gaji pokok,
+ * TMT KGB berikutnya) yang memang tidak dibaca dari berkas. Satu daftar ini menjadi berkas templat
+ * yang diunduh sekaligus panduan kolom di layar, agar keduanya tidak pernah berbeda. Contohnya fiktif.
+ */
+export const KOLOM_TEMPLAT_UPT: readonly {
+  kolom: string;
+  peran: PeranKolomTemplat;
+  keterangan: string;
+  contoh: string;
+}[] = [
+  {
+    kolom: "nip",
+    peran: "wajib",
+    keterangan:
+      "18 digit angka. Di Excel, format kolom ini sebagai Text sebelum mengetik, atau tulis =\"199001012025061001\"; tanpa itu NIP berubah menjadi 1,99E+17 dan barisnya ditolak.",
+    contoh: "199001012025061001",
+  },
+  { kolom: "nama", peran: "wajib", keterangan: "Nama lengkap sesuai SK pengangkatan.", contoh: "NAMA PEGAWAI CONTOH" },
+  { kolom: "jabatan", peran: "diajukan", keterangan: "Nama jabatan.", contoh: "Penjaga Tahanan" },
+  { kolom: "jenisJabatan", peran: "opsional", keterangan: `Salah satu: ${JENIS_JABATAN.join(" · ")}.`, contoh: JENIS_JABATAN[0] },
+  { kolom: "eselon", peran: "opsional", keterangan: `Salah satu: ${ESELON.join(" · ")}.`, contoh: ESELON[0] },
+  {
+    kolom: "golonganRuang",
+    peran: "diajukan",
+    keterangan: "Golongan/ruang sekarang, ditulis seperti II/a atau III/b.",
+    contoh: "II/a",
+  },
+  {
+    kolom: "tmtGolongan",
+    peran: "opsional",
+    keterangan: "TMT golongan sekarang. Bagi CPNS sama dengan TMT CPNS.",
+    contoh: "2025-06-01",
+  },
+  {
+    kolom: "mkgTahun",
+    peran: "opsional",
+    keterangan: "Masa kerja golongan (tahun), disalin dari SK KGB terakhir. Isi 0 bila belum pernah KGB; kosong dibaca 0.",
+    contoh: "0",
+  },
+  { kolom: "mkgBulan", peran: "opsional", keterangan: "Sisa bulan masa kerja golongan, 0 sampai 11.", contoh: "0" },
+  {
+    kolom: "tmtKgbTerakhir",
+    peran: "diajukan",
+    keterangan: "TMT pada SK KGB terakhir. Bila belum pernah KGB, isi TMT CPNS.",
+    contoh: "2025-06-01",
+  },
+  { kolom: "tempatLahir", peran: "opsional", keterangan: "Kota atau kabupaten tempat lahir.", contoh: "Banjarmasin" },
+  { kolom: "tanggalLahir", peran: "opsional", keterangan: "Tanggal lahir.", contoh: "1990-01-01" },
+  { kolom: "jenisKelamin", peran: "opsional", keterangan: `Salah satu: ${JENIS_KELAMIN.join(" · ")}.`, contoh: JENIS_KELAMIN[0] },
+  {
+    kolom: "pendidikanTerakhir",
+    peran: "opsional",
+    keterangan: `Salah satu: ${PENDIDIKAN_TERAKHIR.join(" · ")}.`,
+    contoh: "SMA/SMK",
+  },
+];
+
+/**
+ * Isi berkas templat: baris kepala dan satu baris contoh. Diawali BOM agar Excel membacanya sebagai
+ * UTF-8; PapaParse membuang BOM itu saat berkasnya diunggah kembali.
+ */
+export function templatCsvUpt(): string {
+  const sel = (nilai: string) => (/[",;\n]/.test(nilai) ? `"${nilai.replace(/"/g, '""')}"` : nilai);
+  const baris = [KOLOM_TEMPLAT_UPT.map((k) => k.kolom), KOLOM_TEMPLAT_UPT.map((k) => k.contoh)];
+  return "﻿" + baris.map((b) => b.map(sel).join(",")).join("\r\n") + "\r\n";
+}
+
+const KOLOM_TANGGAL = BIDANG_DIISI.filter((b) => b.jenis === "tanggal");
+
+/**
+ * Tanggal pada baris berkas diseragamkan ke yyyy-mm-dd. Excel berlokal Indonesia menyimpan ulang tanggal
+ * sebagai dd/mm/yyyy, jadi berkas yang disunting di Excel harus tetap terbaca, sama seperti impor Kanwil.
+ */
+function seragamkanTanggal(row: Record<string, unknown>): { row: Record<string, unknown> } | { galat: string } {
+  const hasil = { ...row };
+  for (const bidang of KOLOM_TANGGAL) {
+    const dibaca = bacaTanggal(teks(row, bidang.kunci));
+    if (dibaca.status === "tidak_valid")
+      return { galat: `${bidang.label} tidak valid ("${teks(row, bidang.kunci)}"). Gunakan format ${FORMAT_TANGGAL_DITERIMA}.` };
+    if (dibaca.status === "valid") hasil[bidang.kunci] = dibaca.tanggal.toISOString().slice(0, 10);
+  }
+  return { row: hasil };
+}
 
 /**
  * Batas baris sekali unggah. Satker terbesar di Kalimantan Selatan masih di bawah angka ini, dan
@@ -70,7 +163,9 @@ export function periksaImporUpt(
     if (konteks.nipPegawai.has(nip)) return { ...dasar, galat: "NIP sudah tercatat sebagai pegawai" };
     if (konteks.nipUsulan.has(nip)) return { ...dasar, galat: "NIP sudah ada pada usulan yang belum selesai" };
 
-    const dibaca = bacaIsianBaris(row);
+    const seragam = seragamkanTanggal(row);
+    if ("galat" in seragam) return { ...dasar, galat: seragam.galat };
+    const dibaca = bacaIsianBaris(seragam.row);
     if ("galat" in dibaca) return { ...dasar, galat: dibaca.galat };
 
     return {

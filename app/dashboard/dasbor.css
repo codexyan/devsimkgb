@@ -1410,8 +1410,11 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
   .dsb-papan-kolom[data-ciut] { flex: 0 0 46px; }
 }
 
-/* Tanpa model pas satu layar (tablet, layar pendek), kolom memanjang mengikuti isinya */
+/* Tanpa model pas satu layar (tablet, layar pendek), kolom memanjang mengikuti isinya dan halaman yang
+   bergulir. Papannya ikut dilepas dari batas tinggi .dsb-antrian-gulir: papan tidak bergulir tegak
+   (overflow-y: hidden), jadi pada layar lebar yang pendek kartu di bawah batas itu terpotong tanpa jalan. */
 @media (max-width: 1199px), (max-height: 719px) {
+  .dsb-papan { max-height: none; }
   .dsb-papan-isi { flex: none; overflow: visible; }
 }
 
