@@ -710,7 +710,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                                 {milikSendiri?.status === "revisi"
                                   ? "Perbaiki usulan"
                                   : milikSendiri
-                                    ? "Lanjutkan draf"
+                                    ? milikSendiri.kekurangan.length > 0 ? "Lengkapi draf" : "Ubah draf"
                                     : "Usulkan perbaikan data"}
                               </button>
                             </span>
@@ -781,8 +781,14 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             aksi={
               u ? (
                 <>
-                  <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => lanjutkanDraf(u)}>
-                    {t.jenis === "perbaiki" ? "Perbaiki" : "Lanjutkan"}
+                  {/* Draf yang sudah lengkap tinggal dicentang dan diajukan, jadi menyuntingnya menjadi aksi kedua. */}
+                  <button
+                    type="button"
+                    className="dsb-tombol dsb-tombol-kecil"
+                    data-jenis={t.jenis === "ajukan" ? "garis" : undefined}
+                    onClick={() => lanjutkanDraf(u)}
+                  >
+                    {t.jenis === "perbaiki" ? "Perbaiki" : t.jenis === "lengkapi" ? "Lengkapi" : "Ubah"}
                   </button>
                   <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setDialogBatal(u)}>
                     Hapus
