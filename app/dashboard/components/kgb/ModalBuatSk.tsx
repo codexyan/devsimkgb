@@ -6,6 +6,7 @@ import { alasanTolakBuatSk } from "@/lib/prosesKgb";
 import { formatTanggalId, hariIniWita, isoTanggalLokal, type NilaiTanggal } from "@/lib/waktu";
 import { AWALAN_NOMOR_SK, bagianNomorSk, nomorSkLengkap } from "@/lib/nomorSurat";
 import KerangkaModal from "./KerangkaModal";
+import { bacaDrafSk, hapusDrafSk, simpanDrafSk } from "./drafSk";
 import {
   BagianForm,
   BidangPenetap,
@@ -73,9 +74,12 @@ export default function ModalBuatSk({
   const idNomorSk = useId();
   const idNomorSkPetunjuk = useId();
   const [dasar, setDasar] = useState<DataDasarSk>(() => isianDasarSk(dasarAwal));
+  // Draf peramban hanya dipakai selama SK belum pernah dibuat; sesudahnya nomor tersimpan di server.
+  const [drafAwal] = useState(() => (nomorSkTerisi(skBaruAwal?.nomorSurat) ? null : bacaDrafSk(kgbId)));
   const [skBaru, setSkBaru] = useState(() => ({
-    nomorSurat: nomorSkTerisi(skBaruAwal?.nomorSurat),
-    tanggalSurat: nilaiInputTanggal(skBaruAwal?.tanggalSurat) || isoTanggalLokal(hariIniWita()),
+    nomorSurat: nomorSkTerisi(skBaruAwal?.nomorSurat) || drafAwal?.nomorSurat || "",
+    tanggalSurat:
+      nilaiInputTanggal(skBaruAwal?.tanggalSurat) || drafAwal?.tanggalSurat || isoTanggalLokal(hariIniWita()),
   }));
   const [tab, setTab] = useState<Versi>("biasa");
   const [pratinjau, setPratinjau] = useState<Record<Versi, string | null>>({ biasa: null, srikandi: null });
@@ -89,6 +93,8 @@ export default function ModalBuatSk({
   const putaranIsian = useRef(0);
   const urlPratinjau = useRef<Record<Versi, string | null>>({ biasa: null, srikandi: null });
   const perubahan = useRef<"tidak" | "dasar" | "sk">("tidak");
+  // Ada isian yang belum disimpan sebagai draf maupun dibuat menjadi SK; menutup modal ditanyakan dulu.
+  const belumTersimpan = useRef(false);
   const refKolomForm = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -110,6 +116,7 @@ export default function ModalBuatSk({
 
   function isianBerubah() {
     putaranIsian.current += 1;
+    belumTersimpan.current = true;
     if (urlPratinjau.current.biasa) gantiPratinjau("biasa", null);
     if (urlPratinjau.current.srikandi) gantiPratinjau("srikandi", null);
     setMemuatVersi(null);
@@ -234,6 +241,8 @@ export default function ModalBuatSk({
       return;
     }
     perubahan.current = "sk";
+    belumTersimpan.current = false;
+    hapusDrafSk(kgbId);
     unduhBlob(biasa.data, namaFileSk({ nama: pegawai.nama, tahun: tahunTanggalInput(isi.tanggalSurat), versi: "biasa" }));
     if (!srikandi.ok) {
       setGalat(
@@ -247,8 +256,44 @@ export default function ModalBuatSk({
     );
   }
 
+  /**
+   * Simpan untuk dilanjutkan nanti tanpa membuat SK. Data SK terakhir disimpan ke server lewat PATCH yang
+   * sama dengan pratinjau; nomor dan tanggal SK baru disimpan di peramban (drafSk.ts), sebab mencatatnya
+   * di server berarti SK dianggap sudah dibuat.
+   */
+  async function simpanDraf() {
+    if (sibuk || memuatVersi) return;
+    setSibuk(true);
+    setGalat(null);
+    const galatSimpan = await simpanDasarBilaBerubah();
+    setSibuk(false);
+    if (galatSimpan) {
+      setGalat(galatSimpan);
+      return;
+    }
+    const isi = isiSkBaru();
+    if (!isi.nomorSurat) hapusDrafSk(kgbId);
+    else if (!simpanDrafSk(kgbId, isi)) {
+      setGalat(
+        "Data SK terakhir tersimpan, tetapi peramban ini menolak menyimpan draf nomor SK baru (mode privat atau penyimpanan situs diblokir). Catat nomornya sebelum menutup.",
+      );
+      return;
+    }
+    belumTersimpan.current = false;
+    onBerhasil(
+      isi.nomorSurat
+        ? `Draf SK ${pegawai.nama} disimpan. Nomor SK baru tersimpan di peramban ini saja sampai Buat dan Unduh SK dipilih.`
+        : `Data SK terakhir ${pegawai.nama} tersimpan.`,
+    );
+  }
+
   function tutup() {
     if (sibuk) return;
+    if (
+      belumTersimpan.current &&
+      !window.confirm("Isian belum disimpan. Tutup tanpa menyimpan? Pilih Simpan draf bila ingin melanjutkannya nanti.")
+    )
+      return;
     if (perubahan.current === "sk") onBerhasil(`SK KGB ${pegawai.nama} sudah dibuat.`);
     else if (perubahan.current === "dasar") onBerhasil(`Data SK terakhir ${pegawai.nama} tersimpan.`);
     else onTutup();
@@ -278,6 +323,16 @@ export default function ModalBuatSk({
             <button type="button" className="kgbm-tombol kgbm-kedua" onClick={tutup} disabled={sibuk}>
               Batal
             </button>
+            {!skPernahDibuat && (
+              <button
+                type="button"
+                className="kgbm-tombol kgbm-kedua"
+                onClick={() => void simpanDraf()}
+                disabled={sibuk || !!memuatVersi}
+              >
+                Simpan draf
+              </button>
+            )}
             <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk || !!memuatVersi}>
               {sibuk ? "Membuat SK..." : "Buat dan Unduh SK"}
             </button>
@@ -386,6 +441,13 @@ export default function ModalBuatSk({
                 petunjuk="Penandatangan dipilih menurut tanggal ini sesuai Pengaturan."
                 nonaktif={sibuk}
               />
+              {drafAwal && (
+                <Catatan>
+                  Nomor dan tanggal SK baru diisi dari draf yang disimpan di peramban ini
+                  {drafAwal.disimpan ? ` pada ${new Date(drafAwal.disimpan).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}` : ""}.
+                  Periksa kembali sebelum membuat SK.
+                </Catatan>
+              )}
               {skPernahDibuat && (
                 <Catatan nada="amber">
                   SK baru untuk KGB ini sudah pernah dibuat. Buat dan Unduh SK akan mencatat ulang nomor, tanggal, dan
@@ -456,8 +518,8 @@ export default function ModalBuatSk({
               </div>
             )}
             <p className="kgbm-petunjuk">
-              Pratinjau menyimpan data SK terakhir, tetapi SK baru baru tercatat setelah Buat dan Unduh SK dipilih. SK
-              biasa dan versi Srikandi (dengan tempat TTE) diunduh bersamaan.
+              Pratinjau dan Simpan draf menyimpan data SK terakhir, tetapi SK baru baru tercatat setelah Buat dan Unduh SK
+              dipilih. SK biasa dan versi Srikandi (dengan tempat TTE) diunduh bersamaan.
             </p>
           </div>
         </div>

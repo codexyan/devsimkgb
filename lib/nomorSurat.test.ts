@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AWALAN_NOMOR_SK, bagianNomorSk, nomorSkLengkap } from "./nomorSurat";
+import { AWALAN_NOMOR_SK, bagianNomorSk, kunciNomorSk, nomorSkLengkap } from "./nomorSurat";
 
 test("nomor dari arsiparis disusun menjadi nomor surat lengkap", () => {
   assert.equal(nomorSkLengkap("1234"), "WP.19-SA.04.04-1234");
@@ -27,4 +27,10 @@ test("nomor lama di luar pola Kanwil tetap utuh", () => {
   assert.deepEqual(bagianNomorSk("W.17-KP.04.03-528"), { berawalan: false, nomor: "W.17-KP.04.03-528" });
   assert.equal(nomorSkLengkap("W.17-KP.04.03-528"), AWALAN_NOMOR_SK + "W.17-KP.04.03-528",
     "penyusunan hanya dipakai pada isian bernomor; nomor lama ditampilkan sebagai isian penuh");
+});
+
+test("nomor yang hanya berbeda spasi atau huruf besar dianggap sama", () => {
+  assert.equal(kunciNomorSk("wp.19-SA.04.04- 1234"), kunciNomorSk("WP.19-SA.04.04-1234"));
+  assert.notEqual(kunciNomorSk("WP.19-SA.04.04-1234"), kunciNomorSk("WP.19-SA.04.04-12345"));
+  assert.equal(kunciNomorSk(null), "");
 });

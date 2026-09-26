@@ -30,3 +30,11 @@ export function bagianNomorSk(lengkap: string | null | undefined): { berawalan: 
   }
   return { berawalan: false, nomor: teks };
 }
+
+/**
+ * Bentuk pembanding nomor SK: tanpa spasi dan berhuruf besar. Satu nomor dari arsiparis hanya boleh
+ * dipakai satu SK, dan "wp.19-SA.04.04- 1234" tetaplah nomor yang sama dengan "WP.19-SA.04.04-1234".
+ */
+export function kunciNomorSk(nomor: string | null | undefined): string {
+  return (nomor ?? "").replace(/\s+/g, "").toUpperCase();
+}
