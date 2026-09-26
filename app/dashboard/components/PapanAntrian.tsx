@@ -9,7 +9,7 @@ import type { Nada } from "@/app/dashboard/components/PanelNavy";
    modal yang sama dengan tampilan daftar, jadi menyeret tidak pernah mengubah data tanpa konfirmasi. Setiap aksi
    juga tersedia sebagai tombol di kartu untuk papan ketik dan layar sentuh. */
 
-export type KolomPapan = "terkunci" | "input" | "proses" | "keuangan" | "selesai";
+export type KolomPapan = "terkunci" | "input" | "proses" | "keuangan" | "rekam_upt" | "selesai";
 
 export interface KartuPapan {
   id: string;
@@ -39,7 +39,9 @@ const KOLOM: { k: KolomPapan; judul: string; nada?: Nada }[] = [
   { k: "terkunci", judul: "Belum dibuka" },
   { k: "input", judul: "Perlu diinput", nada: "kuning" },
   { k: "proses", judul: "Sedang diproses", nada: "navy" },
-  { k: "keuangan", judul: "Di keuangan", nada: "ungu" },
+  // Sesudah SK diunggah: pegawai Kanwil ke keuangan Kanwil, pegawai UPT ke keuangan UPT-nya (ADR-009).
+  { k: "keuangan", judul: "Keuangan Kanwil", nada: "ungu" },
+  { k: "rekam_upt", judul: "Rekam UPT", nada: "ungu" },
   { k: "selesai", judul: "Selesai", nada: "hijau" },
 ];
 

@@ -14,8 +14,8 @@ const Memuat = () => <div className="dsb-halaman"><div className="dsb-kerangka" 
 const DashboardHukdis = dynamic(() => import("@/app/dashboard/components/DashboardHukdis"), { ssr: false, loading: Memuat });
 const DashboardKeuangan = dynamic(() => import("@/app/dashboard/components/DashboardKeuangan"), { ssr: false, loading: Memuat });
 const DashboardUpt = dynamic(() => import("@/app/dashboard/components/DashboardUpt"), { ssr: false, loading: Memuat });
-const PemantauanSatker = dynamic(() => import("@/app/dashboard/components/PemantauanSatker"), { ssr: false });
-const PanelGajiWebUpt = dynamic(() => import("@/app/dashboard/components/PanelGajiWebUpt"), { ssr: false });
+const PanelPantauSatker = dynamic(() => import("@/app/dashboard/components/PanelPantauSatker"), { ssr: false });
+const LiniMasaKgb = dynamic(() => import("@/app/dashboard/components/LiniMasaKgb"), { ssr: false });
 const ModalUsulanUpt = dynamic(() => import("@/app/dashboard/components/ModalUsulanUpt"), { ssr: false });
 const PapanAntrian = dynamic(() => import("@/app/dashboard/components/PapanAntrian"), { ssr: false });
 import {
@@ -46,7 +46,11 @@ import {
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId, tanggalKalender } from "@/lib/waktu";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
-import { SATKER_KANWIL, cariSatker } from "@/lib/satker";
+import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
+import { kodeSatkerPegawai } from "@/lib/rekapSatker";
+import { dipegangKeuanganKanwil } from "@/lib/aksesUpt";
+import type { BarisPantau } from "@/app/dashboard/components/PanelPantauSatker";
+import type { EntriLiniMasa, KelompokLiniMasa } from "@/app/dashboard/components/LiniMasaKgb";
 import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 /* -----------------------------------------
    Interfaces
@@ -101,11 +105,6 @@ interface DashboardStats {
   rapelanBerisiko: number;
 }
 
-interface PegawaiKalender {
-  id: string;
-  tmtKgbBerikutnya: string;
-}
-
 interface DashboardData {
   stats: DashboardStats;
   pegawaiJatuhTempo: PegawaiJatuhTempo[];
@@ -129,99 +128,6 @@ function kunciBulan(nilai: string | null | undefined): string {
 
 function daysDiff(date: string) {
   return Math.ceil((new Date(date).getTime() - new Date().getTime()) / 86400000);
-}
-
-/* -----------------------------------------
-   Monthly Strip Calendar
-   ----------------------------------------- */
-
-const BULAN_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
-
-function MonthGrid({
-  pegawaiKalender,
-  selesaiKalender,
-  filterMonth,
-  onSelect,
-}: {
-  pegawaiKalender: PegawaiKalender[];
-  selesaiKalender: { tmtKgbBerikutnya: string }[];
-  filterMonth: string | null;
-  onSelect: (month: string | null) => void;
-}) {
-  const today = new Date();
-  const yr = today.getFullYear();
-
-  const grouped: Record<string, number> = {};
-  for (const p of pegawaiKalender) {
-    const key = kunciBulan(p.tmtKgbBerikutnya);
-    grouped[key] = (grouped[key] ?? 0) + 1;
-  }
-
-  const selesaiGrouped: Record<string, number> = {};
-  for (const p of selesaiKalender) {
-    const key = kunciBulan(p.tmtKgbBerikutnya);
-    selesaiGrouped[key] = (selesaiGrouped[key] ?? 0) + 1;
-  }
-
-  type Tier = "terlambat" | "kritis" | "warn" | "aman" | "empty";
-  // Tingkat hanya ditandai titik kecil; warna status tidak mewarnai seluruh ubin.
-  const tanda: Record<Tier, { nada?: Nada; cincin?: boolean; label: string }> = {
-    terlambat: { nada: "merah", label: "terlambat" },
-    kritis:    { nada: "kuning", label: "kritis, batas input 7 hari lagi atau kurang" },
-    warn:      { nada: "kuning", cincin: true, label: "batas input 30 hari lagi atau kurang" },
-    aman:      { nada: "hijau", label: "aman" },
-    empty:     { label: "" },
-  };
-
-  return (
-    <div className="dsb-bulan-kisi">
-      {Array.from({ length: 12 }, (_, mo) => {
-        const key = `${yr}-${String(mo + 1).padStart(2, "0")}`;
-        const isCurrentMonth = mo === today.getMonth();
-        const isPast = mo < today.getMonth();
-        const count = grouped[key] ?? 0;
-        const done = selesaiGrouped[key] ?? 0;
-        const isSelected = filterMonth === key;
-        const daysToDeadline = Math.ceil((new Date(yr, mo - 1, 0).getTime() - today.getTime()) / 86400000);
-        const allDone = count > 0 && done === count;
-
-        let tier: Tier;
-        if ((isPast && count > 0) || (count > 0 && daysToDeadline < 0)) tier = "terlambat";
-        else if (count > 0 && daysToDeadline <= 7)  tier = "kritis";
-        else if (count > 0 && daysToDeadline <= 30) tier = "warn";
-        else if (count > 0)                          tier = "aman";
-        else                                         tier = "empty";
-
-        const t = tanda[tier];
-        const progressPct = count > 0 ? (done / count) * 100 : 0;
-
-        return (
-          <button
-            key={key}
-            type="button"
-            className="dsb-bulan"
-            aria-pressed={isSelected}
-            data-sekarang={isCurrentMonth ? "" : undefined}
-            data-kosong={count === 0 ? "" : undefined}
-            aria-label={`${BULAN_ID[mo]} ${yr}: ${count} KGB, ${done} selesai${t.label ? `, ${t.label}` : ""}${isCurrentMonth ? ", bulan ini" : ""}`}
-            onClick={() => onSelect(isSelected ? null : key)}
-          >
-            <span className="dsb-bulan-nama">
-              {BULAN_ID[mo]}
-              {t.nada && <span className="dsb-titik" data-nada={t.nada} data-cincin={t.cincin ? "" : undefined} aria-hidden="true" />}
-            </span>
-            <span className="dsb-bulan-baris">
-              <span className="dsb-bulan-angka">{count}</span>
-              {count > 0 && <span className="dsb-bulan-sub">{allDone ? "selesai" : `${done}/${count}`}</span>}
-            </span>
-            <span className="dsb-bulan-bar" aria-hidden="true">
-              {count > 0 && <span style={{ width: `${progressPct}%` }} />}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
 }
 
 /* -----------------------------------------
@@ -262,13 +168,14 @@ type ModalAksi =
 type Tahap = "perlu" | "lewat" | "keuangan" | "selesai" | "semua";
 
 /** Posisi satu pegawai dalam antrian kerja KGB. */
-type PosisiAntrian = "lewat" | "diproses" | "siap" | "keuangan" | "terkunci" | "selesai";
+/** "keuangan" = menunggu keuangan Kanwil; "rekam_upt" = SK pegawai UPT menunggu direkam keuangan UPT (ADR-009). */
+type PosisiAntrian = "lewat" | "diproses" | "siap" | "keuangan" | "rekam_upt" | "terkunci" | "selesai";
 
-const URUTAN_POSISI: Record<PosisiAntrian, number> = { lewat: 0, diproses: 1, siap: 2, keuangan: 3, terkunci: 4, selesai: 5 };
+const URUTAN_POSISI: Record<PosisiAntrian, number> = { lewat: 0, diproses: 1, siap: 2, keuangan: 3, rekam_upt: 4, terkunci: 5, selesai: 6 };
 
 function posisiAntrian(p: PegawaiJatuhTempo): PosisiAntrian {
   if (p.statusKGB === "selesai") return "selesai";
-  if (p.statusKGB === "menunggu_keuangan") return "keuangan";
+  if (p.statusKGB === "menunggu_keuangan") return dipegangKeuanganKanwil(p.unitKerja) ? "keuangan" : "rekam_upt";
   if (p.statusKGB === "sedang_diproses") return "diproses";
   if (p.isLocked) return "terkunci";
   return p.terlambat ? "lewat" : "siap";
@@ -278,7 +185,7 @@ function cocokTahap(pos: PosisiAntrian, tahap: Tahap): boolean {
   switch (tahap) {
     case "perlu": return pos === "lewat" || pos === "diproses" || pos === "siap";
     case "lewat": return pos === "lewat";
-    case "keuangan": return pos === "keuangan";
+    case "keuangan": return pos === "keuangan" || pos === "rekam_upt";
     case "selesai": return pos === "selesai";
     default: return true;
   }
@@ -290,7 +197,8 @@ function StatusAntrian({ pos, dibatalkan, skDibuat, buka }: { pos: PosisiAntrian
     pos === "lewat" ? ["merah", dibatalkan ? "Dibatalkan, lewat batas" : "Lewat batas input"]
     : pos === "siap" ? ["kuning", dibatalkan ? "Dibatalkan, input ulang" : "Belum diproses"]
     : pos === "diproses" ? ["navy", skDibuat ? "SK dibuat, tunggu TTE" : "Sedang diproses"]
-    : pos === "keuangan" ? ["ungu", "Menunggu keuangan"]
+    : pos === "keuangan" ? ["ungu", "Keuangan Kanwil"]
+    : pos === "rekam_upt" ? ["ungu", "Direkam keuangan UPT"]
     : pos === "selesai" ? ["hijau", "Selesai"]
     : [undefined, buka ? `Dibuka ${formatTanggalId(buka, { day: "numeric", month: "short" })}` : "Belum dibuka"];
   return (
@@ -308,6 +216,23 @@ function kolomPapan(pos: PosisiAntrian): KolomPapan {
   if (pos === "lewat" || pos === "siap") return "input";
   if (pos === "diproses") return "proses";
   return pos;
+}
+
+/** Saringan satker antrian: semua, Kanwil, seluruh UPT, atau kode satu satker. */
+function cocokSatker(p: PegawaiJatuhTempo, saring: string): boolean {
+  if (saring === "semua") return true;
+  const kode = kodeSatkerPegawai(p.unitKerja);
+  if (saring === "upt") return kode !== SATKER_KANWIL.kode;
+  return kode === saring;
+}
+
+/** Kelompok lini masa untuk satu posisi antrian. */
+function kelompokLiniMasa(pos: PosisiAntrian): KelompokLiniMasa {
+  if (pos === "lewat") return "lewat";
+  if (pos === "siap" || pos === "terkunci") return "belum";
+  if (pos === "diproses") return "proses";
+  if (pos === "keuangan" || pos === "rekam_upt") return "keuangan";
+  return "selesai";
 }
 
 function pegawaiModal(p: PegawaiJatuhTempo): PegawaiModal {
@@ -328,6 +253,8 @@ function DashboardMain() {
   const [tampilan, setTampilan] = useState<"daftar" | "papan">("daftar");
   const [cariAntrian, setCariAntrian] = useState("");
   const [filterMonth, setFilterMonth] = useState<string | null>(null);
+  // Saringan satker (ADR-012): "semua", "upt", atau kode satker ("kanwil" untuk pegawai Kanwil).
+  const [saringSatker, setSaringSatker] = useState("semua");
   const [modal, setModal] = useState<ModalAksi | null>(null);
   // Usulan data UPT yang menunggu tinjauan, per pegawai: tampil langsung di papan dan daftar (ADR-011).
   const [usulanPerPegawai, setUsulanPerPegawai] = useState<Map<string, UsulanMenunggu>>(() => new Map());
@@ -446,18 +373,12 @@ function DashboardMain() {
   const today = new Date();
   const tahunIni = today.getFullYear();
 
-  // Kalender dihitung dari daftar yang sama dengan antrian (TMT efektif), sehingga angkanya selalu cocok.
-  const pegawaiKalenderDerived: PegawaiKalender[] = pegawaiJatuhTempo.map((p) => ({
-    id: p.id,
-    tmtKgbBerikutnya: p.tmtKgbBerikutnya,
-  }));
-  const selesaiKalenderDerived = pegawaiJatuhTempo
-    .filter((p) => p.statusKGB === "selesai")
-    .map((p) => ({ tmtKgbBerikutnya: p.tmtKgbBerikutnya }));
-
-  /* -- Antrian kerja: satu daftar untuk semua tahap, menggantikan tabel deadline dan kanban -- */
+  /* -- Antrian kerja: satu daftar untuk semua tahap, disaring satker lalu bulan TMT -- */
+  const dalamSatker = pegawaiJatuhTempo.filter((p) => cocokSatker(p, saringSatker));
+  // Lini masa dihitung dari daftar yang sama dengan antrian, sehingga angkanya selalu cocok.
+  const entriLiniMasa: EntriLiniMasa[] = dalamSatker.map((p) => ({ tmt: p.tmtKgbBerikutnya, kelompok: kelompokLiniMasa(posisiAntrian(p)) }));
   const qAntrian = cariAntrian.trim().toLowerCase();
-  const dalamBulan = pegawaiJatuhTempo
+  const dalamBulan = dalamSatker
     .filter((p) => !filterMonth || kunciBulan(p.tmtKgbBerikutnya) === filterMonth)
     .filter((p) => !qAntrian || p.nama.toLowerCase().includes(qAntrian) || p.nip.includes(qAntrian) || (p.unitKerja ?? "").toLowerCase().includes(qAntrian))
     .sort(
@@ -475,6 +396,35 @@ function DashboardMain() {
     { nilai: "selesai", label: "Selesai" },
     { nilai: "semua", label: "Semua" },
   ];
+  const jumlahKanwil = pegawaiJatuhTempo.filter((p) => cocokSatker(p, SATKER_KANWIL.kode)).length;
+  const uptBerisi = SATKER.filter((st) => st.kode !== SATKER_KANWIL.kode)
+    .map((st) => ({ st, jumlah: pegawaiJatuhTempo.filter((p) => cocokSatker(p, st.kode)).length }))
+    .filter((x) => x.jumlah > 0);
+  const labelSaringan =
+    saringSatker === "semua" ? "semua satker"
+    : saringSatker === "upt" ? "seluruh UPT"
+    : namaTampilSatker(SATKER.find((st) => st.kode === saringSatker) ?? SATKER_KANWIL);
+
+  // Pantau satker: angka per tahap dari antrian yang sama, ditambah usulan UPT yang menunggu.
+  const usulanPerSatker = new Map<string, number>();
+  for (const u of usulanPerPegawai.values()) {
+    const kode = cariSatker(u.unitKerja)?.kode;
+    if (kode) usulanPerSatker.set(kode, (usulanPerSatker.get(kode) ?? 0) + 1);
+  }
+  const barisPantau: BarisPantau[] = SATKER.map((st) => {
+    const milik = pegawaiJatuhTempo.filter((p) => kodeSatkerPegawai(p.unitKerja) === st.kode).map(posisiAntrian);
+    return {
+      kode: st.kode,
+      nama: namaTampilSatker(st),
+      kanwil: st.kode === SATKER_KANWIL.kode,
+      lewat: milik.filter((x) => x === "lewat").length,
+      perluInput: milik.filter((x) => x === "siap").length,
+      diproses: milik.filter((x) => x === "diproses").length,
+      diKeuangan: milik.filter((x) => x === "keuangan" || x === "rekam_upt").length,
+      usulan: usulanPerSatker.get(st.kode) ?? 0,
+    };
+  });
+
   const namaBulanFilter = filterMonth
     ? (() => {
         const [y, m] = filterMonth.split("-");
@@ -511,23 +461,14 @@ function DashboardMain() {
       aksi: { label: "Tampilkan", onClick: bukaAntrian("perlu") },
     });
 
-  // KGB dengan TMT dua bulan ke depan yang belum dikirim ke keuangan
-  {
-    const h2Target = new Date(today.getFullYear(), today.getMonth() + 2, 1);
-    const kunciH2 = `${h2Target.getFullYear()}-${String(h2Target.getMonth() + 1).padStart(2, "0")}`;
-    const belumKirimH2 = pegawaiJatuhTempo.filter(
-      (p) => kunciBulan(p.tmtKgbBerikutnya) === kunciH2 && p.statusKGB !== "menunggu_keuangan" && p.statusKGB !== "selesai" && !p.isLocked,
-    );
-    const h2BulanNama = h2Target.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-    const deadlineBulanNama = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-    if (belumKirimH2.length > 0)
-      tindakan.push({
-        id: "h2-deadline",
-        nada: "biru",
-        isi: <><strong>{belumKirimH2.length} KGB berlaku {h2BulanNama}</strong> belum dikirim ke keuangan. Kirim sebelum akhir {deadlineBulanNama}.</>,
-        aksi: { label: "Tampilkan", onClick: bukaAntrian("perlu", kunciH2) },
-      });
-  }
+  // Usulan data UPT yang menunggu tinjauan: ditinjau langsung dari kartu atau baris (ADR-011).
+  if (usulanPerPegawai.size > 0)
+    tindakan.push({
+      id: "usulan-upt",
+      nada: "ungu",
+      isi: <><strong>{usulanPerPegawai.size} usulan data UPT</strong> menunggu tinjauan; tombolnya ada di kartu pegawai.</>,
+      aksi: { label: "Semua usulan", href: "/dashboard/usulan" },
+    });
 
   // Permintaan follow up dari keuangan
   for (const notif of (followupNotifs ?? [])) {
@@ -613,7 +554,8 @@ function DashboardMain() {
       if (pos === "lewat") pindah.selesai = "Arsip, SK sudah terbit di luar SIM-KGB";
     }
     if (kolom === "proses" && p.kgbId) {
-      pindah.keuangan = p.skSudahDibuat ? "Unggah SK TTE" : "Buat SK dulu";
+      // Sesudah diunggah, SK pegawai UPT ditindaklanjuti keuangan UPT, bukan keuangan Kanwil (ADR-009).
+      pindah[dipegangKeuanganKanwil(p.unitKerja) ? "keuangan" : "rekam_upt"] = p.skSudahDibuat ? "Unggah SK TTE" : "Buat SK dulu";
       pindah.input = "Batalkan proses";
     }
     const tanda: NonNullable<KartuPapan["tanda"]> = [];
@@ -625,7 +567,7 @@ function DashboardMain() {
     if (usulan) tanda.push({ teks: "Ada usulan UPT", nada: "ungu" });
     const [catatan, catatanNada]: [string | undefined, Nada | undefined] =
       pos === "terkunci" ? [buka ? `dibuka ${formatTanggalId(buka, { day: "numeric", month: "short" })}` : "belum dibuka", undefined]
-      : pos === "keuangan" || pos === "selesai" ? [undefined, undefined]
+      : pos === "keuangan" || pos === "rekam_upt" || pos === "selesai" ? [undefined, undefined]
       : hari < 0 ? [`lewat batas ${-hari} hari`, "merah"]
       : hari <= 7 ? [hari === 0 ? "batas hari ini" : `batas ${hari} hari lagi`, "merah"]
       : [`batas ${formatTanggalId(p.deadlineSDM, { day: "numeric", month: "short" })}`, undefined];
@@ -661,7 +603,7 @@ function DashboardMain() {
       setModal({ jenis: "input", pegawai: pegawaiModal(p), ulang: p.statusKGB === "ditolak", dasarAwal: dasarAwalInputKgb(p) });
     } else if (dari === "input" && ke === "selesai" && posisiAntrian(p) === "lewat") {
       setModal({ jenis: "arsip", pegawai: pegawaiModal(p) });
-    } else if (dari === "proses" && ke === "keuangan" && p.kgbId) {
+    } else if (dari === "proses" && (ke === "keuangan" || ke === "rekam_upt") && p.kgbId) {
       if (p.skSudahDibuat) setModal({ jenis: "unggah_sk", kgbId: p.kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) });
       else bukaBuatSk(p);
     } else if (dari === "proses" && ke === "input" && p.kgbId) {
@@ -714,12 +656,14 @@ function DashboardMain() {
   }
 
   const pctKgbSelesai = stats.kgbTahunIni > 0 ? Math.round((stats.selesai / stats.kgbTahunIni) * 100) : 0;
-  const menungguKeuangan = Math.min(stats.menungguKeuangan ?? 0, stats.sedangDiproses);
+  const keuanganKanwil = pegawaiJatuhTempo.filter((p) => posisiAntrian(p) === "keuangan").length;
+  const rekamUpt = pegawaiJatuhTempo.filter((p) => posisiAntrian(p) === "rekam_upt").length;
   const nama = namaSapaan(dashUser.nama, ROLE_LABEL[role]);
-  const rincianRapelan = [
-    stats.rapelanBerisiko > 0 ? `${terlambatList.length} belum diinput` : "Tidak ada potensi rapelan",
-    stats.rapelanKonfirmasi > 0 ? `${stats.rapelanKonfirmasi} ditetapkan keuangan` : null,
-  ].filter(Boolean).join(" · ");
+  // Jumlah yang lewat batas input sudah disebut di kartu Belum diproses; di sini cukup keputusan keuangannya.
+  const rincianRapelan =
+    stats.rapelanKonfirmasi > 0 ? `${stats.rapelanKonfirmasi} ditetapkan keuangan`
+    : stats.rapelanBerisiko > 0 ? "Belum ada yang ditetapkan"
+    : "Tidak ada potensi rapelan";
 
   return (
     <>
@@ -761,15 +705,19 @@ function DashboardMain() {
               setRincian({
                 judul: "Dalam proses",
                 nada: "navy",
-                posisi: ["diproses", "keuangan"],
+                posisi: ["diproses", "keuangan", "rekam_upt"],
                 tahap: "keuangan",
                 dariTahun: `${stats.sedangDiproses} sedang berjalan`,
               })
             }
             label="Dalam proses"
             angka={stats.sedangDiproses}
-            meta={menungguKeuangan > 0 ? `${menungguKeuangan} di keuangan` : "Tidak ada yang di keuangan"}
-            metaNada={menungguKeuangan > 0 ? "ungu" : undefined}
+            meta={
+              keuanganKanwil + rekamUpt > 0
+                ? [keuanganKanwil > 0 ? `${keuanganKanwil} keuangan Kanwil` : "", rekamUpt > 0 ? `${rekamUpt} rekam UPT` : ""].filter(Boolean).join(" · ")
+                : "Tidak ada yang di keuangan"
+            }
+            metaNada={keuanganKanwil + rekamUpt > 0 ? "ungu" : undefined}
           />
           <Stat
             nada="hijau"
@@ -799,6 +747,21 @@ function DashboardMain() {
         </StripStat>
       </PanelNavy>
 
+      {/* -- Lini masa jendela input per bulan TMT (ADR-012) -- */}
+      <section className="dsb-panel dsb-muncul" style={{ "--i": 1 } as React.CSSProperties} aria-labelledby="judul-lini-masa">
+        <div className="dsb-panel-kepala">
+          <h2 id="judul-lini-masa" className="dsb-panel-judul">
+            Jendela input per bulan TMT <small>{labelSaringan}</small>
+          </h2>
+          {filterMonth && (
+            <button type="button" className="dsb-tautan" onClick={() => setFilterMonth(null)}>
+              Semua bulan
+            </button>
+          )}
+        </div>
+        <LiniMasaKgb entri={entriLiniMasa} bulanTerpilih={filterMonth} onPilih={(m) => { setFilterMonth(m); setTahap("semua"); }} />
+      </section>
+
       <div className="dsb-dasbor-isi">
 
         {/* -- Antrian kerja KGB -- */}
@@ -827,6 +790,31 @@ function DashboardMain() {
             </div>
           </div>
 
+          <div className="dsb-alat" style={{ padding: "10px 16px 0" }}>
+            <div className="dsb-segmen" role="group" aria-label="Saring satker">
+              <button type="button" aria-pressed={saringSatker === "semua"} onClick={() => setSaringSatker("semua")}>
+                Semua <span style={{ color: "var(--dt5)" }}>{pegawaiJatuhTempo.length}</span>
+              </button>
+              <button type="button" aria-pressed={saringSatker === SATKER_KANWIL.kode} onClick={() => setSaringSatker(SATKER_KANWIL.kode)}>
+                Kanwil <span style={{ color: "var(--dt5)" }}>{jumlahKanwil}</span>
+              </button>
+              <button type="button" aria-pressed={saringSatker === "upt"} onClick={() => setSaringSatker("upt")}>
+                UPT <span style={{ color: "var(--dt5)" }}>{pegawaiJatuhTempo.length - jumlahKanwil}</span>
+              </button>
+            </div>
+            <select
+              className="dsb-cari"
+              style={{ flex: "0 1 240px" }}
+              aria-label="Pilih satu UPT"
+              value={uptBerisi.some((x) => x.st.kode === saringSatker) ? saringSatker : ""}
+              onChange={(e) => setSaringSatker(e.target.value || "upt")}
+            >
+              <option value="">Pilih satu UPT…</option>
+              {uptBerisi.map(({ st, jumlah }) => (
+                <option key={st.kode} value={st.kode}>{namaTampilSatker(st)} ({jumlah})</option>
+              ))}
+            </select>
+          </div>
           <div className="dsb-alat" style={{ padding: "10px 16px", borderBottom: "1px solid var(--ln2)" }}>
             {tampilan === "daftar" ? (
               <div className="dsb-segmen" role="group" aria-label="Saring tahap">
@@ -894,7 +882,7 @@ function DashboardMain() {
                         </td>
                         <td className="whitespace-nowrap">
                           {formatTanggalId(p.tmtKgbBerikutnya, { month: "short", year: "numeric" })}
-                          {pos !== "selesai" && pos !== "keuangan" && (
+                          {pos !== "selesai" && pos !== "keuangan" && pos !== "rekam_upt" && (
                             <p className="dsb-kecil" style={{ margin: 0, color: pos === "lewat" || (hari >= 0 && hari <= 7) ? "var(--st-red)" : undefined }}>
                               Batas {formatTanggalId(p.deadlineSDM, { day: "numeric", month: "short" })} ·{" "}
                               {pos === "terkunci" ? "belum dibuka" : hari < 0 ? `lewat ${-hari} hari` : hari === 0 ? "hari ini" : `${hari} hari lagi`}
@@ -925,29 +913,16 @@ function DashboardMain() {
           </div>
         </section>
 
-        {/* -- Kolom pendamping: tindakan, kalender, satker -- */}
+        {/* -- Kolom pendamping: tindakan dan pantau satker -- */}
         <aside className="dsb-samping dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-label="Ringkasan pendamping">
           <PanelTindakan daftar={tindakan} kosong="Tidak ada KGB yang perlu ditindaklanjuti saat ini." lainnyaHref="/dashboard/notifikasi" />
 
-          <section className="dsb-panel" aria-labelledby="judul-kgb-bulan">
-            <div className="dsb-panel-kepala">
-              <h2 id="judul-kgb-bulan" className="dsb-panel-judul">KGB per bulan <small>{tahunIni}</small></h2>
-              {filterMonth && <button type="button" className="dsb-tautan" onClick={() => setFilterMonth(null)}>Semua bulan</button>}
-            </div>
-            <div className="dsb-panel-isi flex flex-col gap-3">
-              <MonthGrid pegawaiKalender={pegawaiKalenderDerived} selesaiKalender={selesaiKalenderDerived} filterMonth={filterMonth} onSelect={(m) => { setFilterMonth(m); setTahap("semua"); }} />
-              <div className="dsb-legenda">
-                <span><span className="dsb-titik" data-nada="merah" aria-hidden="true" />Terlambat</span>
-                <span><span className="dsb-titik" data-nada="kuning" aria-hidden="true" />≤7 hari</span>
-                <span><span className="dsb-titik" data-nada="kuning" data-cincin="" aria-hidden="true" />≤30 hari</span>
-                <span><span className="dsb-titik" data-nada="hijau" aria-hidden="true" />Aman</span>
-                <span><span className="dsb-titik" data-nada="emas" data-cincin="" aria-hidden="true" />Bulan ini</span>
-              </div>
-            </div>
-          </section>
-
-          <PanelGajiWebUpt versi={lastRefresh?.getTime()} />
-          <PemantauanSatker versi={lastRefresh?.getTime()} />
+          <PanelPantauSatker
+            baris={barisPantau}
+            terpilih={saringSatker === "semua" || saringSatker === "upt" ? null : saringSatker}
+            onPilih={(kode) => setSaringSatker(kode ?? "semua")}
+            versi={lastRefresh?.getTime()}
+          />
         </aside>
       </div>
 
