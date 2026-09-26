@@ -6,7 +6,7 @@ import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
 import { pegawaiSatker } from "@/lib/aksesUpt";
-import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, usulanKosong } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { bacaIsianUsulan, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, simpanBerkasUsulan } from "@/lib/berkasUsulan";
@@ -52,7 +52,7 @@ export async function GET() {
         status: u.status,
         nomorSurat: u.nomorSurat,
         tanggalSurat: u.tanggalSurat ? new Date(u.tanggalSurat).toISOString() : null,
-        berkas: BERKAS_USULAN.filter((b) => u[b.kunci]).map((b) => ({ medan: b.medan, label: b.label })),
+        berkas: BERKAS_USULAN.filter((b) => u[b.kunci]).map((b) => ({ medan: b.medan, label: b.label, nama: namaAsliBerkas(u[b.kunci]) })),
         hukdisAda: !!u.hukdisAda,
         // Dibandingkan dengan data induk sekarang, jadi hanya bermakna sebelum ditinjau: sesudah disetujui
         // data induk sudah sama dengan usulannya, dan angkanya menjadi 0 atau menyesatkan.

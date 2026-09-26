@@ -356,3 +356,35 @@ export function kekuranganUsulan(
   }
   return kurang;
 }
+
+// Nama asli berkas usulan disimpan di kunci objek R2 (tanpa kolom baru), disandikan base64url karena kunci
+// hanya boleh memuat huruf, angka, titik, garis bawah, dan tanda hubung (lib/berkasSk.ts). Kunci lama tanpa
+// bagian ini tetap berlaku; namanya saja yang tidak diketahui.
+const POLA_KUNCI_BERNAMA = /^usulan\/[^_/]+_[^_/]+_\d+_n-([A-Za-z0-9_-]+)\.pdf$/;
+
+function keBase64Url(teks: string): string {
+  let biner = "";
+  for (const b of new TextEncoder().encode(teks)) biner += String.fromCharCode(b);
+  return btoa(biner).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function dariBase64Url(sandi: string): string | null {
+  try {
+    const biner = atob(sandi.replace(/-/g, "+").replace(/_/g, "/"));
+    return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(biner, (c) => c.charCodeAt(0)));
+  } catch {
+    return null;
+  }
+}
+
+/** Kunci objek R2 untuk satu berkas usulan, memuat nama aslinya (dipangkas 100 karakter). */
+export function kunciBerkasUsulan(kode: string, medan: string, waktu: number, namaAsli: string): string {
+  const nama = namaAsli.trim().slice(0, 100);
+  return nama ? `usulan/${kode}_${medan}_${waktu}_n-${keBase64Url(nama)}.pdf` : `usulan/${kode}_${medan}_${waktu}.pdf`;
+}
+
+/** Nama asli berkas dari kuncinya; null untuk kunci lama yang tidak memuatnya. */
+export function namaAsliBerkas(kunci: string | null | undefined): string | null {
+  const cocok = POLA_KUNCI_BERNAMA.exec(kunci ?? "");
+  return cocok ? dariBase64Url(cocok[1]) : null;
+}

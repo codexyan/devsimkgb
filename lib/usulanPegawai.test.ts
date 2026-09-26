@@ -188,3 +188,15 @@ test("berkas yang wajib bertukar menurut pernah atau belum pernah KGB", () => {
   // Surat usulan diunggah sekali pada langkah Ajukan, bukan per pegawai.
   for (const pernah of [true, false]) assert.equal(berkasWajib(wajibUntuk("berkas"), pernah), false);
 });
+
+test("nama asli berkas usulan tersimpan di kunci R2 dan dapat dibaca kembali", async () => {
+  const { kunciBerkasUsulan, namaAsliBerkas } = await import("./usulanPegawai");
+  const { kunciUsulan } = await import("./berkasSk");
+  const kunci = kunciBerkasUsulan("rutan-rantau", "skCpns", 1758860000000, "SK CPNS Fariz (asli).pdf");
+  assert.equal(kunciUsulan(kunci), kunci, "kunci tetap lolos pola kunci usulan");
+  assert.equal(namaAsliBerkas(kunci), "SK CPNS Fariz (asli).pdf");
+  assert.equal(namaAsliBerkas(kunciBerkasUsulan("lapas-banjarmasin", "berkas", 1, "Surat_ÜPT.pdf")), "Surat_ÜPT.pdf");
+  // Kunci lama tanpa nama tetap dikenali sebagai berkas, hanya namanya yang tidak ada.
+  assert.equal(namaAsliBerkas("usulan/rutan-rantau_skCpns_1758860000000.pdf"), null);
+  assert.equal(namaAsliBerkas(null), null);
+});

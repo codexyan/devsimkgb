@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { BATAS_BERKAS_USULAN_BYTE, BERKAS_USULAN, PESAN_BERKAS_TERLALU_BESAR } from "./usulanPegawai";
+import { BATAS_BERKAS_USULAN_BYTE, BERKAS_USULAN, PESAN_BERKAS_TERLALU_BESAR, kunciBerkasUsulan } from "./usulanPegawai";
 import { adaPenandaPdf } from "./prosesKgb";
 
 // Batasnya didefinisikan di lib/usulanPegawai.ts agar formulir di peramban memeriksa hal yang sama sebelum mengunggah.
@@ -32,7 +32,8 @@ export async function simpanBerkasUsulan(
       return { galat: NextResponse.json({ error: PESAN_TERLALU_BESAR }, { status: 413 }) };
     if (!adaPenandaPdf(new Uint8Array(await isi.slice(0, 1024).arrayBuffer())))
       return { galat: NextResponse.json({ error: `${berkas.label} bukan PDF yang valid` }, { status: 400 }) };
-    const kunciObjek = `usulan/${kode}_${berkas.medan}_${Date.now()}.pdf`;
+    // Nama asli ikut di kunci agar formulir dapat menampilkannya kembali (lib/usulanPegawai.ts).
+    const kunciObjek = kunciBerkasUsulan(kode, berkas.medan, Date.now(), isi.name);
     try {
       const { env } = await getCloudflareContext({ async: true });
       await env.SK_BUCKET.put(kunciObjek, await isi.arrayBuffer(), { httpMetadata: { contentType: "application/pdf" } });

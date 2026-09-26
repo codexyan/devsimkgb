@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { canProcessKGB } from "@/lib/auth";
-import { BERKAS_USULAN, bandingkanUsulan, nilaiUsulan, ringkasHukdisUsulan } from "@/lib/usulanPegawai";
+import { BERKAS_USULAN, bandingkanUsulan, nilaiUsulan, ringkasHukdisUsulan, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
 import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
@@ -44,7 +44,7 @@ export async function GET(req: Request) {
         status: u.status,
         nomorSurat: u.nomorSurat,
         tanggalSurat: u.tanggalSurat ? new Date(u.tanggalSurat).toISOString() : null,
-        berkas: BERKAS_USULAN.filter((b) => u[b.kunci]).map((b) => ({ medan: b.medan, label: b.label })),
+        berkas: BERKAS_USULAN.filter((b) => u[b.kunci]).map((b) => ({ medan: b.medan, label: b.label, nama: namaAsliBerkas(u[b.kunci]) })),
         // Usulan yang menunggu dibandingkan dengan data induk; yang sudah ditinjau menampilkan nilai
         // yang diusulkan, karena data induk mungkin sudah menyamainya.
         // Usulan pegawai baru belum punya pembanding, jadi selalu menampilkan nilai yang diusulkan.

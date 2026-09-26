@@ -17,6 +17,7 @@ export default function KolomBerkas({
   bantuan,
   dipilih,
   urlTersimpan,
+  namaTersimpan,
   ditandaiHapus,
   onPilih,
   onHapusTersimpan,
@@ -30,6 +31,8 @@ export default function KolomBerkas({
   dipilih: File | null;
   /** Alamat berkas yang sudah tersimpan di server; null bila belum ada. */
   urlTersimpan: string | null;
+  /** Nama asli berkas tersimpan; null untuk unggahan lama yang namanya tidak tercatat. */
+  namaTersimpan?: string | null;
   /** Berkas tersimpan ditandai untuk dihapus saat formulir disimpan. */
   ditandaiHapus: boolean;
   onPilih: (berkas: File | null) => void;
@@ -82,7 +85,7 @@ export default function KolomBerkas({
             <path d="M14 2v6h6" />
           </svg>
           <span className="kgbm-kartu-berkas-teks">
-            <span className="kgbm-kartu-berkas-nama">{dipilih ? dipilih.name : label}</span>
+            <span className="kgbm-kartu-berkas-nama">{dipilih ? dipilih.name : namaTersimpan || label}</span>
             <span className="kgbm-kartu-berkas-ket">
               {dipilih
                 ? `${ukuranBerkas(dipilih.size)} · baru dipilih, diunggah saat data disimpan`

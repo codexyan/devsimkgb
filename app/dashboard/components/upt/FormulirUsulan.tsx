@@ -29,7 +29,7 @@ export interface DrafUsulanUpt {
   nilai: Record<string, string> | null;
   surat: { nomorSurat: string; tanggalSurat: string; nomorSkTerakhir: string; tanggalSkTerakhir: string; catatanUpt: string } | null;
   hukdis: { ada: boolean; jenis: string; nomorSk: string; tmtMulai: string; tmtBerakhir: string; keterangan: string } | null;
-  berkas: { medan: string; label: string }[];
+  berkas: { medan: string; label: string; nama?: string | null }[];
 }
 
 export interface PegawaiUntukUsulan {
@@ -594,7 +594,7 @@ export default function FormulirUsulan({
         <div className="kgbm-bagian-isi">
           {BERKAS_USULAN.map((b) => {
             const wajib = berkasWajib(b.wajibUntuk, pernahKgb);
-            const tersimpan = draf?.berkas.some((x) => x.medan === b.medan) ?? false;
+            const simpanan = draf?.berkas.find((x) => x.medan === b.medan) ?? null;
             return (
               <KolomBerkas
                 key={b.medan}
@@ -602,7 +602,8 @@ export default function FormulirUsulan({
                 wajib={wajib}
                 bantuan={`${b.keterangan} ${catatanWajib(b.wajibUntuk, wajib)}`.trim()}
                 dipilih={berkas[b.medan] ?? null}
-                urlTersimpan={draf && tersimpan ? `/api/usulan/${draf.id}/berkas?berkas=${b.medan}` : null}
+                urlTersimpan={draf && simpanan ? `/api/usulan/${draf.id}/berkas?berkas=${b.medan}` : null}
+                namaTersimpan={simpanan?.nama ?? null}
                 ditandaiHapus={hapusTersimpan.has(b.medan)}
                 onPilih={(f) => {
                   setBerkas((lama) => ({ ...lama, [b.medan]: f }));
