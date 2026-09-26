@@ -43,6 +43,19 @@ function colLetter(index: number): string {
   return s;
 }
 
+/**
+ * Posisi kolom `nama` pada baris sheet. Dicari menurut header; bila header di posisi definisinya masih
+ * kosong, posisi definisi yang dipakai. Penulisan baris posisional dan kolom baru selalu ditambahkan di
+ * ujung kanan, jadi kolom yang belum sempat diberi header (sinkronHeader belum dijalankan) tetap terbaca,
+ * alih-alih nilainya tertulis tetapi hilang saat dibaca. Header lain di posisi itu berarti susunan sheet
+ * berbeda, dan kolomnya dianggap tidak ada.
+ */
+export function indeksKolom(header: readonly (string | undefined)[], nama: string, posisi: number): number {
+  const idx = header.indexOf(nama);
+  if (idx >= 0) return idx;
+  return (header[posisi] ?? "").trim() === "" ? posisi : -1;
+}
+
 function parseCell(raw: string | undefined, type: ColumnType): unknown {
   if (raw === undefined || raw === "") return null;
   switch (type) {
@@ -185,9 +198,8 @@ export class Table<T extends object = Row> {
       // Lewati baris kosong (bekas hapus).
       if (!cells || cells.every((c) => c === "" || c === undefined)) continue;
       const record = {} as Row;
-      this.def.columns.forEach((col) => {
-        const idx = header.indexOf(col.name);
-        record[col.name] = parseCell(idx >= 0 ? cells[idx] : undefined, col.type);
+      this.def.columns.forEach((col, posisi) => {
+        record[col.name] = parseCell(cells[indeksKolom(header, col.name, posisi)], col.type);
       });
       out.push({ record: record as T, rowNumber: i + 1 }); // 1-based, +1 utk header
     }

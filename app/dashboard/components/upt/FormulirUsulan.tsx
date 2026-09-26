@@ -199,6 +199,18 @@ export default function FormulirUsulan({
     });
   }
 
+  // Berkas yang baru dipilih hanya ada di peramban sampai data disimpan; menutup formulir tanpa
+  // menyimpan membuangnya, jadi ditanyakan dulu agar tidak hilang tanpa disadari.
+  const adaBerkasBelumDisimpan = Object.values(berkas).some(Boolean) || hapusTersimpan.size > 0;
+  function tutup() {
+    if (
+      adaBerkasBelumDisimpan &&
+      !window.confirm("Ada berkas yang belum disimpan. Bila formulir ditutup sekarang, berkas itu tidak ikut tersimpan. Tutup tanpa menyimpan?")
+    )
+      return;
+    onTutup();
+  }
+
   function tutupPratinjau() {
     // Blob URL berkas yang baru dipilih dicabut agar memorinya dilepas.
     if (pratinjau?.lokal) URL.revokeObjectURL(pratinjau.url);
@@ -271,11 +283,11 @@ export default function FormulirUsulan({
       }
       ukuran="lg"
       sibuk={mengirim}
-      onTutup={onTutup}
+      onTutup={tutup}
       onKirim={() => void simpan()}
       kaki={
         <>
-          <button type="button" className="kgbm-tombol kgbm-kedua" onClick={onTutup} disabled={mengirim}>
+          <button type="button" className="kgbm-tombol kgbm-kedua" onClick={tutup} disabled={mengirim}>
             Batal
           </button>
           <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
