@@ -92,6 +92,8 @@ export interface RiwayatKGBRow {
   inputGajiWebAt: Date | null; inputGajiWebBy: string | null; createdBy: string; createdAt: Date | null;
   /** Pejabat yang menetapkan SK dasar; dicetak pada baris "Oleh" di surat KGB. */
   penetapSkDasar: string | null;
+  /** Nomor dan tanggal SK baru yang disimpan sebagai draf, belum dibuat menjadi SK (ADR-011). */
+  drafNomorSurat: string | null; drafTanggalSurat: Date | null;
 }
 
 /**
@@ -193,7 +195,7 @@ export const defs = {
       i("mkgTahunBaru"), i("mkgBulanBaru"), d("tmtKgbBaru"), d("tmtKgbBerikutnya"), s("status"),
       b("flagRapelan"), b("isArsip"), d("konfirmasiKeuanganAt"), s("konfirmasiKeuanganBy"),
       b("rapelanDitetapkan"), d("inputGajiWebAt"), s("inputGajiWebBy"), s("createdBy"), d("createdAt"),
-      s("penetapSkDasar"),
+      s("penetapSkDasar"), s("drafNomorSurat"), d("drafTanggalSurat"),
     ],
   },
   SuratKGB: {
@@ -329,6 +331,8 @@ export function makeRiwayatKGB(p: Partial<RiwayatKGBRow>): RiwayatKGBRow {
     createdBy: p.createdBy ?? "",
     createdAt: p.createdAt ?? new Date(),
     penetapSkDasar: p.penetapSkDasar ?? null,
+    drafNomorSurat: p.drafNomorSurat ?? null,
+    drafTanggalSurat: p.drafTanggalSurat ?? null,
   };
 }
 

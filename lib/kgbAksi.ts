@@ -213,6 +213,20 @@ export function batalkanKgb(kgbId: string, alasan: string): Promise<HasilAksi<un
   );
 }
 
+/** Draf nomor dan tanggal SK baru yang tersimpan di SIM-KGB (ADR-011). */
+export function ambilDrafSk(kgbId: string): Promise<HasilAksi<{ drafNomorSurat: string | null; drafTanggalSurat: string | null }>> {
+  return kirimJson(`/api/kgb/${encodeURIComponent(kgbId)}`, { cache: "no-store" }, "Draf SK gagal dimuat.");
+}
+
+/** Simpan draf nomor dan tanggal SK baru tanpa membuat SK; nomor kosong menghapus drafnya. */
+export function simpanDrafSkServer(kgbId: string, draf: { nomorSurat: string; tanggalSurat: string }): Promise<HasilAksi<unknown>> {
+  return kirimJson<unknown>(
+    `/api/kgb/${encodeURIComponent(kgbId)}`,
+    { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify({ drafSk: draf }) },
+    "Draf SK gagal disimpan.",
+  );
+}
+
 /** Simpan bagian Atas Dasar SK Terakhir sebelum SK dibuat: PATCH /api/kgb/[id]. */
 export function simpanDasarSk(kgbId: string, dasar: DataDasarSk): Promise<HasilAksi<unknown>> {
   return kirimJson<unknown>(

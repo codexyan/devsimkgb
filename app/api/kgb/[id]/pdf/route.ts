@@ -15,7 +15,7 @@ import { alasanTolakBuatSk, bacaTanggalInput, type SuratKgbTersimpan } from "@/l
 import type { HukdisUntukKgb } from "@/lib/prosesKgb";
 import { periksaUlangKgb } from "@/lib/pemeriksaanUlangKgb";
 import { hariIniWita, type NilaiTanggal } from "@/lib/waktu";
-import { kunciNomorSk } from "@/lib/nomorSurat";
+import { nomorSkBentrok } from "@/lib/nomorSkBentrok";
 
 export const runtime = "nodejs";
 
@@ -160,22 +160,10 @@ export async function POST(
     nomorSurat = nomorSuratBody;
     tanggalSurat = tanggal;
 
-    // Satu nomor dari arsiparis untuk satu SK. Diperiksa juga saat pratinjau, agar nomor yang bentrok
-    // ketahuan sebelum operator menekan Buat dan Unduh SK.
-    const kunci = kunciNomorSk(nomorSurat);
-    const bentrok = ((await db.suratKGB.findMany()) as SuratKgbTersimpan[]).find(
-      (s) => s.kgbId !== id && kunciNomorSk(s.nomorSurat) === kunci,
-    );
-    if (bentrok) {
-      const kgbLain = await db.riwayatKGB.findUnique({ id: bentrok.kgbId });
-      const pegawaiLain = kgbLain ? await db.pegawai.findUnique({ id: kgbLain.pegawaiId }) : null;
-      return NextResponse.json(
-        {
-          error: `Nomor SK ${nomorSurat} sudah dipakai SK KGB ${pegawaiLain ? `${pegawaiLain.nama} (${pegawaiLain.nip})` : "pegawai lain"}. Minta nomor lain kepada arsiparis.`,
-        },
-        { status: 409 },
-      );
-    }
+    // Satu nomor dari arsiparis untuk satu SK, termasuk yang dipesan sebagai draf KGB lain. Diperiksa juga
+    // saat pratinjau, agar nomor yang bentrok ketahuan sebelum operator menekan Buat dan Unduh SK.
+    const bentrok = await nomorSkBentrok(nomorSurat, id);
+    if (bentrok) return NextResponse.json({ error: bentrok }, { status: 409 });
   }
 
   let penandatangan: { id: string | null; jenis: JenisPenandatangan; jabatan: string; nama: string; nip: string };
@@ -264,6 +252,10 @@ export async function POST(
         generatedBy: userLogin.id,
       });
     }
+
+    // Draf nomor sudah menjadi SK; kolomnya dikosongkan agar tidak lagi memesan nomor itu.
+    if (kgb.drafNomorSurat || kgb.drafTanggalSurat)
+      await db.riwayatKGB.update({ id }, { drafNomorSurat: null, drafTanggalSurat: null });
 
     logAudit({
       userId: userLogin.id,

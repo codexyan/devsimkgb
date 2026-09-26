@@ -6,6 +6,7 @@ import { useRole, useDashUser } from "@/app/dashboard/components/RoleContext";
 import { ROLES, ROLE_LABEL } from "@/lib/auth";
 import dynamic from "next/dynamic";
 import type { KartuPapan, KolomPapan } from "@/app/dashboard/components/PapanAntrian";
+import type { UsulanMenunggu } from "@/app/dashboard/components/ModalUsulanUpt";
 
 /* Satu akun hanya memakai satu dashboard peran. Memuatnya sesuai kebutuhan menekan kerja server per
    permintaan dan biaya mulai isolate; tampilan sementaranya memakai kerangka yang sama dengan panel lain. */
@@ -15,6 +16,7 @@ const DashboardKeuangan = dynamic(() => import("@/app/dashboard/components/Dashb
 const DashboardUpt = dynamic(() => import("@/app/dashboard/components/DashboardUpt"), { ssr: false, loading: Memuat });
 const PemantauanSatker = dynamic(() => import("@/app/dashboard/components/PemantauanSatker"), { ssr: false });
 const PanelGajiWebUpt = dynamic(() => import("@/app/dashboard/components/PanelGajiWebUpt"), { ssr: false });
+const ModalUsulanUpt = dynamic(() => import("@/app/dashboard/components/ModalUsulanUpt"), { ssr: false });
 const PapanAntrian = dynamic(() => import("@/app/dashboard/components/PapanAntrian"), { ssr: false });
 import {
   KerangkaDashboard,
@@ -327,6 +329,9 @@ function DashboardMain() {
   const [cariAntrian, setCariAntrian] = useState("");
   const [filterMonth, setFilterMonth] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalAksi | null>(null);
+  // Usulan data UPT yang menunggu tinjauan, per pegawai: tampil langsung di papan dan daftar (ADR-011).
+  const [usulanPerPegawai, setUsulanPerPegawai] = useState<Map<string, UsulanMenunggu>>(() => new Map());
+  const [usulanDibuka, setUsulanDibuka] = useState<UsulanMenunggu | null>(null);
   const [pesanBerhasil, setPesanBerhasil] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -401,6 +406,24 @@ function DashboardMain() {
     const t = setTimeout(() => setPesanBerhasil(null), 8000);
     return () => clearTimeout(t);
   }, [pesanBerhasil]);
+
+  // Usulan UPT yang menunggu dimuat ulang setiap dasbor disegarkan.
+  useEffect(() => {
+    if (!lastRefresh) return;
+    let batal = false;
+    fetch("/api/usulan?status=menunggu")
+      .then((r) => (r.ok ? (r.json() as Promise<UsulanMenunggu[]>) : []))
+      .then((daftar) => {
+        if (batal || !Array.isArray(daftar)) return;
+        setUsulanPerPegawai(new Map(daftar.filter((u) => u.pegawaiId).map((u) => [u.pegawaiId as string, u])));
+      })
+      .catch(() => {
+        // Penanda usulan hanya pelengkap; kegagalannya tidak mengganggu papan.
+      });
+    return () => {
+      batal = true;
+    };
+  }, [lastRefresh]);
 
   if (loading) return <KerangkaDashboard />;
 
@@ -520,6 +543,23 @@ function DashboardMain() {
     setModal(null);
   }
 
+  /** Tombol penanda usulan UPT pada kartu dan baris; membuka tinjauannya di tempat. */
+  function tombolUsulan(p: { id: string }) {
+    const u = usulanPerPegawai.get(p.id);
+    if (!u) return null;
+    return (
+      <button
+        type="button"
+        className="dsb-tombol dsb-tombol-kecil"
+        data-jenis="garis"
+        onClick={() => setUsulanDibuka(u)}
+        title="Tinjau usulan data dari UPT"
+      >
+        Usulan UPT{u.perubahan.length > 0 ? ` (${u.perubahan.length})` : ""}
+      </button>
+    );
+  }
+
   function aksiBerhasil(pesan: string) {
     setModal(null);
     setPesanBerhasil(pesan);
@@ -581,6 +621,8 @@ function DashboardMain() {
     if (dibatalkan) tanda.push({ teks: "Dibatalkan", nada: "merah" });
     if (p.flagRapelan && pos !== "selesai") tanda.push({ teks: "Berpotensi rapelan", nada: "kuning" });
     if (p.statusHukdis) tanda.push({ teks: `Hukdis${p.tanggalHukdisBerakhir ? ` s.d. ${formatTanggalId(p.tanggalHukdisBerakhir, { day: "numeric", month: "short" })}` : ""}`, nada: "merah" });
+    const usulan = usulanPerPegawai.get(p.id);
+    if (usulan) tanda.push({ teks: "Ada usulan UPT", nada: "ungu" });
     const [catatan, catatanNada]: [string | undefined, Nada | undefined] =
       pos === "terkunci" ? [buka ? `dibuka ${formatTanggalId(buka, { day: "numeric", month: "short" })}` : "belum dibuka", undefined]
       : pos === "keuangan" || pos === "selesai" ? [undefined, undefined]
@@ -600,7 +642,12 @@ function DashboardMain() {
       catatanNada,
       nada: pos === "lewat" ? "merah" : undefined,
       tanda,
-      aksi: tombol ? <div className="dsb-aksi" style={{ flexWrap: "wrap", justifyContent: "flex-start" }}>{tombol}</div> : undefined,
+      aksi: tombol || usulan ? (
+        <div className="dsb-aksi" style={{ flexWrap: "wrap", justifyContent: "flex-start" }}>
+          {tombolUsulan(p)}
+          {tombol}
+        </div>
+      ) : undefined,
       pindah,
     };
   }
@@ -863,7 +910,7 @@ function DashboardMain() {
                           )}
                         </td>
                         <td className="kanan">
-                          <div className="dsb-aksi">{aksiBaris(p, pos)}</div>
+                          <div className="dsb-aksi">{tombolUsulan(p)}{aksiBaris(p, pos)}</div>
                         </td>
                       </tr>
                     );
@@ -1090,6 +1137,17 @@ function DashboardMain() {
         );
       })()}
 
+
+      {usulanDibuka && (
+        <ModalUsulanUpt
+          usulan={usulanDibuka}
+          onTutup={() => setUsulanDibuka(null)}
+          onBerhasil={(pesan) => {
+            setUsulanDibuka(null);
+            aksiBerhasil(pesan);
+          }}
+        />
+      )}
 
       {/* -- Modal aksi KGB bersama (app/dashboard/components/kgb) -- */}
       {modal?.jenis === "input" && (

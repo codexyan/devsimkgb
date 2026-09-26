@@ -5,12 +5,27 @@ import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { canProcessKGB } from "@/lib/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
-import { alasanTolakUbahSkTerakhir, bacaTanggalInput, tmtTerakhirSebelumInput } from "@/lib/prosesKgb";
+import { alasanTolakBuatSk, alasanTolakUbahSkTerakhir, bacaTanggalInput, tmtTerakhirSebelumInput } from "@/lib/prosesKgb";
+import { nomorSkBentrok } from "@/lib/nomorSkBentrok";
 import { samaTanggalKalender } from "@/lib/waktu";
 import { penundaanHukdisSelamaKgb } from "@/lib/dataPegawai";
 import type { RiwayatHukdisRow } from "@/lib/hukdisKedaluwarsa";
 
 export const runtime = "nodejs";
+
+/** Draf nomor dan tanggal SK baru satu KGB, untuk mengisi ulang Buat SK (ADR-011). */
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canProcessKGB(session.user.role!)) return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+  const { id } = await params;
+  const kgb = await db.riwayatKGB.findUnique({ id });
+  if (!kgb) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
+  return NextResponse.json({
+    drafNomorSurat: kgb.drafNomorSurat ?? null,
+    drafTanggalSurat: kgb.drafTanggalSurat ? new Date(kgb.drafTanggalSurat).toISOString() : null,
+  });
+}
 
 export async function PATCH(
   req: Request,
@@ -36,6 +51,28 @@ export async function PATCH(
     body = parsed as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: "Request body tidak valid" }, { status: 400 });
+  }
+
+  // Draf nomor dan tanggal SK baru (Simpan draf pada Buat SK, ADR-011). Disimpan tanpa membuat catatan
+  // surat, jadi status KGB dan tahapnya di papan tidak berubah. Nomornya dipesan: bentrok dengan SK atau
+  // draf KGB lain ditolak.
+  if (body.drafSk !== undefined) {
+    const draf = body.drafSk && typeof body.drafSk === "object" ? (body.drafSk as Record<string, unknown>) : {};
+    const nomor = typeof draf.nomorSurat === "string" ? draf.nomorSurat.trim() : "";
+    const teksTanggal = typeof draf.tanggalSurat === "string" ? draf.tanggalSurat.trim() : "";
+    const tanggal = teksTanggal ? bacaTanggalInput(teksTanggal) : null;
+    if (teksTanggal && !tanggal) return NextResponse.json({ error: "Tanggal SK Baru tidak valid" }, { status: 400 });
+
+    const kgb = await db.riwayatKGB.findUnique({ id });
+    if (!kgb) return NextResponse.json({ error: "Data KGB tidak ditemukan" }, { status: 404 });
+    const alasan = alasanTolakBuatSk(kgb.status);
+    if (alasan) return NextResponse.json({ error: alasan }, { status: 409 });
+    if (nomor) {
+      const bentrok = await nomorSkBentrok(nomor, id);
+      if (bentrok) return NextResponse.json({ error: bentrok }, { status: 409 });
+    }
+    await db.riwayatKGB.update({ id }, { drafNomorSurat: nomor || null, drafTanggalSurat: nomor ? tanggal : null });
+    return NextResponse.json({ ok: true });
   }
 
   // Update data SK terakhir (dasar surat), hanya selama KGB Sedang Diproses.

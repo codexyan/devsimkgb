@@ -14,6 +14,7 @@ import { bandingkanUsulan, perubahanPegawai, ringkasHukdisUsulan } from "./usula
 import { getGajiPokok, getPangkat } from "./tabelGaji";
 import { SATKER } from "./satker";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
+import { rencanakanPenyesuaianKgb } from "./sesuaikanKgbUsulan";
 
 export interface HasilSetujui {
   ok: true;
@@ -23,6 +24,8 @@ export interface HasilSetujui {
   /** Kalimat perubahan untuk jejak audit. */
   ringkasPerubahan: string;
   hukdis: string | null;
+  /** Penyesuaian KGB berjalan akibat usulan ini (lib/sesuaikanKgbUsulan.ts); null bila tidak ada. */
+  penyesuaianKgb: string | null;
 }
 
 export interface GagalSetujui {
@@ -45,8 +48,11 @@ export async function setujuiUsulan(
   pegawaiLama: PegawaiRow | null,
   oleh: string,
   sekarang: Date,
+  /** Id pengguna peninjau, untuk jadwal KGB yang dibuat ulang; bawaannya nama peninjau. */
+  userId: string = oleh,
 ): Promise<HasilSetujui | GagalSetujui> {
   const nilaiBaru = perubahanPegawai(usulan);
+  let terapkanPenyesuaian: ((userId: string) => Promise<string | null>) | null = null;
   let perubahan = pegawaiLama ? bandingkanUsulan(pegawaiLama, usulan) : [];
   let pegawaiIdHasil = usulan.pegawaiId;
 
@@ -119,6 +125,16 @@ export async function setujuiUsulan(
           pesan: `NIP ${nilaiBaru.nip} sudah tercatat atas nama ${bentrok.nama}. Kembalikan usulan ini agar UPT memeriksa NIP-nya.`,
         };
     }
+    // KGB yang sedang berjalan disesuaikan selama SK-nya belum diunggah; sesudahnya perubahan dasar gaji
+    // ditolak. Penolakan diperiksa sebelum apa pun ditulis (ADR-011).
+    const penyesuaian = await rencanakanPenyesuaianKgb(
+      pegawaiLama,
+      { ...pegawaiLama, ...(nilaiBaru as Partial<PegawaiRow>) },
+      perubahan.length > 0,
+    );
+    if (!penyesuaian.ok) return { ok: false, pesan: penyesuaian.pesan };
+    terapkanPenyesuaian = penyesuaian.terapkan;
+
     const tmtSiklus = (nilaiBaru.tmtKgbBerikutnya as Date | null) ?? pegawaiLama.tmtKgbBerikutnya ?? null;
     await db.pegawai.update(
       { id: pegawaiLama.id },
@@ -135,6 +151,8 @@ export async function setujuiUsulan(
     );
   }
 
+  const penyesuaianKgb = terapkanPenyesuaian ? await terapkanPenyesuaian(userId) : null;
+
   await db.usulanPegawai.update(
     { id: usulan.id },
     { status: "disetujui", ditinjauOleh: oleh, ditinjauAt: sekarang, pegawaiId: pegawaiIdHasil },
@@ -149,6 +167,7 @@ export async function setujuiUsulan(
     jumlahPerubahan: perubahan.length,
     perluCatatHukdis: !!usulan.hukdisAda,
     hukdis: ringkasHukdisUsulan(usulan),
+    penyesuaianKgb,
     ringkasPerubahan:
       usulan.jenis === "baru"
         ? "pegawai baru ditambahkan ke data induk"

@@ -93,13 +93,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true, status: "revisi" });
   }
 
-  const hasil = await setujuiUsulan(usulan, pegawaiLama as PegawaiRow | null, oleh, sekarang);
+  const hasil = await setujuiUsulan(usulan, pegawaiLama as PegawaiRow | null, oleh, sekarang, peninjau.id);
   if (!hasil.ok) return NextResponse.json({ error: hasil.pesan }, { status: 409 });
 
   logAudit({
     userId: peninjau.id,
     aksi: "setujui_usulan_pegawai",
-    detail: `Setujui usulan ${usulan.jenis === "baru" ? "pegawai baru" : "data"} ${namaUsulan} (${nipUsulan}) dari ${usulan.satker}, surat ${usulan.nomorSurat}: ${hasil.ringkasPerubahan}${hasil.hukdis ? `. Laporan hukuman disiplin: ${hasil.hukdis}` : ""}`,
+    detail: `Setujui usulan ${usulan.jenis === "baru" ? "pegawai baru" : "data"} ${namaUsulan} (${nipUsulan}) dari ${usulan.satker}, surat ${usulan.nomorSurat}: ${hasil.ringkasPerubahan}${hasil.penyesuaianKgb ? `. KGB: ${hasil.penyesuaianKgb}` : ""}${hasil.hukdis ? `. Laporan hukuman disiplin: ${hasil.hukdis}` : ""}`,
     targetNama: namaUsulan,
   });
 
@@ -109,5 +109,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     jumlahPerubahan: hasil.jumlahPerubahan,
     // Pengingat untuk peninjau: hukdis tetap dicatat manual di modul Hukuman Disiplin.
     perluCatatHukdis: hasil.perluCatatHukdis,
+    // Apa yang disesuaikan pada KGB berjalan, misalnya SK yang harus dibuat ulang (ADR-011).
+    penyesuaianKgb: hasil.penyesuaianKgb,
   });
 }

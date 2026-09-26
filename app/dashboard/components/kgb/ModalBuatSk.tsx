@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { buatPdfSk, namaFileSk, simpanDasarSk, unduhBlob, type DataDasarSk } from "@/lib/kgbAksi";
+import { ambilDrafSk, buatPdfSk, namaFileSk, simpanDasarSk, simpanDrafSkServer, unduhBlob, type DataDasarSk } from "@/lib/kgbAksi";
 import { alasanTolakBuatSk } from "@/lib/prosesKgb";
 import { formatTanggalId, hariIniWita, isoTanggalLokal, type NilaiTanggal } from "@/lib/waktu";
 import { AWALAN_NOMOR_SK, bagianNomorSk, nomorSkLengkap } from "@/lib/nomorSurat";
 import KerangkaModal from "./KerangkaModal";
-import { bacaDrafSk, hapusDrafSk, simpanDrafSk } from "./drafSk";
+import { bacaDrafSk, hapusDrafSk } from "./drafSk";
 import {
   BagianForm,
   BidangPenetap,
@@ -74,12 +74,15 @@ export default function ModalBuatSk({
   const idNomorSk = useId();
   const idNomorSkPetunjuk = useId();
   const [dasar, setDasar] = useState<DataDasarSk>(() => isianDasarSk(dasarAwal));
-  // Draf peramban hanya dipakai selama SK belum pernah dibuat; sesudahnya nomor tersimpan di server.
-  const [drafAwal] = useState(() => (nomorSkTerisi(skBaruAwal?.nomorSurat) ? null : bacaDrafSk(kgbId)));
+  // Draf nomor SK baru tersimpan di SIM-KGB (ADR-011) dan hanya dipakai selama SK belum pernah dibuat.
+  // Draf lama yang sempat disimpan di peramban dipakai sampai draf server termuat, lalu dibersihkan.
+  const skSudahDibuat = !!nomorSkTerisi(skBaruAwal?.nomorSurat);
+  const [drafPeramban] = useState(() => (skSudahDibuat ? null : bacaDrafSk(kgbId)));
+  const [sumberDraf, setSumberDraf] = useState<"server" | "peramban" | null>(() => (drafPeramban ? "peramban" : null));
   const [skBaru, setSkBaru] = useState(() => ({
-    nomorSurat: nomorSkTerisi(skBaruAwal?.nomorSurat) || drafAwal?.nomorSurat || "",
+    nomorSurat: nomorSkTerisi(skBaruAwal?.nomorSurat) || drafPeramban?.nomorSurat || "",
     tanggalSurat:
-      nilaiInputTanggal(skBaruAwal?.tanggalSurat) || drafAwal?.tanggalSurat || isoTanggalLokal(hariIniWita()),
+      nilaiInputTanggal(skBaruAwal?.tanggalSurat) || drafPeramban?.tanggalSurat || isoTanggalLokal(hariIniWita()),
   }));
   const [tab, setTab] = useState<Versi>("biasa");
   const [pratinjau, setPratinjau] = useState<Record<Versi, string | null>>({ biasa: null, srikandi: null });
@@ -96,6 +99,21 @@ export default function ModalBuatSk({
   // Ada isian yang belum disimpan sebagai draf maupun dibuat menjadi SK; menutup modal ditanyakan dulu.
   const belumTersimpan = useRef(false);
   const refKolomForm = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (skSudahDibuat || alasanTolak) return;
+    let batal = false;
+    ambilDrafSk(kgbId).then((hasil) => {
+      // Isian yang sudah diketik operator tidak ditimpa draf yang datang belakangan.
+      if (batal || !hasil.ok || !hasil.data.drafNomorSurat || belumTersimpan.current) return;
+      const { drafNomorSurat, drafTanggalSurat } = hasil.data;
+      setSkBaru((s) => ({ nomorSurat: drafNomorSurat, tanggalSurat: nilaiInputTanggal(drafTanggalSurat) || s.tanggalSurat }));
+      setSumberDraf("server");
+    });
+    return () => {
+      batal = true;
+    };
+  }, [kgbId, skSudahDibuat, alasanTolak]);
 
   useEffect(() => {
     const daftarUrl = urlPratinjau.current;
@@ -257,9 +275,9 @@ export default function ModalBuatSk({
   }
 
   /**
-   * Simpan untuk dilanjutkan nanti tanpa membuat SK. Data SK terakhir disimpan ke server lewat PATCH yang
-   * sama dengan pratinjau; nomor dan tanggal SK baru disimpan di peramban (drafSk.ts), sebab mencatatnya
-   * di server berarti SK dianggap sudah dibuat.
+   * Simpan untuk dilanjutkan nanti tanpa membuat SK. Data SK terakhir disimpan lewat PATCH yang sama dengan
+   * pratinjau; nomor dan tanggal SK baru disimpan sebagai draf pada KGB-nya (ADR-011), bukan sebagai catatan
+   * surat, sehingga KGB tidak dianggap sudah dibuat SK-nya. Nomor yang bentrok dengan KGB lain ditolak.
    */
   async function simpanDraf() {
     if (sibuk || memuatVersi) return;
@@ -272,17 +290,18 @@ export default function ModalBuatSk({
       return;
     }
     const isi = isiSkBaru();
-    if (!isi.nomorSurat) hapusDrafSk(kgbId);
-    else if (!simpanDrafSk(kgbId, isi)) {
-      setGalat(
-        "Data SK terakhir tersimpan, tetapi peramban ini menolak menyimpan draf nomor SK baru (mode privat atau penyimpanan situs diblokir). Catat nomornya sebelum menutup.",
-      );
+    setSibuk(true);
+    const hasilDraf = await simpanDrafSkServer(kgbId, isi);
+    setSibuk(false);
+    if (!hasilDraf.ok) {
+      setGalat(hasilDraf.error);
       return;
     }
+    hapusDrafSk(kgbId);
     belumTersimpan.current = false;
     onBerhasil(
       isi.nomorSurat
-        ? `Draf SK ${pegawai.nama} disimpan. Nomor SK baru tersimpan di peramban ini saja sampai Buat dan Unduh SK dipilih.`
+        ? `Draf SK ${pegawai.nama} disimpan di SIM-KGB. Nomornya tetap ada saat Buat SK dibuka lagi, dari komputer mana pun.`
         : `Data SK terakhir ${pegawai.nama} tersimpan.`,
     );
   }
@@ -301,7 +320,6 @@ export default function ModalBuatSk({
 
   const urlTab = pratinjau[tab];
   const kurangIsian = alasanTolak ? null : periksaIsian();
-  const skPernahDibuat = !!nomorSkTerisi(skBaruAwal?.nomorSurat);
 
   return (
     <KerangkaModal
@@ -323,7 +341,7 @@ export default function ModalBuatSk({
             <button type="button" className="kgbm-tombol kgbm-kedua" onClick={tutup} disabled={sibuk}>
               Batal
             </button>
-            {!skPernahDibuat && (
+            {!skSudahDibuat && (
               <button
                 type="button"
                 className="kgbm-tombol kgbm-kedua"
@@ -441,14 +459,14 @@ export default function ModalBuatSk({
                 petunjuk="Penandatangan dipilih menurut tanggal ini sesuai Pengaturan."
                 nonaktif={sibuk}
               />
-              {drafAwal && (
+              {sumberDraf && (
                 <Catatan>
-                  Nomor dan tanggal SK baru diisi dari draf yang disimpan di peramban ini
-                  {drafAwal.disimpan ? ` pada ${new Date(drafAwal.disimpan).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}` : ""}.
+                  Nomor dan tanggal SK baru diisi dari draf yang{" "}
+                  {sumberDraf === "server" ? "tersimpan di SIM-KGB" : "sempat disimpan di peramban ini; Simpan draf memindahkannya ke SIM-KGB"}.
                   Periksa kembali sebelum membuat SK.
                 </Catatan>
               )}
-              {skPernahDibuat && (
+              {skSudahDibuat && (
                 <Catatan nada="amber">
                   SK baru untuk KGB ini sudah pernah dibuat. Buat dan Unduh SK akan mencatat ulang nomor, tanggal, dan
                   penandatangan SK sesuai isian di atas.

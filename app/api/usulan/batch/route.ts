@@ -51,6 +51,8 @@ export async function POST(req: Request) {
   const surat = new Set<string>();
   const satker = new Set<string>();
 
+  // KGB berjalan yang ikut disesuaikan (ADR-011), dilaporkan ke peninjau.
+  const penyesuaianKgb: string[] = [];
   for (const id of ids) {
     const usulan = (await db.usulanPegawai.findUnique({ id })) as UsulanPegawaiRow | null;
     if (!usulan) { galat.push(`Usulan ${id} tidak ditemukan`); continue; }
@@ -60,9 +62,10 @@ export async function POST(req: Request) {
     if (usulan.status !== "menunggu") { galat.push(`${nama}: sudah ditinjau`); continue; }
     if (usulan.jenis !== "baru" && !pegawaiLama) { galat.push(`${nama}: data pegawainya tidak ditemukan`); continue; }
 
-    const hasil = await setujuiUsulan(usulan, pegawaiLama, oleh, sekarang);
+    const hasil = await setujuiUsulan(usulan, pegawaiLama, oleh, sekarang, peninjau.id);
     if (!hasil.ok) { galat.push(`${nama}: ${hasil.pesan}`); continue; }
     berhasil.push(nama);
+    if (hasil.penyesuaianKgb) penyesuaianKgb.push(`${nama}: ${hasil.penyesuaianKgb}`);
     if (usulan.nomorSurat) surat.add(usulan.nomorSurat);
     satker.add(SATKER.find((s) => s.kode === usulan.satker)?.nama ?? usulan.satker ?? "-");
   }
@@ -79,5 +82,5 @@ export async function POST(req: Request) {
     targetNama: [...satker].join(", ") || undefined,
   });
 
-  return NextResponse.json({ berhasil: berhasil.length, gagal: galat.length, galat });
+  return NextResponse.json({ berhasil: berhasil.length, gagal: galat.length, galat, penyesuaianKgb });
 }
