@@ -6,16 +6,20 @@ import { logAudit } from "@/lib/auditLog";
 import { pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { formatTanggalId } from "@/lib/waktu";
+import { selesaikanKgb } from "@/lib/selesaikanKgb";
 
 export const runtime = "nodejs";
 
 /**
- * Penanda bahwa KGB sudah direkam di aplikasi Gaji Web oleh operator gaji UPT.
+ * Konfirmasi keuangan UPT: KGB pegawai satker ini sudah direkam di Gaji Web satker.
  *
- * Tiap UPT adalah satker tersendiri dengan DIPA dan operator gajinya sendiri, sehingga yang merekam
- * KGB pegawai UPT di Gaji Web bukan keuangan Kanwil, melainkan UPT itu sendiri. Keuangan Kanwil
- * mengkroscek SK lalu mengirimkannya kembali ke UPT; langkah terakhirnya dicatat di sini, memakai
- * kolom inputGajiWebAt dan inputGajiWebBy pada riwayat KGB.
+ * Tiap UPT adalah satker tersendiri dengan DIPA, keuangan, dan akun Gaji Web sendiri. Keuangan Kanwil
+ * hanya memegang pegawai Kanwil (ADR-009), jadi begitu Tim SDM Kanwil mengunggah SK bertanda tangan,
+ * keuangan UPT yang menetapkan rapelan dan merekamnya. Langkah ini menjalankan penyelesaian yang sama
+ * dengan konfirmasi keuangan Kanwil (lib/selesaikanKgb.ts) sekaligus mencatat inputGajiWebAt/By.
+ *
+ * SK yang telanjur dikonfirmasi keuangan Kanwil sebelum aturan ini berlaku (status selesai, belum
+ * direkam) cukup ditandai rekam Gaji Web-nya saja.
  */
 export async function POST(req: Request) {
   await muatBatasInputSdm();
@@ -33,9 +37,11 @@ export async function POST(req: Request) {
     );
 
   let kgbId = "";
+  let isRapelan: boolean | null = null;
   try {
-    const body = (await req.json()) as { kgbId?: unknown };
+    const body = (await req.json()) as { kgbId?: unknown; isRapelan?: unknown };
     if (typeof body.kgbId === "string") kgbId = body.kgbId.trim();
+    if (typeof body.isRapelan === "boolean") isRapelan = body.isRapelan;
   } catch {
     // body tidak valid diperlakukan sebagai id kosong
   }
@@ -49,23 +55,31 @@ export async function POST(req: Request) {
   if (!pegawai || pegawaiSatker([pegawai], kode).length === 0)
     return NextResponse.json({ error: "KGB tidak ditemukan" }, { status: 404 });
 
-  // SK baru dapat direkam di Gaji Web setelah dikonfirmasi keuangan Kanwil.
-  if (kgb.status !== "selesai")
-    return NextResponse.json(
-      { error: "SK ini belum dikonfirmasi keuangan Kanwil, jadi belum dapat direkam di Gaji Web." },
-      { status: 409 },
-    );
   if (kgb.inputGajiWebAt)
     return NextResponse.json({ error: "KGB ini sudah ditandai direkam di Gaji Web." }, { status: 409 });
+  if (kgb.status !== "menunggu_keuangan" && kgb.status !== "selesai")
+    return NextResponse.json(
+      { error: "SK bertanda tangan untuk KGB ini belum diunggah Tim SDM Kanwil, jadi belum dapat direkam di Gaji Web." },
+      { status: 409 },
+    );
 
   const sekarang = new Date();
   const oleh = `${pengguna.nama} (${pengguna.nip})`;
-  await db.riwayatKGB.update({ id: kgbId }, { inputGajiWebAt: sekarang, inputGajiWebBy: oleh });
+  const menungguKeuangan = kgb.status === "menunggu_keuangan";
+
+  if (menungguKeuangan) {
+    if (isRapelan === null)
+      return NextResponse.json({ error: "Pilih dulu apakah KGB ini dibayar sebagai rapelan." }, { status: 400 });
+    const hasil = await selesaikanKgb({ kgb, userId: pengguna.id, isRapelan, gajiWeb: { at: sekarang, oleh } });
+    if (!hasil.ok) return NextResponse.json({ error: hasil.pesan }, { status: hasil.status });
+  } else {
+    await db.riwayatKGB.update({ id: kgbId }, { inputGajiWebAt: sekarang, inputGajiWebBy: oleh });
+  }
 
   logAudit({
     userId: pengguna.id,
     aksi: "rekam_gaji_web_upt",
-    detail: `KGB ${pegawai.nama} (${pegawai.nip}) TMT ${formatTanggalId(kgb.tmtKgbBaru)} ditandai sudah direkam di Gaji Web satker oleh ${oleh}`,
+    detail: `KGB ${pegawai.nama} (${pegawai.nip}) TMT ${formatTanggalId(kgb.tmtKgbBaru)} dikonfirmasi dan direkam di Gaji Web satker oleh ${oleh}${menungguKeuangan ? `, Rapelan: ${isRapelan ? "Ya" : "Tidak"}` : ""}`,
     targetNama: pegawai.nama,
   });
 

@@ -43,8 +43,8 @@ const PERAN: { id: string; label: string; nada: NadaPeran; tugas: string }[] = [
   { id: ROLES.SUPER_ADMIN, label: "Super Admin",   nada: "kuning", tugas: "Mengatur penandatangan, jadwal proses, pengguna, dan log." },
   { id: ROLES.SDM_KGB,     label: "SDM KGB",       nada: "navy",   tugas: "Input KGB, membuat dan mengirim SK kenaikan gaji berkala." },
   { id: ROLES.SDM_HUKDIS,  label: "SDM Hukdis",    nada: "merah",  tugas: "Mencatat hukuman disiplin dan dampaknya pada KGB." },
-  { id: ROLES.KEUANGAN,    label: "Keuangan",      nada: "ungu",   tugas: "Mengonfirmasi SK dan merekon gaji di Gaji Web." },
-  { id: ROLES.ADMIN_UPT,   label: "Admin UPT",     nada: "hijau",  tugas: "Melihat data pegawai satkernya sendiri; tidak dapat mengubah data." },
+  { id: ROLES.KEUANGAN,    label: "Keuangan",      nada: "ungu",   tugas: "Mengonfirmasi SK pegawai Kanwil dan merekamnya di Gaji Web Kanwil." },
+  { id: ROLES.ADMIN_UPT,   label: "Admin UPT",     nada: "hijau",  tugas: "Mengusulkan data pegawai satkernya, lalu mengonfirmasi SK dan merekamnya di Gaji Web satker." },
 ];
 
 const cfgPeran = (id: string) => PERAN.find((p) => p.id === id) ?? { id, label: ROLE_LABEL[id] ?? id, nada: "navy" as NadaPeran, tugas: "" };

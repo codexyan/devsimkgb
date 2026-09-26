@@ -10,6 +10,7 @@ import { jendelaProsesKgb } from "./tabelGaji";
 import { hukdisMenahanKgb } from "./prosesKgb";
 import { kunciTanggal } from "./rekapKgb";
 import { formatTanggalId, hariIniWita, tanggalKalender } from "./waktu";
+import { dipegangKeuanganKanwil } from "./aksesUpt";
 
 interface NotifikasiResult {
   created: number;
@@ -107,7 +108,9 @@ interface RencanaNotifikasi {
 type PegawaiUntukNotifikasi = Pick<
   PegawaiRow,
   "id" | "nama" | "nip" | "aktif" | "tmtKgbBerikutnya" | "statusHukdis" | "tanggalHukdisBerakhir" | "jenisHukdis"
->;
+> &
+  // Menentukan siapa yang menindaklanjuti SK yang diunggah: keuangan Kanwil atau UPT (ADR-009).
+  Partial<Pick<PegawaiRow, "unitKerja">>;
 type KgbUntukNotifikasi = Pick<RiwayatKGBRow, "id" | "pegawaiId" | "status" | "tmtKgbBaru" | "isArsip" | "flagRapelan"> &
   Partial<Pick<RiwayatKGBRow, "konfirmasiKeuanganAt">>;
 type HukdisUntukNotifikasi = Pick<RiwayatHukdisRow, "pegawaiId" | "berdampakKGB" | "tmtBerakhir"> &
@@ -145,6 +148,41 @@ export function notifikasiUsulanUpt(
     prioritas: "warning",
     linkHref: "/dashboard/usulan",
     kategori: "pegawai",
+  };
+}
+
+/**
+ * Notifikasi saat SK bertanda tangan diunggah Tim SDM. Pegawai Kanwil masuk antrian keuangan Kanwil;
+ * pegawai UPT dikabarkan ke UPT-nya, karena keuangan satker itu yang menetapkan rapelan dan merekamnya
+ * di Gaji Web (ADR-009). Dipakai rute unggah SK agar kabarnya langsung, dan pemeriksaan berkala sebagai
+ * jaring pengaman.
+ */
+export function notifikasiSkDiunggah(
+  kgb: Pick<RiwayatKGBRow, "id" | "tmtKgbBaru" | "flagRapelan">,
+  pegawai: (Pick<PegawaiRow, "nama" | "nip"> & Partial<Pick<PegawaiRow, "unitKerja">>) | null | undefined,
+): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
+  const nama = pegawai?.nama ?? "-";
+  const nip = pegawai?.nip ?? "-";
+  const rapelan = kgb.flagRapelan ? " KGB ini berpotensi rapelan." : "";
+  if (!dipegangKeuanganKanwil(pegawai?.unitKerja)) {
+    return {
+      judul: `SK KGB Terbit: ${nama}`,
+      pesan: `SK kenaikan gaji berkala ${nama} (${nip}) dengan TMT ${formatTanggalId(kgb.tmtKgbBaru)} sudah ditandatangani dan diunggah Tim SDM Kanwil. Unduh SK-nya, tetapkan rapelan, lalu rekam di Gaji Web satker.${rapelan}`,
+      tipe: T.SK_TERBIT,
+      referenceId: kgb.id,
+      prioritas: kgb.flagRapelan ? "warning" : "info",
+      linkHref: "/dashboard",
+      kategori: "kgb",
+    };
+  }
+  return {
+    judul: `SK KGB Menunggu Konfirmasi: ${nama}`,
+    pesan: `SK KGB ${nama} (${nip}) dengan TMT ${formatTanggalId(kgb.tmtKgbBaru)} sudah diunggah dan menunggu konfirmasi keuangan.${rapelan}`,
+    tipe: T.SK_MENUNGGU_KEUANGAN,
+    referenceId: kgb.id,
+    prioritas: kgb.flagRapelan ? "warning" : "info",
+    linkHref: "/dashboard/keuangan",
+    kategori: "keuangan",
   };
 }
 
@@ -353,24 +391,16 @@ export function rencanaNotifikasi(input: {
     });
   }
 
-  // 3. SK menunggu konfirmasi keuangan.
+  // 3. SK yang sudah diunggah dan menunggu keuangan: antrian keuangan Kanwil untuk pegawai Kanwil,
+  // kabar SK terbit untuk UPT bagi pegawai UPT (notifikasiSkDiunggah).
   const menunggu = new Set<string>();
   for (const k of input.kgb) {
     if (k.status !== "menunggu_keuangan" || k.isArsip) continue;
     menunggu.add(k.id);
-    if (notifUntuk(T.SK_MENUNGGU_KEUANGAN, k.id).length > 0) continue;
     const p = pegawaiById.get(k.pegawaiId);
-    baru.push({
-      judul: `SK KGB Menunggu Konfirmasi: ${p?.nama ?? "-"}`,
-      pesan: `SK KGB ${p?.nama ?? "-"} (${p?.nip ?? "-"}) dengan TMT ${formatTanggalId(k.tmtKgbBaru)} sudah diunggah dan menunggu konfirmasi keuangan.${
-        k.flagRapelan ? " KGB ini berpotensi rapelan." : ""
-      }`,
-      tipe: T.SK_MENUNGGU_KEUANGAN,
-      referenceId: k.id,
-      prioritas: k.flagRapelan ? "warning" : "info",
-      linkHref: "/dashboard/keuangan",
-      kategori: "keuangan",
-    });
+    const notif = notifikasiSkDiunggah(k, p);
+    if (notifUntuk(notif.tipe, k.id).length > 0) continue;
+    baru.push(notif);
   }
   // 4. KGB yang sedang berjalan tetapi keadaan pegawainya berubah setelah Input KGB: hukuman disiplin
   // yang menunda KGB, atau pegawai berhenti aktif. Buat SK dan Konfirmasi keuangan akan menolaknya
@@ -404,10 +434,12 @@ export function rencanaNotifikasi(input: {
     });
   }
 
-  // 5. SK sudah dikonfirmasi keuangan: kabar untuk UPT bahwa SK dapat diunduh.
+  // 5. SK pegawai Kanwil yang sudah dikonfirmasi keuangan Kanwil. Pegawai UPT sudah dikabari sejak SK-nya
+  // diunggah (langkah 3), karena keuangan UPT sendiri yang menyelesaikannya.
   const empatBelasHariLalu = new Date(hariIni.getFullYear(), hariIni.getMonth(), hariIni.getDate() - 14);
   for (const k of input.kgb) {
     if (k.status !== "selesai" || k.isArsip) continue;
+    if (!dipegangKeuanganKanwil(pegawaiById.get(k.pegawaiId)?.unitKerja)) continue;
     const konfirmasi = tanggalKalender(k.konfirmasiKeuanganAt);
     if (!konfirmasi || konfirmasi < empatBelasHariLalu) continue;
     if (notifUntuk(T.SK_TERBIT, k.id).length > 0) continue;

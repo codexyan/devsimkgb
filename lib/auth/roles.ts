@@ -3,7 +3,8 @@ export const ROLES = {
   KEUANGAN:     "keuangan",
   SDM_KGB:      "sdm_kgb",
   SDM_HUKDIS:   "sdm_hukdis",
-  // Operator UPT: hanya melihat data satkernya sendiri, tanpa mengubah apa pun.
+  // Operator UPT: data satkernya sendiri. Mengusulkan data dan melaporkan mutasi (ditinjau Kanwil), serta
+  // merangkap keuangan UPT: menetapkan rapelan dan merekam KGB pegawai satkernya di Gaji Web (ADR-009).
   ADMIN_UPT:    "admin_upt",
 } as const;
 

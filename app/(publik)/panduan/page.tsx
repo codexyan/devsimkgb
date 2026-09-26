@@ -202,10 +202,12 @@ export default async function PanduanPage() {
                   </li>
                   <li>
                     <h3 className="pub-step-title">Konfirmasi keuangan dan jadwal berikutnya</h3>
-                    <p className="pub-step-who">Bagian keuangan</p>
+                    <p className="pub-step-who">Keuangan Kanwil untuk pegawai Kanwil; keuangan UPT untuk pegawai UPT</p>
                     <p>
-                      Bagian keuangan memeriksa SK dan memilih Konfirmasi, atau Tinjau dan Konfirmasi untuk KGB yang
-                      berpotensi rapelan. SIM-KGB memperbarui data pegawai dan membuat jadwal KGB berikutnya.
+                      Pegawai Kanwil: keuangan Kanwil memeriksa SK dan memilih Konfirmasi, atau Tinjau dan Konfirmasi
+                      untuk KGB yang berpotensi rapelan. Pegawai UPT: keuangan satkernya sendiri, lewat akun Admin UPT,
+                      menetapkan rapelan dan menandai Sudah direkam di Gaji Web. Keduanya membuat SIM-KGB memperbarui
+                      data pegawai dan membuat jadwal KGB berikutnya.
                     </p>
                     <p className="pg-hasil">
                       Hasil: status <Status status="selesai" />, dan KGB berikutnya tercatat{" "}
@@ -735,14 +737,14 @@ export default async function PanduanPage() {
 
                 <h3 className="pub-h3">Setelah SK terbit: yang merekam di Gaji Web</h3>
                 <p>
-                  Tiap UPT adalah satuan kerja tersendiri dengan daftar isian pelaksanaan anggaran dan operator gajinya
-                  sendiri. Karena itu, untuk pegawai UPT, keuangan Kanwil hanya <strong>mengkroscek</strong> SK lalu
-                  mengirimkannya kembali ke UPT; yang merekam kenaikan gaji berkala di aplikasi Gaji Web adalah operator
-                  gaji UPT. Untuk pegawai Kanwil, keduanya dikerjakan keuangan Kanwil.
+                  Tiap UPT adalah satuan kerja tersendiri dengan daftar isian pelaksanaan anggaran, bagian keuangan, dan
+                  akun Gaji Web sendiri. Karena itu keuangan Kanwil hanya menindaklanjuti <strong>pegawai Kanwil</strong>.
+                  Begitu Tim SDM Kanwil mengunggah SK bertanda tangan, SK pegawai UPT langsung dapat diunduh UPT-nya, dan
+                  keuangan UPT yang menetapkan rapelan serta merekamnya di Gaji Web satker.
                 </p>
                 <div className="pub-table-wrap" tabIndex={0} role="region" aria-label="Tabel pembagian tugas setelah SK terbit">
                   <table className="pub-table">
-                    <caption>Siapa mengerjakan apa setelah SK ditandatangani</caption>
+                    <caption>Siapa mengerjakan apa setelah SK diunggah Tim SDM Kanwil</caption>
                     <thead>
                       <tr>
                         <th scope="col">Langkah</th>
@@ -752,28 +754,29 @@ export default async function PanduanPage() {
                     </thead>
                     <tbody>
                       <tr>
-                        <th scope="row">Memeriksa SK</th>
+                        <th scope="row">Memeriksa SK dan menetapkan rapelan</th>
                         <td>Keuangan Kanwil</td>
-                        <td>Keuangan Kanwil</td>
+                        <td>Keuangan UPT (akun Admin UPT)</td>
                       </tr>
                       <tr>
                         <th scope="row">Merekam di Gaji Web</th>
                         <td>Keuangan Kanwil</td>
-                        <td>Operator gaji UPT</td>
+                        <td>Keuangan UPT, di akun Gaji Web satker</td>
                       </tr>
                       <tr>
                         <th scope="row">Arti status Selesai</th>
-                        <td>Sudah direkam di Gaji Web</td>
-                        <td>SK sudah dikirim kembali ke UPT</td>
+                        <td>Sudah dikonfirmasi dan direkam di Gaji Web</td>
+                        <td>Sudah dikonfirmasi dan direkam di Gaji Web satker</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
                 <p>
-                  Setelah merekamnya, UPT menekan <strong>Tandai sudah direkam di Gaji Web</strong> pada daftar SK terbit
-                  di dashboardnya, sehingga Kanwil tahu pekerjaan satu siklus itu benar-benar tuntas. Batas waktunya sama
-                  untuk semua satuan kerja, karena SPM gaji induk bulan berjalan tetap paling lambat tanggal 15 bulan
-                  sebelumnya.
+                  Setelah merekamnya, UPT menekan <strong>Sudah direkam di Gaji Web</strong> pada kolom SK terbit di
+                  dashboardnya, memilih apakah KGB itu dibayar sebagai rapelan, lalu Simpan. Langkah ini sekaligus
+                  konfirmasi keuangan: data pegawai diperbarui dan jadwal KGB berikutnya dibuat. Kanwil hanya memantau SK
+                  yang belum direkam lewat panel SK UPT belum direkam. Batas waktunya sama untuk semua satuan kerja, karena
+                  SPM gaji induk bulan berjalan tetap paling lambat tanggal 15 bulan sebelumnya.
                 </p>
 
                 <h3 className="pub-h3">Yang wajib dipastikan sebelum surat dikirim</h3>
@@ -1261,8 +1264,10 @@ export default async function PanduanPage() {
                   Konfirmasi keuangan
                 </h2>
                 <p>
-                  Bagian ini untuk pengguna SIM-KGB dengan akses Keuangan. KGB yang perlu dikonfirmasi berstatus{" "}
-                  <Status status="menunggu_keuangan" />.
+                  Bagian ini untuk pengguna SIM-KGB dengan akses Keuangan Kanwil. KGB yang perlu dikonfirmasi berstatus{" "}
+                  <Status status="menunggu_keuangan" />. Modul Keuangan hanya memuat pegawai Kanwil; SK pegawai UPT
+                  dikonfirmasi dan direkam keuangan satkernya sendiri, dan hanya dipantau lewat panel SK UPT belum
+                  direkam di dashboard.
                 </p>
                 <div className="pub-note">
                   <strong className="pub-note-title">Sebelum rekon gaji dikirim</strong>

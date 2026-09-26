@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   SATKER_UPT,
   bolehUnduhSkUpt,
+  dipegangKeuanganKanwil,
   isSatkerUpt,
   kgbDitunda,
   nilaiSatkerUntukPeran,
@@ -59,11 +60,13 @@ test("KGB ditunda hanya bila hukdis masih aktif dan berdampak pada KGB", () => {
   assert.equal(kgbDitunda(riwayat, "z"), false);
 });
 
-test("SK hanya boleh diunduh UPT setelah selesai, ada berkasnya, dan pegawainya satker itu", () => {
+test("SK boleh diunduh UPT sejak diunggah Tim SDM, bila ada berkasnya dan pegawainya satker itu", () => {
   const pegawai = { unitKerja: "Rutan Kelas IIB Rantau" };
   const dasar = { kode: "rutan-rantau", pegawai, pathFile: "sk/199001_1.pdf" };
   assert.equal(bolehUnduhSkUpt({ ...dasar, kgb: { status: "selesai" } }), true);
-  assert.equal(bolehUnduhSkUpt({ ...dasar, kgb: { status: "menunggu_keuangan" } }), false);
+  // Keuangan UPT menindaklanjuti SK begitu diunggah Tim SDM, jadi SK sudah boleh diunduh saat itu.
+  assert.equal(bolehUnduhSkUpt({ ...dasar, kgb: { status: "menunggu_keuangan" } }), true);
+  assert.equal(bolehUnduhSkUpt({ ...dasar, kgb: { status: "sedang_diproses" } }), false);
   assert.equal(bolehUnduhSkUpt({ ...dasar, kgb: { status: "selesai", isArsip: true } }), false);
   assert.equal(bolehUnduhSkUpt({ ...dasar, kgb: null }), false);
   assert.equal(bolehUnduhSkUpt({ ...dasar, pathFile: null, kgb: { status: "selesai" } }), false);
@@ -72,4 +75,20 @@ test("SK hanya boleh diunduh UPT setelah selesai, ada berkasnya, dan pegawainya 
     bolehUnduhSkUpt({ ...dasar, pegawai: { unitKerja: "Lapas Kelas IIA Banjarmasin" }, kgb: { status: "selesai" } }),
     false,
   );
+});
+
+test("keuangan Kanwil hanya memegang pegawai Kanwil; pegawai UPT dipegang keuangan satkernya", () => {
+  assert.equal(dipegangKeuanganKanwil(null), true);
+  assert.equal(dipegangKeuanganKanwil(""), true);
+  assert.equal(dipegangKeuanganKanwil("kanwil"), true);
+  assert.equal(dipegangKeuanganKanwil("Rutan Kelas IIB Rantau"), false);
+  // Unit kerja yang tidak dikenali tetap dipegang Kanwil agar KGB-nya tidak terlantar.
+  assert.equal(dipegangKeuanganKanwil("Satker Antah Berantah"), true);
+});
+
+test("waktu unggah SK dibaca dari key berkasnya", async () => {
+  const { waktuUnggahSk } = await import("@/lib/aksesUpt");
+  assert.equal(waktuUnggahSk("sk/199001012015031001_1758860000000.pdf")?.getTime(), 1758860000000);
+  assert.equal(waktuUnggahSk("sk/lama.pdf"), null);
+  assert.equal(waktuUnggahSk(null), null);
 });

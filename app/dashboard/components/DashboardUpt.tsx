@@ -127,7 +127,13 @@ interface SkUpt {
   mkgBulanBaru: number | null;
   nomorSurat: string | null;
   tanggalSurat: string | null;
+  /** "menunggu_keuangan" (baru diunggah Tim SDM, menunggu keuangan UPT) atau "selesai". */
+  status: string;
+  /** Waktu SK bertanda tangan diunggah Tim SDM Kanwil. */
+  diunggahAt: string | null;
   konfirmasiKeuanganAt: string | null;
+  /** Batas input Kanwil terlewat; keputusan rapelannya diambil keuangan UPT. */
+  potensiRapelan: boolean;
   rapelan: boolean;
   berkasAda: boolean;
   /** Penanda KGB sudah direkam di Gaji Web satker oleh operator gaji UPT. */
@@ -161,7 +167,8 @@ function bulanUsulanSekarang(hariIni: Date): string {
 /** Keadaan KGB satu pegawai dari kacamata UPT. */
 function keadaan(p: PegawaiUpt): { teks: string; nada?: Nada } {
   if (p.statusKGB === "selesai") return { teks: "Selesai", nada: "hijau" };
-  if (p.statusKGB === "menunggu_keuangan") return { teks: "Menunggu konfirmasi keuangan", nada: "ungu" };
+  // Sejak SK diunggah Tim SDM, keuangan UPT sendiri yang menindaklanjutinya (ADR-009).
+  if (p.statusKGB === "menunggu_keuangan") return { teks: "SK terbit, rekam di Gaji Web", nada: "hijau" };
   if (p.statusKGB === "sedang_diproses") return { teks: "Sedang diproses Kanwil", nada: "navy" };
   if (p.terkunci) return { teks: "Belum masuk jadwal" };
   if (p.terlambat) return { teks: "Lewat batas input Kanwil", nada: "merah" };
@@ -450,28 +457,37 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
 
   const [menandaiGajiWeb, setMenandaiGajiWeb] = useState<string | null>(null);
 
+  // Dialog konfirmasi keuangan UPT: keputusan rapelan lalu rekam Gaji Web.
+  const [dialogGajiWeb, setDialogGajiWeb] = useState<{ sk: SkUpt; rapelan: boolean } | null>(null);
+  const [galatGajiWeb, setGalatGajiWeb] = useState<string | null>(null);
+
   /**
-   * UPT merekam KGB di Gaji Web satkernya sendiri, bukan keuangan Kanwil, karena tiap UPT satker
-   * tersendiri dengan operator gajinya sendiri. Penandaan ini yang menutup pekerjaan di sisi UPT.
+   * Keuangan UPT menetapkan rapelan dan merekam KGB di Gaji Web satkernya sendiri (ADR-009). Untuk SK yang
+   * masih menunggu keuangan, langkah ini sekaligus konfirmasi keuangan: gaji pokok, masa kerja, dan jadwal
+   * KGB berikutnya pegawai diperbarui. SK lama yang sudah dikonfirmasi keuangan Kanwil cukup ditandai.
    */
-  async function tandaiGajiWeb(sk: SkUpt) {
+  async function tandaiGajiWeb() {
+    if (!dialogGajiWeb) return;
+    const { sk, rapelan } = dialogGajiWeb;
     setMenandaiGajiWeb(sk.id);
+    setGalatGajiWeb(null);
     try {
       const res = await fetch("/api/upt/gaji-web", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kgbId: sk.id }),
+        body: JSON.stringify(sk.status === "menunggu_keuangan" ? { kgbId: sk.id, isRapelan: rapelan } : { kgbId: sk.id }),
       });
       const d = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setGalat(d.error ?? "Penandaan Gaji Web gagal disimpan");
+        setGalatGajiWeb(d.error ?? "Penandaan Gaji Web gagal disimpan");
         return;
       }
-      setKabar(`KGB ${sk.nama} ditandai sudah direkam di Gaji Web satker.`);
+      setDialogGajiWeb(null);
+      setKabar(`KGB ${sk.nama} dikonfirmasi dan ditandai sudah direkam di Gaji Web satker.`);
       setTimeout(() => setKabar(null), 5000);
       muat();
     } catch {
-      setGalat("Penandaan Gaji Web gagal disimpan");
+      setGalatGajiWeb("Penandaan Gaji Web gagal disimpan");
     } finally {
       setMenandaiGajiWeb(null);
     }
@@ -515,7 +531,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const usulanById = (id: string | null) => (id ? usulan.find((u) => u.id === id) ?? null : null);
   const pegawaiById = (id: string | null) => (id ? pegawai.find((p) => p.id === id) ?? null : null);
   const perluDiusulkan = pegawai.filter((p) => p.bulanTmt === bulanUsulan);
-  const sedangDiproses = pegawai.filter((p) => p.statusKGB === "sedang_diproses" || p.statusKGB === "menunggu_keuangan");
+  // SK yang sudah diunggah (menunggu keuangan) pindah ke kolom SK terbit, jadi tidak lagi dihitung di Kanwil.
+  const sedangDiproses = pegawai.filter((p) => p.statusKGB === "sedang_diproses");
 
   const q = cari.trim().toLowerCase();
   const tampil = useMemo(
@@ -802,11 +819,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           key={`proses:${p.id}`}
           nama={p.nama}
           sub={`${p.nip} · ${tmtSingkat(p.tmtKgb)}`}
-          tanda={
-            p.statusKGB === "menunggu_keuangan"
-              ? { teks: "Menunggu konfirmasi keuangan", nada: "ungu" }
-              : { teks: "SK sedang dibuat Kanwil", nada: "biru" }
-          }
+          tanda={{ teks: "SK sedang dibuat Kanwil", nada: "biru" }}
         />
       )),
       ...laporan
@@ -839,7 +852,15 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               ? { teks: "Siap direkam di Gaji Web", nada: "hijau" }
               : { teks: "Menunggu berkas SK dari Tim SDM", nada: "kuning" }
           }
-          catatan={[sk.nomorSurat ? `SK ${sk.nomorSurat}` : "", sk.rapelan ? "dibayar sebagai rapelan" : ""].filter(Boolean).join(" · ") || null}
+          catatan={
+            [
+              sk.nomorSurat ? `SK ${sk.nomorSurat}` : "",
+              sk.status === "menunggu_keuangan"
+                ? sk.potensiRapelan ? "berpotensi rapelan" : ""
+                : sk.rapelan ? "dibayar sebagai rapelan" : "",
+              sk.diunggahAt ? `diunggah ${fmtTgl(sk.diunggahAt)}` : "",
+            ].filter(Boolean).join(" · ") || null
+          }
           aksi={
             <>
               {sk.berkasAda && (
@@ -852,9 +873,12 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 className="dsb-tombol dsb-tombol-kecil"
                 data-jenis="garis"
                 disabled={menandaiGajiWeb === sk.id}
-                onClick={() => void tandaiGajiWeb(sk)}
+                onClick={() => {
+                  setGalatGajiWeb(null);
+                  setDialogGajiWeb({ sk, rapelan: sk.potensiRapelan });
+                }}
               >
-                {menandaiGajiWeb === sk.id ? "Menyimpan…" : "Sudah direkam di Gaji Web"}
+                Sudah direkam di Gaji Web
               </button>
             </>
           }
@@ -958,6 +982,68 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           </div>
         </div>
       </PanelNavy>
+      )}
+
+      {dialogGajiWeb && (
+        <KerangkaModal
+          judul="Sudah direkam di Gaji Web"
+          subjudul={`${dialogGajiWeb.sk.nama} · ${dialogGajiWeb.sk.nip} · TMT ${fmtTgl(dialogGajiWeb.sk.tmtKgbBaru)}`}
+          ukuran="sm"
+          sibuk={menandaiGajiWeb === dialogGajiWeb.sk.id}
+          onTutup={() => setDialogGajiWeb(null)}
+          onKirim={() => void tandaiGajiWeb()}
+          kaki={
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogGajiWeb(null)} disabled={!!menandaiGajiWeb}>
+                Batal
+              </button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={!!menandaiGajiWeb}>
+                {menandaiGajiWeb ? "Menyimpan…" : "Simpan"}
+              </button>
+            </>
+          }
+        >
+          <PesanGalat pesan={galatGajiWeb} />
+          <p className="dsb-sub" style={{ marginTop: 0 }}>
+            {dialogGajiWeb.sk.golonganBaru} · gaji pokok baru {fmtRp(dialogGajiWeb.sk.gajiPokokBaru)}
+            {dialogGajiWeb.sk.nomorSurat ? ` · SK ${dialogGajiWeb.sk.nomorSurat}` : ""}
+          </p>
+          {dialogGajiWeb.sk.status === "menunggu_keuangan" ? (
+            <>
+              <div className="kgbm-pilihan" role="radiogroup" aria-label="Pembayaran KGB">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!dialogGajiWeb.rapelan}
+                  onClick={() => setDialogGajiWeb((d) => (d ? { ...d, rapelan: false } : d))}
+                >
+                  Tidak rapelan
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={dialogGajiWeb.rapelan}
+                  onClick={() => setDialogGajiWeb((d) => (d ? { ...d, rapelan: true } : d))}
+                >
+                  Dibayar sebagai rapelan
+                </button>
+              </div>
+              {dialogGajiWeb.sk.potensiRapelan && (
+                <Catatan nada="amber">Batas input Kanwil terlewat, sehingga KGB ini berpotensi rapelan.</Catatan>
+              )}
+              <Catatan>
+                Simpan setelah KGB ini direkam di Gaji Web satker. Langkah ini sekaligus konfirmasi keuangan: gaji
+                pokok, masa kerja golongan, dan jadwal KGB berikutnya pegawai diperbarui, dan tidak dapat dibatalkan
+                dari sini.
+              </Catatan>
+            </>
+          ) : (
+            <Catatan>
+              SK ini sudah dikonfirmasi keuangan Kanwil{dialogGajiWeb.sk.rapelan ? " dan dibayar sebagai rapelan" : ""}.
+              Simpan setelah KGB-nya direkam di Gaji Web satker.
+            </Catatan>
+          )}
+        </KerangkaModal>
       )}
 
       {kabar && (

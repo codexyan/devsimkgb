@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { dipegangKeuanganKanwil } from "@/lib/aksesUpt";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { canKonfirmasiKeuangan } from "@/lib/auth";
@@ -42,6 +43,12 @@ export async function POST(req: Request) {
   const pegawai = await db.pegawai.findUnique({ id: pegawaiId });
   if (!pegawai)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
+  // Keuangan Kanwil hanya menindaklanjuti pegawai Kanwil; KGB pegawai UPT diikuti keuangan satkernya (ADR-009).
+  if (!dipegangKeuanganKanwil(pegawai.unitKerja))
+    return NextResponse.json(
+      { error: `${pegawai.nama} pegawai UPT, jadi KGB-nya ditindaklanjuti keuangan satkernya sendiri.` },
+      { status: 409 },
+    );
   tmt = tmt ?? pegawai.tmtKgbBerikutnya;
 
   const sudahAda = await db.notifikasi.findMany({

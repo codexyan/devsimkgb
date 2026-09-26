@@ -217,7 +217,7 @@ export default function KeuanganPage() {
     setMuatMenunggu(true);
     setGalatMenunggu(false);
     try {
-      const res = await fetch("/api/kgb?status=menunggu_keuangan");
+      const res = await fetch("/api/kgb?status=menunggu_keuangan&lingkup=kanwil");
       const daftar = res.ok ? await bacaDaftarKgb(res) : null;
       if (!daftar) {
         setGalatMenunggu(true);
@@ -240,7 +240,7 @@ export default function KeuanganPage() {
     setMuatSemua(true);
     setGalatSemua(false);
     try {
-      const res = await fetch("/api/kgb");
+      const res = await fetch("/api/kgb?lingkup=kanwil");
       const daftar = res.ok ? await bacaDaftarKgb(res) : null;
       if (daftar) setSemua(daftar);
       else setGalatSemua(true);

@@ -14,6 +14,7 @@ const DashboardHukdis = dynamic(() => import("@/app/dashboard/components/Dashboa
 const DashboardKeuangan = dynamic(() => import("@/app/dashboard/components/DashboardKeuangan"), { ssr: false, loading: Memuat });
 const DashboardUpt = dynamic(() => import("@/app/dashboard/components/DashboardUpt"), { ssr: false, loading: Memuat });
 const PemantauanSatker = dynamic(() => import("@/app/dashboard/components/PemantauanSatker"), { ssr: false });
+const PanelGajiWebUpt = dynamic(() => import("@/app/dashboard/components/PanelGajiWebUpt"), { ssr: false });
 const PapanAntrian = dynamic(() => import("@/app/dashboard/components/PapanAntrian"), { ssr: false });
 import {
   KerangkaDashboard,
@@ -898,6 +899,7 @@ function DashboardMain() {
             </div>
           </section>
 
+          <PanelGajiWebUpt versi={lastRefresh?.getTime()} />
           <PemantauanSatker versi={lastRefresh?.getTime()} />
         </aside>
       </div>

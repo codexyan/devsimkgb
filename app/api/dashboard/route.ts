@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { type RiwayatKGBRow } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
-import { canProcessKGB, canViewKGB } from "@/lib/auth";
+import { ROLES, canProcessKGB, canViewKGB } from "@/lib/auth";
+import { dipegangKeuanganKanwil } from "@/lib/aksesUpt";
 import { penetapDariSurat } from "@/lib/penetapSk";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { hariIniWita, tanggalKalender } from "@/lib/waktu";
@@ -46,7 +47,7 @@ export async function GET() {
     // Pipeline memuat TMT tahun ini dan TMT yang masa inputnya sudah dibuka (sebelum awal bulan ke-3 dari sekarang).
     const batasPipeline = new Date(Math.max(tahunAkhir.getTime(), new Date(tahun, bulan + 3, 1).getTime()));
 
-    const [allPegawai, allKgb, allSurat, followupRows] = await Promise.all([
+    const [semuaPegawai, semuaKgb, allSurat, followupRows] = await Promise.all([
       db.pegawai.findMany(),
       db.riwayatKGB.findMany(),
       db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
@@ -54,6 +55,12 @@ export async function GET() {
         ? db.notifikasi.findMany({ where: { tipe: "followup_keuangan", dibaca: false } })
         : Promise.resolve([]),
     ]);
+
+    // Beranda keuangan Kanwil hanya menghitung pegawai Kanwil; pegawai UPT dipegang keuangan satkernya (ADR-009).
+    const allPegawai =
+      role === ROLES.KEUANGAN ? semuaPegawai.filter((p) => dipegangKeuanganKanwil(p.unitKerja)) : semuaPegawai;
+    const idPegawai = new Set(allPegawai.map((p) => p.id));
+    const allKgb = role === ROLES.KEUANGAN ? semuaKgb.filter((k) => idPegawai.has(k.pegawaiId)) : semuaKgb;
 
     const pegawaiAktif = allPegawai.filter((p) => p.aktif).map((p) => penandaHukdisBerlaku(p, hariIni));
     // Pegawai yang sudah berhenti tidak dihitung sebagai pegawai aktif, tetapi tetap boleh muncul pada

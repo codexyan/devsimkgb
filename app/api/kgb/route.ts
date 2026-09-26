@@ -5,7 +5,8 @@ import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { isGolonganDikenal, jendelaProsesKgb } from "@/lib/tabelGaji";
-import { canProcessKGB, canViewKGB } from "@/lib/auth";
+import { ROLES, canProcessKGB, canViewKGB } from "@/lib/auth";
+import { dipegangKeuanganKanwil } from "@/lib/aksesUpt";
 import { rencanaSetelahKgbSelesai, rencanaSiklusBerikutnya, type RencanaSiklusKgb } from "@/lib/jadwalKgb";
 import { formatTanggalId, hariIniWita, samaTanggalKalender, tanggalKalender, type NilaiTanggal } from "@/lib/waktu";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
@@ -49,12 +50,18 @@ export async function GET(req: Request) {
     ? new Date(hariIni.getFullYear(), hariIni.getMonth() + jumlahBulanDeadline + 2, 1)
     : null;
 
-  const [allKgb, pegawaiList, suratList] = await Promise.all([
+  const [semuaKgb, semuaPegawai, suratList] = await Promise.all([
     db.riwayatKGB.findMany(),
     db.pegawai.findMany(),
     db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
   ]);
+  // Keuangan Kanwil hanya memegang pegawai Kanwil; pegawai UPT ditindaklanjuti keuangan satkernya sendiri
+  // (ADR-009). Antrian, rekap, dan dasar Gaji Web di modul Keuangan semuanya berasal dari daftar ini;
+  // modul itu meminta lingkup=kanwil agar Super Admin yang membukanya melihat hal yang sama.
+  const hanyaKanwil = session.user.role === ROLES.KEUANGAN || searchParams.get("lingkup") === "kanwil";
+  const pegawaiList = hanyaKanwil ? semuaPegawai.filter((p) => dipegangKeuanganKanwil(p.unitKerja)) : semuaPegawai;
   const pegById = new Map(pegawaiList.map((p) => [p.id, p]));
+  const allKgb = hanyaKanwil ? semuaKgb.filter((k) => pegById.has(k.pegawaiId)) : semuaKgb;
   const suratByKgb = new Map(suratList.map((sRow) => [sRow.kgbId, sRow]));
   const searchLc = search.toLowerCase();
 

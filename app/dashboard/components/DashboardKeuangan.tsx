@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
 import { useDashUser } from "@/app/dashboard/components/RoleContext";
 import { PanelBulanRekon } from "@/app/dashboard/components/DaftarBulanRekon";
+import PanelGajiWebUpt from "@/app/dashboard/components/PanelGajiWebUpt";
 import { PanelNavy, PanelTindakan, Stat, StripStat, namaSapaan, sapaanWita, tanggalPanjangWita, type Tindakan } from "@/app/dashboard/components/PanelNavy";
 
 interface KGBKeuangan {
@@ -41,7 +42,7 @@ export default function DashboardKeuangan() {
     setLoading(true);
     Promise.all([
       fetch("/api/dashboard").then((r) => r.json() as Promise<{ stats?: Stats }>),
-      fetch("/api/kgb?status=menunggu_keuangan").then((r) => r.json() as Promise<unknown>),
+      fetch("/api/kgb?status=menunggu_keuangan&lingkup=kanwil").then((r) => r.json() as Promise<unknown>),
     ])
       .then(([dash, kgbList]) => {
         if (dash?.stats) setStats(dash.stats);
@@ -203,6 +204,8 @@ export default function DashboardKeuangan() {
       <aside className="dsb-samping dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-label="Ringkasan pendamping">
         <PanelTindakan daftar={loading && !stats ? [] : tindakan} kosong="Tidak ada SK yang menunggu konfirmasi." />
         <PanelBulanRekon versi={lastRefresh?.getTime()} />
+        {/* Pegawai UPT bukan antrian keuangan Kanwil (ADR-009); yang tampil hanya pemantauannya. */}
+        <PanelGajiWebUpt versi={lastRefresh?.getTime()} />
       </aside>
       </div>
     </div>

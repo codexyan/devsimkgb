@@ -33,7 +33,7 @@ export const PERAN: readonly Peran[] = [
   {
     id: "upt",
     label: "Admin kepegawaian UPT",
-    ringkas: "Menyiapkan dan mengirim surat usulan KGB tepat waktu.",
+    ringkas: "Menyiapkan usulan KGB tepat waktu, lalu merekam SK yang terbit di Gaji Web satker.",
     bagian: ["ringkasan", "jadwal", "cpns-pns", "kenaikan-pangkat", "untuk-upt", "contoh-kasus", "status", "pertanyaan"],
   },
   {
@@ -51,7 +51,7 @@ export const PERAN: readonly Peran[] = [
   {
     id: "keuangan",
     label: "Bagian keuangan",
-    ringkas: "Mengonfirmasi SK dan merekon gaji di Gaji Web.",
+    ringkas: "Mengonfirmasi SK pegawai Kanwil dan merekamnya di Gaji Web; SK pegawai UPT dipegang keuangan UPT.",
     bagian: ["ringkasan", "jadwal", "cpns-pns", "keuangan", "pengiriman-sk", "dasar-hukum"],
   },
   {

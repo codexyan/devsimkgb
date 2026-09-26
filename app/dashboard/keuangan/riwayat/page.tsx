@@ -163,7 +163,7 @@ export default function RiwayatKeuanganPage() {
     setLoading(true);
     setGalat(false);
     try {
-      const [r1, r2, r3] = await Promise.all([fetch("/api/keuangan/log"), fetch("/api/keuangan/rekon"), fetch("/api/kgb")]);
+      const [r1, r2, r3] = await Promise.all([fetch("/api/keuangan/log"), fetch("/api/keuangan/rekon"), fetch("/api/kgb?lingkup=kanwil")]);
       if (!r1.ok || !r2.ok || !r3.ok) setGalat(true);
       if (r1.ok) { const d = await bacaJson<unknown>(r1, []); setLogs(Array.isArray(d) ? (d as LogEntry[]) : []); }
       if (r2.ok) { const d = await bacaJson<unknown>(r2, []); setRekap(Array.isArray(d) ? (d as RekapBulan[]) : []); }

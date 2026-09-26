@@ -5,6 +5,7 @@ import { canAccessKeuangan } from "@/lib/auth";
 import { hariIniWita } from "@/lib/waktu";
 import { entriRekapKgb, kunciBulanTmt, rekapPerBulanTmt } from "@/lib/rekapKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { dipegangKeuanganKanwil } from "@/lib/aksesUpt";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,11 @@ export async function GET() {
   if (!canAccessKeuangan(session.user.role ?? ""))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const [allKgb, pegawaiList] = await Promise.all([db.riwayatKGB.findMany(), db.pegawai.findMany()]);
+  const [semuaKgb, semuaPegawai] = await Promise.all([db.riwayatKGB.findMany(), db.pegawai.findMany()]);
+  // Rekap Gaji Web Kanwil hanya memuat pegawai Kanwil; pegawai UPT direkam keuangan satkernya (ADR-009).
+  const pegawaiList = semuaPegawai.filter((p) => dipegangKeuanganKanwil(p.unitKerja));
+  const idKanwil = new Set(pegawaiList.map((p) => p.id));
+  const allKgb = semuaKgb.filter((k) => idKanwil.has(k.pegawaiId));
   const hariIni = hariIniWita();
   const bulanTerbuka = kunciBulanTmt(new Date(hariIni.getFullYear(), hariIni.getMonth() + 2, 1)) ?? "";
 

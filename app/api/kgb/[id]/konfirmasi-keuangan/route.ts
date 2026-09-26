@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
 import { canKonfirmasiKeuangan } from "@/lib/auth";
-import { penetapDariSurat } from "@/lib/penetapSk";
-import { rencanaSetelahKgbSelesai, type RencanaSetelahKgbSelesai } from "@/lib/jadwalKgb";
-import { placeholderBerlebih, type SuratKgbTersimpan } from "@/lib/prosesKgb";
-import { hariIniWita, tanggalKalender, type NilaiTanggal } from "@/lib/waktu";
-import { periksaUlangKgb } from "@/lib/pemeriksaanUlangKgb";
+import { dipegangKeuanganKanwil } from "@/lib/aksesUpt";
+import { selesaikanKgb } from "@/lib/selesaikanKgb";
+import { hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
@@ -61,70 +58,18 @@ export async function POST(
       return NextResponse.json({ error: "SK berpotensi rapelan, tinjau satu per satu" }, { status: 409 });
   }
 
-  const [pegawai, suratSelesai] = await Promise.all([
-    db.pegawai.findUnique({ id: kgb.pegawaiId }),
-    db.suratKGB.findUnique({ kgbId: kgb.id }) as Promise<SuratKgbTersimpan | null>,
-  ]);
-  if (!pegawai)
-    return NextResponse.json({ error: "Data pegawai tidak ditemukan" }, { status: 404 });
+  // Keuangan Kanwil hanya menindaklanjuti pegawai Kanwil. Pegawai UPT dikonfirmasi dan direkam di Gaji Web
+  // oleh keuangan satkernya sendiri lewat akun Admin UPT (ADR-009).
+  const pegawaiKgb = await db.pegawai.findUnique({ id: kgb.pegawaiId });
+  if (pegawaiKgb && !dipegangKeuanganKanwil(pegawaiKgb.unitKerja))
+    return NextResponse.json(
+      { error: `${pegawaiKgb.nama} pegawai UPT, jadi KGB-nya dikonfirmasi keuangan satkernya sendiri, bukan keuangan Kanwil.` },
+      { status: 409 },
+    );
 
-  // Pintu terakhir sebelum gaji baru masuk rekon Gaji Web: keadaan pegawai diperiksa ulang agar tidak
-  // terjadi kelebihan bayar yang harus disetor kembali (masukan tim keuangan).
-  {
-    const hukdisRows = await db.riwayatHukdis.findMany({ where: { pegawaiId: pegawai.id } });
-    const periksa = periksaUlangKgb({
-      tahap: "konfirmasi_keuangan",
-      pegawai,
-      riwayatHukdis: hukdisRows.map((h) => ({
-        berdampakKGB: h.berdampakKGB === true,
-        tmtBerakhir: h.tmtBerakhir as NilaiTanggal,
-        tmtMulai: h.tmtMulai as NilaiTanggal,
-      })),
-      tmtKgb: kgb.tmtKgbBaru,
-      hariIni: hariIniWita(),
-    });
-    if (periksa.tolak) return NextResponse.json({ error: periksa.tolak }, { status: 409 });
-  }
-
-  // TMT berikutnya memakai yang paling akhir antara record KGB dan data pegawai, agar penundaan hukdis
-  // yang dicatat selama KGB berjalan tidak hilang. SK dasar siklus berikutnya adalah surat KGB ini,
-  // jadi penetapnya = penandatangan surat ini.
-  let rencana: RencanaSetelahKgbSelesai;
-  try {
-    rencana = rencanaSetelahKgbSelesai({
-      kgb,
-      tmtKgbBerikutnyaPegawai: pegawai.tmtKgbBerikutnya,
-      penetapSkDasar: penetapDariSurat(suratSelesai),
-    });
-  } catch (e) {
-    const pesan = e instanceof Error ? e.message : "Jadwal KGB berikutnya tidak dapat dihitung";
-    return NextResponse.json({ error: `${pesan}. Hubungi Tim SDM untuk memeriksa data KGB ini.` }, { status: 422 });
-  }
-
-  // Status Selesai ditulis paling akhir. Bila salah satu langkah gagal, KGB tetap Menunggu Keuangan
-  // dan konfirmasi dapat diulang: data pegawai dihitung dari record KGB yang tidak berubah, dan
-  // placeholder yang setengah jadi diganti.
-  await db.pegawai.update({ id: pegawai.id }, rencana.pegawai);
-  await db.riwayatKGB.deleteMany({ pegawaiId: pegawai.id, status: "belum_diproses" });
-  await db.riwayatKGB.create(
-    makeRiwayatKGB({ ...rencana.placeholder, pegawaiId: pegawai.id, createdBy: userLogin.id }),
-  );
-
-  // Dua konfirmasi yang berjalan bersamaan bisa sama-sama membuat placeholder; sisakan satu.
-  const placeholderList = await db.riwayatKGB.findMany({ where: { pegawaiId: pegawai.id, status: "belum_diproses" } });
-  for (const idBerlebih of placeholderBerlebih(placeholderList)) {
-    await db.riwayatKGB.delete({ id: idBerlebih });
-  }
-
-  await db.riwayatKGB.update(
-    { id },
-    {
-      status: "selesai",
-      konfirmasiKeuanganAt: new Date(),
-      konfirmasiKeuanganBy: userLogin.id,
-      rapelanDitetapkan: isRapelan,
-    },
-  );
+  const hasil = await selesaikanKgb({ kgb, userId: userLogin.id, isRapelan });
+  if (!hasil.ok) return NextResponse.json({ error: hasil.pesan }, { status: hasil.status });
+  const { pegawai } = hasil;
 
   logAudit({
     userId: userLogin.id,

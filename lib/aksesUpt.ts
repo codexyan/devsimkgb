@@ -1,9 +1,10 @@
-// Batas akses peran admin_upt: operator UPT hanya boleh melihat data satkernya sendiri dan tidak boleh
-// mengubah apa pun. Modul ini murni (tanpa basis data) agar aturannya dapat diuji dan dipakai ulang oleh
-// rute API mana pun. Aturan yang disepakati pemilik (docs/adr/ADR-004-admin-upt.md):
+// Batas akses peran admin_upt: operator UPT hanya boleh melihat data satkernya sendiri. Modul ini murni
+// (tanpa basis data) agar aturannya dapat diuji dan dipakai ulang oleh rute API mana pun. Aturan yang
+// disepakati pemilik (docs/adr/ADR-004-admin-upt.md, ADR-009-keuangan-per-satker.md):
 //   - pegawai yang terlihat hanya yang unit kerjanya cocok dengan kode satker akun;
 //   - hukuman disiplin hanya tampil sebagai "KGB ditunda", tanpa jenis dan keterangan;
-//   - berkas SK hanya boleh diunduh setelah KGB dikonfirmasi keuangan (status selesai).
+//   - berkas SK boleh diunduh begitu SK bertanda tangan diunggah Tim SDM Kanwil (menunggu keuangan),
+//     karena keuangan UPT sendiri yang menindaklanjutinya di Gaji Web.
 
 import { ROLES } from "@/lib/auth/roles";
 import { SATKER } from "@/lib/satker";
@@ -34,6 +35,15 @@ export function nilaiSatkerUntukPeran(role: string, satker: unknown): { ok: true
   return { ok: true, satker: kode };
 }
 
+/**
+ * Apakah KGB pegawai ini ditindaklanjuti keuangan Kanwil. Keuangan Kanwil hanya memegang pegawai Kanwil;
+ * pegawai UPT dikonfirmasi dan direkam di Gaji Web oleh keuangan satkernya sendiri, lewat akun Admin UPT.
+ * Unit kerja yang tidak dikenali ikut Kanwil agar tidak ada KGB yang tak dipegang siapa pun.
+ */
+export function dipegangKeuanganKanwil(unitKerja: string | null | undefined): boolean {
+  return !isSatkerUpt(kodeSatkerPegawai(unitKerja));
+}
+
 /** Pegawai satker itu saja; unit kerja dicocokkan dengan daftar satker baku (lib/rekapSatker.ts). */
 export function pegawaiSatker<T extends { unitKerja: string | null }>(daftar: readonly T[], kode: string): T[] {
   return daftar.filter((p) => kodeSatkerPegawai(p.unitKerja) === kode);
@@ -51,8 +61,9 @@ export function kgbDitunda(
 }
 
 /**
- * SK boleh diunduh UPT bila KGB sudah dikonfirmasi keuangan, berkasnya ada, dan pegawainya memang
- * pegawai satker itu. Arsip (SK terbit di luar SIM-KGB) tidak punya berkas, jadi ikut tertolak.
+ * SK boleh diunduh UPT sejak SK bertanda tangan diunggah Tim SDM (menunggu keuangan) sampai selesai, bila
+ * berkasnya ada dan pegawainya memang pegawai satker itu. Arsip (SK terbit di luar SIM-KGB) tidak punya
+ * berkas, jadi ikut tertolak.
  */
 export function bolehUnduhSkUpt(input: {
   kode: string;
@@ -62,6 +73,18 @@ export function bolehUnduhSkUpt(input: {
 }): boolean {
   const { kode, kgb, pegawai, pathFile } = input;
   if (!kgb || !pegawai || !pathFile) return false;
-  if (kgb.status !== "selesai" || kgb.isArsip) return false;
+  if (!["menunggu_keuangan", "selesai"].includes(kgb.status) || kgb.isArsip) return false;
   return kodeSatkerPegawai(pegawai.unitKerja) === kode;
+}
+
+/**
+ * Waktu SK bertanda tangan diunggah, dibaca dari key berkasnya ("sk/<nip>_<milidetik>.pdf", lihat
+ * app/api/kgb/[id]/upload-sk). Dipakai untuk menghitung sudah berapa lama SK pegawai UPT menunggu
+ * direkam di Gaji Web; null bila key-nya tidak berpola itu.
+ */
+export function waktuUnggahSk(pathFile: string | null | undefined): Date | null {
+  const cocok = /_(\d{13})\.pdf$/i.exec(pathFile ?? "");
+  if (!cocok) return null;
+  const waktu = new Date(Number(cocok[1]));
+  return Number.isNaN(waktu.getTime()) ? null : waktu;
 }

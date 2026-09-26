@@ -15,6 +15,7 @@ import {
   type SuratKgbTersimpan,
 } from "@/lib/prosesKgb";
 import { hariIniWita, isoTanggalLokal } from "@/lib/waktu";
+import { notifikasiSkDiunggah } from "@/lib/generateNotifikasi";
 
 export const runtime = "nodejs";
 
@@ -122,6 +123,13 @@ export async function POST(
 
   if (izin.jenis === "unggah") {
     await db.riwayatKGB.update({ id }, { status: "menunggu_keuangan" });
+    // Kabar langsung ke yang menindaklanjuti: keuangan Kanwil untuk pegawai Kanwil, UPT untuk pegawai UPT
+    // (ADR-009). Kegagalannya tidak membatalkan unggahan; pemeriksaan berkala membuatnya belakangan.
+    try {
+      await db.notifikasi.create({ ...notifikasiSkDiunggah(kgb, pegawai), id: newId(), dibaca: false, createdAt: new Date() });
+    } catch {
+      // Notifikasinya menyusul lewat pemeriksaan berkala.
+    }
   }
 
   const keterangan =

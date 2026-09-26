@@ -131,6 +131,16 @@ test("KGB yang sudah diinput tidak diingatkan", () => {
   assert.equal(dibatalkan.baru.length, 1);
 });
 
+test("SK pegawai UPT yang diunggah dikabarkan ke UPT, bukan masuk antrian keuangan Kanwil", () => {
+  const kgb = [{ id: "k1", pegawaiId: "p1", status: "menunggu_keuangan", tmtKgbBaru: tanggal(2026, 10), isArsip: false, flagRapelan: false }];
+  const hasil = rencana(tanggal(2026, 9, 15), [], {
+    pegawai: [pegawai({ tmtKgbBerikutnya: tanggal(2028, 10), unitKerja: "Rutan Kelas IIB Rantau" })],
+    kgb,
+  });
+  assert.deepEqual(hasil.baru.map((n) => [n.tipe, n.referenceId]), [["sk_terbit", "k1"]]);
+  assert.match(hasil.baru[0].pesan, /rekam di Gaji Web satker/);
+});
+
 test("pegawai tidak aktif tidak mendapat notifikasi", () => {
   assert.equal(rencana(tanggal(2026, 4, 16), [], { pegawai: [pegawai({ aktif: false })] }).baru.length, 0);
 });

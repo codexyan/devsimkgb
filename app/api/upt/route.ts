@@ -6,7 +6,7 @@ import { penandaHukdisBerlaku, hukdisMasihBerlaku } from "@/lib/hukdisKedaluwars
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { isoTanggalKalender, kunciBulanTmt, kunciTanggal, pilihKgbSiklus, rapelanSiklus } from "@/lib/rekapKgb";
 import { rekapPerSatker } from "@/lib/rekapSatker";
-import { kgbDitunda, pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
+import { kgbDitunda, pegawaiSatker, satkerAkunUpt, waktuUnggahSk } from "@/lib/aksesUpt";
 import { statusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { BELUM_SELESAI, BIDANG_USULAN } from "@/lib/usulanPegawai";
 import { SATKER } from "@/lib/satker";
@@ -136,10 +136,11 @@ export async function GET() {
     })
     .sort((a, b) => (a.tmtKgb ?? "9999").localeCompare(b.tmtKgb ?? "9999") || a.nama.localeCompare(b.nama, "id"));
 
-  // SK yang sudah dikonfirmasi keuangan; hanya ini yang boleh diunduh UPT.
+  // SK yang sudah diunggah Tim SDM Kanwil. Sejak saat itu keuangan UPT yang menindaklanjutinya: menetapkan
+  // rapelan dan merekamnya di Gaji Web satker (ADR-009); yang selesai tetap tampil sebagai riwayat.
   const namaPegawai = new Map(milikSatker.map((p) => [p.id, p]));
   const sk = kgbSatker
-    .filter((k) => k.status === "selesai" && !k.isArsip)
+    .filter((k) => (k.status === "menunggu_keuangan" || k.status === "selesai") && !k.isArsip)
     .map((k) => {
       const p = namaPegawai.get(k.pegawaiId);
       const surat = suratByKgb.get(k.id);
@@ -156,7 +157,11 @@ export async function GET() {
         mkgBulanBaru: k.mkgBulanBaru,
         nomorSurat: surat?.nomorSurat ?? null,
         tanggalSurat: isoTanggalKalender(surat?.tanggalSurat ?? null),
+        status: k.status,
+        diunggahAt: waktuUnggahSk(surat?.pathFile)?.toISOString() ?? null,
         konfirmasiKeuanganAt: k.konfirmasiKeuanganAt ? new Date(k.konfirmasiKeuanganAt).toISOString() : null,
+        // Potensi rapelan dari Kanwil (batas input terlewat); keputusannya diambil keuangan UPT.
+        potensiRapelan: k.flagRapelan === true,
         rapelan: k.rapelanDitetapkan === true,
         berkasAda: !!surat?.pathFile,
         // Langkah terakhir milik UPT: merekam KGB di Gaji Web satkernya sendiri.
@@ -164,7 +169,11 @@ export async function GET() {
         gajiWebOleh: k.inputGajiWebBy ?? null,
       };
     })
-    .sort((a, b) => (b.tmtKgbBaru ?? "").localeCompare(a.tmtKgbBaru ?? ""))
+    // Yang belum direkam di Gaji Web didahulukan agar tidak terpotong batas jumlah oleh riwayat yang selesai.
+    .sort(
+      (a, b) =>
+        Number(!!a.gajiWebAt) - Number(!!b.gajiWebAt) || (b.tmtKgbBaru ?? "").localeCompare(a.tmtKgbBaru ?? ""),
+    )
     .slice(0, BATAS_SK);
 
   return NextResponse.json({
