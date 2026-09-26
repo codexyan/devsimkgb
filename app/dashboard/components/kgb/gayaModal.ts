@@ -28,6 +28,9 @@ export const GAYA_MODAL_KGB = `
 .kgbm-tutup:disabled { opacity: .4; cursor: not-allowed; }
 .kgbm-form { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .kgbm-badan { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+/* Isi badan tidak boleh menyusut: badan yang bergulir, bukan bagiannya yang terpotong. Bagian (.kgbm-bagian)
+   memakai overflow hidden, jadi bagian yang menyusut menyembunyikan isian di bawahnya tanpa jalan. */
+.kgbm-badan > * { flex-shrink: 0; }
 .kgbm-kaki { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--ln2); flex-shrink: 0; }
 .kgbm-kaki > .kgbm-tombol { flex: 1 1 140px; }
 .kgbm-tombol { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 14px; border-radius: 12px;

@@ -120,6 +120,24 @@ export async function ambilRiwayatKgb(pegawaiId: string): Promise<HasilAksi<Riwa
   return { ok: true, data: Array.isArray(hasil.data) ? hasil.data.filter((k) => !!k?.id) : [] };
 }
 
+/** SK dasar dari usulan UPT yang disetujui (GET /api/pegawai/[id]/sk-dasar); null bila tidak ada. */
+export interface SkDasarUsulan {
+  usulanId: string;
+  nomorSK: string | null;
+  tanggalSK: string | null;
+  tmtSK: string | null;
+  /** Medan berkas pindaian SK-nya pada usulan, untuk /api/usulan/[id]/berkas. */
+  berkas: "skCpns" | "skTerakhir" | null;
+}
+
+export function ambilSkDasarUsulan(pegawaiId: string): Promise<HasilAksi<SkDasarUsulan | null>> {
+  return kirimJson<SkDasarUsulan | null>(
+    `/api/pegawai/${encodeURIComponent(pegawaiId)}/sk-dasar`,
+    { cache: "no-store" },
+    "SK dasar dari usulan UPT gagal dimuat.",
+  );
+}
+
 /** Input KGB dan Input Ulang KGB: POST /api/kgb. */
 export function inputKgb(pegawaiId: string, dasar: DataDasarSk): Promise<HasilAksi<{ id: string }>> {
   return kirimJson<{ id: string }>(
