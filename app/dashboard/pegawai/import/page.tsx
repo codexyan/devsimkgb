@@ -54,6 +54,9 @@ const TEMPLATE_HEADER = [
   "eselon",
   "statusHukdis",
   "keteranganHukdis",
+  "nomorSkDasar",
+  "tanggalSkDasar",
+  "penetapSkDasar",
 ];
 
 // Contoh fiktif; bukan data pegawai sebenarnya.
@@ -77,6 +80,9 @@ const TEMPLATE_EXAMPLE = [
   "Non Eselon",
   "false",
   "",
+  "SEC-12.KP.02.01 TAHUN 2015",
+  "2015-02-20",
+  "Menteri Hukum dan HAM",
 ];
 
 /* Nilai CSV diberi tanda kutip bila berisi koma, kutip, atau baris baru. */
@@ -611,6 +617,27 @@ export default function ImportPage() {
                   deskripsi: "Keterangan hukuman disiplin jika ada; hanya dibaca bila Super Admin yang mengimpor",
                   format: "Teks bebas, kosongkan jika tidak ada",
                   contoh: "",
+                },
+                {
+                  kolom: "nomorSkDasar",
+                  wajib: false,
+                  deskripsi: "Nomor SK dasar KGB pertama di SIM-KGB: SK CPNS bila belum pernah KGB, atau SK KGB terakhir bila terbit di luar SIM-KGB. Terisi otomatis di Input KGB",
+                  format: "Teks bebas",
+                  contoh: "SEC-12.KP.02.01 TAHUN 2015",
+                },
+                {
+                  kolom: "tanggalSkDasar",
+                  wajib: false,
+                  deskripsi: "Tanggal SK dasar di atas; TMT-nya memakai tmtKgbTerakhir",
+                  format: FORMAT_TANGGAL_DITERIMA,
+                  contoh: "2015-02-20",
+                },
+                {
+                  kolom: "penetapSkDasar",
+                  wajib: false,
+                  deskripsi: "Pejabat yang menetapkan SK dasar; tercetak pada baris Oleh di SK KGB",
+                  format: "Teks bebas",
+                  contoh: "Menteri Hukum dan HAM",
                 },
               ].map((item) => (
                 <div key={item.kolom} className="grid grid-cols-12 gap-3 px-4 py-2.5 items-start hover:bg-gray-50 transition-colors">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ambilRiwayatKgb, ambilSkDasarUsulan, inputKgb, type DataDasarSk, type SkDasarUsulan } from "@/lib/kgbAksi";
+import { ambilPegawaiKgb, ambilRiwayatKgb, ambilSkDasarUsulan, inputKgb, type DataDasarSk, type SkDasarUsulan } from "@/lib/kgbAksi";
 import { pernahKgb } from "@/lib/usulanPegawai";
 import { formatTanggalId } from "@/lib/waktu";
 import KerangkaModal from "./KerangkaModal";
@@ -62,8 +62,10 @@ export default function ModalInputKgb({
   const cariDiRiwayat = dasarDariRiwayat && isianDasarKosong(isianDasarSk(dasarAwal));
   // null selama riwayat dimuat; catatan "belum tercatat" menunggu hasilnya agar tidak berkedip.
   const [dasarRiwayat, setDasarRiwayat] = useState<DasarSkAwal | null | undefined>(() => (cariDiRiwayat ? null : undefined));
-  // SK dasar yang diketik UPT pada usulan yang disetujui, dipakai bila riwayat KGB belum memuatnya.
+  // Asal isian SK dasar bila bukan dari riwayat KGB: data pegawai (ADR-010), atau usulan UPT yang disetujui
+  // sebelum SK-nya disalin ke data pegawai.
   const [skUsulan, setSkUsulan] = useState<SkDasarUsulan | null>(null);
+  const [dariDataPegawai, setDariDataPegawai] = useState(false);
 
   useEffect(() => {
     if (!cariDiRiwayat) return;
@@ -71,6 +73,20 @@ export default function ModalInputKgb({
     ambilRiwayatKgb(ringkas.id).then(async (hasilRiwayat) => {
       if (batal) return;
       let dasar = hasilRiwayat.ok ? dasarAwalDariRiwayat(hasilRiwayat.data) : null;
+      if (!dasar?.nomorSK?.trim()) {
+        const hasilPegawai = await ambilPegawaiKgb(ringkas.id);
+        if (batal) return;
+        const p = hasilPegawai.ok ? hasilPegawai.data : null;
+        if (p && (p.nomorSkDasar?.trim() || p.tanggalSkDasar)) {
+          setDariDataPegawai(true);
+          dasar = {
+            nomorSK: p.nomorSkDasar ?? null,
+            tanggalSK: p.tanggalSkDasar ?? null,
+            tmtSK: p.tmtKgbTerakhir,
+            penetapSkDasar: p.penetapSkDasar?.trim() || dasar?.penetapSkDasar || null,
+          };
+        }
+      }
       if (!dasar?.nomorSK?.trim()) {
         const hasilUsulan = await ambilSkDasarUsulan(ringkas.id);
         if (batal) return;
@@ -225,6 +241,9 @@ export default function ModalInputKgb({
         }
       >
         {riwayatDimuat && <Memuat teks="Mencari SK dasar di riwayat KGB dan usulan UPT..." />}
+        {!riwayatDimuat && dariDataPegawai && (
+          <Catatan>Diisi dari SK dasar pada data pegawai. Periksa kembali sebelum menyimpan.</Catatan>
+        )}
         {!riwayatDimuat && skUsulan && (
           <Catatan>
             Diisi dari usulan UPT yang sudah disetujui. Cocokkan dengan dokumennya sebelum menyimpan

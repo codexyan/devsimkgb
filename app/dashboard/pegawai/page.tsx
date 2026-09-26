@@ -56,6 +56,7 @@ interface PegawaiDetail {
   gajiPokok?: number | null; tmtKgbTerakhir?: string | null; tmtKgbBerikutnya?: string | null;
   statusHukdis?: boolean | null; keteranganHukdis?: string | null; tanggalHukdisBerakhir?: string | null;
   jenisHukdis?: string | null; aktif?: boolean | null;
+  nomorSkDasar?: string | null; tanggalSkDasar?: string | null; penetapSkDasar?: string | null;
 }
 
 const FORMAT_TANGGAL_PENDEK: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
@@ -117,6 +118,9 @@ const formInit = {
   tanggalHukdisBerakhir: "",
   jenisHukdis: "",
   aktif: true,
+  nomorSkDasar: "",
+  tanggalSkDasar: "",
+  penetapSkDasar: "",
 };
 
 
@@ -278,6 +282,9 @@ export default function PegawaiPage() {
       tanggalHukdisBerakhir: keIsianTanggal(full.tanggalHukdisBerakhir),
       jenisHukdis: full.jenisHukdis || "",
       aktif: full.aktif ?? true,
+      nomorSkDasar: full.nomorSkDasar || "",
+      tanggalSkDasar: keIsianTanggal(full.tanggalSkDasar),
+      penetapSkDasar: full.penetapSkDasar || "",
     });
     setShowModal(true);
   }
@@ -1180,6 +1187,49 @@ export default function PegawaiPage() {
                         Terisi sendiri dari golongan, masa kerja, dan KGB terakhir. Golongan II/a dari masa kerja 0
                         naik setelah 1 tahun, bukan 2. Ubah hanya bila memang bergeser, misalnya karena penundaan
                         hukuman disiplin.
+                      </p>
+                    </div>
+                    {/* SK dasar KGB pertama (ADR-010): tercetak pada "Atas dasar" SK KGB selama belum ada KGB
+                        yang selesai di SIM-KGB. Sesudahnya SK dasarnya SK KGB itu, jadi isian ini tidak dipakai lagi. */}
+                    <div className="col-span-1 sm:col-span-2 min-w-0 pt-1" style={{ borderTop: "1px solid var(--ln2)" }}>
+                      <p className="text-xs font-semibold mt-2" style={{ color: "var(--dtn)" }}>
+                        SK dasar KGB pertama{" "}
+                        <span className="font-normal" style={{ color: "var(--dt5)" }}>
+                          SK CPNS bila belum pernah KGB; SK KGB terakhir bila KGB-nya terbit di luar SIM-KGB
+                        </span>
+                      </p>
+                    </div>
+                    <Field label="Nomor SK dasar">
+                      <input
+                        className={inputClass}
+                        style={inputStyle}
+                        placeholder="Nomor sesuai dokumen SK"
+                        value={form.nomorSkDasar}
+                        onChange={(e) => f("nomorSkDasar", e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Tanggal SK dasar">
+                      <input
+                        type="date"
+                        className={inputClass}
+                        style={dateInputStyle}
+                        value={form.tanggalSkDasar}
+                        onChange={(e) => f("tanggalSkDasar", e.target.value)}
+                      />
+                    </Field>
+                    <div className="col-span-1 sm:col-span-2 min-w-0">
+                      <Field label="Pejabat penetap SK dasar">
+                        <input
+                          className={inputClass}
+                          style={inputStyle}
+                          placeholder="Menteri Imigrasi dan Pemasyarakatan"
+                          value={form.penetapSkDasar}
+                          onChange={(e) => f("penetapSkDasar", e.target.value)}
+                        />
+                      </Field>
+                      <p className="text-xs mt-1" style={{ color: "var(--dt4)" }}>
+                        Terisi di Input KGB pertama sebagai Atas dasar dan baris Oleh. TMT-nya memakai KGB Terakhir
+                        Berlaku di atas, yang bagi CPNS sama dengan TMT CPNS.
                       </p>
                     </div>
                   </div>

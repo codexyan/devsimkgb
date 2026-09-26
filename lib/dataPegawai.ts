@@ -148,6 +148,10 @@ interface IsianPegawai {
   gajiPokok: number;
   tmtKgbTerakhir: Date | null;
   tmtKgbBerikutnya: Date;
+  /** SK dasar KGB pertama (SK CPNS); semuanya boleh kosong (ADR-010). */
+  nomorSkDasar: string | null;
+  tanggalSkDasar: Date | null;
+  penetapSkDasar: string | null;
 }
 
 const LABEL_TANGGAL = {
@@ -155,6 +159,7 @@ const LABEL_TANGGAL = {
   tmtGolongan: "TMT Golongan",
   tmtKgbTerakhir: "TMT KGB Terakhir",
   tmtKgbBerikutnya: "TMT KGB Berikutnya",
+  tanggalSkDasar: "Tanggal SK Dasar",
 } as const;
 
 /**
@@ -231,6 +236,9 @@ export function bacaIsianPegawai(
       gajiPokok: gaji.gajiPokok,
       tmtKgbTerakhir: tanggal.tmtKgbTerakhir ?? null,
       tmtKgbBerikutnya,
+      nomorSkDasar: teksAtauNull(isian.nomorSkDasar),
+      tanggalSkDasar: tanggal.tanggalSkDasar ?? null,
+      penetapSkDasar: teksAtauNull(isian.penetapSkDasar),
     },
   };
 }

@@ -41,6 +41,12 @@ export interface PegawaiRow {
    * TMT-nya sebelum tanggal itu tetap sah diproses.
    */
   satkerTugas: string | null; berhentiTmt: Date | null; berhentiAlasan: string | null;
+  /**
+   * SK dasar KGB pertama (SK CPNS): nomor, tanggal, dan pejabat penetapnya; TMT-nya tmtKgbTerakhir. Diisi
+   * Kanwil atau disalin dari usulan UPT yang disetujui. Setelah ada KGB selesai di SIM-KGB, SK dasarnya SK
+   * KGB itu (ADR-010).
+   */
+  nomorSkDasar: string | null; tanggalSkDasar: Date | null; penetapSkDasar: string | null;
 }
 
 /** Satu kenaikan pangkat: dasar SK-nya dan dampaknya pada MKG serta gaji pokok (lib/kenaikanPangkat.ts). */
@@ -155,6 +161,7 @@ export const defs = {
       s("jenisHukdis"), s("keteranganHukdis"), b("aktif"), d("createdAt"), d("updatedAt"),
       d("konfirmasiUptTmt"), d("konfirmasiUptAt"), s("konfirmasiUptOleh"),
       s("satkerTugas"), d("berhentiTmt"), s("berhentiAlasan"),
+      s("nomorSkDasar"), d("tanggalSkDasar"), s("penetapSkDasar"),
     ],
   },
   UsulanPegawai: {

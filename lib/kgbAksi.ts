@@ -29,6 +29,10 @@ export interface PegawaiKgb {
   tmtKgbTerakhir: string | null;
   statusHukdis: boolean;
   tanggalHukdisBerakhir: string | null;
+  /** SK dasar KGB pertama pada data pegawai (ADR-010). */
+  nomorSkDasar?: string | null;
+  tanggalSkDasar?: string | null;
+  penetapSkDasar?: string | null;
 }
 
 /** Satu baris riwayat dari GET /api/kgb?pegawaiId=. */

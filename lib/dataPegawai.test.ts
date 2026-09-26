@@ -185,3 +185,24 @@ test("tanpa TMT KGB terakhir maupun berikutnya, galatnya menyebutkan jalan kelua
   const hasil = bacaIsianPegawai({ ...ISIAN_DASAR, tmtKgbTerakhir: "", tmtKgbBerikutnya: "" }, { denganNip: true });
   assert.match(hasil.galat ?? "", /isi TMT KGB Terakhir agar dihitungkan sistem/);
 });
+
+test("SK dasar KGB pertama ikut terbaca dan boleh kosong", () => {
+  const terisi = isianSah(
+    bacaIsianPegawai(
+      { ...ISIAN_DASAR, nomorSkDasar: " SEC-12.KP.02.01 TAHUN 2015 ", tanggalSkDasar: "20/02/2015", penetapSkDasar: "Menteri Hukum dan HAM" },
+      { denganNip: true },
+    ),
+  );
+  assert.equal(terisi.nomorSkDasar, "SEC-12.KP.02.01 TAHUN 2015");
+  assert.equal(terisi.tanggalSkDasar?.getTime(), Date.UTC(2015, 1, 20));
+  assert.equal(terisi.penetapSkDasar, "Menteri Hukum dan HAM");
+
+  const kosong = isianSah(bacaIsianPegawai(ISIAN_DASAR, { denganNip: true }));
+  assert.equal(kosong.nomorSkDasar, null);
+  assert.equal(kosong.tanggalSkDasar, null);
+
+  assert.match(
+    bacaIsianPegawai({ ...ISIAN_DASAR, tanggalSkDasar: "31/02/2015" }, { denganNip: true }).galat ?? "",
+    /Tanggal SK Dasar/,
+  );
+});

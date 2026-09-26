@@ -100,6 +100,11 @@ export async function setujuiUsulan(
       satkerTugas: null,
       berhentiTmt: null,
       berhentiAlasan: null,
+      // SK yang diketik UPT pada usulan (SK CPNS, atau SK KGB terakhir di luar SIM-KGB) menjadi SK dasar
+      // Input KGB pertama, jadi Tim SDM tidak mengetiknya ulang (ADR-010).
+      nomorSkDasar: usulan.nomorSkTerakhir?.trim() || null,
+      tanggalSkDasar: usulan.tanggalSkTerakhir ?? null,
+      penetapSkDasar: null,
     };
     await db.pegawai.create(pegawaiBaru);
     pegawaiIdHasil = pegawaiBaru.id;
@@ -119,6 +124,9 @@ export async function setujuiUsulan(
       { id: pegawaiLama.id },
       {
         ...nilaiBaru,
+        // SK dasar ikut diperbarui hanya bila UPT mengisinya pada usulan ini (ADR-010).
+        ...(usulan.nomorSkTerakhir?.trim() ? { nomorSkDasar: usulan.nomorSkTerakhir.trim() } : {}),
+        ...(usulan.tanggalSkTerakhir ? { tanggalSkDasar: usulan.tanggalSkTerakhir } : {}),
         konfirmasiUptTmt: tmtSiklus,
         konfirmasiUptAt: sekarang,
         konfirmasiUptOleh: usulan.diajukanOleh,
