@@ -85,3 +85,20 @@ test("dalam satu jenis: TMT terdekat dulu, lalu nama, yang tanpa TMT paling bela
   );
   assert.deepEqual(daftar.map((t) => t.nama), ["Depan", "Anwar", "Belakang", "Tanpa TMT"]);
 });
+
+test("pegawai lewat batas input masuk walau bukan bulan usulan, dan didahulukan", () => {
+  const tugas = daftarTugasUpt(
+    [usulan({ id: "u9", pegawaiId: "p9", status: "revisi", nama: "B", alasanTolak: "SK kurang" })],
+    [pegawai({ terlambat: true }), pegawai({ id: "p2", nama: "C", bulanTmt: "2026-11", tmtKgb: "2026-11-01" })],
+    "2026-11",
+  );
+  assert.deepEqual(tugas.map((t) => t.jenis), ["terlambat", "perbaiki", "periksa"]);
+  assert.match(tugas[0].langkah, /Batas input Kanwil sudah lewat/);
+});
+
+test("lewat batas tidak ditagih lagi bila sudah dikonfirmasi, sudah diusulkan, atau tidak boleh dikonfirmasi", () => {
+  const bulan = "2026-11";
+  assert.equal(daftarTugasUpt([], [pegawai({ terlambat: true, konfirmasi: "berlaku" })], bulan).length, 0);
+  assert.equal(daftarTugasUpt([], [pegawai({ terlambat: true, usulanBerjalan: "menunggu" })], bulan).length, 0);
+  assert.equal(daftarTugasUpt([], [pegawai({ terlambat: true, bolehKonfirmasi: false })], bulan).length, 0);
+});

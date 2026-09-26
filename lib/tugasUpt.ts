@@ -11,12 +11,13 @@
 //
 // Murni agar dapat dipakai server maupun peramban dan diuji tanpa lapisan data.
 
-export type JenisTugasUpt = "perbaiki" | "lengkapi" | "ajukan" | "periksa";
+export type JenisTugasUpt = "terlambat" | "perbaiki" | "lengkapi" | "ajukan" | "periksa";
 
 /** Nada kartu tugas; mengikuti kosakata warna dasbor. */
-export type NadaTugas = "ungu" | "kuning" | "hijau" | "biru";
+export type NadaTugas = "merah" | "ungu" | "kuning" | "hijau" | "biru";
 
 export const TUGAS_UPT: Record<JenisTugasUpt, { judul: string; nada: NadaTugas }> = {
+  terlambat: { judul: "Lewat batas input", nada: "merah" },
   perbaiki: { judul: "Dikembalikan Kanwil", nada: "ungu" },
   lengkapi: { judul: "Belum lengkap", nada: "kuning" },
   ajukan: { judul: "Siap diajukan", nada: "hijau" },
@@ -24,7 +25,8 @@ export const TUGAS_UPT: Record<JenisTugasUpt, { judul: string; nada: NadaTugas }
 };
 
 /** Urutan pengerjaan; makin kecil makin dulu. */
-const URUTAN: Record<JenisTugasUpt, number> = { perbaiki: 0, lengkapi: 1, ajukan: 2, periksa: 3 };
+// Lewat batas didahulukan: batas input Kanwil sudah terlewati, jadi KGB-nya sudah terancam rapelan.
+const URUTAN: Record<JenisTugasUpt, number> = { terlambat: 0, perbaiki: 1, lengkapi: 2, ajukan: 3, periksa: 4 };
 
 export interface UsulanTugas {
   id: string;
@@ -50,6 +52,8 @@ export interface PegawaiTugas {
   /** "berlaku" bila UPT sudah menyatakan data siklus ini benar. */
   konfirmasi: string;
   bolehKonfirmasi: boolean;
+  /** Batas input Kanwil untuk TMT ini sudah lewat, padahal KGB-nya belum diinput. */
+  terlambat?: boolean;
 }
 
 export interface TugasUpt {
@@ -127,16 +131,21 @@ export function daftarTugasUpt(
   }
 
   for (const p of pegawai) {
-    if (!bulanUsulan || p.bulanTmt !== bulanUsulan) continue;
     if (p.usulanBerjalan) continue;
     if (p.konfirmasi === "berlaku") continue;
     if (!p.bolehKonfirmasi) continue;
+    // Yang lewat batas masuk walau bukan bulan usulan berjalan: siklusnya sudah terlewati, dan tanpa
+    // langkah UPT pegawai itu tidak muncul di daftar mana pun selain tabel pegawai.
+    const terlambat = !!p.terlambat;
+    if (!terlambat && (!bulanUsulan || p.bulanTmt !== bulanUsulan)) continue;
     tugas.push({
       kunci: `pegawai:${p.id}`,
-      jenis: "periksa",
+      jenis: terlambat ? "terlambat" : "periksa",
       nama: p.nama,
       nip: p.nip,
-      langkah: "Nyatakan datanya sudah benar, atau usulkan perbaikan bila ada yang keliru.",
+      langkah: terlambat
+        ? "Batas input Kanwil sudah lewat. Segera nyatakan datanya sudah benar, atau usulkan perbaikan."
+        : "Nyatakan datanya sudah benar, atau usulkan perbaikan bila ada yang keliru.",
       catatan: null,
       usulanId: null,
       pegawaiId: p.id,

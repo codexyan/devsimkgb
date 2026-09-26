@@ -54,7 +54,11 @@ export async function GET() {
         tanggalSurat: u.tanggalSurat ? new Date(u.tanggalSurat).toISOString() : null,
         berkas: BERKAS_USULAN.filter((b) => u[b.kunci]).map((b) => ({ medan: b.medan, label: b.label })),
         hukdisAda: !!u.hukdisAda,
-        jumlahPerubahan: u.jenis === "baru" ? BIDANG_USULAN.length : p ? bandingkanUsulan(p, u).length : 0,
+        // Dibandingkan dengan data induk sekarang, jadi hanya bermakna sebelum ditinjau: sesudah disetujui
+        // data induk sudah sama dengan usulannya, dan angkanya menjadi 0 atau menyesatkan.
+        jumlahPerubahan: !BELUM_SELESAI.includes(u.status)
+          ? null
+          : u.jenis === "baru" ? BIDANG_USULAN.length : p ? bandingkanUsulan(p, u).length : 0,
         // Apa yang masih kurang sebelum draf ini boleh diajukan; kosong berarti siap.
         kekurangan: DIPEGANG_UPT.includes(u.status) ? kekuranganUsulan(u, u.jenis, p) : [],
         // Isi dikirim utuh agar formulirnya dapat dilanjutkan, baik draf maupun usulan yang

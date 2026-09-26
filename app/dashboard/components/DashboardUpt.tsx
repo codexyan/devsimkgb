@@ -87,7 +87,8 @@ interface UsulanTerkirim extends DrafUsulanUpt {
   nomorSurat: string | null;
   tanggalSurat: string | null;
   hukdisAda: boolean;
-  jumlahPerubahan: number;
+  /** Kolom yang diusulkan berubah; null setelah ditinjau Kanwil. */
+  jumlahPerubahan: number | null;
   /** Yang masih kurang sebelum draf ini boleh diajukan; selalu kosong untuk usulan yang sudah dikirim. */
   kekurangan: string[];
   diajukanAt: string | null;
@@ -452,6 +453,7 @@ export default function DashboardUpt() {
         pegawai.map((p) => ({
           id: p.id, nama: p.nama, nip: p.nip, tmtKgb: p.tmtKgb, bulanTmt: p.bulanTmt,
           usulanBerjalan: p.usulanBerjalan, konfirmasi: p.konfirmasi, bolehKonfirmasi: p.bolehKonfirmasi,
+          terlambat: p.terlambat,
         })),
         bulanUsulan,
       ),
@@ -751,14 +753,6 @@ export default function DashboardUpt() {
             <h2 id="judul-tugas-upt" className="dsb-panel-judul">
               Perlu dikerjakan <small>{tugas.length === 0 ? "tidak ada" : `${tugas.length} pegawai`}</small>
             </h2>
-            <span className="upt-aksi">
-              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setDialogImpor(true)}>
-                Unggah daftar
-              </button>{" "}
-              <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={bukaPegawaiBaru}>
-                Tambah pegawai
-              </button>
-            </span>
           </div>
           {tugas.length === 0 ? (
             <p className="dsb-kosong">
@@ -848,16 +842,19 @@ export default function DashboardUpt() {
                   })}
                 </ul>
               </div>
-              <div style={{ padding: "10px 16px", borderTop: "1px solid var(--ln2)" }}>
-                <button
-                  type="button"
-                  className="dsb-tombol"
-                  disabled={pilihAjukan.size === 0}
-                  onClick={bukaDialogAjukan}
-                >
-                  {pilihAjukan.size > 0 ? `Ajukan ${pilihAjukan.size} pegawai ke Kanwil` : "Centang dulu yang akan diajukan"}
-                </button>
-              </div>
+              {/* Hanya draf yang dapat dicentang dan diajukan; tanpa draf, tombol ini tidak berguna. */}
+              {tugas.some((t) => t.usulanId) && (
+                <div style={{ padding: "10px 16px", borderTop: "1px solid var(--ln2)" }}>
+                  <button
+                    type="button"
+                    className="dsb-tombol"
+                    disabled={pilihAjukan.size === 0}
+                    onClick={bukaDialogAjukan}
+                  >
+                    {pilihAjukan.size > 0 ? `Ajukan ${pilihAjukan.size} pegawai ke Kanwil` : "Centang dulu yang akan diajukan"}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </section>
@@ -882,9 +879,15 @@ export default function DashboardUpt() {
                 </button>
               ))}
             </div>
-            <button type="button" className="dsb-tombol dsb-tombol-kecil" style={{ marginLeft: "auto" }} onClick={bukaPegawaiBaru}>
-              Tambah data pegawai
-            </button>
+            {/* Satu-satunya tempat menambah pegawai: pegawai baru tersimpan sebagai draf di Perlu dikerjakan. */}
+            <span className="upt-aksi" style={{ marginLeft: "auto" }}>
+              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setDialogImpor(true)}>
+                Unggah daftar
+              </button>
+              <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={bukaPegawaiBaru}>
+                Tambah pegawai
+              </button>
+            </span>
             <input
               type="search"
               className="dsb-cari"
@@ -1151,7 +1154,13 @@ export default function DashboardUpt() {
                           <span className="dsb-nama">{u.nama}</span>
                           <span className="dsb-kecil"> · {LABEL_JENIS_USULAN[u.jenis] ?? u.jenis} · {cfg.label}</span>
                           <p className="dsb-kecil" style={{ margin: 0 }}>
-                            {u.nomorSurat ? `Surat ${u.nomorSurat} · ` : ""}{u.jumlahPerubahan} kolom{u.hukdisAda ? " · disertai laporan hukdis" : ""}
+                            {u.nomorSurat ? `Surat ${u.nomorSurat} · ` : ""}
+                            {u.jumlahPerubahan !== null
+                              ? `${u.jumlahPerubahan} kolom`
+                              : u.ditinjauAt
+                                ? `ditinjau ${formatTanggalId(u.ditinjauAt, { day: "numeric", month: "short", year: "numeric" })}`
+                                : "sudah ditinjau"}
+                            {u.hukdisAda ? " · disertai laporan hukdis" : ""}
                           </p>
                           {u.alasanTolak && (
                             <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-red)" }}>Ditolak: {u.alasanTolak}</p>
