@@ -4,18 +4,12 @@
 
 import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { BERKAS_USULAN } from "./usulanPegawai";
+import { BATAS_BERKAS_USULAN_BYTE, BERKAS_USULAN, PESAN_BERKAS_TERLALU_BESAR } from "./usulanPegawai";
 import { adaPenandaPdf } from "./prosesKgb";
 
-/**
- * Batas ukuran tiap berkas. Satu lembar SK yang dipindai sebagai dokumen berukuran ratusan kilobyte;
- * yang melampaui satu megabyte hampir selalu foto kamera beresolusi penuh yang dibungkus PDF. Batas ini
- * menahan berkas semacam itu sejak awal, sebab operator UPT mengunggah lewat data seluler dan unggahan
- * besar yang putus di tengah jalan jauh lebih menyakitkan daripada ditolak sejak awal.
- */
-export const BATAS_BERKAS_BYTE = 1024 * 1024;
-export const PESAN_TERLALU_BESAR =
-  "Ukuran tiap berkas paling besar 1 MB. Pindai SK sebagai dokumen hitam putih, atau perkecil berkasnya, lalu unggah kembali.";
+// Batasnya didefinisikan di lib/usulanPegawai.ts agar formulir di peramban memeriksa hal yang sama sebelum mengunggah.
+export const BATAS_BERKAS_BYTE = BATAS_BERKAS_USULAN_BYTE;
+export const PESAN_TERLALU_BESAR = PESAN_BERKAS_TERLALU_BESAR;
 
 export type KunciBerkasUsulan = (typeof BERKAS_USULAN)[number]["kunci"];
 type Bucket = { delete(keys: string | string[]): Promise<void> };

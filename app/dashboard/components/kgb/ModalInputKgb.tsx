@@ -248,7 +248,7 @@ export default function ModalInputKgb({
         <BidangPenetap
           nilai={form.penetapSkDasar}
           onUbah={ubah("penetapSkDasar")}
-          petunjuk="Tercetak pada baris Oleh di surat KGB. SK pengangkatan PNS ditetapkan Menteri, SK KGB sebelumnya oleh pejabat yang menandatanganinya."
+          petunjuk="Tercetak pada baris Oleh di surat KGB. Untuk KGB pertama SK terakhirnya SK CPNS; untuk KGB berikutnya SK KGB sebelumnya. Isi dengan pejabat yang menetapkan SK itu."
           nonaktif={sibuk}
         />
       </BagianForm>

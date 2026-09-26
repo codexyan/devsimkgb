@@ -8,8 +8,8 @@ export const PENETAP_KANWIL = "Kepala Kantor Wilayah Direktorat Jenderal Pemasya
 /**
  * Pilihan yang ditawarkan pada isian "Oleh". Daftarnya tidak mengikat: penetap lain boleh diketik.
  *
- * Menteri ikut di sini karena SK pengangkatan PNS berbentuk Keputusan Menteri, dan bagi pegawai yang
- * baru diangkat justru SK itulah dasar gaji pokoknya. Tanpa pilihan ini, isiannya mudah jatuh ke
+ * Menteri ikut di sini karena SK pengangkatan CPNS lazimnya berbentuk Keputusan Menteri, dan bagi pegawai
+ * yang belum pernah KGB justru SK CPNS itulah SK dasarnya. Tanpa pilihan ini, isiannya mudah jatuh ke
  * Kepala Kantor Wilayah yang kebetulan berada di urutan pertama, padahal bukan penetapnya.
  */
 export const SARAN_PENETAP_SK = [

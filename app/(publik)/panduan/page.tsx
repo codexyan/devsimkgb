@@ -693,17 +693,19 @@ export default async function PanduanPage() {
                   </li>
                   <li>
                     <strong>Unggah berkas dasarnya</strong>, masing-masing PDF paling besar 1 MB. Pindai sebagai
-                    dokumen, bukan foto kamera, agar ukurannya muat. Berkas yang sudah tersimpan dapat dibuka kembali
-                    dari formulirnya untuk dipastikan tidak tertukar.
+                    dokumen, bukan foto kamera, agar ukurannya muat. Setiap berkas dapat dipratinjau begitu dipilih, sebelum
+                    diunggah, lalu diganti atau dihapus dari kartunya, agar dapat dipastikan tidak tertukar.
                   </li>
                   <li>
-                    Keempat berkas itu: <strong>surat usulan Srikandi</strong>, yaitu surat pengantar UPT yang sudah
+                    Kelima berkas itu: <strong>surat usulan Srikandi</strong>, yaitu surat pengantar UPT yang sudah
                     dikirim ke Kanwil; <strong>SK KGB terakhir</strong>, dikosongkan bila pegawai belum pernah menerima
-                    KGB; <strong>SK pengangkatan PNS</strong>, yaitu Keputusan Menteri tentang pengangkatan CPNS
-                    menjadi PNS yang bagi pegawai baru menjadi dasar gaji pokoknya, boleh digabung dengan SK CPNS dan
-                    SPMT dalam satu berkas; dan <strong>SK kenaikan pangkat terakhir</strong> bila pegawai pernah naik
-                    pangkat, sebab kenaikan pangkat memotong masa kerja golongan. Ketiga berkas terakhir diminta tim
-                    keuangan agar masa kerja golongan dapat dicocokkan dengan dokumen aslinya, bukan dengan ingatan.
+                    KGB; <strong>SK CPNS</strong>, wajib bagi pegawai yang belum pernah KGB karena SK inilah acuan
+                    pertamanya: TMT CPNS awal masa kerja golongan, dan nomor serta tanggalnya tercetak sebagai SK dasar
+                    pada surat KGB pertama; <strong>SK pengangkatan PNS</strong>, boleh digabung dengan SPMT, dilampirkan
+                    bila pegawai sudah diangkat PNS, sebab KGB pertama dapat jatuh sebelum pengangkatan itu; dan{" "}
+                    <strong>SK kenaikan pangkat terakhir</strong> bila pegawai pernah naik pangkat, sebab kenaikan pangkat
+                    memotong masa kerja golongan. Berkas selain surat usulan diminta tim keuangan agar masa kerja
+                    golongan dapat dicocokkan dengan dokumen aslinya, bukan dengan ingatan.
                   </li>
                   <li>
                     Bila pegawai sedang atau pernah menjalani hukuman disiplin yang belum dilaporkan, centang bagiannya
@@ -945,7 +947,7 @@ export default async function PanduanPage() {
                 <h3 className="pub-h3">Kesalahan yang sering terjadi</h3>
                 <ul>
                   <li>TMT atau masa kerja golongan pada tabel usulan tidak sama dengan yang tertulis di SK.</li>
-                  <li>SK dasar tidak dilampirkan, misalnya SK KGB terakhir atau SK pengangkatan PNS.</li>
+                  <li>SK dasar tidak dilampirkan, misalnya SK KGB terakhir, atau SK CPNS bagi pegawai yang belum pernah KGB.</li>
                   <li>NIP salah ketik, sehingga data pegawai tidak ditemukan di SIM-KGB.</li>
                   <li>
                     Surat diterima setelah batas proses Tim SDM, sehingga SK berisiko terbit setelah TMT dan selisih gaji
@@ -1105,8 +1107,7 @@ export default async function PanduanPage() {
                       Isi bagian Atas Dasar SK Terakhir dari SK dasar yang dilampirkan. Nomor SK Terakhir, Tanggal SK
                       Terakhir, dan TMT SK Terakhir wajib diisi; Oleh wajib dilengkapi paling lambat saat Buat SK. Isian Oleh
                       adalah pejabat yang menetapkan SK terakhir itu, bukan yang menandatangani SK KGB yang sedang
-                      dibuat: SK pengangkatan PNS ditetapkan Menteri, sedangkan SK KGB sebelumnya oleh pejabat yang
-                      menandatanganinya.
+                      dibuat. Untuk KGB pertama, SK terakhirnya adalah SK CPNS; untuk KGB berikutnya, SK KGB sebelumnya.
                       Pilih Simpan Input KGB. Status berubah menjadi <Status status="sedang_diproses" />.
                     </p>
                     <p>SIM-KGB menolak Input KGB bila:</p>

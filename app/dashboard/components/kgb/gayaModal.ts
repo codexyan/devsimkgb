@@ -89,6 +89,20 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
 .kgbm-berkas-terpilih button { margin-left: auto; border: 0; padding: 0; background: none; font: inherit;
   font-size: 11.5px; font-weight: 600; color: var(--st-red); cursor: pointer; white-space: nowrap; }
 .kgbm-berkas-terpilih button:hover { text-decoration: underline; }
+.kgbm-kartu-berkas { display: flex; align-items: center; gap: 10px; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--ln1);
+  border-radius: 10px; background: var(--sub); }
+.kgbm-kartu-berkas[data-keadaan="baru"] { border-color: var(--tint-blue-ln); background: var(--tint-blue-bg); }
+.kgbm-kartu-berkas-ikon { flex-shrink: 0; color: var(--dt4); }
+.kgbm-kartu-berkas[data-keadaan="baru"] .kgbm-kartu-berkas-ikon { color: var(--st-blue); }
+.kgbm-kartu-berkas-teks { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.kgbm-kartu-berkas-nama { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--dt1); }
+.kgbm-kartu-berkas-ket { font-size: 11px; font-weight: 400; color: var(--dt4); }
+.kgbm-kartu-berkas-aksi { display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0; }
+.kgbm-kartu-berkas-aksi button { padding: 3px 9px; border: 1px solid var(--ln0); border-radius: 7px; background: var(--card);
+  font: inherit; font-size: 11.5px; font-weight: 600; color: var(--dtn); cursor: pointer; }
+.kgbm-kartu-berkas-aksi button:hover { background: var(--tint-navy); }
+.kgbm-kartu-berkas-aksi button[data-bahaya] { color: var(--st-red); }
+.kgbm-kartu-berkas-aksi button[data-bahaya]:hover { background: var(--tint-red-bg); }
 .kgbm-grid2 { display: grid; grid-template-columns: 1fr; gap: 10px; }
 @media (min-width: 480px) { .kgbm-grid2 { grid-template-columns: 1fr 1fr; } }
 .kgbm-galat { font-size: 12px; line-height: 1.5; padding: 8px 12px; border-radius: 10px; background: var(--tint-red-bg);

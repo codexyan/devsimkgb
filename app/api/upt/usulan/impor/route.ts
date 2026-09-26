@@ -79,6 +79,7 @@ export async function POST(req: Request) {
       pathSkTerakhir: null,
       pathSyaratCpns: null,
       pathSkPangkat: null,
+      pathSkCpns: null,
       nama: null, tempatLahir: null, tanggalLahir: null, jenisKelamin: null,
       pendidikanTerakhir: null, jabatan: null, pangkat: null, golonganRuang: null,
       eselon: null, jenisJabatan: null, tmtGolongan: null,

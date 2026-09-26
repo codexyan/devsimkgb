@@ -506,7 +506,7 @@ export default function UsulanPage() {
 
                             {(u.nomorSkTerakhir || u.tanggalSkTerakhir) && (
                               <p className="dsb-kecil">
-                                Dasar: SK terakhir {u.nomorSkTerakhir ?? "-"} tanggal {tgl(u.tanggalSkTerakhir)}
+                                SK dasar (SK CPNS bila belum pernah KGB): {u.nomorSkTerakhir ?? "-"} tanggal {tgl(u.tanggalSkTerakhir)}
                               </p>
                             )}
                             {u.hukdis && (

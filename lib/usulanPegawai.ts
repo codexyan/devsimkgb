@@ -73,7 +73,17 @@ export type KunciBidangUsulan = (typeof BIDANG_USULAN)[number]["kunci"];
  * pegawai yang belum pernah KGB tidak punya SK KGB terakhir, dan memintanya justru membuat operator
  * mengunggah SK pengangkatan PNS ke kolom yang salah.
  */
-export type WajibBerkas = "pernah_kgb" | "belum_pernah_kgb" | "pernah_naik_pangkat" | "saat_mengajukan";
+/**
+ * Batas ukuran tiap berkas usulan. Satu lembar SK yang dipindai sebagai dokumen berukuran ratusan kilobyte;
+ * yang melampaui satu megabyte hampir selalu foto kamera beresolusi penuh yang dibungkus PDF. Batas ini
+ * menahan berkas semacam itu sejak awal, sebab operator UPT mengunggah lewat data seluler dan unggahan
+ * besar yang putus di tengah jalan jauh lebih menyakitkan daripada ditolak sejak awal.
+ */
+export const BATAS_BERKAS_USULAN_BYTE = 1024 * 1024;
+export const PESAN_BERKAS_TERLALU_BESAR =
+  "Ukuran tiap berkas paling besar 1 MB. Pindai SK sebagai dokumen hitam putih, atau perkecil berkasnya, lalu unggah kembali.";
+
+export type WajibBerkas = "pernah_kgb" | "belum_pernah_kgb" | "sudah_pns" | "pernah_naik_pangkat" | "saat_mengajukan";
 
 /**
  * Berkas dasar yang menyertai usulan. Tim keuangan meminta ketiga berkas selain suratnya agar masa
@@ -98,12 +108,20 @@ export const BERKAS_USULAN = [
     wajibUntuk: "pernah_kgb",
   },
   {
+    medan: "skCpns",
+    kunci: "pathSkCpns",
+    label: "SK CPNS",
+    keterangan:
+      "Keputusan pengangkatan CPNS. Bagi pegawai yang belum pernah KGB, SK inilah acuan pertama: TMT CPNS awal masa kerja golongan, dan nomor serta tanggalnya diisikan sebagai SK dasar gaji pokok.",
+    wajibUntuk: "belum_pernah_kgb",
+  },
+  {
     medan: "syaratCpns",
     kunci: "pathSyaratCpns",
     label: "SK pengangkatan PNS",
     keterangan:
-      "Keputusan Menteri tentang pengangkatan CPNS menjadi PNS. Bagi pegawai yang belum pernah KGB, SK inilah dasar gaji pokoknya. Boleh digabung dengan SK CPNS dan SPMT dalam satu berkas.",
-    wajibUntuk: "belum_pernah_kgb",
+      "Keputusan tentang pengangkatan CPNS menjadi PNS, boleh digabung dengan SPMT dalam satu berkas. KGB pertama dapat jatuh sebelum pegawai diangkat PNS, jadi SK ini tidak selalu sudah ada.",
+    wajibUntuk: "sudah_pns",
   },
   {
     medan: "skPangkat",
@@ -115,7 +133,7 @@ export const BERKAS_USULAN = [
   },
 ] as const satisfies readonly {
   medan: string;
-  kunci: "pathBerkas" | "pathSkTerakhir" | "pathSyaratCpns" | "pathSkPangkat";
+  kunci: "pathBerkas" | "pathSkTerakhir" | "pathSkCpns" | "pathSyaratCpns" | "pathSkPangkat";
   label: string;
   /** Penjelasan singkat: dokumen apa yang dimaksud dan kapan diperlukan. */
   keterangan: string;

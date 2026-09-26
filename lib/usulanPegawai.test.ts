@@ -172,13 +172,16 @@ test("usulan yang dikembalikan kembali dipegang UPT, tetapi tetap menutup pintu 
 test("berkas yang wajib bertukar menurut pernah atau belum pernah KGB", () => {
   const wajibUntuk = (medan: string) => BERKAS_USULAN.find((b) => b.medan === medan)!.wajibUntuk;
 
-  // Belum pernah KGB: dasar gaji pokoknya SK pengangkatan PNS, dan SK KGB terakhir memang tidak ada.
-  assert.equal(berkasWajib(wajibUntuk("syaratCpns"), false), true);
+  // Belum pernah KGB: acuan pertamanya SK CPNS, dan SK KGB terakhir memang tidak ada.
+  assert.equal(berkasWajib(wajibUntuk("skCpns"), false), true);
   assert.equal(berkasWajib(wajibUntuk("skTerakhir"), false), false);
 
   // Sudah pernah KGB: yang dicocokkan tim keuangan adalah SK KGB terakhirnya.
   assert.equal(berkasWajib(wajibUntuk("skTerakhir"), true), true);
-  assert.equal(berkasWajib(wajibUntuk("syaratCpns"), true), false);
+  assert.equal(berkasWajib(wajibUntuk("skCpns"), true), false);
+
+  // KGB pertama dapat jatuh sebelum pengangkatan PNS, jadi SK PNS tidak pernah diwajibkan.
+  for (const pernah of [true, false]) assert.equal(berkasWajib(wajibUntuk("syaratCpns"), pernah), false);
 
   // Kenaikan pangkat tidak dapat dipastikan dari isian, jadi tidak pernah diwajibkan.
   for (const pernah of [true, false]) assert.equal(berkasWajib(wajibUntuk("skPangkat"), pernah), false);

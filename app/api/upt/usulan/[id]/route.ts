@@ -88,11 +88,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const berkas = await simpanBerkasUsulan(form, akun.kode);
   if ("galat" in berkas) return berkas.galat;
 
-  // Berkas lama yang digantikan dibuang, supaya R2 tidak menumpuk unggahan yang tidak lagi dirujuk.
+  // Berkas tersimpan yang dihapus operator (tombol Hapus pada kartu berkas). Berkas yang sekaligus
+  // diganti unggahan baru cukup diganti; permintaan hapusnya diabaikan.
+  const dihapus = new Set(form.getAll("hapusBerkas").map(String));
+  const hapusSaja = BERKAS_USULAN.filter((b) => dihapus.has(b.medan) && !berkas.jalur[b.kunci] && usulan[b.kunci]);
+
+  // Berkas lama yang digantikan atau dihapus dibuang, supaya R2 tidak menumpuk unggahan yang tidak lagi dirujuk.
   const digantikan = BERKAS_USULAN.map((b) => (berkas.jalur[b.kunci] ? usulan[b.kunci] : null)).filter(
     (jalur): jalur is string => !!jalur,
   );
-  await hapusBerkasUsulan(digantikan);
+  await hapusBerkasUsulan([...digantikan, ...hapusSaja.map((b) => usulan[b.kunci] as string)]);
 
   const perubahan: Partial<UsulanPegawaiRow> = {
     ...isian,
@@ -111,6 +116,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   for (const b of BERKAS_USULAN) {
     if (berkas.jalur[b.kunci]) perubahan[b.kunci] = berkas.jalur[b.kunci] ?? null;
   }
+  for (const b of hapusSaja) perubahan[b.kunci] = null;
   // Surat hanya disentuh bila formulirnya memang mengirimkannya. Formulir data pegawai tidak memuat
   // isian surat, dan usulan yang dikembalikan Kanwil harus tetap membawa nomor surat aslinya.
   if (form.has("nomorSurat")) perubahan.nomorSurat = teks("nomorSurat") || null;

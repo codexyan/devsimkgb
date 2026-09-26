@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
+import KolomBerkas from "./KolomBerkas";
 import { BERKAS_USULAN, berkasWajib, hitungUsulan, type WajibBerkas } from "@/lib/usulanPegawai";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
@@ -64,6 +65,7 @@ const PILIHAN_BIDANG: Record<string, readonly string[]> = {
 function catatanWajib(wajibUntuk: WajibBerkas, wajib: boolean): string {
   if (wajib) return "Wajib untuk keadaan pegawai ini.";
   if (wajibUntuk === "pernah_naik_pangkat") return "Lampirkan hanya bila pegawai pernah naik pangkat.";
+  if (wajibUntuk === "sudah_pns") return "Lampirkan bila pegawai sudah diangkat PNS.";
   if (wajibUntuk === "saat_mengajukan") return "";
   return "Tidak wajib untuk keadaan pegawai ini.";
 }
@@ -151,7 +153,8 @@ export default function FormulirUsulan({
   });
   const [hukdis, setHukdis] = useState(draf?.hukdis ?? HUKDIS_KOSONG);
   const [berkas, setBerkas] = useState<Record<string, File | null>>({});
-  const [ulangBerkas, setUlangBerkas] = useState<Record<string, number>>({});
+  // Berkas tersimpan yang ditandai operator untuk dihapus; dihapus server saat data disimpan.
+  const [hapusTersimpan, setHapusTersimpan] = useState<Set<string>>(() => new Set());
   // Pegawai yang belum pernah KGB mengisi TMT CPNS dan masa kerja 0; yang sudah pernah menyalin SK KGB
   // terakhirnya. Pemisahan ini yang menghilangkan tebak-tebakan pada dua isian tersulit.
   const [pernahKgb, setPernahKgb] = useState(() => {
@@ -162,7 +165,7 @@ export default function FormulirUsulan({
   const [mengirim, setMengirim] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
   /** Berkas tersimpan yang sedang dibuka, agar operator dapat memastikan yang diunggah memang benar. */
-  const [pratinjau, setPratinjau] = useState<{ judul: string; url: string } | null>(null);
+  const [pratinjau, setPratinjau] = useState<{ judul: string; url: string; lokal: boolean } | null>(null);
 
   const ubah = (kunci: string, nilai: string) => setIsian((f) => ({ ...f, [kunci]: nilai }));
   /** Usulan yang dilempar kembali Kanwil; isinya utuh, yang berubah hanya kalimat pemandunya. */
@@ -187,9 +190,19 @@ export default function FormulirUsulan({
     [isian.golonganRuang, isian.mkgTahun, isian.mkgBulan, isian.tmtKgbTerakhir],
   );
 
-  function hapusBerkas(medan: string) {
-    setBerkas((f) => ({ ...f, [medan]: null }));
-    setUlangBerkas((u) => ({ ...u, [medan]: (u[medan] ?? 0) + 1 }));
+  function tandaiHapus(medan: string, hapus: boolean) {
+    setHapusTersimpan((lama) => {
+      const baru = new Set(lama);
+      if (hapus) baru.add(medan);
+      else baru.delete(medan);
+      return baru;
+    });
+  }
+
+  function tutupPratinjau() {
+    // Blob URL berkas yang baru dipilih dicabut agar memorinya dilepas.
+    if (pratinjau?.lokal) URL.revokeObjectURL(pratinjau.url);
+    setPratinjau(null);
   }
 
   async function simpan() {
@@ -216,6 +229,7 @@ export default function FormulirUsulan({
       for (const b of BERKAS_USULAN) {
         const isi = berkas[b.medan];
         if (isi) form.set(b.medan, isi);
+        else if (draf && hapusTersimpan.has(b.medan)) form.append("hapusBerkas", b.medan);
       }
 
       const res = draf
@@ -287,7 +301,7 @@ export default function FormulirUsulan({
         <b>{pernahKgb ? "sudah pernah KGB" : "belum pernah KGB"}</b>
         {pernahKgb
           ? " menuntut TMT KGB terakhir, masa kerja golongan yang disalin dari SK KGB itu, dan lampiran SK KGB terakhirnya."
-          : " menuntut TMT CPNS, masa kerja golongan 0 tahun 0 bulan, dan lampiran SK pengangkatan PNS; SK KGB terakhir justru dikosongkan."}{" "}
+          : " menuntut TMT CPNS, masa kerja golongan 0 tahun 0 bulan, serta nomor, tanggal, dan lampiran SK CPNS sebagai acuan pertama; SK KGB terakhir justru dikosongkan."}{" "}
         Pilihannya diatur pada bagian Pangkat, gaji pokok, dan KGB di bawah.
       </p>
 
@@ -497,15 +511,20 @@ export default function FormulirUsulan({
 
           <div className="kgbm-grid2">
             <label className="kgbm-label">
-              Nomor SK dasar gaji pokok
+              {pernahKgb ? "Nomor SK dasar gaji pokok" : "Nomor SK CPNS"}
               <input
                 className="kgbm-input"
                 value={sk.nomorSkTerakhir}
                 onChange={(e) => setSk((f) => ({ ...f, nomorSkTerakhir: e.target.value }))}
               />
+              <span className="kgbm-bantuan">
+                {pernahKgb
+                  ? "Nomor SK KGB terakhir, atau SK kenaikan pangkat bila itu yang terakhir."
+                  : "Bagi pegawai yang belum pernah KGB, SK CPNS inilah SK dasar yang tercetak pada surat KGB pertamanya."}
+              </span>
             </label>
             <IsianTanggal
-              label="Tanggal SK"
+              label={pernahKgb ? "Tanggal SK" : "Tanggal SK CPNS"}
               nilai={sk.tanggalSkTerakhir}
               onUbah={(v) => setSk((f) => ({ ...f, tanggalSkTerakhir: v }))}
             />
@@ -573,52 +592,27 @@ export default function FormulirUsulan({
           <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 1 MB</p>
         </div>
         <div className="kgbm-bagian-isi">
-          {draf && draf.berkas.length > 0 && (
-            <p className="kgbm-baris-tombol">
-              <span className="kgbm-bantuan">Sudah tersimpan, tekan untuk memeriksanya:</span>
-              {draf.berkas.map((b) => (
-                <button
-                  key={b.medan}
-                  type="button"
-                  className="dsb-tombol dsb-tombol-kecil"
-                  data-jenis="garis"
-                  onClick={() => setPratinjau({ judul: b.label, url: `/api/usulan/${draf.id}/berkas?berkas=${b.medan}` })}
-                >
-                  {b.label}
-                </button>
-              ))}
-            </p>
-          )}
           {BERKAS_USULAN.map((b) => {
-            const terpilih = berkas[b.medan];
             const wajib = berkasWajib(b.wajibUntuk, pernahKgb);
-            const judulBerkas = `${b.label} (PDF, paling besar 1 MB)`;
+            const tersimpan = draf?.berkas.some((x) => x.medan === b.medan) ?? false;
             return (
-              <div key={b.medan}>
-                <label className="kgbm-label">
-                  {wajib ? <span className="kgbm-wajib">{judulBerkas}</span> : judulBerkas}
-                  <input
-                    key={ulangBerkas[b.medan] ?? 0}
-                    className="kgbm-input"
-                    type="file"
-                    accept="application/pdf"
-                    onChange={(e) => setBerkas((f) => ({ ...f, [b.medan]: e.target.files?.[0] ?? null }))}
-                  />
-                  <span className="kgbm-bantuan">
-                    {b.keterangan} {catatanWajib(b.wajibUntuk, wajib)}
-                  </span>
-                </label>
-                {terpilih && (
-                  <p className="kgbm-berkas-terpilih">
-                    <span>
-                      {terpilih.name} · {terpilih.size >= 1048576
-                        ? `${(terpilih.size / 1048576).toFixed(1)} MB`
-                        : `${Math.max(1, Math.round(terpilih.size / 1024))} KB`}
-                    </span>
-                    <button type="button" onClick={() => hapusBerkas(b.medan)}>Hapus berkas</button>
-                  </p>
-                )}
-              </div>
+              <KolomBerkas
+                key={b.medan}
+                label={b.label}
+                wajib={wajib}
+                bantuan={`${b.keterangan} ${catatanWajib(b.wajibUntuk, wajib)}`.trim()}
+                dipilih={berkas[b.medan] ?? null}
+                urlTersimpan={draf && tersimpan ? `/api/usulan/${draf.id}/berkas?berkas=${b.medan}` : null}
+                ditandaiHapus={hapusTersimpan.has(b.medan)}
+                onPilih={(f) => {
+                  setBerkas((lama) => ({ ...lama, [b.medan]: f }));
+                  // Berkas pengganti menggantikan yang tersimpan; tanda hapusnya tidak diperlukan lagi.
+                  if (f) tandaiHapus(b.medan, false);
+                }}
+                onHapusTersimpan={() => tandaiHapus(b.medan, true)}
+                onBatalHapus={() => tandaiHapus(b.medan, false)}
+                onPratinjau={(judul, url, lokal) => setPratinjau({ judul, url, lokal })}
+              />
             );
           })}
           <label className="kgbm-label">
@@ -637,7 +631,7 @@ export default function FormulirUsulan({
           judul={pratinjau.judul}
           subjudul={`${isian.nama || pegawai?.nama || "Pegawai"} · berkas tersimpan`}
           url={pratinjau.url}
-          onTutup={() => setPratinjau(null)}
+          onTutup={tutupPratinjau}
         />
       )}
     </KerangkaModal>

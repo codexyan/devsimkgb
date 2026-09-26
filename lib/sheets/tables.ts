@@ -118,6 +118,8 @@ export interface UsulanPegawaiRow {
   catatanUpt: string | null;
   diajukanOleh: string; diajukanAt: Date | null;
   ditinjauOleh: string | null; ditinjauAt: Date | null; alasanTolak: string | null;
+  /** SK pengangkatan CPNS: acuan pertama (SK dasar) bagi pegawai yang belum pernah KGB. */
+  pathSkCpns: string | null;
 }
 
 export interface AuditLogRow {
@@ -172,6 +174,8 @@ export const defs = {
       s("catatanUpt"),
       s("diajukanOleh"), d("diajukanAt"),
       s("ditinjauOleh"), d("ditinjauAt"), s("alasanTolak"),
+      // Ditambahkan kemudian; penulisan baris posisional, jadi kolom baru selalu di ujung kanan.
+      s("pathSkCpns"),
     ],
   },
   RiwayatKGB: {
