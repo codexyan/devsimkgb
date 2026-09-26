@@ -127,6 +127,8 @@ export async function ambilRiwayatKgb(pegawaiId: string): Promise<HasilAksi<Riwa
 /** SK dasar dari usulan UPT yang disetujui (GET /api/pegawai/[id]/sk-dasar); null bila tidak ada. */
 export interface SkDasarUsulan {
   usulanId: string;
+  /** "disetujui", atau "menunggu"/"revisi" bila usulannya belum selesai ditinjau Kanwil. */
+  status: string;
   nomorSK: string | null;
   tanggalSK: string | null;
   tmtSK: string | null;

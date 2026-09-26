@@ -7,10 +7,14 @@ import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
 export const runtime = "nodejs";
 
 /**
- * SK dasar KGB yang pernah dikirim UPT lewat usulan yang disetujui: nomor dan tanggal SK CPNS (bagi
- * pegawai yang belum pernah KGB) atau SK KGB terakhir, beserta TMT-nya. Dipakai Input KGB sebagai
- * isian awal ketika riwayat KGB belum memuatnya, supaya Tim SDM tidak mengetik ulang yang sudah
- * diketik UPT, dan dapat membuka pindaian SK-nya untuk dicocokkan.
+ * SK dasar KGB yang dikirim UPT lewat usulan: nomor dan tanggal SK CPNS (bagi pegawai yang belum pernah
+ * KGB) atau SK KGB terakhir, beserta TMT-nya. Dipakai Input KGB sebagai isian awal ketika riwayat KGB dan
+ * data pegawai belum memuatnya, supaya Tim SDM tidak mengetik ulang yang sudah diketik UPT, dan dapat
+ * membuka pindaian SK-nya untuk dicocokkan.
+ *
+ * Usulan yang disetujui didahulukan. Bila belum ada, usulan yang sudah diajukan tetapi belum selesai
+ * ditinjau (menunggu atau dikembalikan) ikut dipakai, dengan statusnya disebut agar peninjau tahu datanya
+ * belum diperiksa. Draf tidak pernah dipakai: Kanwil belum boleh melihatnya sebelum diajukan UPT.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -19,15 +23,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const { id } = await params;
   const usulan = (await db.usulanPegawai.findMany({
-    where: { pegawaiId: id, status: "disetujui" },
+    where: { pegawaiId: id, status: { in: ["disetujui", "menunggu", "revisi"] } },
   })) as UsulanPegawaiRow[];
+  const waktu = (u: UsulanPegawaiRow) => new Date(u.ditinjauAt ?? u.diajukanAt ?? 0).getTime();
   const terbaru = usulan
     .filter((u) => u.nomorSkTerakhir?.trim() || u.tanggalSkTerakhir)
-    .sort((a, b) => new Date(b.ditinjauAt ?? 0).getTime() - new Date(a.ditinjauAt ?? 0).getTime())[0];
+    .sort((a, b) => Number(b.status === "disetujui") - Number(a.status === "disetujui") || waktu(b) - waktu(a))[0];
   if (!terbaru) return NextResponse.json(null);
 
   return NextResponse.json({
     usulanId: terbaru.id,
+    status: terbaru.status,
     nomorSK: terbaru.nomorSkTerakhir?.trim() || null,
     tanggalSK: terbaru.tanggalSkTerakhir ? new Date(terbaru.tanggalSkTerakhir).toISOString() : null,
     // Pada formulir UPT, TMT CPNS dan TMT KGB terakhir sama-sama disimpan di kolom ini.

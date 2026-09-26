@@ -245,8 +245,21 @@ export default function ModalInputKgb({
           <Catatan>Diisi dari SK dasar pada data pegawai. Periksa kembali sebelum menyimpan.</Catatan>
         )}
         {!riwayatDimuat && skUsulan && (
-          <Catatan>
-            Diisi dari usulan UPT yang sudah disetujui. Cocokkan dengan dokumennya sebelum menyimpan
+          <Catatan nada={skUsulan.status === "disetujui" ? undefined : "amber"}>
+            {skUsulan.status === "disetujui" ? (
+              "Diisi dari usulan UPT yang sudah disetujui."
+            ) : (
+              <>
+                Diisi dari usulan UPT yang{" "}
+                {skUsulan.status === "revisi" ? "sedang dikembalikan untuk revisi" : "belum ditinjau Kanwil"}; datanya
+                belum diperiksa. Tinjau di{" "}
+                <a className="kgbm-tautan" href="/dashboard/usulan" target="_blank" rel="noopener noreferrer">
+                  Usulan UPT
+                </a>
+                .
+              </>
+            )}{" "}
+            Cocokkan dengan dokumennya sebelum menyimpan
             {skUsulan.berkas ? (
               <>
                 :{" "}
