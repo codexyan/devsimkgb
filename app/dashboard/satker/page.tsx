@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { KepalaKartu } from "@/app/dashboard/components/PanelNavy";
 import type { RingkasanSatker } from "@/lib/rekapSatker";
 import { hariIniWita } from "@/lib/waktu";
-import { namaTampilSatker } from "./labelSatker";
+import { namaBulan, namaTampilSatker } from "./labelSatker";
 
 /* Modul Satker & UPT: ringkasan KGB setiap satuan kerja di lingkungan Kanwil (Kanwil dan 18 UPT).
    Satu baris per satker; klik untuk membuka rincian pegawai dan jadwal usulan satker itu. */
@@ -17,6 +17,34 @@ interface DataSatker {
 }
 
 type Saring = "semua" | "tindakan" | "kosong";
+
+/** Nada baris: merah bila ada KGB lewat batas input, kuning bila ada potensi rapelan. */
+function nadaBaris(r: RingkasanSatker): "merah" | "kuning" | undefined {
+  if (r.terlambat > 0) return "merah";
+  if (r.berpotensiRapelan > 0) return "kuning";
+  return undefined;
+}
+
+/** Bulan TMT terdekat yang punya KGB: dasar surat usulan UPT berikutnya. */
+function usulanBerikutnya(r: RingkasanSatker): { bulanTmt: string; jumlah: number } | null {
+  return r.mendatang.find((m) => m.jumlah > 0) ?? null;
+}
+
+/** Bar bertumpuk selesai, diproses, dan belum diproses untuk KGB tahun berjalan. */
+function BarProgres({ selesai, diproses, belum, total }: { selesai: number; diproses: number; belum: number; total: number }) {
+  const lebar = (n: number) => `${total > 0 ? (n / total) * 100 : 0}%`;
+  return (
+    <span
+      className="dsb-bar-tumpuk"
+      role="img"
+      aria-label={`${selesai} selesai, ${diproses} diproses, ${belum} belum diproses dari ${total}`}
+    >
+      <span data-nada="hijau" style={{ width: lebar(selesai) }} />
+      <span data-nada="biru" style={{ width: lebar(diproses) }} />
+      <span data-nada="abu" style={{ width: lebar(belum) }} />
+    </span>
+  );
+}
 
 export default function HalamanSatker() {
   const router = useRouter();
@@ -80,7 +108,7 @@ export default function HalamanSatker() {
   ];
 
   return (
-    <div className="dsb-halaman">
+    <div className="dsb-halaman" data-muat-layar="">
       <header className="dsb-halaman-kepala dsb-muncul">
         <div className="min-w-0">
           <p className="dsb-label">Satker & UPT</p>
@@ -136,7 +164,8 @@ export default function HalamanSatker() {
         </div>
       )}
 
-      <section className="dsb-kartu overflow-hidden dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-labelledby="judul-daftar-satker">
+      {/* Panel mengisi sisa layar; yang bergulir hanya tabelnya, dengan kepala kolom tetap terlihat. */}
+      <section className="dsb-panel dsb-penuh overflow-hidden dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-labelledby="judul-daftar-satker">
         <div className="dsb-kartu-isi">
           <KepalaKartu
             idJudul="judul-daftar-satker"
@@ -168,16 +197,15 @@ export default function HalamanSatker() {
         {tampil.length === 0 ? (
           <p className="dsb-kosong" style={{ borderTop: "1px solid var(--ln2)" }}>Tidak ada satker untuk saringan ini.</p>
         ) : (
-          <div className="overflow-x-auto" style={{ borderTop: "1px solid var(--ln2)" }}>
-            <table className="dsb-tabel" style={{ minWidth: "860px" }}>
+          <div className="dsb-gulir-tabel" style={{ borderTop: "1px solid var(--ln2)" }}>
+            <table className="dsb-tabel dsb-tabel-satker" style={{ minWidth: "940px" }}>
               <thead>
                 <tr>
                   <th scope="col">Satker</th>
                   <th scope="col" className="kanan">Pegawai</th>
                   <th scope="col" className="kanan">KGB {tahun}</th>
-                  <th scope="col" className="kanan">Belum diproses</th>
-                  <th scope="col" className="kanan">Dalam proses</th>
-                  <th scope="col">Selesai</th>
+                  <th scope="col">Progres KGB {tahun}</th>
+                  <th scope="col">Usulan berikutnya</th>
                   <th scope="col">Perlu perhatian</th>
                   <th scope="col"><span className="sr-only">Buka</span></th>
                 </tr>
@@ -185,10 +213,17 @@ export default function HalamanSatker() {
               <tbody>
                 {tampil.map((r) => {
                   const kosong = r.pegawai === 0;
-                  const pct = r.tahunIni.total > 0 ? Math.round((r.tahunIni.selesai / r.tahunIni.total) * 100) : 0;
+                  const { total: kgb, selesai, diproses, belumDiproses: belum } = r.tahunIni;
+                  const pct = kgb > 0 ? Math.round((selesai / kgb) * 100) : 0;
+                  const berikut = usulanBerikutnya(r);
                   const href = `/dashboard/satker/${r.satker.kode}`;
                   return (
-                    <tr key={r.satker.kode} className={kosong ? "dsb-baris-klik dsb-redup" : "dsb-baris-klik"} onClick={() => router.push(href)}>
+                    <tr
+                      key={r.satker.kode}
+                      className={kosong ? "dsb-baris-klik dsb-redup" : "dsb-baris-klik"}
+                      data-nada={kosong ? undefined : nadaBaris(r)}
+                      onClick={() => router.push(href)}
+                    >
                       <td>
                         <Link href={href} className="dsb-nama" style={{ textDecoration: "none", color: kosong ? "var(--dt3)" : undefined }} onClick={(e) => e.stopPropagation()}>
                           {namaTampilSatker(r.satker)}
@@ -197,37 +232,67 @@ export default function HalamanSatker() {
                           KPPN {r.satker.kppn}
                         </p>
                       </td>
-                      <td className="kanan">{kosong ? "–" : r.pegawai}</td>
-                      <td className="kanan">{kosong ? "–" : r.tahunIni.total}</td>
-                      <td className="kanan">{kosong ? "–" : r.tahunIni.belumDiproses}</td>
-                      <td className="kanan">{kosong ? "–" : r.tahunIni.diproses}</td>
-                      <td>
-                        {kosong ? (
-                          <span className="dsb-kecil">–</span>
-                        ) : (
-                          <span className="inline-flex items-center gap-2" style={{ fontVariantNumeric: "tabular-nums" }}>
-                            <span className="dsb-bar-mini" aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>
-                            {r.tahunIni.selesai}/{r.tahunIni.total}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <div className="flex flex-wrap gap-1.5">
-                          {kosong && <span className="dsb-tag" data-garis="">Belum ada data pegawai</span>}
-                          {r.terlambat > 0 && (
-                            <span className="dsb-tag" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>{r.terlambat} lewat batas</span>
-                          )}
-                          {r.berpotensiRapelan > 0 && (
-                            <span className="dsb-tag" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)" }}>{r.berpotensiRapelan} rapelan</span>
-                          )}
-                          {r.hukdis > 0 && (
-                            <span className="dsb-tag" data-garis="">{r.hukdis} hukdis</span>
-                          )}
-                          {!kosong && r.terlambat === 0 && r.berpotensiRapelan === 0 && r.hukdis === 0 && (
-                            <span className="dsb-kecil">Sesuai jadwal</span>
-                          )}
-                        </div>
-                      </td>
+                      {kosong ? (
+                        // Satu keterangan menggantikan deretan tanda strip pada satker yang belum berdata.
+                        <td colSpan={5} className="dsb-kecil">
+                          Belum ada data pegawai di SIM-KGB
+                        </td>
+                      ) : (
+                        <>
+                          <td className="kanan">{r.pegawai}</td>
+                          <td className="kanan">{kgb}</td>
+                          <td>
+                            {kgb === 0 ? (
+                              <span className="dsb-kecil">Tidak ada KGB tahun ini</span>
+                            ) : (
+                              <>
+                                <span className="flex items-center gap-2">
+                                  <BarProgres selesai={selesai} diproses={diproses} belum={belum} total={kgb} />
+                                  <span className="dsb-angka-kecil">{pct}%</span>
+                                </span>
+                                <p className="dsb-kecil whitespace-nowrap" style={{ margin: "3px 0 0" }}>
+                                  {selesai} selesai · {diproses} diproses · {belum} belum
+                                </p>
+                              </>
+                            )}
+                          </td>
+                          <td>
+                            {berikut ? (
+                              <>
+                                <span className="dsb-angka-kecil">TMT {namaBulan(berikut.bulanTmt)}</span>
+                                <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>{berikut.jumlah} pegawai</p>
+                              </>
+                            ) : (
+                              <span className="dsb-kecil whitespace-nowrap">Tidak ada dalam {r.mendatang.length} bulan</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="flex flex-wrap gap-1.5">
+                              {r.terlambat > 0 && (
+                                <span className="dsb-tag" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>
+                                  <span className="dsb-titik" data-nada="merah" aria-hidden="true" />
+                                  {r.terlambat} lewat batas
+                                </span>
+                              )}
+                              {r.berpotensiRapelan > 0 && (
+                                <span className="dsb-tag" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber)" }}>
+                                  <span className="dsb-titik" data-nada="kuning" aria-hidden="true" />
+                                  {r.berpotensiRapelan} rapelan
+                                </span>
+                              )}
+                              {r.hukdis > 0 && (
+                                <span className="dsb-tag" data-garis="">{r.hukdis} hukdis</span>
+                              )}
+                              {r.terlambat === 0 && r.berpotensiRapelan === 0 && r.hukdis === 0 && (
+                                <span className="dsb-kecil inline-flex items-center gap-1.5">
+                                  <span className="dsb-titik" data-nada="hijau" aria-hidden="true" />
+                                  Sesuai jadwal
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </>
+                      )}
                       <td className="kanan" aria-hidden="true" style={{ color: "var(--dt5)" }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                       </td>
@@ -238,6 +303,14 @@ export default function HalamanSatker() {
             </table>
           </div>
         )}
+        <div className="dsb-kaki">
+          <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="inline-flex items-center gap-1.5"><span className="dsb-bar-legenda" data-nada="hijau" aria-hidden="true" />Selesai</span>
+            <span className="inline-flex items-center gap-1.5"><span className="dsb-bar-legenda" data-nada="biru" aria-hidden="true" />Diproses Kanwil atau keuangan</span>
+            <span className="inline-flex items-center gap-1.5"><span className="dsb-bar-legenda" data-nada="abu" aria-hidden="true" />Belum diproses</span>
+          </span>
+          <span>Garis tepi merah: ada KGB lewat batas input · kuning: berpotensi rapelan</span>
+        </div>
       </section>
     </div>
   );

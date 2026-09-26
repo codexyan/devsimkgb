@@ -964,6 +964,38 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 
 .dsb-bar-mini > span { display: block; height: 100%; background: var(--st-green); }
 
+/* Bar bertumpuk: selesai, diproses, dan belum diproses dalam satu batang */
+.dsb-bar-tumpuk {
+  display: inline-flex;
+  width: 120px;
+  height: 6px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--ln2);
+}
+
+.dsb-bar-tumpuk > span { height: 100%; }
+.dsb-bar-tumpuk > span + span { box-shadow: inset 1px 0 0 var(--card); }
+
+.dsb-bar-legenda {
+  display: inline-block;
+  width: 10px;
+  height: 6px;
+  border-radius: 2px;
+}
+
+:is(.dsb-bar-tumpuk > span, .dsb-bar-legenda)[data-nada="hijau"] { background: var(--st-green); }
+:is(.dsb-bar-tumpuk > span, .dsb-bar-legenda)[data-nada="biru"] { background: var(--st-blue); }
+:is(.dsb-bar-tumpuk > span, .dsb-bar-legenda)[data-nada="abu"] { background: var(--ln0); }
+
+.dsb-angka-kecil { font-size: 12.5px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--dt2); }
+
+/* Baris tabel bernada: garis tepi kiri menandai satker yang perlu tindakan */
+.dsb-tabel tbody tr[data-nada] td:first-child { box-shadow: inset 3px 0 0 var(--garis-nada); }
+.dsb-tabel tbody tr[data-nada="merah"] { --garis-nada: var(--st-red); }
+.dsb-tabel tbody tr[data-nada="kuning"] { --garis-nada: var(--st-amber); }
+
 
 /* ── Kalender KGB per bulan ────────────────────────────────────────────── */
 .dsb-bulan-kisi {
