@@ -85,12 +85,22 @@ export async function rencanakanPenyesuaianKgb(
         // Nama, NIP, jabatan, dan angka gaji tercetak di SK, jadi SK yang sudah dibuat harus dibuat ulang.
         const surat = (await db.suratKGB.findUnique({ kgbId: berjalan.id })) as SuratKgbTersimpan | null;
         if (surat && !surat.pathFile) {
-          await db.riwayatKGB.update(
-            { id: berjalan.id },
-            { drafNomorSurat: surat.nomorSurat || null, drafTanggalSurat: surat.tanggalSurat ?? null },
-          );
+          let tersimpan = true;
+          try {
+            await db.riwayatKGB.update(
+              { id: berjalan.id },
+              { drafNomorSurat: surat.nomorSurat || null, drafTanggalSurat: surat.tanggalSurat ?? null },
+            );
+          } catch {
+            // Kolom draf belum dimigrasikan: nomornya tetap disebut di catatan dan log aktivitas.
+            tersimpan = false;
+          }
           await db.suratKGB.delete({ kgbId: berjalan.id });
-          catatan.push(`SK ${surat.nomorSurat} perlu dibuat ulang; nomornya disimpan sebagai draf`);
+          catatan.push(
+            tersimpan
+              ? `SK ${surat.nomorSurat} perlu dibuat ulang; nomornya disimpan sebagai draf`
+              : `SK ${surat.nomorSurat} perlu dibuat ulang dengan nomor yang sama`,
+          );
         }
       }
 

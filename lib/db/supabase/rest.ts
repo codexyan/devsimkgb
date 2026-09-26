@@ -31,7 +31,40 @@ export interface OpsiRest {
   prefer?: string[];
 }
 
-/** Request ke `/rest/v1/{path}`; 429 dan 5xx dicoba ulang dengan jeda bertambah. */
+/**
+ * Kolom yang ditolak PostgREST karena belum ada di tabel (PGRST204), dari pesan
+ * "Could not find the 'nama_kolom' column of 'tabel' in the schema cache".
+ */
+function kolomBelumAda(teks: string): string | null {
+  try {
+    const isi = JSON.parse(teks) as { code?: string; message?: string };
+    if (isi.code !== "PGRST204") return null;
+    return /Could not find the '([^']+)' column/.exec(isi.message ?? "")?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Buang satu kolom dari badan tulis bila nilainya kosong di semua baris; null bila ada yang berisi. */
+function tanpaKolomKosong(body: unknown, kolom: string): unknown | null {
+  const baris = Array.isArray(body) ? body : [body];
+  const kosong = baris.every((b) => b && typeof b === "object" && ((b as Record<string, unknown>)[kolom] ?? null) === null);
+  if (!kosong) return null;
+  const buang = (b: unknown) => {
+    const { [kolom]: _, ...sisa } = b as Record<string, unknown>;
+    return sisa;
+  };
+  return Array.isArray(body) ? body.map(buang) : buang(body);
+}
+
+/**
+ * Request ke `/rest/v1/{path}`; 429 dan 5xx dicoba ulang dengan jeda bertambah.
+ *
+ * Kode dapat ter-deploy sebelum migrasinya dijalankan. Agar kolom baru yang belum ada tidak menggagalkan
+ * setiap penulisan, kolom yang ditolak PGRST204 dibuang lalu request diulang, asalkan nilainya kosong di
+ * semua baris: kolom kosong di tabel sama saja dengan kolom yang tidak ditulis. Nilai yang benar-benar
+ * berisi tetap gagal, supaya data tidak hilang diam-diam.
+ */
 export async function rest(path: string, opsi: OpsiRest = {}): Promise<Response> {
   const { url, kunci } = konfigurasi();
   const headers: Record<string, string> = { apikey: kunci, Accept: "application/json" };
@@ -39,14 +72,24 @@ export async function rest(path: string, opsi: OpsiRest = {}): Promise<Response>
   if (!kunci.startsWith("sb_")) headers.Authorization = `Bearer ${kunci}`;
   if (opsi.body !== undefined) headers["Content-Type"] = "application/json";
   if (opsi.prefer?.length) headers.Prefer = opsi.prefer.join(", ");
-  const body = opsi.body === undefined ? undefined : JSON.stringify(opsi.body);
+  let isi = opsi.body;
+  let body = isi === undefined ? undefined : JSON.stringify(isi);
 
-  for (let attempt = 0; ; attempt++) {
+  for (let attempt = 0, dibuang = 0; ; attempt++) {
     const res = await fetch(`${url}/rest/v1/${path}`, { method: opsi.method ?? "GET", headers, body });
     if (res.ok) return res;
     const teks = await res.text();
     if ((res.status === 429 || res.status >= 500) && attempt < MAX_RETRY) {
       await sleep(Math.min(8_000, 500 * 2 ** attempt));
+      continue;
+    }
+    const kolom = res.status === 400 && isi !== undefined && dibuang < 8 ? kolomBelumAda(teks) : null;
+    const tanpa = kolom ? tanpaKolomKosong(isi, kolom) : null;
+    if (kolom && tanpa !== null) {
+      console.warn(`[supabase] kolom ${kolom} belum ada di ${path.split("?")[0]}; dilewati karena kosong. Jalankan migrasinya.`);
+      isi = tanpa;
+      body = JSON.stringify(isi);
+      dibuang += 1;
       continue;
     }
     throw buatGalat(res.status, path, teks);
