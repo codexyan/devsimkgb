@@ -1363,6 +1363,42 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 .dsb-kartu-tanda { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 6px 0 0; }
 .dsb-kartu-aksi { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--ln2); }
 
+/* ── Dasbor UPT: strip jadwal di pita navy dan papan alur KGB ──────────── */
+.upt-jadwal {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  border-top: 1px solid var(--ln1);
+}
+
+.upt-jadwal-bulan {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 10px 22px 12px;
+  border-left: 1px solid var(--ln1);
+}
+
+.upt-jadwal-bulan:first-child { border-left: 0; }
+.upt-jadwal-nama { font-size: 12px; color: var(--dt3); }
+.upt-jadwal-angka { font-size: 20px; font-weight: 600; line-height: 1.2; color: var(--dt1); font-variant-numeric: tabular-nums; }
+.upt-jadwal-angka small { font-size: 12px; font-weight: 400; color: var(--dt4); }
+.upt-jadwal-ket { font-size: 11.5px; color: var(--dt4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.upt-jadwal-bulan[data-kosong] .upt-jadwal-angka { color: var(--dt4); }
+/* Bulan yang jendela kirimnya sedang terbuka: emas berarti "sekarang" (ADR-003) */
+.upt-jadwal-bulan[data-sekarang] { box-shadow: inset 0 3px 0 var(--emas-isi); background: rgba(243, 198, 63, 0.08); }
+.upt-jadwal-bulan[data-sekarang] .upt-jadwal-ket { color: var(--emas-isi); font-weight: 500; }
+.upt-jadwal-bulan[data-ringkas] { background: var(--sub); }
+
+.upt-papan-ket { flex-basis: 100%; font-size: 11.5px; font-weight: 400; color: var(--dt5); }
+.upt-papan-kaki { flex: none; padding: 8px; border-top: 1px solid var(--ln2); }
+.upt-papan-kaki .dsb-tombol { width: 100%; justify-content: center; }
+.upt-kartu .dsb-kartu-kepala { flex-wrap: nowrap; align-items: center; justify-content: flex-start; gap: 8px; }
+.upt-kartu .dsb-kartu-kepala .dsb-cek { flex-shrink: 0; }
+.upt-kartu .dsb-kartu-aksi { display: flex; flex-wrap: wrap; gap: 6px; }
+.upt-kartu-catatan { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: var(--dt3); }
+.dsb-kartu-kgb[data-nada="ungu"] { box-shadow: inset 3px 0 0 var(--st-violet); }
+
 .dsb-hanya-sempit { display: none; }
 
 /* Layar sempit: kolom selebar layar, digeser mendatar satu per satu */
