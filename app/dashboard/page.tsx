@@ -1097,6 +1097,7 @@ function DashboardMain() {
           pegawai={modal.pegawai}
           ulang={modal.ulang}
           dasarAwal={modal.dasarAwal}
+          dasarDariRiwayat
           onTutup={tutupModal}
           onBerhasil={aksiBerhasil}
           onArsipKgb={() => setModal({ jenis: "arsip", pegawai: modal.pegawai })}
