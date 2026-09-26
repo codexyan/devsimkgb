@@ -48,6 +48,13 @@ function bacaIsian(teks: (kunci: string) => string): { isian: Partial<UsulanPega
       isian[bidang.kunci] = null;
       continue;
     }
+    if (bidang.kunci === "nip") {
+      // Excel gemar menyimpan NIP sebagai rumus teks ="..." agar angka depannya tidak hilang.
+      const nip = mentah.replace(/^="(.*)"$/, "$1").trim();
+      if (!/^\d{18}$/.test(nip)) return { galat: "NIP harus tepat 18 digit angka" };
+      isian.nip = nip;
+      continue;
+    }
     if (bidang.jenis === "tanggal") {
       const tanggal = bacaTanggalInput(mentah);
       if (!tanggal) return { galat: `${bidang.label} tidak valid` };

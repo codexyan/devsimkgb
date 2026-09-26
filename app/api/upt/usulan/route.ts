@@ -12,6 +12,7 @@ import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
+import { bentrokNipUsulan } from "@/lib/nipUsulan";
 import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
@@ -177,6 +178,13 @@ export async function POST(req: Request) {
         { error: pesanMasihBerjalan((sudahAda[0] as UsulanPegawaiRow).status, "Pegawai ini") },
         { status: 409 },
       );
+
+    // Pembetulan NIP: NIP barunya tidak boleh sudah dipakai orang lain.
+    const nipUsulan = dibaca.isian.nip;
+    if (nipUsulan && nipUsulan !== pegawai.nip) {
+      const bentrok = await bentrokNipUsulan(nipUsulan, { pegawaiId });
+      if (bentrok) return NextResponse.json({ error: bentrok }, { status: 409 });
+    }
   }
 
   const isian = isiHitungan(dibaca.isian, dasar);

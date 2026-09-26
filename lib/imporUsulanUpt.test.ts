@@ -23,7 +23,8 @@ const baris = (p: Record<string, unknown> = {}) => ({
 test("baris lengkap diterima, dan kolom hitungan tidak dibaca dari berkas", () => {
   const [h] = periksaImporUpt([baris({ gajiPokok: "9999999", tmtKgbBerikutnya: "2099-01-01" })], kosong);
   assert.equal(h.galat, null);
-  assert.deepEqual(h.kurang, []);
+  // Berkas tidak lewat CSV, jadi draf hasil unggahan selalu masih menunggu lampirannya.
+  assert.deepEqual(h.kurang, ["SK CPNS"]);
   assert.equal(h.nama, "DERA KALISTANINGSIH");
   // Gaji pokok dan jatuh tempo dihitung sistem, bukan disalin dari berkas: satu salah ketik di
   // kolom itu langsung menggeser uang.
@@ -34,7 +35,7 @@ test("baris lengkap diterima, dan kolom hitungan tidak dibaca dari berkas", () =
 test("baris yang belum lengkap tetap diterima sebagai draf, hanya ditandai", () => {
   const [h] = periksaImporUpt([baris({ golonganRuang: "", tmtKgbTerakhir: "" })], kosong);
   assert.equal(h.galat, null);
-  assert.deepEqual(h.kurang, ["golongan/ruang", "TMT KGB terakhir"]);
+  assert.deepEqual(h.kurang, ["golongan/ruang", "TMT KGB terakhir", "SK CPNS"]);
 });
 
 test("NIP yang tidak sah, kembar, atau sudah dipakai ditolak satu per satu", () => {
@@ -82,16 +83,16 @@ test("ringkasan memisahkan yang gagal dari yang sekadar belum lengkap", () => {
     [baris(), baris({ nip: "200409072025061002", golonganRuang: "" }), baris({ nip: "123" })],
     kosong,
   );
-  assert.deepEqual(ringkasImpor(hasil), { sah: 2, gagal: 1, belumLengkap: 1 });
+  assert.deepEqual(ringkasImpor(hasil), { sah: 2, gagal: 1, belumLengkap: 2 });
 });
 
-test("templat yang diunduh terbaca kembali: kepalanya lengkap dan baris contohnya siap diajukan", () => {
+test("templat yang diunduh terbaca kembali: kepalanya lengkap dan yang kurang dari baris contohnya hanya berkas", () => {
   const [kepala, contoh] = templatCsvUpt().replace(/^\uFEFF/, "").trim().split("\r\n").map((b) => b.split(","));
   for (const k of KOLOM_IMPOR_UPT) assert.ok(kepala.includes(k), `kolom ${k} ada di templat`);
   const row = Object.fromEntries(kepala.map((k, i) => [k, contoh[i]]));
   const [h] = periksaImporUpt([row], kosong);
   assert.equal(h.galat, null);
-  assert.deepEqual(h.kurang, []);
+  assert.deepEqual(h.kurang, ["SK CPNS"]);
 });
 
 test("tanggal dd/mm/yyyy dari Excel berlokal Indonesia dibaca sama dengan yyyy-mm-dd", () => {
@@ -99,4 +100,11 @@ test("tanggal dd/mm/yyyy dari Excel berlokal Indonesia dibaca sama dengan yyyy-m
   assert.equal(h.galat, null);
   assert.deepEqual(h.isian?.tmtKgbTerakhir, new Date(Date.UTC(2025, 5, 1)));
   assert.deepEqual(h.isian?.tmtGolongan, new Date(Date.UTC(2025, 5, 1)));
+});
+
+test("NIP pada isian dibaca dan diperiksa bersama isian lain", async () => {
+  const { bacaIsianBaris } = await import("./usulanFormulir");
+  const sah = bacaIsianBaris({ nip: '="200509182025062002"' });
+  assert.ok("isian" in sah && sah.isian.nip === "200509182025062002");
+  assert.deepEqual(bacaIsianBaris({ nip: "12345" }), { galat: "NIP harus tepat 18 digit angka" });
 });

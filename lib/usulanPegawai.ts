@@ -46,8 +46,12 @@ export const BELUM_SELESAI: readonly string[] = ["draf", "menunggu", "revisi"];
 
 export type JenisBidang = "teks" | "tanggal" | "angka" | "rupiah";
 
-/** Kolom pegawai yang boleh diusulkan UPT, urut seperti formulirnya. */
+/**
+ * Kolom pegawai yang boleh diusulkan UPT, urut seperti formulirnya. NIP ikut diusulkan, bukan diubah UPT
+ * sendiri: NIP penanda orang, dan Kanwil mencocokkannya dengan SK CPNS sebelum menyetujui.
+ */
 export const BIDANG_USULAN = [
+  { kunci: "nip", label: "NIP", jenis: "teks" },
   { kunci: "nama", label: "Nama lengkap", jenis: "teks" },
   { kunci: "tempatLahir", label: "Tempat lahir", jenis: "teks" },
   { kunci: "tanggalLahir", label: "Tanggal lahir", jenis: "tanggal" },
@@ -83,12 +87,17 @@ export const BATAS_BERKAS_USULAN_BYTE = 1024 * 1024;
 export const PESAN_BERKAS_TERLALU_BESAR =
   "Ukuran tiap berkas paling besar 1 MB. Pindai SK sebagai dokumen hitam putih, atau perkecil berkasnya, lalu unggah kembali.";
 
-export type WajibBerkas = "pernah_kgb" | "belum_pernah_kgb" | "sudah_pns" | "pernah_naik_pangkat" | "saat_mengajukan";
+/**
+ * Keadaan yang menentukan berkas mana yang diminta. Pegawai yang sudah pernah KGB dicocokkan dengan SK KGB
+ * dan SK kenaikan pangkat terakhirnya; yang belum pernah dengan SK CPNS dan SK pengangkatan PNS-nya.
+ * "pengajuan" adalah surat usulan Srikandi, yang diunggah sekali untuk satu surat pada langkah Ajukan.
+ */
+export type KeadaanBerkas = "pernah_kgb" | "belum_pernah_kgb" | "pengajuan";
 
 /**
- * Berkas dasar yang menyertai usulan. Tim keuangan meminta ketiga berkas selain suratnya agar masa
- * kerja golongan dan gaji pokok dapat dicocokkan dengan dokumen aslinya, bukan dengan ingatan.
- * `medan` adalah nama field pada formulir, `kunci` adalah kolom penyimpan jalur berkasnya.
+ * Berkas dasar yang menyertai usulan. Tim keuangan memintanya agar masa kerja golongan dan gaji pokok
+ * dapat dicocokkan dengan dokumen aslinya, bukan dengan ingatan. `medan` adalah nama field pada formulir,
+ * `kunci` adalah kolom penyimpan jalur berkasnya. Berkas `wajib` ditagih saat diajukan (kekuranganUsulan).
  */
 export const BERKAS_USULAN = [
   {
@@ -97,39 +106,42 @@ export const BERKAS_USULAN = [
     label: "Surat usulan Srikandi",
     keterangan:
       "Surat pengantar dari UPT yang sudah dikirim ke Kanwil lewat Srikandi. Diunggah sekali pada langkah Ajukan dan berlaku untuk semua pegawai pada surat itu, jadi tidak ada di formulir tiap pegawai.",
-    wajibUntuk: "saat_mengajukan",
+    keadaan: "pengajuan",
+    wajib: false,
   },
   {
     medan: "skTerakhir",
     kunci: "pathSkTerakhir",
     label: "SK KGB terakhir",
-    keterangan:
-      "SK kenaikan gaji berkala yang terakhir diterima pegawai. Kosongkan bila pegawai belum pernah menerima KGB.",
-    wajibUntuk: "pernah_kgb",
+    keterangan: "SK kenaikan gaji berkala yang terakhir diterima pegawai.",
+    keadaan: "pernah_kgb",
+    wajib: true,
+  },
+  {
+    medan: "skPangkat",
+    kunci: "pathSkPangkat",
+    label: "SK kenaikan pangkat terakhir",
+    keterangan: "SK kenaikan pangkat yang terakhir diterima. Diperlukan karena kenaikan pangkat memotong masa kerja golongan.",
+    keadaan: "pernah_kgb",
+    wajib: true,
   },
   {
     medan: "skCpns",
     kunci: "pathSkCpns",
     label: "SK CPNS",
     keterangan:
-      "Keputusan pengangkatan CPNS. Bagi pegawai yang belum pernah KGB, SK inilah acuan pertama: TMT CPNS awal masa kerja golongan, dan nomor serta tanggalnya diisikan sebagai SK dasar gaji pokok.",
-    wajibUntuk: "belum_pernah_kgb",
+      "Keputusan pengangkatan CPNS. SK inilah acuan pertama: TMT CPNS awal masa kerja golongan, dan nomor serta tanggalnya diisikan sebagai SK dasar gaji pokok.",
+    keadaan: "belum_pernah_kgb",
+    wajib: true,
   },
   {
     medan: "syaratCpns",
     kunci: "pathSyaratCpns",
     label: "SK pengangkatan PNS",
     keterangan:
-      "Keputusan tentang pengangkatan CPNS menjadi PNS, boleh digabung dengan SPMT dalam satu berkas. KGB pertama dapat jatuh sebelum pegawai diangkat PNS, jadi SK ini tidak selalu sudah ada.",
-    wajibUntuk: "sudah_pns",
-  },
-  {
-    medan: "skPangkat",
-    kunci: "pathSkPangkat",
-    label: "SK kenaikan pangkat terakhir",
-    keterangan:
-      "SK kenaikan pangkat yang terakhir diterima, bila pegawai pernah naik pangkat. Diperlukan karena kenaikan pangkat memotong masa kerja golongan.",
-    wajibUntuk: "pernah_naik_pangkat",
+      "Keputusan pengangkatan CPNS menjadi PNS, boleh digabung dengan SPMT dalam satu berkas. Lampirkan bila sudah terbit: KGB pertama dapat jatuh sebelum pegawai diangkat PNS.",
+    keadaan: "belum_pernah_kgb",
+    wajib: false,
   },
 ] as const satisfies readonly {
   medan: string;
@@ -137,22 +149,30 @@ export const BERKAS_USULAN = [
   label: string;
   /** Penjelasan singkat: dokumen apa yang dimaksud dan kapan diperlukan. */
   keterangan: string;
-  wajibUntuk: WajibBerkas;
+  keadaan: KeadaanBerkas;
+  wajib: boolean;
 }[];
 
 /**
- * Apakah berkas ini wajib bagi pegawai dengan keadaan KGB tertentu.
- *
- * Dua dari empat berkas bertukar tempat menurut keadaan itu: yang sudah pernah KGB wajib melampirkan
- * SK KGB terakhirnya, sedangkan yang belum pernah justru wajib melampirkan SK pengangkatan PNS, sebab
- * di situlah gaji pokok awalnya tertulis. Kenaikan pangkat tidak dapat dipastikan dari isian, jadi
- * berkasnya tidak pernah diwajibkan, hanya diminta bila ada.
+ * Pegawai sudah pernah KGB bila masa kerja golongannya lebih dari nol. Aturan yang sama dipakai formulir
+ * untuk memilih keadaan awalnya, dan tombol "Belum pernah KGB" di sana mengisi masa kerja 0 tahun 0 bulan.
  */
-export function berkasWajib(wajibUntuk: WajibBerkas, pernahKgb: boolean): boolean {
-  if (wajibUntuk === "pernah_kgb") return pernahKgb;
-  if (wajibUntuk === "belum_pernah_kgb") return !pernahKgb;
-  return false;
+export function pernahKgb(mkgTahun: unknown, mkgBulan: unknown): boolean {
+  return Number(mkgTahun ?? 0) > 0 || Number(mkgBulan ?? 0) > 0;
 }
+
+/** Berkas yang diminta formulir tiap pegawai untuk satu keadaan, urut seperti di formulir. */
+export function berkasUntukKeadaan(pernah: boolean) {
+  const keadaan: KeadaanBerkas = pernah ? "pernah_kgb" : "belum_pernah_kgb";
+  return BERKAS_USULAN.filter((b) => b.keadaan === keadaan);
+}
+
+/**
+ * Kolom yang menentukan gaji pokok dan jatuh tempo KGB. Usulan perbaikan yang menyentuh salah satunya
+ * harus disertai berkas dasar, sebab angka itulah yang dicocokkan tim keuangan dengan SK aslinya;
+ * perbaikan nama atau tempat lahir tidak perlu.
+ */
+const KOLOM_DASAR_GAJI: readonly KunciBidangUsulan[] = ["golonganRuang", "tmtGolongan", "mkgTahun", "mkgBulan", "tmtKgbTerakhir"];
 
 export const LABEL_JENIS_USULAN: Record<string, string> = {
   perubahan: "Perbaikan data",
@@ -353,6 +373,14 @@ export function kekuranganUsulan(
   });
   if (golongan && hitung.gajiPokok === 0) {
     kurang.push(`masa kerja golongan yang cocok dengan tabel PP 5/2024 untuk golongan ${golongan}`);
+  }
+
+  const perluBerkas =
+    jenis === "baru" || (!!pegawai && bandingkanUsulan(pegawai, usulan).some((p) => KOLOM_DASAR_GAJI.includes(p.kunci)));
+  if (perluBerkas) {
+    for (const b of berkasUntukKeadaan(pernahKgb(nilai("mkgTahun"), nilai("mkgBulan")))) {
+      if (b.wajib && !usulan[b.kunci]) kurang.push(b.label);
+    }
   }
   return kurang;
 }

@@ -9,6 +9,7 @@ import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, hapusBerkasUsulan, simpanBerkas
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { TIPE_NOTIFIKASI } from "@/lib/generateNotifikasi";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { bentrokNipUsulan } from "@/lib/nipUsulan";
 import type { PegawaiRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
@@ -71,6 +72,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const { nama, pegawai } = await namaUsulan(usulan);
   const isian = isiHitungan(dibaca.isian, pegawai);
+
+  // NIP boleh dibetulkan selama usulan masih dipegang UPT. Pada pegawai baru NIP adalah penandanya, jadi
+  // tidak boleh kosong; pada usulan perbaikan, kosong berarti NIP tidak diusulkan berubah.
+  if (usulan.jenis === "baru" && !isian.nip)
+    return NextResponse.json({ error: "NIP harus tepat 18 digit angka" }, { status: 400 });
+  if (isian.nip && isian.nip !== usulan.nip && isian.nip !== pegawai?.nip) {
+    const bentrok = await bentrokNipUsulan(isian.nip, { usulanId: id, pegawaiId: usulan.pegawaiId });
+    if (bentrok) return NextResponse.json({ error: bentrok }, { status: 409 });
+  }
 
   const tanggalSurat = teks("tanggalSurat") ? bacaTanggalInput(teks("tanggalSurat")) : null;
   if (teks("tanggalSurat") && !tanggalSurat)

@@ -8,7 +8,7 @@ import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { hitungDeadlineSDM } from "@/lib/tabelGaji";
 import { kunciBulanTmt, type RekapStatusKgb } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
-import { BUTIR_KONFIRMASI_UPT, LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
+import { LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { BELUM_SELESAI, LABEL_JENIS_USULAN } from "@/lib/usulanPegawai";
 import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
@@ -20,8 +20,8 @@ import type { Satker } from "@/lib/satker";
 
 /* Dashboard Admin UPT: satu halaman berisi jadwal pengiriman surat usulan, daftar pegawai satker dengan status
    KGB-nya di Kanwil, dan SK yang sudah selesai untuk diunduh. Seluruh datanya dari /api/upt, yang membatasi
-   isinya ke satker akun. Peran ini hanya melihat: tidak ada tombol yang mengubah data, dan hukuman disiplin
-   hanya tampil sebagai "KGB ditunda". */
+   isinya ke satker akun. UPT mengusulkan data, melaporkan mutasi, dan menandai SK yang sudah direkam di Gaji
+   Web; data induk tetap diubah Kanwil. Hukuman disiplin hanya tampil sebagai "KGB ditunda". */
 
 interface PegawaiUpt {
   id: string;
@@ -40,8 +40,9 @@ interface PegawaiUpt {
   konfirmasi: StatusKonfirmasiUpt;
   konfirmasiAt: string | null;
   konfirmasiOleh: string | null;
-  bolehKonfirmasi: boolean;
-  /** "draf", "menunggu", atau "revisi" bila ada usulan berjalan; konfirmasi tidak diminta lagi. */
+  /** Pengingat pemeriksaan masih berlaku: KGB belum diinput Kanwil dan batas inputnya belum lewat. */
+  perluDiperiksa: boolean;
+  /** "draf", "menunggu", atau "revisi" bila ada usulan berjalan. */
   usulanBerjalan?: string | null;
   dataSekarang: Record<string, string>;
 }
@@ -261,37 +262,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     return () => { clearTimeout(t); clearInterval(iv); };
   }, []);
 
-  // Konfirmasi data: satu-satunya penulisan yang boleh dilakukan akun UPT (lib/konfirmasiUpt.ts).
-  const [dialogKonfirmasi, setDialogKonfirmasi] = useState<PegawaiUpt | null>(null);
-  const [mengirim, setMengirim] = useState(false);
-  const [galatKonfirmasi, setGalatKonfirmasi] = useState<string | null>(null);
   const [kabar, setKabar] = useState<string | null>(null);
-
-  async function kirimKonfirmasi() {
-    if (!dialogKonfirmasi) return;
-    setMengirim(true);
-    setGalatKonfirmasi(null);
-    try {
-      const res = await fetch("/api/upt/konfirmasi", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pegawaiId: dialogKonfirmasi.id }),
-      });
-      const d = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setGalatKonfirmasi(d.error ?? "Konfirmasi gagal dikirim");
-        return;
-      }
-      setKabar(`Data ${dialogKonfirmasi.nama} sudah dikonfirmasi. Tim SDM Kanwil melihatnya saat memproses KGB.`);
-      setTimeout(() => setKabar(null), 5000);
-      setDialogKonfirmasi(null);
-      muat();
-    } catch {
-      setGalatKonfirmasi("Konfirmasi gagal dikirim");
-    } finally {
-      setMengirim(false);
-    }
-  }
 
   // Data pegawai UPT disiapkan dulu sebagai draf, baru diajukan: satu surat usulan lazimnya memuat
   // beberapa pegawai, dan datanya dilengkapi bertahap dari SK yang tidak selalu ada di meja.
@@ -531,8 +502,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           usulanBerjalan:
             p.usulanBerjalan ??
             (usulan.some((u) => u.pegawaiId === p.id && BELUM_SELESAI.includes(u.status)) ? "draf" : null),
-          konfirmasi: p.konfirmasi, bolehKonfirmasi: p.bolehKonfirmasi,
-          terlambat: p.terlambat,
+          perluDiperiksa: p.perluDiperiksa,
+          batasInput: p.deadlineSDM,
         })),
         bulanUsulan,
       ),
@@ -687,22 +658,11 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                                 aria-hidden="true"
                               />{" "}
                               {p.usulanBerjalan === "draf"
-                                ? "Sedang disiapkan usulannya, konfirmasi tidak diperlukan"
+                                ? "Sedang disiapkan usulannya"
                                 : p.usulanBerjalan === "revisi"
                                   ? "Dikembalikan Kanwil, perlu diperbaiki lalu dikirim ulang"
                                   : "Sudah diusulkan, menunggu tinjauan Kanwil"}
                             </p>
-                          ) : p.bolehKonfirmasi ? (
-                            <span className="upt-aksi">
-                              <button
-                                type="button"
-                                className="dsb-tombol dsb-tombol-kecil"
-                                data-jenis="garis"
-                                onClick={() => { setDialogKonfirmasi(p); setGalatKonfirmasi(null); }}
-                              >
-                                Data sudah benar
-                              </button>
-                            </span>
                           ) : null}
                           {!sedangDitinjau && (
                             <span className="upt-aksi">
@@ -746,7 +706,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
       return { bulanTmt, jumlah: peta.get(bulanTmt) ?? (i === 0 ? perluDiusulkan.length : 0) };
     });
   })();
-  const adaTerlambat = tugas.some((t) => t.jenis === "terlambat");
   const adaDraf = tugas.some((t) => t.usulanId);
   const batasSelesai = hariIni.getTime() - 60 * 86_400_000;
   const baruDitinjau = (t: string | null) => !!t && new Date(t).getTime() >= batasSelesai;
@@ -763,7 +722,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             key={t.kunci}
             nama={t.nama}
             sub={`${t.nip} · ${tmtSingkat(t.tmt)}`}
-            nada={t.jenis === "terlambat" ? "merah" : t.jenis === "perbaiki" ? "ungu" : undefined}
+            nada={t.jenis === "perbaiki" ? "ungu" : undefined}
             tanda={{ teks: cfg.judul, nada: cfg.nada }}
             catatan={t.catatan ? `${t.jenis === "perbaiki" ? "Catatan Kanwil" : "Belum ada"}: ${t.catatan}` : null}
             petunjuk={t.langkah}
@@ -795,14 +754,9 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                   </button>
                 </>
               ) : p ? (
-                <>
-                  <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => { setDialogKonfirmasi(p); setGalatKonfirmasi(null); }}>
-                    Data sudah benar
-                  </button>
-                  <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => bukaUsulan(p)}>
-                    Usulkan perbaikan
-                  </button>
-                </>
+                <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => bukaUsulan(p)}>
+                  Usulkan perbaikan
+                </button>
               ) : null
             }
           />
@@ -1159,46 +1113,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         </KerangkaModal>
       )}
 
-      {dialogKonfirmasi && (
-        <KerangkaModal
-          judul="Data sudah benar"
-          subjudul={`${dialogKonfirmasi.nama} · ${dialogKonfirmasi.nip}${dialogKonfirmasi.tmtKgb ? ` · TMT KGB ${formatTanggalId(dialogKonfirmasi.tmtKgb)}` : ""}`}
-          ukuran="md"
-          sibuk={mengirim}
-          onTutup={() => setDialogKonfirmasi(null)}
-          onKirim={() => void kirimKonfirmasi()}
-          kaki={
-            <>
-              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogKonfirmasi(null)} disabled={mengirim}>
-                Batal
-              </button>
-              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
-                {mengirim ? "Mengirim…" : "Ya, data sudah benar"}
-              </button>
-            </>
-          }
-        >
-          <PesanGalat pesan={galatKonfirmasi} />
-          <p className="dsb-sub" style={{ marginTop: 0 }}>
-            Dengan menekan tombol di bawah, UPT menyatakan hal berikut untuk siklus KGB ini. Bila ternyata ada
-            yang perlu diperbaiki, tutup jendela ini lalu pilih Usulkan perbaikan data; usulan itu sekaligus
-            menjadi pernyataan yang sama.
-          </p>
-          <ol className="dsb-jadwal" style={{ paddingLeft: 18, listStyle: "decimal" }}>
-            {BUTIR_KONFIRMASI_UPT.map((butir) => (
-              <li key={butir}>
-                <span>{butir}</span>
-              </li>
-            ))}
-          </ol>
-          <Catatan nada="amber">
-            Masa kerja golongan dan hukuman disiplin yang keliru membuat gaji pokok pada SK salah. Kekurangannya
-            dibayar sebagai rapel, tetapi kelebihannya harus disetor kembali ke kas negara oleh pegawai yang
-            bersangkutan.
-          </Catatan>
-        </KerangkaModal>
-      )}
-
       {halaman === "pegawai" ? (
         panelPegawai
       ) : (
@@ -1227,7 +1141,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                   aria-expanded={!diciut}
                   title={diciut ? `Buka kolom ${judul}` : `Ciutkan kolom ${judul}`}
                 >
-                  <span className="dsb-titik" data-nada={k === "kerja" && adaTerlambat ? "merah" : nada} aria-hidden="true" />
+                  <span className="dsb-titik" data-nada={nada} aria-hidden="true" />
                   <span className="dsb-papan-judul">{judul}</span>
                   <span className="dsb-papan-jumlah">{isi.length}</span>
                   {!diciut && <span className="upt-papan-ket">{ket}</span>}

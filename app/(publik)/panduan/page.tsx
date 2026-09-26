@@ -676,7 +676,9 @@ export default async function PanduanPage() {
                     <strong>Siapkan datanya.</strong> Tekan <strong>Tambah pegawai</strong> untuk pegawai yang belum
                     tercatat, misalnya CPNS yang baru dilantik, atau <strong>Usulkan perbaikan data</strong> pada baris
                     pegawai yang sudah ada. Isian disimpan sebagai draf milik satker: belum terlihat Kanwil, boleh
-                    ditinggal dan dilanjutkan kapan saja, dan boleh dihapus bila keliru.
+                    ditinggal dan dilanjutkan kapan saja, dan boleh dihapus bila keliru. NIP yang tercatat keliru juga
+                    dibetulkan lewat usulan perbaikan: ketik NIP yang benar, lalu Kanwil mencocokkannya dengan SK CPNS
+                    sebelum menyetujui. NIP pegawai baru masih dapat dibetulkan selama datanya belum diajukan.
                   </li>
                   <li>
                     <strong>Golongan dan masa kerja golongan disalin dari SK, bukan dihitung sendiri.</strong> Pilih
@@ -697,15 +699,16 @@ export default async function PanduanPage() {
                     diunggah, lalu diganti atau dihapus dari kartunya, agar dapat dipastikan tidak tertukar.
                   </li>
                   <li>
-                    Keempat berkas itu: <strong>SK KGB terakhir</strong>, dikosongkan bila pegawai belum pernah menerima
-                    KGB; <strong>SK CPNS</strong>, wajib bagi pegawai yang belum pernah KGB karena SK inilah acuan
-                    pertamanya: TMT CPNS awal masa kerja golongan, dan nomor serta tanggalnya tercetak sebagai SK dasar
-                    pada surat KGB pertama; <strong>SK pengangkatan PNS</strong>, boleh digabung dengan SPMT, dilampirkan
-                    bila pegawai sudah diangkat PNS, sebab KGB pertama dapat jatuh sebelum pengangkatan itu; dan{" "}
-                    <strong>SK kenaikan pangkat terakhir</strong> bila pegawai pernah naik pangkat, sebab kenaikan pangkat
-                    memotong masa kerja golongan. Berkas ini diminta tim keuangan agar masa kerja golongan dapat
-                    dicocokkan dengan dokumen aslinya, bukan dengan ingatan. <strong>Surat usulan Srikandi</strong> tidak
-                    diunggah di sini, melainkan sekali pada langkah Ajukan, karena satu surat memuat banyak pegawai.
+                    Berkas yang diminta mengikuti keadaan pegawai. Yang <strong>sudah pernah KGB</strong>:{" "}
+                    <strong>SK KGB terakhir</strong> dan <strong>SK kenaikan pangkat terakhir</strong>, keduanya wajib.
+                    Yang <strong>belum pernah KGB</strong>: <strong>SK CPNS</strong>, wajib karena SK inilah acuan
+                    pertamanya (TMT CPNS awal masa kerja golongan, dan nomor serta tanggalnya tercetak sebagai SK dasar
+                    pada surat KGB pertama), dan <strong>SK pengangkatan PNS</strong> bila sudah terbit, boleh digabung
+                    dengan SPMT. Berkas ini diminta tim keuangan agar masa kerja golongan dapat dicocokkan dengan dokumen
+                    aslinya. Berkas wajib ditagih saat diajukan: bagi pegawai baru selalu, bagi usulan perbaikan hanya
+                    bila golongan, TMT golongan, masa kerja golongan, atau TMT KGB terakhirnya ikut diubah.{" "}
+                    <strong>Surat usulan Srikandi</strong> tidak diunggah di sini, melainkan sekali pada langkah Ajukan,
+                    karena satu surat memuat banyak pegawai.
                   </li>
                   <li>
                     Bila pegawai sedang atau pernah menjalani hukuman disiplin yang belum dilaporkan, centang bagiannya
@@ -787,17 +790,16 @@ export default async function PanduanPage() {
                   ))}
                 </ol>
                 <div className="pub-note">
-                  <strong className="pub-note-title">Menyatakannya di SIM-KGB</strong>
+                  <strong className="pub-note-title">Menindaklanjutinya di SIM-KGB</strong>
                   <p>
-                    Pada dashboard Admin UPT, tiap pegawai punya dua kemungkinan jawaban yang saling melengkapi.
-                    Bila ada yang perlu diperbaiki, pilih <strong>Usulkan perbaikan data</strong>. Bila setelah
-                    diperiksa ternyata sudah sesuai, pilih <strong>Data sudah benar</strong>.
+                    Pegawai yang KGB-nya masuk bulan usulan muncul di kolom <strong>Perlu dikerjakan</strong> sebagai
+                    pengingat <em>Perlu diperiksa</em>, lengkap dengan batas input Kanwil. Bila ada yang keliru, pilih{" "}
+                    <strong>Usulkan perbaikan</strong> sebelum batas itu.
                   </p>
                   <p>
-                    Keduanya dicatat beserta nama dan waktunya, dan terlihat oleh Tim SDM saat memproses KGB.
-                    Mengusulkan perbaikan sekaligus dihitung sebagai pernyataan itu, jadi pegawai yang sedang
-                    diusulkan tidak perlu dinyatakan dua kali. Pernyataannya berlaku untuk satu siklus KGB, jadi
-                    diulang setiap kali pegawai masuk jadwal berikutnya.
+                    Bila sampai batas input tidak ada usulan, data pegawai dianggap benar dan pengingatnya hilang
+                    sendiri; tidak ada tombol untuk menyatakannya. Usulan yang disetujui Kanwil tercatat beserta nama
+                    pengusulnya dan terlihat oleh Tim SDM saat memproses KGB.
                   </p>
                 </div>
 

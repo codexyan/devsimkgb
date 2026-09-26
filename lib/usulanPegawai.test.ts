@@ -15,8 +15,7 @@ import {
   BELUM_SELESAI,
   DIPEGANG_UPT,
   STATUS_USULAN,
-  BERKAS_USULAN,
-  berkasWajib,
+  berkasUntukKeadaan,
 } from "./usulanPegawai";
 
 const tgl = (tahun: number, bulan: number, hari = 1) => new Date(tahun, bulan - 1, hari);
@@ -137,20 +136,22 @@ test("kekuranganUsulan: draf pegawai baru yang lengkap boleh diajukan", () => {
   const siap = {
     nama: "NOORHIKMAH", nip: "198809042025062014", jabatan: "Penjaga Tahanan",
     golonganRuang: "II/a", mkgTahun: 0, mkgBulan: 0, tmtKgbTerakhir: new Date(Date.UTC(2025, 5, 1)),
+    pathSkCpns: "usulan/rutan-rantau_skCpns_1.pdf",
   };
   assert.deepEqual(kekuranganUsulan(siap, "baru"), []);
 });
 
 test("kekuranganUsulan: yang kurang disebut satu per satu, bukan sekadar ditolak", () => {
   const kurang = kekuranganUsulan({ nama: "", nip: "123", golonganRuang: "" }, "baru");
-  assert.deepEqual(kurang, ["nama lengkap", "NIP 18 digit", "jabatan", "golongan/ruang", "TMT KGB terakhir"]);
+  assert.deepEqual(kurang, ["nama lengkap", "NIP 18 digit", "jabatan", "golongan/ruang", "TMT KGB terakhir", "SK CPNS"]);
 });
 
 test("kekuranganUsulan: usulan perbaikan boleh bersandar pada data pegawai yang sudah tercatat", () => {
   const pegawai = { golonganRuang: "III/b", mkgTahun: 10, mkgBulan: 0, tmtKgbTerakhir: new Date(Date.UTC(2024, 2, 1)) };
   assert.deepEqual(kekuranganUsulan({ jabatan: "Analis Kepegawaian" }, "perubahan", pegawai), []);
   // Masa kerja yang tidak ada barisnya di tabel ditahan di sini, sebelum uangnya salah.
-  assert.deepEqual(kekuranganUsulan({ golonganRuang: "II/c", mkgTahun: 0, mkgBulan: 0 }, "perubahan", pegawai).length, 1);
+  const kurang = kekuranganUsulan({ golonganRuang: "II/c", mkgTahun: 0, mkgBulan: 0 }, "perubahan", pegawai);
+  assert.match(kurang[0], /masa kerja golongan yang cocok dengan tabel PP 5\/2024/);
 });
 
 test("usulan yang dikembalikan kembali dipegang UPT, tetapi tetap menutup pintu usulan baru", () => {
@@ -169,24 +170,24 @@ test("usulan yang dikembalikan kembali dipegang UPT, tetapi tetap menutup pintu 
   assert.notEqual(STATUS_USULAN.revisi.nada, STATUS_USULAN.menunggu.nada);
 });
 
-test("berkas yang wajib bertukar menurut pernah atau belum pernah KGB", () => {
-  const wajibUntuk = (medan: string) => BERKAS_USULAN.find((b) => b.medan === medan)!.wajibUntuk;
+test("berkas yang diminta bertukar menurut pernah atau belum pernah KGB", () => {
+  const ringkas = (pernah: boolean) => berkasUntukKeadaan(pernah).map((b) => `${b.medan}${b.wajib ? "*" : ""}`);
+  // Sudah pernah KGB: dicocokkan dengan SK KGB terakhir dan SK kenaikan pangkat terakhir, keduanya wajib.
+  assert.deepEqual(ringkas(true), ["skTerakhir*", "skPangkat*"]);
+  // Belum pernah KGB: SK CPNS wajib; SK PNS bila sudah terbit, sebab KGB pertama dapat mendahuluinya.
+  assert.deepEqual(ringkas(false), ["skCpns*", "syaratCpns"]);
+});
 
-  // Belum pernah KGB: acuan pertamanya SK CPNS, dan SK KGB terakhir memang tidak ada.
-  assert.equal(berkasWajib(wajibUntuk("skCpns"), false), true);
-  assert.equal(berkasWajib(wajibUntuk("skTerakhir"), false), false);
+test("berkas wajib ditagih saat diajukan: pegawai baru selalu, perbaikan hanya bila dasar gajinya berubah", () => {
+  const baru = { nama: "A", nip: "200509182025062002", jabatan: "Penjaga Tahanan", golonganRuang: "II/a",
+    mkgTahun: 0, mkgBulan: 0, tmtKgbTerakhir: tgl(2025, 6) };
+  assert.deepEqual(kekuranganUsulan(baru, "baru"), ["SK CPNS"]);
+  assert.deepEqual(kekuranganUsulan({ ...baru, pathSkCpns: "usulan/x.pdf" }, "baru"), []);
+  assert.deepEqual(kekuranganUsulan({ ...baru, mkgTahun: 2 }, "baru"), ["SK KGB terakhir", "SK kenaikan pangkat terakhir"]);
 
-  // Sudah pernah KGB: yang dicocokkan tim keuangan adalah SK KGB terakhirnya.
-  assert.equal(berkasWajib(wajibUntuk("skTerakhir"), true), true);
-  assert.equal(berkasWajib(wajibUntuk("skCpns"), true), false);
-
-  // KGB pertama dapat jatuh sebelum pengangkatan PNS, jadi SK PNS tidak pernah diwajibkan.
-  for (const pernah of [true, false]) assert.equal(berkasWajib(wajibUntuk("syaratCpns"), pernah), false);
-
-  // Kenaikan pangkat tidak dapat dipastikan dari isian, jadi tidak pernah diwajibkan.
-  for (const pernah of [true, false]) assert.equal(berkasWajib(wajibUntuk("skPangkat"), pernah), false);
-  // Surat usulan diunggah sekali pada langkah Ajukan, bukan per pegawai.
-  for (const pernah of [true, false]) assert.equal(berkasWajib(wajibUntuk("berkas"), pernah), false);
+  // Perbaikan nama saja tidak menuntut berkas; perbaikan masa kerja golongan menuntutnya.
+  assert.deepEqual(kekuranganUsulan({ nama: "Siti N." }, "perubahan", pegawai), []);
+  assert.deepEqual(kekuranganUsulan({ mkgTahun: 2 }, "perubahan", pegawai), ["SK KGB terakhir", "SK kenaikan pangkat terakhir"]);
 });
 
 test("nama asli berkas usulan tersimpan di kunci R2 dan dapat dibaca kembali", async () => {
@@ -199,4 +200,11 @@ test("nama asli berkas usulan tersimpan di kunci R2 dan dapat dibaca kembali", a
   // Kunci lama tanpa nama tetap dikenali sebagai berkas, hanya namanya yang tidak ada.
   assert.equal(namaAsliBerkas("usulan/rutan-rantau_skCpns_1758860000000.pdf"), null);
   assert.equal(namaAsliBerkas(null), null);
+});
+
+test("pembetulan NIP ikut diusulkan dan terbaca sebagai perubahan", () => {
+  const perubahan = bandingkanUsulan({ ...pegawai, nip: "200509182025062002" }, { nip: "200509182025062003" });
+  assert.deepEqual(perubahan.map((p) => [p.label, p.sekarang, p.diusulkan]), [["NIP", "200509182025062002", "200509182025062003"]]);
+  // NIP yang sama dengan yang tercatat bukan perubahan, jadi isian yang terisi otomatis tidak mengotori usulan.
+  assert.equal(usulanKosong({ ...pegawai, nip: "200509182025062002" }, { nip: "200509182025062002" }), true);
 });

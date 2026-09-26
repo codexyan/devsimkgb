@@ -9,15 +9,20 @@
 // menurut siapa yang sedang menunggu. Yang dikembalikan Kanwil didahulukan, sebab di situ ada orang
 // yang benar-benar menunggu jawaban; yang belum diperiksa sama sekali paling belakang.
 //
+// Pegawai yang KGB-nya jatuh tempo hanya diingatkan, tidak ditagih pernyataan: bila sampai batas input
+// Kanwil tidak ada usulan perbaikan, datanya dianggap benar dan kartunya hilang sendiri. Tombol "Data
+// sudah benar" yang dulu ada tidak menghalangi apa pun di Kanwil, jadi hanya menambah pekerjaan.
+//
 // Murni agar dapat dipakai server maupun peramban dan diuji tanpa lapisan data.
 
-export type JenisTugasUpt = "terlambat" | "perbaiki" | "lengkapi" | "ajukan" | "periksa";
+import { formatTanggalId } from "./waktu";
+
+export type JenisTugasUpt = "perbaiki" | "lengkapi" | "ajukan" | "periksa";
 
 /** Nada kartu tugas; mengikuti kosakata warna dasbor. */
 export type NadaTugas = "merah" | "ungu" | "kuning" | "hijau" | "biru";
 
 export const TUGAS_UPT: Record<JenisTugasUpt, { judul: string; nada: NadaTugas }> = {
-  terlambat: { judul: "Lewat batas input", nada: "merah" },
   perbaiki: { judul: "Dikembalikan Kanwil", nada: "ungu" },
   lengkapi: { judul: "Belum lengkap", nada: "kuning" },
   ajukan: { judul: "Siap diajukan", nada: "hijau" },
@@ -25,8 +30,7 @@ export const TUGAS_UPT: Record<JenisTugasUpt, { judul: string; nada: NadaTugas }
 };
 
 /** Urutan pengerjaan; makin kecil makin dulu. */
-// Lewat batas didahulukan: batas input Kanwil sudah terlewati, jadi KGB-nya sudah terancam rapelan.
-const URUTAN: Record<JenisTugasUpt, number> = { terlambat: 0, perbaiki: 1, lengkapi: 2, ajukan: 3, periksa: 4 };
+const URUTAN: Record<JenisTugasUpt, number> = { perbaiki: 0, lengkapi: 1, ajukan: 2, periksa: 3 };
 
 export interface UsulanTugas {
   id: string;
@@ -49,11 +53,10 @@ export interface PegawaiTugas {
   bulanTmt: string | null;
   /** Sudah punya usulan berjalan; tugasnya sudah terwakili baris usulan itu. */
   usulanBerjalan?: string | null;
-  /** "berlaku" bila UPT sudah menyatakan data siklus ini benar. */
-  konfirmasi: string;
-  bolehKonfirmasi: boolean;
-  /** Batas input Kanwil untuk TMT ini sudah lewat, padahal KGB-nya belum diinput. */
-  terlambat?: boolean;
+  /** KGB-nya belum diinput Kanwil dan batas inputnya belum lewat, jadi perbaikan masih berguna. */
+  perluDiperiksa: boolean;
+  /** Batas input Kanwil untuk TMT ini, yyyy-mm-dd; disebut pada kartu pengingat. */
+  batasInput?: string | null;
 }
 
 export interface TugasUpt {
@@ -75,8 +78,7 @@ export interface TugasUpt {
  *
  * Yang sedang ditinjau Kanwil sengaja tidak masuk: UPT tidak dapat berbuat apa-apa atasnya, dan
  * menampilkannya sebagai "tugas" hanya membuat daftar ini berisi hal yang tidak bisa dikerjakan.
- * Pegawai yang sudah punya usulan berjalan juga tidak diminta konfirmasi lagi, sebab mengusulkan
- * adalah pernyataan yang lebih kuat daripada menyatakan data yang ada sudah benar.
+ * Pegawai yang sudah punya usulan berjalan juga tidak diingatkan lagi, karena perbaikannya sudah diurus.
  */
 export function daftarTugasUpt(
   usulan: readonly UsulanTugas[],
@@ -131,21 +133,16 @@ export function daftarTugasUpt(
   }
 
   for (const p of pegawai) {
-    if (p.usulanBerjalan) continue;
-    if (p.konfirmasi === "berlaku") continue;
-    if (!p.bolehKonfirmasi) continue;
-    // Yang lewat batas masuk walau bukan bulan usulan berjalan: siklusnya sudah terlewati, dan tanpa
-    // langkah UPT pegawai itu tidak muncul di daftar mana pun selain tabel pegawai.
-    const terlambat = !!p.terlambat;
-    if (!terlambat && (!bulanUsulan || p.bulanTmt !== bulanUsulan)) continue;
+    if (p.usulanBerjalan || !p.perluDiperiksa) continue;
+    if (!bulanUsulan || p.bulanTmt !== bulanUsulan) continue;
     tugas.push({
       kunci: `pegawai:${p.id}`,
-      jenis: terlambat ? "terlambat" : "periksa",
+      jenis: "periksa",
       nama: p.nama,
       nip: p.nip,
-      langkah: terlambat
-        ? "Batas input Kanwil sudah lewat. Segera nyatakan datanya sudah benar, atau usulkan perbaikan."
-        : "Nyatakan datanya sudah benar, atau usulkan perbaikan bila ada yang keliru.",
+      langkah: p.batasInput
+        ? `Periksa datanya. Bila ada yang keliru, usulkan perbaikan sebelum ${formatTanggalId(p.batasInput)}; tanpa usulan, datanya dianggap benar.`
+        : "Periksa datanya. Bila ada yang keliru, usulkan perbaikan; tanpa usulan, datanya dianggap benar.",
       catatan: null,
       usulanId: null,
       pegawaiId: p.id,

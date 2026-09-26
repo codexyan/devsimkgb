@@ -105,6 +105,15 @@ export async function setujuiUsulan(
     pegawaiIdHasil = pegawaiBaru.id;
     perubahan = [];
   } else if (pegawaiLama) {
+    // Pembetulan NIP diperiksa ulang: NIP itu bisa saja sudah dipakai sejak usulan dikirim.
+    if (nilaiBaru.nip && nilaiBaru.nip !== pegawaiLama.nip) {
+      const bentrok = await db.pegawai.findUnique({ nip: nilaiBaru.nip });
+      if (bentrok && bentrok.id !== pegawaiLama.id)
+        return {
+          ok: false,
+          pesan: `NIP ${nilaiBaru.nip} sudah tercatat atas nama ${bentrok.nama}. Kembalikan usulan ini agar UPT memeriksa NIP-nya.`,
+        };
+    }
     const tmtSiklus = (nilaiBaru.tmtKgbBerikutnya as Date | null) ?? pegawaiLama.tmtKgbBerikutnya ?? null;
     await db.pegawai.update(
       { id: pegawaiLama.id },

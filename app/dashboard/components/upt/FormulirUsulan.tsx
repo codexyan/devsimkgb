@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import KolomBerkas from "./KolomBerkas";
-import { BERKAS_USULAN, berkasWajib, hitungUsulan, type WajibBerkas } from "@/lib/usulanPegawai";
+import { BERKAS_USULAN, berkasUntukKeadaan, hitungUsulan, pernahKgb as sudahPernahKgb } from "@/lib/usulanPegawai";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiSaatIni } from "@/lib/pilihanPegawai";
@@ -43,7 +43,7 @@ export interface PegawaiUntukUsulan {
  * Berkas milik tiap pegawai. Surat usulan Srikandi tidak termasuk: satu surat memuat banyak pegawai,
  * jadi suratnya diunggah sekali pada langkah Ajukan dan dipasang ke semua pegawai pada surat itu.
  */
-const BERKAS_PEGAWAI = BERKAS_USULAN.filter((b) => b.wajibUntuk !== "saat_mengajukan");
+const BERKAS_PEGAWAI = BERKAS_USULAN.filter((b) => b.keadaan !== "pengajuan");
 
 const HUKDIS_KOSONG = { ada: false, jenis: "", nomorSk: "", tmtMulai: "", tmtBerakhir: "", keterangan: "" };
 const SK_KOSONG = { nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" };
@@ -61,19 +61,6 @@ const PILIHAN_BIDANG: Record<string, readonly string[]> = {
   jenisJabatan: JENIS_JABATAN,
   eselon: ESELON,
 };
-
-/**
- * Kalimat singkat tentang kewajiban satu berkas bagi pegawai yang sedang didata. Disebutkan juga
- * ketika tidak wajib: operator yang melihat kolom kosong tanpa keterangan cenderung mengisinya dengan
- * dokumen apa saja yang ada di tangan, dan SK yang salah kolom lebih sulit ditemukan daripada kolom
- * yang memang kosong.
- */
-function catatanWajib(wajibUntuk: WajibBerkas, wajib: boolean): string {
-  if (wajib) return "Wajib untuk keadaan pegawai ini.";
-  if (wajibUntuk === "pernah_naik_pangkat") return "Lampirkan hanya bila pegawai pernah naik pangkat.";
-  if (wajibUntuk === "sudah_pns") return "Lampirkan bila pegawai sudah diangkat PNS.";
-  return "Tidak wajib untuk keadaan pegawai ini.";
-}
 
 /** Isian pilihan; nilai lama yang di luar daftar tetap ditampilkan agar tidak hilang saat disimpan. */
 function IsianPilihan({
@@ -148,9 +135,10 @@ export default function FormulirUsulan({
   const awal: Record<string, string> = {
     ...tersimpan,
     tmtKgbTerakhir: tersimpan.tmtKgbTerakhir || tersimpan.tmtGolongan || "",
+    // Draf lama belum menyimpan NIP di isiannya; yang ditampilkan NIP yang tercatat.
+    nip: tersimpan.nip || pegawai?.nip || (draf?.nip && draf.nip !== "-" ? draf.nip : ""),
   };
   const [isian, setIsian] = useState<Record<string, string>>({ ...awal });
-  const [nip, setNip] = useState(draf?.nip && draf.nip !== "-" ? draf.nip : "");
   const [sk, setSk] = useState({
     nomorSkTerakhir: draf?.surat?.nomorSkTerakhir ?? "",
     tanggalSkTerakhir: draf?.surat?.tanggalSkTerakhir ?? "",
@@ -162,11 +150,7 @@ export default function FormulirUsulan({
   const [hapusTersimpan, setHapusTersimpan] = useState<Set<string>>(() => new Set());
   // Pegawai yang belum pernah KGB mengisi TMT CPNS dan masa kerja 0; yang sudah pernah menyalin SK KGB
   // terakhirnya. Pemisahan ini yang menghilangkan tebak-tebakan pada dua isian tersulit.
-  const [pernahKgb, setPernahKgb] = useState(() => {
-    const tahun = Number(awal.mkgTahun ?? 0);
-    const bulan = Number(awal.mkgBulan ?? 0);
-    return tahun > 0 || bulan > 0;
-  });
+  const [pernahKgb, setPernahKgb] = useState(() => sudahPernahKgb(awal.mkgTahun, awal.mkgBulan));
   const [mengirim, setMengirim] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
   /** Berkas tersimpan yang sedang dibuka, agar operator dapat memastikan yang diunggah memang benar. */
@@ -230,7 +214,6 @@ export default function FormulirUsulan({
       form.set("status", "draf");
       form.set("jenis", jenis);
       if (pegawai) form.set("pegawaiId", pegawai.id);
-      if (jenis === "baru") form.set("nip", nip);
       for (const bidang of BIDANG_DIISI) form.set(bidang.kunci, isian[bidang.kunci] ?? "");
       form.set("nomorSkTerakhir", sk.nomorSkTerakhir);
       form.set("tanggalSkTerakhir", sk.tanggalSkTerakhir);
@@ -317,8 +300,8 @@ export default function FormulirUsulan({
         Isian dan berkas bertanda <i>*</i> wajib. Daftarnya berubah menurut keadaan pegawai:{" "}
         <b>{pernahKgb ? "sudah pernah KGB" : "belum pernah KGB"}</b>
         {pernahKgb
-          ? " menuntut TMT KGB terakhir, masa kerja golongan yang disalin dari SK KGB itu, dan lampiran SK KGB terakhirnya."
-          : " menuntut TMT CPNS, masa kerja golongan 0 tahun 0 bulan, serta nomor, tanggal, dan lampiran SK CPNS sebagai acuan pertama; SK KGB terakhir justru dikosongkan."}{" "}
+          ? " menuntut TMT KGB terakhir, masa kerja golongan yang disalin dari SK KGB itu, serta lampiran SK KGB terakhir dan SK kenaikan pangkat terakhir."
+          : " menuntut TMT CPNS, masa kerja golongan 0 tahun 0 bulan, serta nomor, tanggal, dan lampiran SK CPNS sebagai acuan pertama; SK pengangkatan PNS dilampirkan bila sudah terbit."}{" "}
         Pilihannya diatur pada bagian Pangkat, gaji pokok, dan KGB di bawah.
       </p>
 
@@ -329,23 +312,24 @@ export default function FormulirUsulan({
           <p className="kgbm-bagian-ket">Sesuai SK pengangkatan</p>
         </div>
         <div className="kgbm-bagian-isi">
-          {jenis === "baru" && (
-            <label className="kgbm-label">
-              <span className="kgbm-wajib">NIP (18 digit)</span>
-              <input
-                className="kgbm-input"
-                data-autofocus
-                inputMode="numeric"
-                value={nip}
-                onChange={(e) => setNip(e.target.value.replace(/\D/g, "").slice(0, 18))}
-                placeholder="198809042025062014"
-              />
-              <span className="kgbm-bantuan">
-                Delapan angka pertama tanggal lahir, enam berikutnya TMT CPNS. NIP dipakai sebagai penanda
-                data ini, jadi tidak dapat diubah setelah disimpan.
-              </span>
-            </label>
-          )}
+          <label className="kgbm-label">
+            {jenis === "baru" ? <span className="kgbm-wajib">NIP (18 digit)</span> : "NIP (18 digit)"}
+            <input
+              className="kgbm-input"
+              data-autofocus={jenis === "baru" ? true : undefined}
+              inputMode="numeric"
+              value={isian.nip ?? ""}
+              onChange={(e) => ubah("nip", e.target.value.replace(/\D/g, "").slice(0, 18))}
+              placeholder="198809042025062014"
+            />
+            <span className="kgbm-bantuan">
+              {jenis === "baru"
+                ? "Delapan angka pertama tanggal lahir, enam berikutnya TMT CPNS. Masih dapat dibetulkan selama data ini belum diajukan ke Kanwil."
+                : pegawai && isian.nip && isian.nip !== pegawai.nip
+                  ? `Diusulkan berubah dari ${pegawai.nip}. Kanwil mencocokkannya dengan SK CPNS sebelum menyetujui.`
+                  : "Ubah hanya bila NIP yang tercatat keliru. Kanwil mencocokkannya dengan SK CPNS sebelum menyetujui."}
+            </span>
+          </label>
           <div className="kgbm-grid2">
             {BIDANG_DIISI.filter((b) => BIDANG_IDENTITAS.has(b.kunci)).map((bidang) =>
               bidang.jenis === "tanggal" ? (
@@ -609,15 +593,15 @@ export default function FormulirUsulan({
           <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 1 MB</p>
         </div>
         <div className="kgbm-bagian-isi">
-          {BERKAS_PEGAWAI.map((b) => {
-            const wajib = berkasWajib(b.wajibUntuk, pernahKgb);
+          {berkasUntukKeadaan(pernahKgb).map((b) => {
+            const wajib = b.wajib;
             const simpanan = draf?.berkas.find((x) => x.medan === b.medan) ?? null;
             return (
               <KolomBerkas
                 key={b.medan}
                 label={b.label}
                 wajib={wajib}
-                bantuan={`${b.keterangan} ${catatanWajib(b.wajibUntuk, wajib)}`.trim()}
+                bantuan={b.keterangan}
                 dipilih={berkas[b.medan] ?? null}
                 urlTersimpan={draf && simpanan ? `/api/usulan/${draf.id}/berkas?berkas=${b.medan}` : null}
                 namaTersimpan={simpanan?.nama ?? null}

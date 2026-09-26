@@ -44,6 +44,7 @@ const AKSI_CONFIG: Record<string, { label: string; nada: NadaAksi; kelompok: str
   rekon_keuangan:           { label: "Rekon keuangan",         nada: "ungu",   kelompok: "Keuangan" },
   tambah_pegawai:           { label: "Tambah pegawai",         nada: "navy",   kelompok: "Pegawai" },
   edit_pegawai:             { label: "Ubah pegawai",           nada: "abu",    kelompok: "Pegawai" },
+  ubah_nip_pegawai:         { label: "Betulkan NIP",           nada: "kuning", kelompok: "Pegawai" },
   hapus_pegawai:            { label: "Hapus pegawai",          nada: "merah",  kelompok: "Pegawai" },
   import_pegawai:           { label: "Impor pegawai",          nada: "navy",   kelompok: "Pegawai" },
   konfirmasi_upt:           { label: "Konfirmasi data UPT",    nada: "hijau",  kelompok: "Pegawai" },

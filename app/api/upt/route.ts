@@ -113,14 +113,15 @@ export async function GET() {
         terlambat,
         // Hukdis hanya sebagai penanda; jenis dan keterangannya tidak dikirim ke UPT.
         kgbDitunda: kgbDitunda(hukdisRingkas, p.id),
-        // Konfirmasi data oleh UPT untuk siklus ini; dapat diulang selama KGB belum selesai.
+        // Konfirmasi siklus ini; kini hanya tercatat saat usulan perbaikan UPT disetujui Kanwil.
         konfirmasi: statusKonfirmasiUpt(p, tmt),
         konfirmasiAt: p.konfirmasiUptAt ? new Date(p.konfirmasiUptAt).toISOString() : null,
         konfirmasiOleh: p.konfirmasiUptOleh ?? null,
-        // Usulan yang sedang berjalan menggantikan konfirmasi; setelah disetujui, konfirmasinya
-        // ditulis sendiri oleh rute tinjauan (app/api/usulan/[id]/route.ts).
         usulanBerjalan: jenisUsulanPegawai.get(p.id) ?? null,
-        bolehKonfirmasi: !!tmt && status !== "selesai" && !jenisUsulanPegawai.has(p.id),
+        // Pengingat pemeriksaan hanya selama perbaikan masih berguna: KGB belum diinput Kanwil dan
+        // batas inputnya belum lewat. Sesudahnya, tanpa usulan, datanya dianggap benar (lib/tugasUpt.ts).
+        perluDiperiksa:
+          !!tmt && (status === null || status === "belum_diproses") && !jendela?.flagRapelan && !jenisUsulanPegawai.has(p.id),
         // Nilai kolom yang boleh diusulkan UPT, sebagai isian awal formulir usulan data.
         dataSekarang: Object.fromEntries(
           BIDANG_USULAN.map((bidang) => {

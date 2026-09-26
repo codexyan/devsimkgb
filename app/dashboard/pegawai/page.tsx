@@ -964,14 +964,18 @@ export default function PegawaiPage() {
                       </label>
                       <input
                         className={inputClass}
-                        style={editData ? readonlyStyle : inputStyle}
+                        style={inputStyle}
                         placeholder="18 digit NIP"
                         inputMode="numeric"
                         maxLength={18}
                         value={form.nip}
                         onChange={(e) => f("nip", e.target.value.replace(/\D/g, ""))}
-                        readOnly={!!editData}
                       />
+                      {editData && editData.nip !== form.nip && (
+                        <p className="mt-1 text-xs" style={{ color: "var(--st-amber)" }}>
+                          NIP diubah dari {editData.nip}. Pastikan sesuai SK CPNS; SK yang sudah terbit tetap memuat NIP lama.
+                        </p>
+                      )}
                     </div>
 
                     {/* Nama Lengkap : satu field */}

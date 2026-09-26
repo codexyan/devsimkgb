@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { SATKER } from "@/lib/satker";
 import { namaUnitKerja } from "@/app/dashboard/satker/labelSatker";
-import { LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
+import type { StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { KODE_SATKER_LAIN, kodeSatkerPegawai } from "@/lib/rekapSatker";
 import { canProcessKGB, isSuperAdmin } from "@/lib/auth";
 import { useRole } from "@/app/dashboard/components/RoleContext";
@@ -586,17 +586,12 @@ export default function KGBPage() {
           )}
         </div>
 
-        {(k.status === "belum_diproses" || k.status === "sedang_diproses") && k.konfirmasiUpt !== "berlaku" && (
-          <Catatan nada="amber">
-            {LABEL_KONFIRMASI_UPT[k.konfirmasiUpt ?? "belum"]}. Masa kerja golongan dan status hukuman disiplin
-            sebaiknya dipastikan UPT lebih dulu, karena salah data berujung kekurangan atau kelebihan gaji.
-          </Catatan>
-        )}
+        {/* UPT tidak lagi diminta menyatakan data benar; tanpa usulan sampai batas input, datanya dianggap
+            benar. Yang tercatat hanyalah usulan perbaikan yang disetujui untuk siklus ini. */}
         {k.konfirmasiUpt === "berlaku" && k.status !== "selesai" && (
           <Catatan nada="hijau">
-            {LABEL_KONFIRMASI_UPT.berlaku}
-            {k.konfirmasiUptOleh ? ` oleh ${k.konfirmasiUptOleh}` : ""}: masa kerja golongan, gaji pokok dasar, dan
-            status hukuman disiplin dinyatakan sesuai.
+            Data siklus ini diperbarui dari usulan UPT yang sudah disetujui
+            {k.konfirmasiUptOleh ? ` (diusulkan ${k.konfirmasiUptOleh})` : ""}.
           </Catatan>
         )}
         {k.status === "belum_diproses" && jendela?.isLocked && (

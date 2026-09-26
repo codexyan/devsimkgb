@@ -69,7 +69,7 @@ export async function PATCH(
   if (!lama)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
-  // NIP tidak diubah lewat PATCH; unit kerja yang tidak dikirim tetap memakai nilai tersimpan.
+  // NIP diperiksa tersendiri di bawah; unit kerja yang tidak dikirim tetap memakai nilai tersimpan.
   const hasil = bacaIsianPegawai(
     { ...body, unitKerja: body.unitKerja === undefined ? lama.unitKerja : body.unitKerja },
     { denganNip: false },
@@ -77,6 +77,18 @@ export async function PATCH(
   if (hasil.galat !== undefined)
     return NextResponse.json({ error: hasil.galat }, { status: 400 });
   const { nip: _nip, ...isian } = hasil.data;
+
+  // NIP yang tercatat keliru dapat dibetulkan Kanwil. Riwayat KGB, SK, hukdis, dan usulan terhubung lewat
+  // id pegawai, jadi aman diubah; SK yang sudah terbit tetap memuat NIP lamanya. NIP kosong berarti tetap.
+  const nipBaru = typeof body.nip === "string" ? body.nip.replace(/^="(.*)"$/, "$1").trim() : "";
+  const ubahNip = !!nipBaru && nipBaru !== lama.nip;
+  if (ubahNip) {
+    if (!/^\d{18}$/.test(nipBaru))
+      return NextResponse.json({ error: `NIP "${nipBaru}" tidak valid. NIP terdiri dari 18 digit angka.` }, { status: 400 });
+    const bentrok = await db.pegawai.findUnique({ nip: nipBaru });
+    if (bentrok && bentrok.id !== id)
+      return NextResponse.json({ error: `NIP ${nipBaru} sudah tercatat atas nama ${bentrok.nama}.` }, { status: 409 });
+  }
 
   // Penanda hukdis hanya diubah pengelola hukdis, dan hanya field yang dikirim; peran lain
   // mempertahankan nilai tersimpan dan mencatat hukdis lewat Riwayat Hukdis.
@@ -143,6 +155,7 @@ export async function PATCH(
     { id },
     {
       ...isian,
+      ...(ubahNip ? { nip: nipBaru } : {}),
       tmtKgbTerakhir,
       statusHukdis: ubahHukdis("statusHukdis") ? body.statusHukdis === true || body.statusHukdis === "true" : lama.statusHukdis,
       tanggalHukdisBerakhir: ubahHukdis("tanggalHukdisBerakhir")
@@ -167,6 +180,13 @@ export async function PATCH(
     );
   }
 
+  if (ubahNip)
+    logAudit({
+      userId: userLogin.id,
+      aksi: "ubah_nip_pegawai",
+      detail: `NIP ${pegawai.nama} dibetulkan dari ${lama.nip} menjadi ${nipBaru}`,
+      targetNama: pegawai.nama,
+    });
   logAudit({
     userId: userLogin.id,
     aksi: "edit_pegawai",
