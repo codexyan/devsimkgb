@@ -39,6 +39,12 @@ export interface PegawaiUntukUsulan {
   dataSekarang: Record<string, string>;
 }
 
+/**
+ * Berkas milik tiap pegawai. Surat usulan Srikandi tidak termasuk: satu surat memuat banyak pegawai,
+ * jadi suratnya diunggah sekali pada langkah Ajukan dan dipasang ke semua pegawai pada surat itu.
+ */
+const BERKAS_PEGAWAI = BERKAS_USULAN.filter((b) => b.wajibUntuk !== "saat_mengajukan");
+
 const HUKDIS_KOSONG = { ada: false, jenis: "", nomorSk: "", tmtMulai: "", tmtBerakhir: "", keterangan: "" };
 const SK_KOSONG = { nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" };
 
@@ -66,7 +72,6 @@ function catatanWajib(wajibUntuk: WajibBerkas, wajib: boolean): string {
   if (wajib) return "Wajib untuk keadaan pegawai ini.";
   if (wajibUntuk === "pernah_naik_pangkat") return "Lampirkan hanya bila pegawai pernah naik pangkat.";
   if (wajibUntuk === "sudah_pns") return "Lampirkan bila pegawai sudah diangkat PNS.";
-  if (wajibUntuk === "saat_mengajukan") return "";
   return "Tidak wajib untuk keadaan pegawai ini.";
 }
 
@@ -238,7 +243,7 @@ export default function FormulirUsulan({
         form.set("hukdisTmtBerakhir", hukdis.tmtBerakhir);
         form.set("hukdisKeterangan", hukdis.keterangan);
       }
-      for (const b of BERKAS_USULAN) {
+      for (const b of BERKAS_PEGAWAI) {
         const isi = berkas[b.medan];
         if (isi) form.set(b.medan, isi);
         else if (draf && hapusTersimpan.has(b.medan)) form.append("hapusBerkas", b.medan);
@@ -604,7 +609,7 @@ export default function FormulirUsulan({
           <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 1 MB</p>
         </div>
         <div className="kgbm-bagian-isi">
-          {BERKAS_USULAN.map((b) => {
+          {BERKAS_PEGAWAI.map((b) => {
             const wajib = berkasWajib(b.wajibUntuk, pernahKgb);
             const simpanan = draf?.berkas.find((x) => x.medan === b.medan) ?? null;
             return (

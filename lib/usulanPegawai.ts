@@ -96,7 +96,7 @@ export const BERKAS_USULAN = [
     kunci: "pathBerkas",
     label: "Surat usulan Srikandi",
     keterangan:
-      "Surat pengantar dari UPT yang sudah dikirim ke Kanwil lewat Srikandi. Tidak perlu di sini: suratnya diunggah sekali pada langkah Ajukan, dan berlaku untuk semua pegawai pada surat itu.",
+      "Surat pengantar dari UPT yang sudah dikirim ke Kanwil lewat Srikandi. Diunggah sekali pada langkah Ajukan dan berlaku untuk semua pegawai pada surat itu, jadi tidak ada di formulir tiap pegawai.",
     wajibUntuk: "saat_mengajukan",
   },
   {

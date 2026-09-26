@@ -697,15 +697,15 @@ export default async function PanduanPage() {
                     diunggah, lalu diganti atau dihapus dari kartunya, agar dapat dipastikan tidak tertukar.
                   </li>
                   <li>
-                    Kelima berkas itu: <strong>surat usulan Srikandi</strong>, yaitu surat pengantar UPT yang sudah
-                    dikirim ke Kanwil; <strong>SK KGB terakhir</strong>, dikosongkan bila pegawai belum pernah menerima
+                    Keempat berkas itu: <strong>SK KGB terakhir</strong>, dikosongkan bila pegawai belum pernah menerima
                     KGB; <strong>SK CPNS</strong>, wajib bagi pegawai yang belum pernah KGB karena SK inilah acuan
                     pertamanya: TMT CPNS awal masa kerja golongan, dan nomor serta tanggalnya tercetak sebagai SK dasar
                     pada surat KGB pertama; <strong>SK pengangkatan PNS</strong>, boleh digabung dengan SPMT, dilampirkan
                     bila pegawai sudah diangkat PNS, sebab KGB pertama dapat jatuh sebelum pengangkatan itu; dan{" "}
                     <strong>SK kenaikan pangkat terakhir</strong> bila pegawai pernah naik pangkat, sebab kenaikan pangkat
-                    memotong masa kerja golongan. Berkas selain surat usulan diminta tim keuangan agar masa kerja
-                    golongan dapat dicocokkan dengan dokumen aslinya, bukan dengan ingatan.
+                    memotong masa kerja golongan. Berkas ini diminta tim keuangan agar masa kerja golongan dapat
+                    dicocokkan dengan dokumen aslinya, bukan dengan ingatan. <strong>Surat usulan Srikandi</strong> tidak
+                    diunggah di sini, melainkan sekali pada langkah Ajukan, karena satu surat memuat banyak pegawai.
                   </li>
                   <li>
                     Bila pegawai sedang atau pernah menjalani hukuman disiplin yang belum dilaporkan, centang bagiannya
