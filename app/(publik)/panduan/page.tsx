@@ -717,6 +717,12 @@ export default async function PanduanPage() {
                     dan isi jenis, nomor SK, serta masa berlakunya.
                   </li>
                   <li>
+                    <strong>Banyak pegawai sekaligus?</strong> Pakai <strong>Usulan kolektif</strong> di menu UPT: pilih
+                    pegawainya (atau pintasan KGB bulan usulan), ubah yang keliru dan lampirkan berkasnya dalam satu
+                    tabel, simpan semuanya, lalu ajukan dengan satu surat Srikandi dari layar yang sama. Draf pegawai baru
+                    hasil Unggah daftar ikut muncul di tabel itu untuk dilengkapi berkasnya.
+                  </li>
+                  <li>
                     <strong>Ajukan ke Kanwil.</strong> Centang pegawai yang akan diusulkan pada panel Data disiapkan,
                     lalu tekan Ajukan. Nomor dan tanggal surat Srikandi diisi sekali dan berlaku untuk semuanya, karena
                     satu surat usulan memang lazim memuat beberapa pegawai. Data yang belum lengkap disebutkan satu per

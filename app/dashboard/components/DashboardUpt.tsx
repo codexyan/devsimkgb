@@ -591,6 +591,9 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             </div>
             {/* Satu-satunya tempat menambah pegawai: pegawai baru tersimpan sebagai draf di Perlu dikerjakan. */}
             <span className="upt-aksi" style={{ marginLeft: "auto" }}>
+              <Link href="/dashboard/upt/kolektif" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" title="Siapkan banyak pegawai untuk satu surat Srikandi sekaligus">
+                Usulan kolektif
+              </Link>
               <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setDialogImpor(true)}>
                 Unggah daftar
               </button>
