@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { BATAS_BERKAS_USULAN_BYTE, BERKAS_USULAN, PESAN_BERKAS_TERLALU_BESAR, kunciBerkasUsulan } from "./usulanPegawai";
+import { BATAS_BERKAS_USULAN_BYTE, BERKAS_USULAN, PESAN_BERKAS_TERLALU_BESAR, kunciBerkasUsulan, namaAsliBerkas } from "./usulanPegawai";
 import { adaPenandaPdf } from "./prosesKgb";
 
 // Batasnya didefinisikan di lib/usulanPegawai.ts agar formulir di peramban memeriksa hal yang sama sebelum mengunggah.
@@ -59,4 +59,43 @@ export async function hapusBerkasUsulan(jalur: readonly string[]): Promise<void>
   } catch {
     // Diabaikan dengan sengaja; lihat keterangan di atas.
   }
+}
+
+type BucketSalin = {
+  get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
+  put(key: string, isi: ArrayBuffer, opsi: { httpMetadata: { contentType: string } }): Promise<unknown>;
+};
+
+/**
+ * Salin berkas bawaan dari usulan yang sudah disetujui ke objek baru milik usulan ini (lib/bawaanUsulan.ts).
+ * Disalin, bukan dirujuk bersama, karena menghapus draf menghapus objek berkasnya: rujukan bersama akan
+ * ikut melenyapkan berkas usulan lama yang sudah menjadi riwayat. Best effort: berkas yang gagal disalin
+ * dilewati, dan kelengkapannya tetap ditagih saat diajukan.
+ */
+export async function salinBerkasBawaan(
+  daftar: readonly { kunci: KunciBerkasUsulan; medan: string; jalur: string }[],
+  kode: string,
+): Promise<Partial<Record<KunciBerkasUsulan, string>>> {
+  const hasil: Partial<Record<KunciBerkasUsulan, string>> = {};
+  if (daftar.length === 0) return hasil;
+  let bucket: BucketSalin | undefined;
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    bucket = (env as unknown as { SK_BUCKET?: BucketSalin }).SK_BUCKET;
+  } catch {
+    return hasil;
+  }
+  if (!bucket) return hasil;
+  for (const b of daftar) {
+    try {
+      const asal = await bucket.get(b.jalur);
+      if (!asal) continue;
+      const kunciObjek = kunciBerkasUsulan(kode, b.medan, Date.now(), namaAsliBerkas(b.jalur) ?? "");
+      await bucket.put(kunciObjek, await asal.arrayBuffer(), { httpMetadata: { contentType: "application/pdf" } });
+      hasil[b.kunci] = kunciObjek;
+    } catch {
+      // Dilewati; lihat keterangan di atas.
+    }
+  }
+  return hasil;
 }

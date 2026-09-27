@@ -41,6 +41,8 @@ export default function DashboardHukdis() {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [hanyaTunda, setHanyaTunda] = useState(false);
+  // Laporan hukdis dari UPT yang menunggu dicatat (ADR-016); cukup jumlahnya, rinciannya di modul Hukdis.
+  const [laporanUpt, setLaporanUpt] = useState(0);
 
   function fetchData() {
     setLoading(true);
@@ -53,6 +55,10 @@ export default function DashboardHukdis() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+    fetch("/api/hukdis/laporan")
+      .then((r) => r.json() as Promise<{ laporan?: { status: string }[] }>)
+      .then((d) => setLaporanUpt(Array.isArray(d.laporan) ? d.laporan.filter((l) => l.status === "menunggu").length : 0))
+      .catch(() => {});
   }
 
   useEffect(() => {
@@ -100,6 +106,13 @@ export default function DashboardHukdis() {
     document.getElementById("daftar-hukdis")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   const tindakan: Tindakan[] = [];
+  if (laporanUpt > 0)
+    tindakan.push({
+      id: "laporan-upt",
+      nada: "kuning",
+      isi: <><strong>{laporanUpt} laporan hukdis dari UPT</strong> menunggu dicatat. Hukuman yang menunda KGB baru menggeser jadwal setelah dicatat.</>,
+      aksi: { label: "Tinjau laporan", href: "/dashboard/hukdis#laporan-upt" },
+    });
   if (segeraTunda.length > 0)
     tindakan.push({
       id: "segera-tunda",

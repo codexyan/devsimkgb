@@ -127,6 +127,7 @@ const menuAdminUpt: Entry[] = [
   { href: "/dashboard", label: "Dashboard", icon: Ic.dashboard },
   { href: "/dashboard/upt/pegawai", label: "Data Pegawai", icon: Ic.people },
   { href: "/dashboard/upt/kolektif", label: "Usulan kolektif", icon: Ic.edit },
+  { href: "/dashboard/upt/hukdis", label: "Hukuman Disiplin", icon: Ic.shield },
   { href: "/dashboard/upt/riwayat", label: "Riwayat", icon: Ic.history },
   { href: "/dashboard/profile", label: "Profil Saya", icon: Ic.person },
 ];

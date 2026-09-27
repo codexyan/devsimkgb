@@ -11,6 +11,7 @@ import { tmtBerakhirOtomatis } from "@/lib/hukdisJenis";
 import { SATKER } from "@/lib/satker";
 import { KODE_SATKER_LAIN, kodeSatkerPegawai } from "@/lib/rekapSatker";
 import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
+import { ModalPratinjauBerkas } from "@/app/dashboard/components/kgb";
 
 /* ─────────────────────────────────────────────────────────────────────────
    Modul Hukuman Disiplin (mandiri). Daftar SEMUA catatan hukdis lintas
@@ -30,6 +31,18 @@ interface Summary { total: number; aktif: number; ringan: number; sedang: number
 interface Jenis { kode: string; label: string; kategori: string; durasiHukdis: number; berdampakKGB: boolean; durasiTunda: number | null; dasarHukum: string | null; aktif: boolean; }
 interface PegawaiOpt { id: string; nip: string; nama: string; jabatan: string; golonganRuang: string; statusHukdis: boolean; }
 interface RegulasiOpt { id: string; nomor: string; tahun: string; tentang: string; status: string; }
+/** Laporan hukuman disiplin dari UPT yang menunggu dicatat (ADR-016). */
+interface LaporanUpt {
+  id: string;
+  pegawai: { id: string; nama: string; nip: string; jabatan: string; golonganRuang: string; statusHukdis: boolean } | null;
+  satkerNama: string;
+  jenisHukdis: string; jenisLabel: string;
+  nomorSK: string | null; tanggalSK: string | null; tmtMulai: string | null; tmtBerakhir: string | null;
+  keterangan: string | null;
+  berkas: { nama: string | null; url: string } | null;
+  status: string;
+  dilaporkanOleh: string | null; dilaporkanAt: string | null;
+}
 const regText = (r: RegulasiOpt) => `${r.nomor} Tahun ${r.tahun}`;
 
 const KAT: Record<string, { label: string; nada: "hijau" | "kuning" | "merah" }> = {
@@ -93,6 +106,16 @@ export default function HukdisPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Laporan dari UPT (ADR-016): dicatat lewat modal input yang sama, atau dikembalikan dengan catatan.
+  const [laporanUpt, setLaporanUpt] = useState<LaporanUpt[]>([]);
+  const [laporanAktif, setLaporanAktif] = useState(true);
+  const [dariLaporan, setDariLaporan] = useState<LaporanUpt | null>(null);
+  const [kembalikan, setKembalikan] = useState<LaporanUpt | null>(null);
+  const [catatanKembali, setCatatanKembali] = useState("");
+  const [sibukKembali, setSibukKembali] = useState(false);
+  const [galatKembali, setGalatKembali] = useState("");
+  const [pratinjauLaporan, setPratinjauLaporan] = useState<LaporanUpt | null>(null);
+
   // Delete modal
   const [delTarget, setDelTarget] = useState<Hukdis | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -100,18 +123,32 @@ export default function HukdisPage() {
 
   const refModalInput = useDialogModal(showInput, () => setShowInput(false), submitting);
   const refModalHapus = useDialogModal(!!delTarget, () => setDelTarget(null), deleting);
+  const refModalKembali = useDialogModal(!!kembalikan, () => setKembalikan(null), sibukKembali);
 
   function fetchData() {
     setLoading(true);
     fetch("/api/hukdis").then((r) => r.json() as Promise<{ data?: Hukdis[]; summary?: Summary }>).then((d) => {
       if (d && Array.isArray(d.data)) { setData(d.data); setSummary(d.summary ?? null); }
     }).catch(() => {}).finally(() => setLoading(false));
+    fetch("/api/hukdis/laporan").then((r) => r.json() as Promise<{ aktif?: boolean; laporan?: LaporanUpt[] }>).then((d) => {
+      if (Array.isArray(d.laporan)) setLaporanUpt(d.laporan.filter((l) => l.status === "menunggu"));
+      setLaporanAktif(d.aktif !== false);
+    }).catch(() => {});
   }
   useEffect(() => { if (allowed) fetchData(); else setLoading(false); }, [allowed]);
 
-  function openInput() {
-    setShowInput(true); setError(""); setSelPeg(null); setPegSearch(""); setDasarManual(false);
-    setForm({ jenisHukdis: "", nomorSK: "", tanggalSK: todayIso(), tmtMulai: todayIso(), tmtBerakhir: "", berdampakKGB: false, durasiTunda: 12, dasarHukum: "", keterangan: "" });
+  /** Buka modal input; dari laporan UPT, isiannya diambil dari laporan dan pegawainya terkunci. */
+  function openInput(laporan: LaporanUpt | null = null) {
+    const dariUpt = laporan?.pegawai ? laporan : null;
+    setShowInput(true); setError(""); setPegSearch(""); setDasarManual(false);
+    setDariLaporan(dariUpt);
+    setSelPeg(dariUpt?.pegawai ?? null);
+    setForm({
+      jenisHukdis: dariUpt?.jenisHukdis ?? "", nomorSK: dariUpt?.nomorSK ?? "",
+      tanggalSK: dariUpt?.tanggalSK?.slice(0, 10) ?? todayIso(), tmtMulai: dariUpt?.tmtMulai?.slice(0, 10) ?? todayIso(),
+      tmtBerakhir: dariUpt?.tmtBerakhir?.slice(0, 10) ?? "", berdampakKGB: false, durasiTunda: 12, dasarHukum: "",
+      keterangan: dariUpt?.keterangan ?? "",
+    });
     // Muat jenis + pegawai + regulasi sekali saat modal dibuka
     Promise.all([
       fetch("/api/hukdis/konfigurasi").then((r) => r.json() as any).catch(() => null),
@@ -119,6 +156,15 @@ export default function HukdisPage() {
       fetch("/api/hukdis/regulasi").then((r) => r.json() as any).catch(() => []),
     ]).then(([cfg, peg, reg]) => {
       if (cfg?.jenis) setJenisList(cfg.jenis.filter((j: Jenis) => j.aktif));
+      // Nilai bawaan jenis (dampak KGB, lama tunda, dasar hukum, masa hukuman) ikut diisi untuk laporan UPT,
+      // sama dengan memilih jenis itu sendiri; peninjau tetap bebas mengubahnya.
+      const j = dariUpt && Array.isArray(cfg?.jenis) ? (cfg.jenis as Jenis[]).find((x) => x.kode === dariUpt.jenisHukdis) : null;
+      if (j) {
+        setForm((f) => ({
+          ...f, berdampakKGB: j.berdampakKGB, durasiTunda: j.durasiTunda ?? 12, dasarHukum: j.dasarHukum ?? "",
+          tmtBerakhir: f.tmtBerakhir || (j.durasiHukdis > 0 && f.tmtMulai ? tmtBerakhirOtomatis(f.tmtMulai, j.durasiHukdis) : ""),
+        }));
+      }
       if (Array.isArray(peg)) setPegawai(peg);
       // Hanya regulasi yang masih relevan untuk input baru
       if (Array.isArray(reg)) setRegulasiList(reg.filter((r: RegulasiOpt) => r.status === "berlaku" || r.status === "dicabut_sebagian"));
@@ -157,13 +203,18 @@ export default function HukdisPage() {
     if (new Date(form.tmtBerakhir) < new Date(form.tmtMulai)) { setError("TMT berakhir tidak boleh sebelum TMT mulai"); return; }
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/pegawai/${selPeg.id}/hukdis`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
-      });
+      // Laporan UPT dicatat lewat pintunya sendiri agar laporannya ikut ditandai tercatat (ADR-016).
+      const res = dariLaporan
+        ? await fetch(`/api/hukdis/laporan/${dariLaporan.id}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aksi: "terima", ...form }),
+          })
+        : await fetch(`/api/pegawai/${selPeg.id}/hukdis`, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
+          });
       const d = await res.json() as any;
       if (!res.ok) { setError(d.error || "Gagal menyimpan hukdis"); return; }
       setShowInput(false);
-      setSuccess(`Hukdis untuk ${selPeg.nama} tersimpan.`);
+      setSuccess(dariLaporan ? `Laporan ${dariLaporan.satkerNama} dicatat: hukdis ${selPeg.nama} tersimpan.` : `Hukdis untuk ${selPeg.nama} tersimpan.`);
       setTimeout(() => setSuccess(""), 4000);
       fetchData();
     } catch { setError("Gagal menghubungi server"); }
@@ -185,6 +236,25 @@ export default function HukdisPage() {
       fetchData();
     } catch { setDelError("Gagal menghubungi server"); }
     finally { setDeleting(false); }
+  }
+
+  async function handleKembalikan() {
+    if (!kembalikan) return;
+    if (!catatanKembali.trim()) { setGalatKembali("Tulis apa yang perlu diperbaiki UPT."); return; }
+    setSibukKembali(true);
+    setGalatKembali("");
+    try {
+      const res = await fetch(`/api/hukdis/laporan/${kembalikan.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aksi: "kembalikan", catatan: catatanKembali }),
+      });
+      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) { setGalatKembali(d.error || "Laporan gagal dikembalikan."); return; }
+      setSuccess(`Laporan ${kembalikan.pegawai?.nama ?? ""} dikembalikan ke ${kembalikan.satkerNama}.`);
+      setTimeout(() => setSuccess(""), 5000);
+      setKembalikan(null);
+      fetchData();
+    } catch { setGalatKembali("Gagal menghubungi server"); }
+    finally { setSibukKembali(false); }
   }
 
   /** Sisa hari sampai TMT berakhir (tanggal berakhir ikut dihitung); null bila tanggal tidak terbaca. */
@@ -251,7 +321,7 @@ export default function HukdisPage() {
             <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
             Jenis hukdis
           </Link>
-          <button type="button" onClick={openInput} className="dsb-tombol">
+          <button type="button" onClick={() => openInput()} className="dsb-tombol">
             <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Input hukdis
           </button>
@@ -305,8 +375,50 @@ export default function HukdisPage() {
         </div>
       )}
 
+      {/* Laporan dari UPT (ADR-016) */}
+      {!laporanAktif && (
+        <div role="status" className="dsb-pesan" data-nada="kuning">
+          <p>Laporan hukuman disiplin dari UPT belum aktif: tabel <code>laporan_hukdis</code> belum dibuat. Jalankan migrasi <code>20260927100000_laporan_hukdis.sql</code> di Supabase.</p>
+        </div>
+      )}
+      {laporanUpt.length > 0 && (
+        <section id="laporan-upt" className="dsb-panel hkd-panel dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-labelledby="judul-laporan-upt">
+          <div className="dsb-panel-kepala">
+            <h2 id="judul-laporan-upt" className="dsb-panel-judul">
+              Laporan dari UPT <span className="hkd-lencana" aria-label={`${laporanUpt.length} menunggu`}>{laporanUpt.length}</span>
+            </h2>
+            <span className="dsb-kecil">Cocokkan dengan pindaian SK, lalu catat atau kembalikan</span>
+          </div>
+          <div className="hkd-laporan-daftar">
+            {laporanUpt.map((l) => (
+              <div key={l.id} className="hkd-laporan-baris">
+                <div className="min-w-0">
+                  <p className="dsb-nama truncate">{l.pegawai?.nama ?? "Pegawai tidak ditemukan"}</p>
+                  <p className="dsb-kecil truncate">{l.pegawai?.nip ?? "-"} · {l.satkerNama}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate" style={{ color: "var(--dtn)" }} title={l.jenisLabel}>{l.jenisLabel}</p>
+                  <p className="dsb-kecil truncate">SK {l.nomorSK ?? "-"} · {fmt(l.tanggalSK)}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="whitespace-nowrap">{fmt(l.tmtMulai)} – {l.tmtBerakhir ? fmt(l.tmtBerakhir) : "tanpa masa"}</p>
+                  <p className="dsb-kecil truncate" title={l.dilaporkanOleh ?? undefined}>dilaporkan {fmt(l.dilaporkanAt)}{l.keterangan ? ` · ${l.keterangan}` : ""}</p>
+                </div>
+                <span className="hkd-aksi">
+                  {l.berkas && (
+                    <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setPratinjauLaporan(l)}>Pindaian SK</button>
+                  )}
+                  <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" data-nada="merah" onClick={() => { setCatatanKembali(""); setGalatKembali(""); setKembalikan(l); }}>Kembalikan</button>
+                  <button type="button" className="dsb-tombol dsb-tombol-kecil" disabled={!l.pegawai} onClick={() => openInput(l)}>Catat</button>
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Daftar */}
-      <section className="dsb-panel dsb-penuh overflow-hidden dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-label="Daftar catatan hukdis">
+      <section className="dsb-panel dsb-penuh overflow-hidden dsb-muncul" style={{ "--i": 3 } as React.CSSProperties} aria-label="Daftar catatan hukdis">
         <div className="flex flex-col gap-3" style={{ padding: "14px 16px", borderBottom: "1px solid var(--ln2)" }}>
           <div className="dsb-segmen" role="group" aria-label="Saring masa berlaku" style={{ alignSelf: "flex-start" }}>
             {SARINGAN.map((s) => (
@@ -355,7 +467,7 @@ export default function HukdisPage() {
                   : "Tidak ada catatan yang cocok dengan saringan."}
             </p>
             {data.length === 0 && (
-              <button type="button" onClick={openInput} className="dsb-tombol dsb-tombol-kecil">Input hukdis pertama</button>
+              <button type="button" onClick={() => openInput()} className="dsb-tombol dsb-tombol-kecil">Input hukdis pertama</button>
             )}
           </div>
         ) : (
@@ -449,7 +561,7 @@ export default function HukdisPage() {
               <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "var(--navy-solid)" }}>
                 <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               </div>
-              <div className="flex-1"><h2 id="judul-input-hukdis" className="text-sm font-semibold leading-tight" style={{ color: "var(--dtn)" }}>Input Hukuman Disiplin</h2><p className="text-xs" style={{ color: "var(--dt4)" }}>Pilih pegawai lalu isi detail SK hukdis</p></div>
+              <div className="flex-1"><h2 id="judul-input-hukdis" className="text-sm font-semibold leading-tight" style={{ color: "var(--dtn)" }}>{dariLaporan ? "Catat laporan hukdis UPT" : "Input Hukuman Disiplin"}</h2><p className="text-xs" style={{ color: "var(--dt4)" }}>{dariLaporan ? `Dari ${dariLaporan.satkerNama}; periksa isian terhadap pindaian SK` : "Pilih pegawai lalu isi detail SK hukdis"}</p></div>
               <button onClick={() => setShowInput(false)} disabled={submitting} aria-label="Tutup" className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--ln2)", color: "var(--dt3)" }}><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
 
@@ -475,7 +587,11 @@ export default function HukdisPage() {
                   <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ background: "var(--sub)", border: "0.5px solid var(--ln1)" }}>
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ background: "var(--tint-navy)", color: "var(--dtn)" }}>{initials(selPeg.nama)}</div>
                     <div className="flex-1 min-w-0"><p className="text-xs font-semibold truncate" style={{ color: "var(--dtn)" }}>{selPeg.nama}</p><p className="text-xs" style={{ color: "var(--dt4)" }}>{selPeg.nip} · Gol. {selPeg.golonganRuang}</p></div>
-                    <button onClick={() => setSelPeg(null)} className="text-xs px-2 py-1 rounded-lg shrink-0" style={{ color: "var(--dt4)", border: "0.5px solid var(--ln1)" }}>Ganti</button>
+                    {dariLaporan ? (
+                      dariLaporan.berkas && <button type="button" onClick={() => setPratinjauLaporan(dariLaporan)} className="text-xs px-2 py-1 rounded-lg shrink-0" style={{ color: "var(--accent)", border: "0.5px solid var(--ln1)" }}>Pindaian SK</button>
+                    ) : (
+                      <button onClick={() => setSelPeg(null)} className="text-xs px-2 py-1 rounded-lg shrink-0" style={{ color: "var(--dt4)", border: "0.5px solid var(--ln1)" }}>Ganti</button>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>Jenis Hukuman Disiplin</label>
@@ -571,10 +687,40 @@ export default function HukdisPage() {
 
             <div className="flex gap-2 px-5 py-4 shrink-0" style={{ borderTop: "0.5px solid var(--ln2)" }}>
               <button onClick={() => setShowInput(false)} className="flex-1 text-xs py-2.5 rounded-xl" style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}>Batal</button>
-              <button onClick={handleSubmit} disabled={submitting || !selPeg} className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white disabled:opacity-50" style={{ background: "var(--navy-solid)" }}>{submitting ? "Menyimpan…" : "Simpan Hukdis"}</button>
+              <button onClick={handleSubmit} disabled={submitting || !selPeg} className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white disabled:opacity-50" style={{ background: "var(--navy-solid)" }}>{submitting ? "Menyimpan…" : dariLaporan ? "Catat hukdis" : "Simpan Hukdis"}</button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal kembalikan laporan UPT */}
+      {kembalikan && (
+        <div className="adm-overlay" onClick={() => !sibukKembali && setKembalikan(null)}>
+          <div ref={refModalKembali} role="dialog" aria-modal="true" aria-labelledby="judul-kembali-hukdis" tabIndex={-1} className="adm-modal outline-none" style={{ maxWidth: "26rem" }} onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <h2 id="judul-kembali-hukdis" className="text-sm font-semibold mb-1" style={{ color: "var(--dtn)" }}>Kembalikan laporan ke UPT?</h2>
+              <p className="text-xs mb-3 leading-relaxed" style={{ color: "var(--dt4)" }}>
+                Laporan <strong style={{ color: "var(--dtn)" }}>{kembalikan.jenisLabel}</strong> untuk <strong style={{ color: "var(--dtn)" }}>{kembalikan.pegawai?.nama ?? "pegawai ini"}</strong> dikembalikan ke {kembalikan.satkerNama}. Tidak ada yang dicatat; UPT memperbaikinya lalu mengirim ulang.
+              </p>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }} htmlFor="catatan-kembali-hukdis">Yang perlu diperbaiki</label>
+              <textarea id="catatan-kembali-hukdis" autoFocus rows={3} value={catatanKembali} onChange={(e) => setCatatanKembali(e.target.value)} placeholder="Mis. pindaian SK tidak terbaca, atau jenis hukuman tidak sesuai SK" className="adm-input resize-none mb-3" />
+              {galatKembali && <p role="alert" className="text-xs rounded-lg px-3 py-2 mb-3" style={{ background: "var(--tint-red-bg)", color: "var(--st-red)" }}>{galatKembali}</p>}
+              <div className="flex gap-2">
+                <button onClick={() => setKembalikan(null)} disabled={sibukKembali} className="flex-1 text-xs py-2.5 rounded-xl" style={{ border: "0.5px solid var(--ln1)", color: "var(--dt4)" }}>Batal</button>
+                <button onClick={handleKembalikan} disabled={sibukKembali} className="flex-1 text-xs py-2.5 rounded-xl font-semibold text-white disabled:opacity-50" style={{ background: "var(--navy-solid)" }}>{sibukKembali ? "Mengembalikan…" : "Kembalikan"}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pratinjauLaporan?.berkas && (
+        <ModalPratinjauBerkas
+          judul="SK hukuman disiplin"
+          subjudul={`${pratinjauLaporan.pegawai?.nama ?? "-"} · ${pratinjauLaporan.satkerNama}`}
+          url={pratinjauLaporan.berkas.url}
+          onTutup={() => setPratinjauLaporan(null)}
+        />
       )}
 
       {/* Modal Hapus */}

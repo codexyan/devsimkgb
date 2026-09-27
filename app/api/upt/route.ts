@@ -8,12 +8,14 @@ import { isoTanggalKalender, kunciBulanTmt, kunciTanggal, pilihKgbSiklus, rapela
 import { rekapPerSatker } from "@/lib/rekapSatker";
 import { kgbDitunda, pegawaiSatker, satkerAkunUpt, waktuUnggahSk } from "@/lib/aksesUpt";
 import { statusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
-import { BELUM_SELESAI, BIDANG_USULAN } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, namaAsliBerkas } from "@/lib/usulanPegawai";
+import { bawaanPegawai } from "@/lib/bawaanUsulan";
 import { SATKER } from "@/lib/satker";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { berhakKgb } from "@/lib/mutasiPegawai";
 import { muatKppnSatker } from "@/lib/muatKppnSatker";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
+import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
 
 /** Kolom hukdis yang dipakai di sini; sisanya sengaja tidak dibaca agar tidak ikut terkirim. */
 type HukdisBaris = { pegawaiId: string; berdampakKGB: boolean | null; tmtBerakhir: Date | null };
@@ -45,7 +47,7 @@ export async function GET() {
   const satker = SATKER.find((s) => s.kode === kode)!;
 
   const hariIni = hariIniWita();
-  const [semuaPegawai, semuaKgb, semuaSurat, semuaHukdis, usulanBerjalan] = await Promise.all([
+  const [semuaPegawai, semuaKgb, semuaSurat, semuaHukdis, usulanBerjalan, usulanDisetujui] = await Promise.all([
     db.pegawai.findMany(),
     db.riwayatKGB.findMany(),
     db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
@@ -53,6 +55,8 @@ export async function GET() {
     // Usulan yang sedang berjalan: menyiapkan atau mengirim usulan sudah menjadi pernyataan UPT
     // tentang pegawai itu, sehingga konfirmasi terpisah tidak diminta lagi.
     db.usulanPegawai.findMany({ where: { satker: kode, status: { in: BELUM_SELESAI } } }),
+    // Sumber SK dasar dan berkas yang terbawa ke usulan perbaikan berikutnya (lib/bawaanUsulan.ts).
+    db.usulanPegawai.findMany({ where: { status: "disetujui" } }) as Promise<UsulanPegawaiRow[]>,
   ]);
   const jenisUsulanPegawai = new Map<string, string>();
   for (const u of usulanBerjalan as { pegawaiId: string | null; status: string }[]) {
@@ -132,6 +136,18 @@ export async function GET() {
             return [bidang.kunci, String(nilai)];
           }),
         ) as Record<string, string>,
+        // SK dasar dan berkas yang sudah disetujui Kanwil; formulir perbaikan memakainya sebagai isian awal.
+        bawaan: (() => {
+          const b = bawaanPegawai(p, usulanDisetujui);
+          return {
+            nomorSkTerakhir: b.nomorSkTerakhir ?? "",
+            tanggalSkTerakhir: kunciTanggal(b.tanggalSkTerakhir) ?? "",
+            berkas: BERKAS_USULAN.flatMap((jenis) => {
+              const asal = jenis.kunci === "pathBerkas" ? undefined : b.berkas[jenis.kunci];
+              return asal ? [{ medan: jenis.medan, label: jenis.label, nama: namaAsliBerkas(asal.jalur), usulanId: asal.usulanId }] : [];
+            }),
+          };
+        })(),
       };
     })
     .sort((a, b) => (a.tmtKgb ?? "9999").localeCompare(b.tmtKgb ?? "9999") || a.nama.localeCompare(b.nama, "id"));

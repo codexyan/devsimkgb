@@ -27,12 +27,12 @@ Halaman **Usulan kolektif** (`/dashboard/upt/kolektif`, komponen `UsulanKolektif
 3. **Simpan semua.** Hanya baris yang berubah atau diberi berkas yang disimpan.
    - Penyimpanan berjalan berurutan lewat rute yang sama dengan formulir perorangan (POST/PATCH
      `/api/upt/usulan`), sehingga pemeriksaan dan aturan kelengkapannya tidak berbeda.
-   - Laporan hukdis pada draf yang ada dipertahankan.
+   - Laporan hukdis pada draf yang ada dipertahankan (sejak ADR-016 laporan baru lewat modul Hukuman Disiplin).
    - Galat ditampilkan per baris.
 4. **Ajukan dengan satu surat** dari layar yang sama. Draf yang lengkap otomatis dicentang, dan yang kurang
    disebut kekurangannya.
 
-Laporan hukuman disiplin tetap diisi lewat formulir perorangan.
+Laporan hukuman disiplin kini lewat modul Hukuman Disiplin UPT (ADR-016).
 
 ## Akibat
 

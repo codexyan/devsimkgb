@@ -29,6 +29,8 @@ export const TIPE_NOTIFIKASI = {
   USULAN_REVISI: "usulan_revisi",
   MUTASI_UPT: "mutasi_upt",
   MUTASI_DIKEMBALIKAN: "mutasi_dikembalikan",
+  HUKDIS_UPT: "hukdis_upt",
+  HUKDIS_DIKEMBALIKAN: "hukdis_dikembalikan",
 } as const;
 
 const T = TIPE_NOTIFIKASI;
@@ -44,12 +46,13 @@ export function tipeNotifikasiUntukRole(role: string | null | undefined): readon
     case "sdm_kgb":
       return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.FOLLOWUP_KEUANGAN, T.HUKDIS_BERAKHIR, T.KGB_PERLU_DITINJAU, T.USULAN_UPT, T.MUTASI_UPT];
     case "sdm_hukdis":
-      return [T.HUKDIS_BERAKHIR];
+      // Laporan hukdis dari UPT ditinjau SDM Hukdis, bukan Tim SDM KGB (ADR-016).
+      return [T.HUKDIS_BERAKHIR, T.HUKDIS_UPT];
     case "keuangan":
       return [T.SK_MENUNGGU_KEUANGAN, T.KGB_PERLU_DITINJAU];
     case "admin_upt":
       // Disaring lagi per satker oleh GET /api/notifikasi; di sini hanya jenisnya yang dibatasi.
-      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT, T.USULAN_REVISI, T.MUTASI_DIKEMBALIKAN];
+      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT, T.USULAN_REVISI, T.MUTASI_DIKEMBALIKAN, T.HUKDIS_DIKEMBALIKAN];
     default:
       return [];
   }
@@ -251,6 +254,50 @@ export function notifikasiMutasiDikembalikan(
     prioritas: "warning",
     linkHref: "/dashboard",
     kategori: "pegawai",
+  };
+}
+
+/**
+ * Isi notifikasi untuk laporan hukuman disiplin dari UPT (ADR-016). Rujukannya id laporan; peninjaunya
+ * SDM Hukdis dan Super Admin, yang melihat seluruh satker.
+ */
+export function notifikasiHukdisUpt(
+  laporan: { id: string; labelJenis: string; satker: string | null },
+  pegawai: { nama: string | null; nip: string | null } | null | undefined,
+): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
+  const nama = pegawai?.nama?.trim() || "-";
+  const nip = pegawai?.nip?.trim() || "-";
+  return {
+    judul: `Laporan Hukdis UPT: ${nama}`,
+    pesan:
+      `${laporan.satker ?? "UPT"} melaporkan hukuman disiplin ${laporan.labelJenis.toLowerCase()} untuk ${nama} (${nip}). ` +
+      "Cocokkan dengan pindaian SK-nya lalu catat, sebab hukuman yang menunda KGB baru menggeser jadwal setelah dicatat.",
+    tipe: T.HUKDIS_UPT,
+    referenceId: laporan.id,
+    prioritas: "warning",
+    linkHref: "/dashboard/hukdis#laporan-upt",
+    kategori: "hukdis",
+  };
+}
+
+/**
+ * Isi notifikasi untuk laporan hukdis yang dikembalikan ke UPT. Rujukannya id pegawai, supaya penyaringan
+ * per satker di GET /api/notifikasi langsung berlaku.
+ */
+export function notifikasiHukdisDikembalikan(
+  pegawai: { id: string; nama: string | null; nip: string | null },
+  catatan: string,
+): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
+  const nama = pegawai.nama?.trim() || "-";
+  const nip = pegawai.nip?.trim() || "-";
+  return {
+    judul: `Laporan Hukdis Dikembalikan: ${nama}`,
+    pesan: `Kanwil mengembalikan laporan hukuman disiplin ${nama} (${nip}) untuk diperbaiki: ${catatan}`,
+    tipe: T.HUKDIS_DIKEMBALIKAN,
+    referenceId: pegawai.id,
+    prioritas: "warning",
+    linkHref: "/dashboard/upt/hukdis",
+    kategori: "hukdis",
   };
 }
 

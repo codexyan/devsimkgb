@@ -5,8 +5,9 @@ import { newId } from "@/lib/sheets/id";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { TIPE_NOTIFIKASI, notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
-import { DIPEGANG_UPT, kekuranganUsulan } from "@/lib/usulanPegawai";
-import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, simpanBerkasUsulan } from "@/lib/berkasUsulan";
+import { DIPEGANG_UPT, kekuranganUsulan, pernahKgb } from "@/lib/usulanPegawai";
+import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan, type BawaanUsulan } from "@/lib/bawaanUsulan";
+import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
@@ -69,10 +70,18 @@ export async function POST(req: Request) {
   const pegawaiPerId = new Map(
     ((await db.pegawai.findMany()) as PegawaiRow[]).map((p) => [p.id, p]),
   );
+  // Berkas yang sudah disetujui untuk pegawainya ikut dihitung, lalu disalin saat dikirim (ADR-017).
+  const disetujui = (await db.usulanPegawai.findMany({ where: { status: "disetujui" } })) as UsulanPegawaiRow[];
+  const bawaanPerUsulan = new Map<string, BawaanUsulan>();
+  for (const u of draf) {
+    const pegawai = u.pegawaiId ? pegawaiPerId.get(u.pegawaiId) : null;
+    if (pegawai && u.jenis === "perubahan") bawaanPerUsulan.set(u.id, bawaanPegawai(pegawai, disetujui));
+  }
   const belumLengkap: { nama: string; kurang: string[] }[] = [];
   for (const u of draf) {
     const pegawai = u.pegawaiId ? pegawaiPerId.get(u.pegawaiId) : null;
-    const kurang = kekuranganUsulan(u, u.jenis, pegawai);
+    const bawaan = bawaanPerUsulan.get(u.id);
+    const kurang = kekuranganUsulan(bawaan ? denganBerkasBawaan(u, bawaan) : u, u.jenis, pegawai);
     if (kurang.length > 0) belumLengkap.push({ nama: pegawai?.nama ?? u.nama ?? u.nip ?? "-", kurang });
   }
   if (belumLengkap.length > 0)
@@ -95,9 +104,17 @@ export async function POST(req: Request) {
   for (const u of draf) {
     const pegawai = u.pegawaiId ? pegawaiPerId.get(u.pegawaiId) : null;
     const nama = pegawai?.nama ?? u.nama ?? "-";
+    const bawaan = bawaanPerUsulan.get(u.id);
+    const salinan = bawaan
+      ? await salinBerkasBawaan(
+          berkasPerluDisalin(u, bawaan, pernahKgb(u.mkgTahun ?? pegawai?.mkgTahun, u.mkgBulan ?? pegawai?.mkgBulan)),
+          kode,
+        )
+      : {};
     await db.usulanPegawai.update(
       { id: u.id },
       {
+        ...salinan,
         status: "menunggu",
         nomorSurat,
         tanggalSurat,

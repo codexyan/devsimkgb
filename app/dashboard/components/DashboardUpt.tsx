@@ -45,6 +45,8 @@ interface PegawaiUpt {
   /** "draf", "menunggu", atau "revisi" bila ada usulan berjalan. */
   usulanBerjalan?: string | null;
   dataSekarang: Record<string, string>;
+  /** SK dasar dan berkas yang sudah disetujui Kanwil; terbawa ke usulan perbaikan berikutnya. */
+  bawaan?: PegawaiUntukUsulan["bawaan"];
 }
 
 /**
@@ -336,7 +338,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   function bukaUsulan(p: PegawaiUpt) {
     setFormulir({
       jenis: "perubahan",
-      pegawai: { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang },
+      pegawai: { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan },
       draf: drafPegawai(p.id),
     });
   }
@@ -349,7 +351,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     const p = (data?.pegawai ?? []).find((x) => x.id === u.pegawaiId) ?? null;
     setFormulir({
       jenis: u.jenis === "baru" ? "baru" : "perubahan",
-      pegawai: p ? { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang } : null,
+      pegawai: p ? { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan } : null,
       draf: u,
     });
   }
@@ -590,7 +592,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               ))}
             </div>
             {/* Satu-satunya tempat menambah pegawai: pegawai baru tersimpan sebagai draf di Perlu dikerjakan. */}
-            <span className="upt-aksi" style={{ marginLeft: "auto" }}>
+            <span className="upt-deret" style={{ marginLeft: "auto" }}>
               <Link href="/dashboard/upt/kolektif" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" title="Siapkan banyak pegawai untuk satu surat Srikandi sekaligus">
                 Usulan kolektif
               </Link>
@@ -1210,7 +1212,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           <h2 className="dsb-panel-judul">
             Alur KGB <small>tiap pegawai berada di kolom tahapnya</small>
           </h2>
-          <span className="upt-aksi" style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
+          <span className="upt-deret" style={{ marginLeft: "auto" }}>
             <Link href="/dashboard/upt/riwayat" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">Riwayat</Link>
             <Link href="/dashboard/upt/pegawai" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">
               Data pegawai ({pegawai.length})

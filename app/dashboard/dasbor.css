@@ -2002,6 +2002,8 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
    ditumpuk menjadi blok di layar sempit, agar tidak menempel pada teks status. */
 .upt-aksi { display: block; margin-top: 6px; }
 .upt-aksi + .upt-aksi { margin-top: 4px; }
+/* Deretan tombol pada bilah alat dan kepala panel UPT: sejajar dengan jarak tetap, turun baris di layar sempit. */
+.upt-deret { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 /* ── Usulan UPT: daftar per surat dan panel detail (ADR-014) ──────────── */
 .usl-kepala-halaman { align-items: center; }
@@ -2227,3 +2229,36 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 .kol-wajib::after { content: "*"; margin-left: 3px; font-weight: 700; color: var(--st-red); }
 .kol-tabel select.kol-keadaan { min-width: 128px; }
 .kol-surat { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; padding: 12px 16px; border-top: 1px solid var(--ln2); }
+
+/* ── Hukdis UPT (ADR-016) ─────────────────────────────────────────────────────────────────────
+   Modul laporan hukuman disiplin Admin UPT dan panel "Laporan dari UPT" di modul Hukdis Kanwil. */
+.hkd-panel { overflow: hidden; }
+.hkd-aksi { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.hkd-laporan-daftar { display: flex; flex-direction: column; }
+.hkd-laporan-baris {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.3fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ln2);
+}
+.hkd-laporan-baris:last-child { border-bottom: 0; }
+.hkd-laporan-baris p { margin: 0; }
+.hkd-lencana {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--st-amber);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+@media (max-width: 760px) {
+  .hkd-laporan-baris { grid-template-columns: minmax(0, 1fr); }
+  .hkd-aksi { justify-content: flex-start; }
+}

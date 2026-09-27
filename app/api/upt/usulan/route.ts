@@ -6,10 +6,11 @@ import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
 import { pegawaiSatker } from "@/lib/aksesUpt";
-import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgb, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
+import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan } from "@/lib/bawaanUsulan";
 import { bacaIsianUsulan, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
-import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, simpanBerkasUsulan } from "@/lib/berkasUsulan";
+import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
 import { bentrokNipUsulan } from "@/lib/nipUsulan";
@@ -44,6 +45,8 @@ export async function GET() {
   const daftar = semuaUsulan
     .map((u) => {
       const p = u.pegawaiId ? pegawaiById.get(u.pegawaiId) : null;
+      // Berkas yang sudah disetujui ikut terbawa saat disimpan atau diajukan, jadi kelengkapannya ikut dihitung.
+      const lengkapiBawaan = p && u.jenis === "perubahan" ? denganBerkasBawaan(u, bawaanPegawai(p, semuaUsulan)) : u;
       return {
         id: u.id,
         pegawaiId: u.pegawaiId,
@@ -61,7 +64,7 @@ export async function GET() {
           ? null
           : u.jenis === "baru" ? BIDANG_USULAN.length : p ? bandingkanUsulan(p, u).length : 0,
         // Apa yang masih kurang sebelum draf ini boleh diajukan; kosong berarti siap.
-        kekurangan: DIPEGANG_UPT.includes(u.status) ? kekuranganUsulan(u, u.jenis, p) : [],
+        kekurangan: DIPEGANG_UPT.includes(u.status) ? kekuranganUsulan(lengkapiBawaan, u.jenis, p) : [],
         // Isi dikirim utuh agar formulirnya dapat dilanjutkan, baik draf maupun usulan yang
         // dikembalikan Kanwil; usulan yang sedang ditinjau atau sudah selesai tidak perlu.
         nilai: DIPEGANG_UPT.includes(u.status) ? nilaiFormulir(u) : null,
@@ -190,8 +193,26 @@ export async function POST(req: Request) {
   const isian = isiHitungan(dibaca.isian, dasar);
   const hukdisAda = teks("hukdisAda") === "true";
 
+  // Berkas yang sudah disetujui Kanwil untuk pegawai ini ikut terbawa bila tidak diunggah ulang (ADR-017).
+  const bawaan = dasar
+    ? bawaanPegawai(dasar, (await db.usulanPegawai.findMany({ where: { pegawaiId: dasar.id, status: "disetujui" } })) as UsulanPegawaiRow[])
+    : null;
+  const pernah = pernahKgb(isian.mkgTahun ?? dasar?.mkgTahun, isian.mkgBulan ?? dasar?.mkgBulan);
+
   if (!draf) {
-    const kurang = kekuranganUsulan({ ...isian, nip: nipBaru, nama: isian.nama ?? null }, jenis, dasar);
+    const kurang = kekuranganUsulan(
+      {
+        ...denganBerkasBawaan(isian, bawaan ?? { nomorSkTerakhir: null, tanggalSkTerakhir: null, berkas: {} }),
+        // Berkas yang diunggah bersama permintaan ini dihitung ada; objeknya baru disimpan setelah semua lolos.
+        ...Object.fromEntries(
+          BERKAS_USULAN.filter((b) => { const f = form.get(b.medan); return f instanceof File && f.size > 0; }).map((b) => [b.kunci, b.medan]),
+        ),
+        nip: nipBaru,
+        nama: isian.nama ?? null,
+      },
+      jenis,
+      dasar,
+    );
     if (kurang.length > 0)
       return NextResponse.json({ error: `Belum lengkap: ${kurang.join(", ")}.` }, { status: 400 });
     if (jenis === "perubahan" && dasar && usulanKosong(dasar, { ...isian, hukdisAda }))
@@ -211,6 +232,10 @@ export async function POST(req: Request) {
   // Berkas disimpan setelah semua pemeriksaan lolos, agar permintaan yang ditolak tidak meninggalkan objek di R2.
   const berkas = await simpanBerkasUsulan(form, kode);
   if ("galat" in berkas) return berkas.galat;
+  if (bawaan) {
+    const dihapus = new Set(form.getAll("hapusBerkas").map(String));
+    Object.assign(berkas.jalur, await salinBerkasBawaan(berkasPerluDisalin(berkas.jalur, bawaan, pernah, dihapus), kode));
+  }
 
   const baris: UsulanPegawaiRow = {
     id: newId(),

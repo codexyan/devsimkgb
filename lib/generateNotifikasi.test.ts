@@ -169,7 +169,7 @@ test("SK menunggu keuangan dibuat sekali per KGB dan ditandai dibaca setelah dik
 test("tipe notifikasi per role", () => {
   assert.equal(tipeNotifikasiUntukRole("superAdminCore"), null);
   assert.deepEqual(tipeNotifikasiUntukRole("keuangan"), ["sk_menunggu_keuangan", "kgb_perlu_ditinjau"]);
-  assert.deepEqual(tipeNotifikasiUntukRole("sdm_hukdis"), ["hukdis_berakhir"]);
+  assert.deepEqual(tipeNotifikasiUntukRole("sdm_hukdis"), ["hukdis_berakhir", "hukdis_upt"]);
   assert.equal(bolehLihatNotifikasi("keuangan", "rapelan"), false);
   assert.equal(bolehLihatNotifikasi("keuangan", "followup_keuangan"), false);
   assert.equal(bolehLihatNotifikasi("sdm_kgb", "followup_keuangan"), true);
@@ -224,8 +224,11 @@ test("SK yang baru dikonfirmasi keuangan dikabarkan sekali", () => {
 
 test("Admin UPT hanya menerima pengingat KGB, kabar SK terbit, dan yang dikembalikan kepadanya", () => {
   assert.deepEqual(tipeNotifikasiUntukRole("admin_upt"), [
-    "kgb_jatuh_tempo", "rapelan", "sk_terbit", "usulan_revisi", "mutasi_dikembalikan",
+    "kgb_jatuh_tempo", "rapelan", "sk_terbit", "usulan_revisi", "mutasi_dikembalikan", "hukdis_dikembalikan",
   ]);
+  // Laporan hukdis yang masih menunggu adalah urusan SDM Hukdis Kanwil (ADR-016).
+  assert.equal(bolehLihatNotifikasi("admin_upt", "hukdis_upt"), false);
+  assert.equal(bolehLihatNotifikasi("sdm_kgb", "hukdis_upt"), false);
   assert.equal(bolehLihatNotifikasi("admin_upt", "sk_terbit"), true);
   assert.equal(bolehLihatNotifikasi("admin_upt", "usulan_revisi"), true);
   assert.equal(bolehLihatNotifikasi("admin_upt", "mutasi_dikembalikan"), true);

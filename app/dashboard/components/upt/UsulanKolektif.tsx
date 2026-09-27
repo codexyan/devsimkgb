@@ -13,8 +13,8 @@ import { formatTanggalId, hariIniWita } from "@/lib/waktu";
    perbaikan data, dan kelengkapan berkas sekaligus. Halaman ini menyiapkan semuanya dalam satu tabel: pilih
    pegawai, ubah yang keliru, lampirkan berkas per baris, simpan sekaligus sebagai draf, lalu ajukan dengan satu
    surat. Tiap baris tetap disimpan lewat rute yang sama dengan formulir perorangan (POST/PATCH
-   /api/upt/usulan), sehingga aturan kelengkapan dan pemeriksaannya tidak berbeda. Laporan hukuman disiplin
-   tetap lewat formulir perorangan. */
+   /api/upt/usulan), sehingga aturan kelengkapan dan pemeriksaannya tidak berbeda. SK dasar dan berkas yang
+   sudah disetujui Kanwil ikut terbawa (lib/bawaanUsulan.ts); laporan hukuman disiplin lewat modulnya sendiri. */
 
 interface PegawaiUpt {
   id: string;
@@ -26,6 +26,15 @@ interface PegawaiUpt {
   statusKGB: string | null;
   usulanBerjalan?: string | null;
   dataSekarang: Record<string, string>;
+  bawaan?: { nomorSkTerakhir: string; tanggalSkTerakhir: string; berkas: BerkasTersimpan[] };
+}
+
+interface BerkasTersimpan {
+  medan: string;
+  label: string;
+  nama?: string | null;
+  /** Terisi bila berkasnya bawaan dari usulan yang sudah disetujui, belum milik draf ini. */
+  usulanId?: string;
 }
 
 interface DrafUpt {
@@ -56,8 +65,9 @@ interface Baris {
   isian: Record<string, string>;
   pernah: boolean;
   berkas: Record<string, File | null>;
-  tersimpan: { medan: string; label: string; nama?: string | null }[];
-  hukdis: DrafUpt["hukdis"];
+  tersimpan: BerkasTersimpan[];
+  /** Berkas yang sudah disetujui Kanwil; disalin server ke draf bila kolomnya masih kosong. */
+  bawaan: BerkasTersimpan[];
   catatanUpt: string;
   keadaan: Keadaan;
   pesan: string | null;
@@ -68,11 +78,13 @@ const KOLOM_TABEL = ["golonganRuang", "mkgTahun", "mkgBulan", "tmtKgbTerakhir", 
 
 function barisDari(p: PegawaiUpt | null, d: DrafUpt | null): Baris {
   const data = d?.nilai ?? p?.dataSekarang ?? {};
+  // SK dasar draf lebih dulu; bila kosong, yang sudah disetujui Kanwil sehingga tidak perlu diketik ulang.
+  const skDraf = d?.surat?.nomorSkTerakhir?.trim() ? d.surat : null;
   const awal: Record<string, string> = {
     ...data,
     tmtKgbTerakhir: data.tmtKgbTerakhir || data.tmtGolongan || "",
-    nomorSkTerakhir: d?.surat?.nomorSkTerakhir ?? "",
-    tanggalSkTerakhir: d?.surat?.tanggalSkTerakhir ?? "",
+    nomorSkTerakhir: skDraf?.nomorSkTerakhir ?? p?.bawaan?.nomorSkTerakhir ?? "",
+    tanggalSkTerakhir: skDraf ? skDraf.tanggalSkTerakhir : (d?.surat?.tanggalSkTerakhir || p?.bawaan?.tanggalSkTerakhir || ""),
   };
   return {
     kunci: d ? `draf:${d.id}` : `pegawai:${p!.id}`,
@@ -86,7 +98,7 @@ function barisDari(p: PegawaiUpt | null, d: DrafUpt | null): Baris {
     pernah: pernahKgb(awal.mkgTahun, awal.mkgBulan),
     berkas: {},
     tersimpan: d?.berkas ?? [],
-    hukdis: d?.hukdis ?? null,
+    bawaan: p?.bawaan?.berkas ?? [],
     catatanUpt: d?.surat?.catatanUpt ?? "",
     keadaan: "siap",
     pesan: null,
@@ -187,15 +199,7 @@ export default function UsulanKolektif() {
     form.set("nomorSkTerakhir", b.isian.nomorSkTerakhir ?? "");
     form.set("tanggalSkTerakhir", b.isian.tanggalSkTerakhir ?? "");
     form.set("catatanUpt", b.catatanUpt);
-    // Laporan hukuman disiplin pada draf yang sudah ada dipertahankan; menambahkannya lewat formulir perorangan.
-    form.set("hukdisAda", String(!!b.hukdis?.ada));
-    if (b.hukdis?.ada) {
-      form.set("hukdisJenis", b.hukdis.jenis);
-      form.set("hukdisNomorSk", b.hukdis.nomorSk);
-      form.set("hukdisTmtMulai", b.hukdis.tmtMulai);
-      form.set("hukdisTmtBerakhir", b.hukdis.tmtBerakhir);
-      form.set("hukdisKeterangan", b.hukdis.keterangan);
-    }
+    // Isian hukdis sengaja tidak dikirim: laporan lama pada draf dibiarkan utuh oleh server (ADR-016).
     for (const [medan, file] of Object.entries(b.berkas)) if (file) form.set(medan, file);
     return form;
   }
@@ -236,6 +240,9 @@ export default function UsulanKolektif() {
     const du = (await ru.json().catch(() => [])) as DrafUpt[];
     if (Array.isArray(du)) {
       setDraf(du);
+      // Berkas yang baru diunggah atau disalin dari bawaan kini milik draf; kolomnya menampilkan yang tersimpan.
+      const perId = new Map(du.map((d) => [d.id, d]));
+      setBaris((lama) => lama?.map((x) => (x.drafId && perId.has(x.drafId) ? { ...x, tersimpan: perId.get(x.drafId)!.berkas } : x)) ?? null);
       const idSesi = new Set([...idTersimpan, ...baris.map((b) => b.drafId).filter((id): id is string => !!id)]);
       setPilihAjukan(new Set(du.filter((d) => idSesi.has(d.id) && d.kekurangan.length === 0).map((d) => d.id)));
     }
@@ -315,7 +322,7 @@ export default function UsulanKolektif() {
           <h2 id="judul-pilih-kolektif" className="dsb-panel-judul">
             1. Pilih pegawai <small>{terpilih.size} dipilih{drafBaru.length > 0 ? ` · ${drafBaru.length} pegawai baru ikut otomatis` : ""}</small>
           </h2>
-          <span className="upt-aksi">
+          <span className="upt-deret">
             <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setTerpilih(new Set(jatuhTempo.map((p) => p.id)))} disabled={jatuhTempo.length === 0}>
               KGB {namaBulan(bulanUsulan)} ({jatuhTempo.length})
             </button>
@@ -438,15 +445,15 @@ export default function UsulanKolektif() {
                       <td>
                         <div className="kol-berkas">
                           {berkasUntukKeadaan(b.pernah).map((jenis) => {
-                            const ada = b.tersimpan.find((t) => t.medan === jenis.medan);
+                            const ada = b.tersimpan.find((t) => t.medan === jenis.medan) ?? b.bawaan.find((t) => t.medan === jenis.medan);
                             const dipilih = b.berkas[jenis.medan];
                             return (
-                              <label key={jenis.medan} className="kol-berkas-butir" data-isi={dipilih || ada ? "" : undefined} title={dipilih?.name ?? ada?.nama ?? jenis.keterangan}>
+                              <label key={jenis.medan} className="kol-berkas-butir" data-isi={dipilih || ada ? "" : undefined} title={dipilih?.name ?? (ada ? `${ada.nama ?? jenis.label}${ada.usulanId ? " · dari usulan yang disetujui Kanwil, ikut terbawa saat disimpan" : ""}` : jenis.keterangan)}>
                                 <span>
                                   {jenis.label}
                                   {jenis.wajib && <span className="kol-wajib" aria-hidden="true" />}
                                 </span>
-                                <span className="kol-berkas-nama">{dipilih ? dipilih.name : ada ? (ada.nama ?? "tersimpan") : "pilih PDF"}</span>
+                                <span className="kol-berkas-nama">{dipilih ? dipilih.name : ada ? `${ada.nama ?? "tersimpan"}${ada.usulanId ? " (disetujui)" : ""}` : "pilih PDF"}</span>
                                 <input type="file" accept="application/pdf" className="sr-only" onChange={(e) => pilihBerkas(b.kunci, jenis.medan, e.target.files?.[0] ?? null)} />
                               </label>
                             );
@@ -470,7 +477,7 @@ export default function UsulanKolektif() {
             </table>
           </div>
           <div className="dsb-kaki">
-            <span>Berkas PDF paling besar 1 MB per berkas. Laporan hukuman disiplin diisi lewat formulir perorangan.</span>
+            <span>Berkas PDF paling besar 1 MB per berkas. Berkas bertanda (disetujui) ikut dari usulan terdahulu; pilih PDF baru untuk menggantinya.</span>
             <button type="button" className="dsb-tombol" onClick={() => void simpanSemua()} disabled={menyimpan || jumlahBerubah === 0}>
               {menyimpan ? "Menyimpan…" : `Simpan ${jumlahBerubah} draf`}
             </button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import KolomBerkas from "./KolomBerkas";
 import { BERKAS_USULAN, berkasUntukKeadaan, hitungUsulan, pernahKgb as sudahPernahKgb } from "@/lib/usulanPegawai";
@@ -32,11 +33,19 @@ export interface DrafUsulanUpt {
   berkas: { medan: string; label: string; nama?: string | null }[];
 }
 
+/** SK dasar dan berkas yang sudah disetujui Kanwil untuk pegawai ini (lib/bawaanUsulan.ts). */
+export interface BawaanUsulanUpt {
+  nomorSkTerakhir: string;
+  tanggalSkTerakhir: string;
+  berkas: { medan: string; label: string; nama?: string | null; usulanId: string }[];
+}
+
 export interface PegawaiUntukUsulan {
   id: string;
   nama: string;
   nip: string;
   dataSekarang: Record<string, string>;
+  bawaan?: BawaanUsulanUpt;
 }
 
 /**
@@ -45,7 +54,6 @@ export interface PegawaiUntukUsulan {
  */
 const BERKAS_PEGAWAI = BERKAS_USULAN.filter((b) => b.keadaan !== "pengajuan");
 
-const HUKDIS_KOSONG = { ada: false, jenis: "", nomorSk: "", tmtMulai: "", tmtBerakhir: "", keterangan: "" };
 const SK_KOSONG = { nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" };
 
 /** Isian identitas; sisanya dikelompokkan sendiri karena punya pemandu. */
@@ -139,12 +147,14 @@ export default function FormulirUsulan({
     nip: tersimpan.nip || pegawai?.nip || (draf?.nip && draf.nip !== "-" ? draf.nip : ""),
   };
   const [isian, setIsian] = useState<Record<string, string>>({ ...awal });
+  // SK dasar yang sudah disetujui Kanwil menjadi isian awal, agar tidak diketik ulang pada tiap perbaikan.
+  const bawaan = jenis === "perubahan" ? pegawai?.bawaan : undefined;
+  const skDraf = draf?.surat?.nomorSkTerakhir?.trim() ? draf.surat : null;
   const [sk, setSk] = useState({
-    nomorSkTerakhir: draf?.surat?.nomorSkTerakhir ?? "",
-    tanggalSkTerakhir: draf?.surat?.tanggalSkTerakhir ?? "",
+    nomorSkTerakhir: skDraf?.nomorSkTerakhir ?? bawaan?.nomorSkTerakhir ?? "",
+    tanggalSkTerakhir: skDraf ? skDraf.tanggalSkTerakhir : (draf?.surat?.tanggalSkTerakhir || bawaan?.tanggalSkTerakhir || ""),
     catatanUpt: draf?.surat?.catatanUpt ?? "",
   });
-  const [hukdis, setHukdis] = useState(draf?.hukdis ?? HUKDIS_KOSONG);
   const [berkas, setBerkas] = useState<Record<string, File | null>>({});
   // Berkas tersimpan yang ditandai operator untuk dihapus; dihapus server saat data disimpan.
   const [hapusTersimpan, setHapusTersimpan] = useState<Set<string>>(() => new Set());
@@ -218,18 +228,11 @@ export default function FormulirUsulan({
       form.set("nomorSkTerakhir", sk.nomorSkTerakhir);
       form.set("tanggalSkTerakhir", sk.tanggalSkTerakhir);
       form.set("catatanUpt", sk.catatanUpt);
-      form.set("hukdisAda", String(hukdis.ada));
-      if (hukdis.ada) {
-        form.set("hukdisJenis", hukdis.jenis);
-        form.set("hukdisNomorSk", hukdis.nomorSk);
-        form.set("hukdisTmtMulai", hukdis.tmtMulai);
-        form.set("hukdisTmtBerakhir", hukdis.tmtBerakhir);
-        form.set("hukdisKeterangan", hukdis.keterangan);
-      }
       for (const b of BERKAS_PEGAWAI) {
         const isi = berkas[b.medan];
         if (isi) form.set(b.medan, isi);
-        else if (draf && hapusTersimpan.has(b.medan)) form.append("hapusBerkas", b.medan);
+        // Termasuk berkas bawaan yang ditolak operator, agar server tidak menyalinnya.
+        else if (hapusTersimpan.has(b.medan)) form.append("hapusBerkas", b.medan);
       }
 
       const res = draf
@@ -533,58 +536,18 @@ export default function FormulirUsulan({
         </div>
       </div>
 
-      {/* ── Hukuman disiplin ──────────────────────────────────────────── */}
-      <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
-        <div className="kgbm-bagian-kepala">
-          <p className="kgbm-bagian-judul">Hukuman disiplin</p>
-          <p className="kgbm-bagian-ket">Hanya laporan; penetapannya tetap dicatat Kanwil di modul Hukuman Disiplin</p>
-        </div>
-        <div className="kgbm-bagian-isi">
-          <label className="kgbm-label" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <input
-              type="checkbox"
-              className="dsb-cek"
-              checked={hukdis.ada}
-              onChange={(e) => setHukdis((f) => ({ ...f, ada: e.target.checked }))}
-            />
-            Pegawai ini sedang atau pernah menjalani hukuman disiplin yang belum dilaporkan
-          </label>
-          {hukdis.ada && (
-            <>
-              <div className="kgbm-grid2">
-                <label className="kgbm-label">
-                  Jenis hukuman
-                  <input
-                    className="kgbm-input"
-                    value={hukdis.jenis}
-                    onChange={(e) => setHukdis((f) => ({ ...f, jenis: e.target.value }))}
-                    placeholder="Penundaan kenaikan gaji berkala"
-                  />
-                </label>
-                <label className="kgbm-label">
-                  Nomor SK hukuman
-                  <input
-                    className="kgbm-input"
-                    value={hukdis.nomorSk}
-                    onChange={(e) => setHukdis((f) => ({ ...f, nomorSk: e.target.value }))}
-                  />
-                </label>
-                <IsianTanggal label="TMT mulai" nilai={hukdis.tmtMulai} onUbah={(v) => setHukdis((f) => ({ ...f, tmtMulai: v }))} />
-                <IsianTanggal label="TMT berakhir" nilai={hukdis.tmtBerakhir} onUbah={(v) => setHukdis((f) => ({ ...f, tmtBerakhir: v }))} />
-              </div>
-              <label className="kgbm-label">
-                Keterangan
-                <textarea
-                  className="kgbm-input"
-                  rows={2}
-                  value={hukdis.keterangan}
-                  onChange={(e) => setHukdis((f) => ({ ...f, keterangan: e.target.value }))}
-                />
-              </label>
-            </>
-          )}
-        </div>
-      </div>
+      {/* ── Hukuman disiplin: kini lewat modulnya sendiri (ADR-016) ───── */}
+      {draf?.hukdis?.ada ? (
+        <Catatan nada="amber">
+          Draf ini masih memuat laporan hukuman disiplin dari formulir lama, dan laporan itu tetap ikut terkirim.
+          Laporan hukuman disiplin yang baru disampaikan lewat menu <Link href="/dashboard/upt/hukdis">Hukuman Disiplin</Link>.
+        </Catatan>
+      ) : (
+        <p className="kgbm-legenda">
+          Hukuman disiplin tidak lagi dilaporkan di sini. Gunakan menu <Link href="/dashboard/upt/hukdis">Hukuman Disiplin</Link>{" "}
+          beserta pindaian SK hukumannya; Tim SDM Hukdis Kanwil yang meninjau dan mencatatnya.
+        </p>
+      )}
 
       {/* ── Berkas ────────────────────────────────────────────────────── */}
       <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
@@ -596,6 +559,8 @@ export default function FormulirUsulan({
           {berkasUntukKeadaan(pernahKgb).map((b) => {
             const wajib = b.wajib;
             const simpanan = draf?.berkas.find((x) => x.medan === b.medan) ?? null;
+            // Tanpa berkas sendiri, berkas terakhir yang disetujui Kanwil ikut terbawa saat disimpan.
+            const dariBawaan = simpanan ? null : (bawaan?.berkas.find((x) => x.medan === b.medan) ?? null);
             return (
               <KolomBerkas
                 key={b.medan}
@@ -603,8 +568,14 @@ export default function FormulirUsulan({
                 wajib={wajib}
                 bantuan={b.keterangan}
                 dipilih={berkas[b.medan] ?? null}
-                urlTersimpan={draf && simpanan ? `/api/usulan/${draf.id}/berkas?berkas=${b.medan}` : null}
-                namaTersimpan={simpanan?.nama ?? null}
+                urlTersimpan={
+                  draf && simpanan
+                    ? `/api/usulan/${draf.id}/berkas?berkas=${b.medan}`
+                    : dariBawaan
+                      ? `/api/usulan/${dariBawaan.usulanId}/berkas?berkas=${b.medan}`
+                      : null
+                }
+                namaTersimpan={simpanan?.nama ?? (dariBawaan ? `${dariBawaan.nama ?? b.label} · dari usulan yang disetujui` : null)}
                 ditandaiHapus={hapusTersimpan.has(b.medan)}
                 onPilih={(f) => {
                   setBerkas((lama) => ({ ...lama, [b.medan]: f }));

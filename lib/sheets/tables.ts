@@ -73,6 +73,25 @@ export interface LaporanMutasiRow {
   riwayatId: string | null;
 }
 
+/**
+ * Laporan hukuman disiplin dari UPT, sebelum dicatat SDM Hukdis Kanwil (lib/laporanHukdis.ts, ADR-016).
+ * UPT memegang SK hukumannya; yang mencatat ke riwayat hukdis dan menggeser KGB tetap Kanwil.
+ */
+export interface LaporanHukdisRow {
+  id: string; pegawaiId: string; satker: string;
+  /** Kode jenis dari katalog HukdisJenis; peninjau boleh menggantinya saat mencatat. */
+  jenisHukdis: string;
+  nomorSK: string | null; tanggalSK: Date | null; tmtMulai: Date | null; tmtBerakhir: Date | null;
+  keterangan: string | null;
+  /** Pindaian SK hukuman disiplin di R2 (folder usulan/). */
+  pathBerkas: string | null;
+  status: string; catatanKanwil: string | null;
+  dilaporkanOleh: string | null; dilaporkanAt: Date | null;
+  ditinjauOleh: string | null; ditinjauAt: Date | null;
+  /** Baris riwayat hukdis yang terbit dari laporan ini; null selama belum dicatat. */
+  riwayatId: string | null;
+}
+
 /** Satu perpindahan atau pemberhentian pegawai beserta dasar SK-nya (lib/mutasiPegawai.ts). */
 export interface RiwayatMutasiRow {
   id: string; pegawaiId: string; jenis: string;
@@ -243,6 +262,15 @@ export const defs = {
       s("ditinjauOleh"), d("ditinjauAt"), s("riwayatId"),
     ],
   },
+  LaporanHukdis: {
+    tab: "LaporanHukdis",
+    columns: [
+      s("id"), s("pegawaiId"), s("satker"), s("jenisHukdis"), s("nomorSK"), d("tanggalSK"),
+      d("tmtMulai"), d("tmtBerakhir"), s("keterangan"), s("pathBerkas"),
+      s("status"), s("catatanKanwil"), s("dilaporkanOleh"), d("dilaporkanAt"),
+      s("ditinjauOleh"), d("ditinjauAt"), s("riwayatId"),
+    ],
+  },
   RiwayatPangkat: {
     tab: "RiwayatPangkat",
     columns: [
@@ -294,6 +322,7 @@ export const sheets = {
   riwayatPangkat: new Table<RiwayatPangkatRow>(defs.RiwayatPangkat),
   riwayatMutasi: new Table<RiwayatMutasiRow>(defs.RiwayatMutasi),
   laporanMutasi: new Table<LaporanMutasiRow>(defs.LaporanMutasi),
+  laporanHukdis: new Table<LaporanHukdisRow>(defs.LaporanHukdis),
   usulanPegawai: new Table<UsulanPegawaiRow>(defs.UsulanPegawai),
   hukdisJenis: new Table(defs.HukdisJenis),
   hukdisKonfigurasi: new Table(defs.HukdisKonfigurasi),

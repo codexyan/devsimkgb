@@ -3,9 +3,10 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
-import { BELUM_SELESAI, BERKAS_USULAN, DIPEGANG_UPT } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, BERKAS_USULAN, DIPEGANG_UPT, pernahKgb } from "@/lib/usulanPegawai";
+import { bawaanPegawai, berkasPerluDisalin } from "@/lib/bawaanUsulan";
 import { bacaIsianUsulan, isiHitungan } from "@/lib/usulanFormulir";
-import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, hapusBerkasUsulan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
+import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, hapusBerkasUsulan, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { TIPE_NOTIFIKASI } from "@/lib/generateNotifikasi";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
@@ -113,12 +114,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     ...isian,
     nomorSkTerakhir: teks("nomorSkTerakhir") || null,
     tanggalSkTerakhir,
-    hukdisAda: teks("hukdisAda") === "true",
-    hukdisJenis: teks("hukdisJenis") || null,
-    hukdisNomorSk: teks("hukdisNomorSk") || null,
-    hukdisTmtMulai,
-    hukdisTmtBerakhir,
-    hukdisKeterangan: teks("hukdisKeterangan") || null,
+    // Laporan hukdis kini lewat modulnya sendiri (ADR-016). Formulir usulan tidak lagi mengirimnya, dan
+    // laporan lama pada draf dibiarkan utuh kecuali permintaannya memang memuat isian hukdis.
+    ...(form.has("hukdisAda")
+      ? {
+          hukdisAda: teks("hukdisAda") === "true",
+          hukdisJenis: teks("hukdisJenis") || null,
+          hukdisNomorSk: teks("hukdisNomorSk") || null,
+          hukdisTmtMulai,
+          hukdisTmtBerakhir,
+          hukdisKeterangan: teks("hukdisKeterangan") || null,
+        }
+      : {}),
     catatanUpt: teks("catatanUpt") || null,
     diajukanOleh: `${akun.pengguna.nama} (${akun.pengguna.nip})`,
     diajukanAt: new Date(),
@@ -127,6 +134,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (berkas.jalur[b.kunci]) perubahan[b.kunci] = berkas.jalur[b.kunci] ?? null;
   }
   for (const b of hapusSaja) perubahan[b.kunci] = null;
+  // Berkas yang sudah disetujui Kanwil untuk pegawai ini mengisi kolom yang masih kosong, kecuali yang
+  // baru saja dihapus operator (ADR-017). Draf lama yang dibuat sebelum aturan ini ikut terlengkapi.
+  if (usulan.jenis === "perubahan" && pegawai) {
+    const hasil = { ...usulan, ...perubahan };
+    const bawaan = bawaanPegawai(
+      pegawai,
+      (await db.usulanPegawai.findMany({ where: { pegawaiId: pegawai.id, status: "disetujui" } })) as UsulanPegawaiRow[],
+    );
+    const salinan = await salinBerkasBawaan(
+      berkasPerluDisalin(hasil, bawaan, pernahKgb(hasil.mkgTahun ?? pegawai.mkgTahun, hasil.mkgBulan ?? pegawai.mkgBulan), dihapus),
+      akun.kode,
+    );
+    Object.assign(perubahan, salinan);
+  }
   // Surat hanya disentuh bila formulirnya memang mengirimkannya. Formulir data pegawai tidak memuat
   // isian surat, dan usulan yang dikembalikan Kanwil harus tetap membawa nomor surat aslinya.
   if (form.has("nomorSurat")) perubahan.nomorSurat = teks("nomorSurat") || null;
