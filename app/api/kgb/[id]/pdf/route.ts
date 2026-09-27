@@ -17,6 +17,8 @@ import type { HukdisUntukKgb } from "@/lib/prosesKgb";
 import { periksaUlangKgb } from "@/lib/pemeriksaanUlangKgb";
 import { hariIniWita, type NilaiTanggal } from "@/lib/waktu";
 import { nomorSkBentrok } from "@/lib/nomorSkBentrok";
+import { templateUntuk } from "@/lib/templateSurat";
+import { muatVersiTemplate } from "@/lib/templateSuratServer";
 
 export const runtime = "nodejs";
 
@@ -227,6 +229,8 @@ export async function POST(
       nama: penandatangan.nama,
     },
     dasarHukum: teksDasarHukum(kanwil?.nomorPP, kanwil?.tahunPP),
+    // Versi template yang berlaku pada tanggal surat (ADR-019): SK lama tetap tercetak dengan format ketika terbit.
+    template: templateUntuk((await muatVersiTemplate()).versi, tanggalSurat),
   };
 
   // Preview mode hanya mengirim isi surat. Status sudah Sedang Diproses (dijaga di atas), jadi tidak diubah.

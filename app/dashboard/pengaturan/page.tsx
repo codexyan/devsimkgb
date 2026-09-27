@@ -5,6 +5,7 @@ import { useRole } from "@/app/dashboard/components/RoleContext";
 import { ROLES } from "@/lib/auth";
 import PenandatanganManager from "./PenandatanganManager";
 import PemeriksaanData from "./PemeriksaanData";
+import TemplateSuratManager from "./TemplateSuratManager";
 import { aturBatasInputSdm, BATAS_INPUT_SDM_BAWAAN, normalisasiBatasInputSdm } from "@/lib/batasInputSdm";
 import { hitungDeadlineSDM, hitungRekonGaji, hitungUnlockDate } from "@/lib/tabelGaji";
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
@@ -13,6 +14,7 @@ import { formatTanggalId, hariIniWita } from "@/lib/waktu";
    Pengaturan (Super Admin). Satu bagian tampil sekaligus supaya halaman pas satu layar:
    daftar bagian di kolom kanan, isinya di panel kiri yang bergulir sendiri.
      1. Penandatangan surat KGB: definitif, Plh, Plt, Dirjen, dengan masa berlaku
+     1a. Template surat KGB:     kop, kertas, kalimat, tembusan; berversi per tanggal (ADR-019)
      2. Dasar hukum KGB
      3. Jadwal proses KGB:       tanggal batas input Tim SDM
      4. Notifikasi KGB:          ambang H-… peringatan
@@ -34,7 +36,7 @@ const KOSONG: Konfigurasi = {
   batasInputSdm: BATAS_INPUT_SDM_BAWAAN,
 };
 
-type IdBagian = "pejabat" | "dokumen" | "jadwal" | "kppn" | "notifikasi" | "keamanan" | "kontak" | "pemeriksaan";
+type IdBagian = "pejabat" | "template" | "dokumen" | "jadwal" | "kppn" | "notifikasi" | "keamanan" | "kontak" | "pemeriksaan";
 
 /** Satu satker beserta KPPN mitra yang berlaku dan bawaannya, dikirim rute Pengaturan. */
 interface SatkerKppn {
@@ -209,6 +211,7 @@ export default function PengaturanPage() {
   const daftarBagian = useMemo(
     () => [
       { id: "pejabat" as const, label: "Penandatangan surat", ket: "Dipilih otomatis menurut tanggal surat", lengkap: adaPenandatangan },
+      { id: "template" as const, label: "Template surat KGB", ket: "Kop, kertas, kalimat, dan tembusan berversi", lengkap: true, luar: true },
       { id: "dokumen" as const, label: "Dasar hukum KGB", ket: "Peraturan Pemerintah yang dirujuk SK", lengkap: !!form.nomorPP.trim() },
       { id: "jadwal" as const, label: "Jadwal proses KGB", ket: "Batas input Tim SDM sebelum rekon gaji", lengkap: true },
       { id: "kppn" as const, label: "KPPN mitra satker", ket: "Kantor bayar tujuan SK tiap satker", lengkap: true },
@@ -339,6 +342,7 @@ export default function PengaturanPage() {
             ) : (
               <div className="dsb-gulir dsb-panel-isi atr-isi">
                 {bagian === "pejabat" && <PenandatanganManager onStatus={setAdaPenandatangan} />}
+                {bagian === "template" && <TemplateSuratManager bolehUbah />}
 
                 {bagian === "dokumen" && (
                   <>

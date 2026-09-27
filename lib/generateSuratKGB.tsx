@@ -10,6 +10,16 @@ import {
 } from "@react-pdf/renderer";
 import type { JenisPenandatangan } from "./penandatangan";
 import { formatTanggalId, type NilaiTanggal } from "./waktu";
+import {
+  TEMPLATE_BAWAAN,
+  isiPenanda,
+  mmKePt,
+  potongSurel,
+  potongTebal,
+  type BarisKop,
+  type IsiTemplateSurat,
+  type NilaiPenanda,
+} from "./templateSurat";
 
 // Surat KGB disusun di peramban, bukan di Worker: satu PDF memakan ±1 detik CPU, jauh di atas batas
 // CPU per permintaan Cloudflare Workers Free. Server hanya memeriksa dan mengirim datanya lewat
@@ -20,8 +30,11 @@ Font.registerHyphenationCallback((word) => [word]);
 
 /** Logo dan label Srikandi: URL (peramban) atau path berkas (skrip Node). */
 export interface AsetSurat {
+  /** Logo bawaan (Kementerian); logo unggahan template dimuat dari logoUnggahan. */
   logoSrc: string;
   labelSrikandiSrc: string | null;
+  /** Alamat logo unggahan dari kuncinya di R2; tanpa ini logo unggahan diganti logo bawaan. */
+  logoUnggahan?: (kunci: string) => string;
 }
 
 let fontTerdaftar = false;
@@ -50,49 +63,25 @@ export async function buatPdfSuratKgb(data: DataSuratKGB, srikandi: boolean): Pr
   const aset: AsetSurat = {
     logoSrc: `${akar}/logo-imipas.png`,
     labelSrikandiSrc: srikandi ? `${akar}/label-srikandi.png` : null,
+    logoUnggahan: (kunci) => `${akar}/api/template-surat/logo?key=${encodeURIComponent(kunci)}`,
   };
   return pdf(<SuratKGBDocument {...data} srikandi={srikandi} aset={aset} />).toBlob();
 }
 
-// Ukuran dalam pt, diambil dari template Word "Template KGB.docx": Arial 10,5 pt berspasi 1,15,
-// margin kiri 62 pt. Kop surat diletakkan mutlak terhadap halaman, seperti gambar dan garis di template.
-const BARIS = 13.87;
-const KIRI = 62;
-const TITIK_DUA = 218.1 - KIRI;
-const NILAI = 232.2 - KIRI;
-const KOLOM_TTD = 366.9 - KIRI;
+// Ukuran halaman, margin, kop, dan huruf berasal dari template berversi (lib/templateSurat.ts, ADR-019).
+// Yang tetap di sini adalah letak kolom isian, diukur dari margin kiri dalam pt seperti di template Word
+// "Template KGB.docx" (margin kiri 62 pt: titik dua pada 218,1 pt, nilai pada 232,2 pt, blok tanda tangan
+// pada 366,9 pt).
+const KIRI_WORD = 62;
+const TITIK_DUA = 218.1 - KIRI_WORD;
+const NILAI = 232.2 - KIRI_WORD;
+const KOLOM_TTD = 366.9 - KIRI_WORD;
 const SELA = 9.3;
 
 const S = StyleSheet.create({
-  page: {
-    fontFamily: "Arial",
-    fontSize: 10.5,
-    lineHeight: BARIS / 10.5,
-    paddingTop: 116,
-    paddingBottom: 14,
-    paddingLeft: KIRI,
-    paddingRight: 61,
-  },
-  logo: { position: "absolute", left: 67.1, top: 32.7, width: 64.8, height: 64.8 },
-  // Baris kop tidak tepat segaris tengah di template; geseran `left` meniru letaknya.
-  kop: { position: "absolute", left: KIRI + 50, right: 61, top: 32.4, alignItems: "center" },
-  kopBiasa: { fontSize: 10, lineHeight: 1.32 },
-  kopTebal: { fontSize: 11, fontWeight: "bold", lineHeight: 1.2 },
-  kopL1: { left: 2 },
-  kopL2: { left: 0.6, marginTop: 3.7 },
-  kopL3: { left: 12.9 },
-  kopL45: { left: -7.1 },
   kopSurel: { fontStyle: "italic", color: "#0563C1" },
-  garisKop: {
-    position: "absolute",
-    left: 58.3,
-    top: 108.1,
-    width: 478.25,
-    borderTopWidth: 0.63,
-    borderTopColor: "#000",
-  },
   row: { flexDirection: "row" },
-  kepalaLabel: { width: 118.7 - KIRI },
+  kepalaLabel: { width: 118.7 - KIRI_WORD },
   kepalaTitikDua: { width: 132.9 - 118.7 },
   isi: { flex: 1 },
   label: { width: TITIK_DUA },
@@ -102,13 +91,11 @@ const S = StyleSheet.create({
   tanggal: { position: "absolute", right: 0, top: 0 },
   p: { textAlign: "justify" },
   tebal: { fontWeight: "bold" },
-  ttd: { marginTop: BARIS + 0.2 },
   ttdKolom: { marginLeft: KOLOM_TTD },
   // Ruang antara jabatan dan nama: tempat label Srikandi, atau tanda tangan basah pada surat reguler.
   ruangTtd: { height: 55.5, justifyContent: "center" },
   labelSrikandi: { width: 150, height: 41.3, objectFit: "contain" },
-  ttdPengirim: { position: "absolute", left: 133 - KIRI, top: 644.3 - 602.7 },
-  tembusan: { marginTop: 2 * BARIS },
+  ttdPengirim: { position: "absolute", left: 133 - KIRI_WORD, top: 644.3 - 602.7 },
   tembusanJudul: { fontSize: 9.5, lineHeight: 12.5 / 9.5 },
   tembusanItem: { flexDirection: "row", fontSize: 9, lineHeight: 11.9 / 9 },
   tembusanNo: { width: 14.2 },
@@ -170,6 +157,79 @@ export interface DataSuratKGB {
   };
   /** Nomor peraturan gaji yang dirujuk, mis. "Nomor 5 Tahun 2024". */
   dasarHukum: string;
+  /**
+   * Template yang berlaku pada tanggal surat (lib/templateSurat.ts pilihVersi, dipilih server). Kosong pada
+   * data dari versi aplikasi sebelum ADR-019: templat bawaan yang dipakai.
+   */
+  template?: IsiTemplateSurat;
+}
+
+/** Nilai isian otomatis {…} template untuk satu surat. */
+export function nilaiPenandaSurat(d: DataSuratKGB): NilaiPenanda {
+  return {
+    nama: d.pegawai.nama,
+    nip: d.pegawai.nip,
+    pangkat_golongan: `${d.pegawai.pangkat} (${d.pegawai.golonganRuang})`,
+    satker: d.satker.nama,
+    kppn: d.kppn,
+    gaji_lama: rp(d.kgb.gajiPokokLama),
+    gaji_baru: rp(d.kgb.gajiPokokBaru),
+    mkg_lama: masaKerja(d.kgb.mkgTahunLama, d.kgb.mkgBulanLama),
+    mkg_baru: masaKerja(d.kgb.mkgTahunBaru, d.kgb.mkgBulanBaru),
+    pangkat_golongan_baru: d.kgb.pangkatGolonganBaru,
+    tmt_kgb: tgl(d.kgb.tmtKgbBaru),
+    tmt_berikutnya: tgl(d.kgb.tmtKgbBerikutnya),
+    penetap_sk_dasar: d.kgb.penetapSkDasar,
+    nomor_sk_dasar: d.kgb.nomorSK,
+    tanggal_sk_dasar: tgl(d.kgb.tanggalSK),
+    dasar_hukum: d.dasarHukum,
+    nomor_surat: d.nomorSurat,
+    tanggal_surat: tgl(d.tanggalSurat),
+    jabatan_penandatangan: d.penandatangan.jabatan,
+    nama_penandatangan: d.penandatangan.nama,
+  };
+}
+
+/** Teks template dengan isian terisi dan potongan **tebal** dicetak tebal. */
+function TeksTemplate({ teks, nilai }: { teks: string; nilai: NilaiPenanda }) {
+  return (
+    <>
+      {potongTebal(isiPenanda(teks, nilai)).map((p, i) =>
+        p.tebal ? (
+          <Text key={i} style={S.tebal}>
+            {p.teks}
+          </Text>
+        ) : (
+          p.teks
+        ),
+      )}
+    </>
+  );
+}
+
+/** Satu baris kop. Geseran mendatar meniru letak baris di template Word yang tidak persis segaris tengah. */
+function BarisKopSurat({ baris, nilai }: { baris: BarisKop; nilai: NilaiPenanda }) {
+  return (
+    <Text
+      style={{
+        fontSize: baris.ukuranPt,
+        fontWeight: baris.tebal ? "bold" : "normal",
+        lineHeight: baris.tebal ? 1.2 : 1.32,
+        left: baris.geserPt,
+        marginTop: baris.jarakAtasPt,
+      }}
+    >
+      {potongSurel(isiPenanda(baris.teks, nilai)).map((p, i) =>
+        p.surel ? (
+          <Text key={i} style={S.kopSurel}>
+            {p.teks}
+          </Text>
+        ) : (
+          p.teks
+        ),
+      )}
+    </Text>
+  );
 }
 
 interface SuratKGBProps extends DataSuratKGB {
@@ -200,91 +260,125 @@ function BarisHuruf({ huruf, label, nilai }: { huruf: string; label: string; nil
   );
 }
 
-export function SuratKGBDocument({
-  nomorSurat,
-  tanggalSurat,
-  kppn,
-  satker,
-  pegawai,
-  kgb,
-  penandatangan,
-  dasarHukum,
-  srikandi = false,
-  aset,
-}: SuratKGBProps) {
-  const { logoSrc, labelSrikandiSrc } = aset;
+export function SuratKGBDocument(props: SuratKGBProps) {
+  const { nomorSurat, satker, pegawai, kgb, penandatangan, srikandi = false, aset } = props;
+  const t = props.template ?? TEMPLATE_BAWAAN;
+  const nilai = nilaiPenandaSurat(props);
+
+  const lebar = mmKePt(t.kertas.lebarMm);
+  const kiri = mmKePt(t.margin.kiriMm);
+  const kanan = mmKePt(t.margin.kananMm);
+  const baris = t.huruf.ukuranPt * t.huruf.spasi;
+  // Garis kop sedikit melewati margin, seperti di template Word: 3,7 pt ke kiri dan 2,27 pt ke kanan.
+  const garisKiri = kiri - 3.7;
+  const garisLebar = lebar - kanan + 2.27 - garisKiri;
+
   // KGB milik pimpinan Kanwil ditandatangani Dirjen, sehingga suratnya berkop Direktorat Jenderal.
-  const kopDitjen = penandatangan.jenis === "dirjen";
+  const barisKop = penandatangan.jenis === "dirjen" ? t.kop.barisDitjen : t.kop.baris;
+  const logo =
+    t.kop.logo === "tanpa"
+      ? null
+      : t.kop.logo === "bawaan" || !aset.logoUnggahan
+        ? aset.logoSrc
+        : aset.logoUnggahan(t.kop.logo);
   // Pegawai Kanwil tidak ditembuskan ke Kepala Kanwil, karena Kepala Kanwil sendiri penandatangannya.
-  const tembusan = [
-    "Sekretaris Jenderal Kementerian Imigrasi dan Pemasyarakatan;",
-    "Kepala Kantor Wilayah Regional VIII Badan Kepegawaian Negara Banjarmasin;",
-    ...(satker.kanwil ? [] : [`Kepala ${satker.nama};`]),
-    `Pejabat Pembuat Daftar Gaji ${satker.nama};`,
-    "Pegawai yang bersangkutan.",
-  ];
+  const tembusan = t.tembusan.filter((b) => !(satker.kanwil && b.kecualiKanwil)).map((b) => isiPenanda(b.teks, nilai));
+  const { labelSrikandiSrc } = aset;
 
   return (
     <Document>
-      <Page size="A4" style={S.page}>
-        {/* KOP SURAT */}
-        {/* eslint-disable-next-line jsx-a11y/alt-text -- Image @react-pdf/renderer (PDF), bukan elemen DOM; prop alt tidak ada di tipenya */}
-        <Image style={S.logo} src={logoSrc} />
-        <View style={S.kop}>
-          <Text style={[S.kopBiasa, S.kopL1]}>
-            KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN REPUBLIK INDONESIA
-          </Text>
-          {kopDitjen ? (
-            <Text style={[S.kopTebal, S.kopL2]}>DIREKTORAT JENDERAL PEMASYARAKATAN</Text>
-          ) : (
-            <>
-              <Text style={[S.kopBiasa, S.kopL2]}>DIREKTORAT JENDERAL PEMASYARAKATAN</Text>
-              <Text style={[S.kopTebal, S.kopL3]}>KANTOR WILAYAH KALIMANTAN SELATAN</Text>
-              <Text style={[S.kopBiasa, S.kopL45]}>
-                Jalan Jendral A. Yani Km. 5,5 No. 24, Banjarmasin, Kalimantan Selatan
-              </Text>
-              <Text style={[S.kopBiasa, S.kopL45]}>
-                Telepon 085252502005, Pos-el :{" "}
-                <Text style={S.kopSurel}>kanwilditjenpaskalsel@gmail.com</Text>
-              </Text>
-            </>
-          )}
+      <Page
+        size={[lebar, mmKePt(t.kertas.tinggiMm)]}
+        style={{
+          fontFamily: "Arial",
+          fontSize: t.huruf.ukuranPt,
+          lineHeight: t.huruf.spasi,
+          paddingTop: mmKePt(t.margin.atasMm),
+          paddingBottom: mmKePt(t.margin.bawahMm),
+          paddingLeft: kiri,
+          paddingRight: kanan,
+        }}
+      >
+        {/* KOP SURAT: diletakkan mutlak terhadap halaman, seperti gambar dan garis di template Word. */}
+        {logo && (
+          // eslint-disable-next-line jsx-a11y/alt-text -- Image @react-pdf/renderer (PDF), bukan elemen DOM; prop alt tidak ada di tipenya
+          <Image
+            style={{
+              position: "absolute",
+              left: mmKePt(t.kop.logoKiriMm),
+              top: mmKePt(t.kop.logoAtasMm),
+              width: mmKePt(t.kop.logoUkuranMm),
+              height: mmKePt(t.kop.logoUkuranMm),
+              objectFit: "contain",
+            }}
+            src={logo}
+          />
+        )}
+        <View
+          style={{
+            position: "absolute",
+            left: kiri + mmKePt(t.kop.teksIndenMm),
+            right: kanan,
+            top: mmKePt(t.kop.teksAtasMm),
+            alignItems: "center",
+          }}
+        >
+          {barisKop.map((b, i) => (
+            <BarisKopSurat key={i} baris={b} nilai={nilai} />
+          ))}
         </View>
-        <View style={S.garisKop} />
+        {t.kop.garis && (
+          <View
+            style={{
+              position: "absolute",
+              left: garisKiri,
+              top: mmKePt(t.kop.garisAtasMm),
+              width: garisLebar,
+              borderTopWidth: 0.63,
+              borderTopColor: "#000",
+            }}
+          />
+        )}
 
         {/* NOMOR, SIFAT, LAMPIRAN, HAL + TANGGAL */}
         <View style={{ position: "relative" }}>
           {[
             ["Nomor", nomorSurat],
-            ["Sifat", "Segera"],
-            ["Lampiran", "-"],
-            ["Hal", "Kenaikan Gaji Berkala"],
-          ].map(([label, nilai]) => (
+            ["Sifat", isiPenanda(t.kepala.sifat, nilai)],
+            ["Lampiran", isiPenanda(t.kepala.lampiran, nilai)],
+            ["Hal", isiPenanda(t.kepala.hal, nilai)],
+          ].map(([label, isi]) => (
             <View key={label} style={S.row}>
               <Text style={S.kepalaLabel}>{label}</Text>
               <Text style={S.kepalaTitikDua}>:</Text>
-              <Text style={S.isi}>{nilai}</Text>
+              <Text style={S.isi}>{isi}</Text>
             </View>
           ))}
-          <View style={S.row}>
-            <Text style={{ width: 132.9 - KIRI }} />
-            <Text style={S.isi}>
-              a.n. <Text style={S.tebal}>{pegawai.nama}</Text>
-            </Text>
-          </View>
-          <Text style={S.tanggal}>{tgl(tanggalSurat)}</Text>
+          {t.kepala.atasNama.trim() !== "" && (
+            <View style={S.row}>
+              <Text style={{ width: 132.9 - KIRI_WORD }} />
+              <Text style={S.isi}>
+                <TeksTemplate teks={t.kepala.atasNama} nilai={nilai} />
+              </Text>
+            </View>
+          )}
+          <Text style={S.tanggal}>
+            <TeksTemplate teks={t.kepala.tanggal} nilai={nilai} />
+          </Text>
         </View>
 
-        {/* TUJUAN */}
+        {/* TUJUAN: tiap baris template dicetak sebagai baris sendiri. */}
         <View style={{ marginTop: SELA }}>
-          <Text>Yth. Kepala Kantor Pelayanan Perbendaharaan Negara {kppn}</Text>
-          <Text>di tempat</Text>
+          {t.tujuan.split("\n").map((b, i) => (
+            <Text key={i}>
+              <TeksTemplate teks={b} nilai={nilai} />
+            </Text>
+          ))}
         </View>
 
         {/* PEMBUKA */}
         <Text style={[S.p, { marginTop: 7.9, textIndent: 28.35 }]}>
-          Dengan ini diberitahukan bahwa, sesungguhnya dengan telah terpenuhinya masa kerja dan
-          syarat – syarat lainnya atas nama:
+          <TeksTemplate teks={t.paragraf.pembuka} nilai={nilai} />
         </Text>
 
         {/* DATA PEGAWAI */}
@@ -298,8 +392,7 @@ export function SuratKGBDocument({
 
         {/* DASAR SK */}
         <Text style={[S.p, { marginTop: SELA }]}>
-          dan atas dasar Surat Keterangan Pembayaran (SKP) terakhir tentang Gaji/Pangkat yang
-          ditetapkan:
+          <TeksTemplate teks={t.paragraf.dasarSk} nilai={nilai} />
         </Text>
         <View style={{ marginTop: SELA }}>
           <BarisHuruf huruf="a" label="Oleh Pejabat" nilai={kgb.penetapSkDasar} />
@@ -315,8 +408,7 @@ export function SuratKGBDocument({
 
         {/* HASIL KGB */}
         <Text style={[S.p, { marginTop: SELA }]}>
-          maka kepada yang bersangkutan dapat diberikan{" "}
-          <Text style={S.tebal}>kenaikan gaji berkala</Text> hingga memperoleh :
+          <TeksTemplate teks={t.paragraf.hasil} nilai={nilai} />
         </Text>
         <View style={{ marginTop: SELA }}>
           <Baris label="Gaji Pokok Baru" nilai={rp(kgb.gajiPokokBaru)} />
@@ -328,13 +420,12 @@ export function SuratKGBDocument({
 
         {/* DASAR HUKUM */}
         <Text style={[S.p, { marginTop: SELA }]}>
-          sesuai dengan Peraturan Pemerintah {dasarHukum} kepada Pegawai tersebut dapat dibayarkan
-          penghasilannya berdasarkan gaji pokok baru.
+          <TeksTemplate teks={t.paragraf.penutup} nilai={nilai} />
         </Text>
 
         {/* TTD: delegasi, jadi ditandatangani atas nama jabatan sendiri (tanpa a.n. Menteri).
             Nama tanpa NIP pada kedua versi, mengikuti template. */}
-        <View style={S.ttd}>
+        <View style={{ marginTop: baris + 0.2 }}>
           {srikandi && <Text style={S.ttdPengirim}>{"${ttd_pengirim}"}</Text>}
           <View style={S.ttdKolom}>
             <Text>{penandatangan.jabatan},</Text>
@@ -349,15 +440,17 @@ export function SuratKGBDocument({
         </View>
 
         {/* TEMBUSAN */}
-        <View style={S.tembusan}>
-          <Text style={S.tembusanJudul}>Tembusan :</Text>
-          {tembusan.map((isi, i) => (
-            <View key={isi} style={S.tembusanItem}>
-              <Text style={S.tembusanNo}>{i + 1}.</Text>
-              <Text style={S.isi}>{isi}</Text>
-            </View>
-          ))}
-        </View>
+        {tembusan.length > 0 && (
+          <View style={{ marginTop: 2 * baris }}>
+            <Text style={S.tembusanJudul}>{t.tembusanJudul}</Text>
+            {tembusan.map((isi, i) => (
+              <View key={i} style={S.tembusanItem}>
+                <Text style={S.tembusanNo}>{i + 1}.</Text>
+                <Text style={S.isi}>{isi}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </Page>
     </Document>
   );

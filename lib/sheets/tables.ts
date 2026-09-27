@@ -94,6 +94,15 @@ export interface LaporanHukdisRow {
   riwayatId: string | null;
 }
 
+/**
+ * Satu versi template surat KGB (lib/templateSurat.ts, ADR-019). `isi` adalah JSON IsiTemplateSurat; SK memakai
+ * versi yang berlaku pada tanggal suratnya, jadi versi yang sudah berlaku tidak pernah diubah atau dihapus.
+ */
+export interface TemplateSuratRow {
+  id: string; versi: number; berlakuMulai: Date | null; isi: string;
+  catatan: string | null; dibuatOleh: string | null; dibuatAt: Date | null;
+}
+
 /** Satu perpindahan atau pemberhentian pegawai beserta dasar SK-nya (lib/mutasiPegawai.ts). */
 export interface RiwayatMutasiRow {
   id: string; pegawaiId: string; jenis: string;
@@ -264,6 +273,10 @@ export const defs = {
       s("ditinjauOleh"), d("ditinjauAt"), s("riwayatId"),
     ],
   },
+  TemplateSurat: {
+    tab: "TemplateSurat",
+    columns: [s("id"), i("versi"), d("berlakuMulai"), s("isi"), s("catatan"), s("dibuatOleh"), d("dibuatAt")],
+  },
   LaporanHukdis: {
     tab: "LaporanHukdis",
     columns: [
@@ -325,6 +338,7 @@ export const sheets = {
   riwayatMutasi: new Table<RiwayatMutasiRow>(defs.RiwayatMutasi),
   laporanMutasi: new Table<LaporanMutasiRow>(defs.LaporanMutasi),
   laporanHukdis: new Table<LaporanHukdisRow>(defs.LaporanHukdis),
+  templateSurat: new Table<TemplateSuratRow>(defs.TemplateSurat),
   usulanPegawai: new Table<UsulanPegawaiRow>(defs.UsulanPegawai),
   hukdisJenis: new Table(defs.HukdisJenis),
   hukdisKonfigurasi: new Table(defs.HukdisKonfigurasi),

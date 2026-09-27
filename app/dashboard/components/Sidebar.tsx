@@ -106,6 +106,8 @@ const menuSdmKgb: Entry[] = [
   grupKepegawaian,
   menuSatker,
   { href: "/dashboard/laporan", label: "Laporan", icon: Ic.chart },
+  // Lihat dan pratinjau template SK; mengubahnya hanya Super Admin di Pengaturan (ADR-019).
+  { href: "/dashboard/template-surat", label: "Template surat", icon: Ic.document },
 ];
 
 const menuKeuanganItems: Entry[] = [

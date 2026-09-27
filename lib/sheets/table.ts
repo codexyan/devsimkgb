@@ -243,7 +243,24 @@ export class Table<T extends object = Row> {
     return rows.filter((r) => matches(r.record as Row, where)).length;
   }
 
+  /** Sudah dipastikan tab ini punya baris judul pada proses ini. */
+  private judulAda = false;
+
+  /**
+   * Tab yang masih kosong (tabel baru) diberi baris judul lebih dulu. Tanpa itu baris data pertama
+   * terbaca sebagai judul oleh readAll, dan seluruh isi tab tampak kosong.
+   */
+  private async pastikanJudul(): Promise<void> {
+    if (this.judulAda) return;
+    const baris = await getValues(`${this.def.tab}!A1:${this.lastCol}1`);
+    if (!baris[0]?.some((c) => c !== "" && c !== undefined)) {
+      await appendRows(`${this.def.tab}!A1`, [this.def.columns.map((c) => c.name)]);
+    }
+    this.judulAda = true;
+  }
+
   async create(data: T): Promise<T> {
+    await this.pastikanJudul();
     await appendRows(`${this.def.tab}!A1`, [this.toCells(data)]);
     return data;
   }
@@ -251,6 +268,7 @@ export class Table<T extends object = Row> {
   /** Tambah banyak baris sekaligus (satu request append). */
   async createMany(rows: T[]): Promise<number> {
     if (rows.length === 0) return 0;
+    await this.pastikanJudul();
     await appendRows(`${this.def.tab}!A1`, rows.map((r) => this.toCells(r)));
     return rows.length;
   }

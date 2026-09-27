@@ -3,7 +3,6 @@
 
 import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { GalatSupabase } from "./db/supabase/rest";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, hapusBerkasUsulan } from "./berkasUsulan";
 import { kunciBerkasUsulan } from "./usulanPegawai";
 import { adaPenandaPdf } from "./prosesKgb";
@@ -15,13 +14,8 @@ export const MEDAN_SK_HUKDIS = "skHukdis";
 export const PESAN_BELUM_AKTIF =
   "Modul laporan hukuman disiplin belum aktif: tabel laporan_hukdis belum dibuat di basis data. Minta pengelola menjalankan migrasinya.";
 
-/**
- * Galat karena tabel belum ada: PGRST205 dari PostgREST (tabel tidak ada di cache skema) atau 42P01 dari
- * Postgres. Migrasi dijalankan manual, jadi kode yang sudah terpasang bisa mendahului tabelnya.
- */
-export function tabelBelumAda(e: unknown): boolean {
-  return e instanceof GalatSupabase && (e.kode === "PGRST205" || e.kode === "42P01");
-}
+// Dipakai bersama tabel baru lain; tetap diekspor dari sini agar pemanggil lama tidak berubah.
+export { tabelBelumAda } from "./db/tabelBelumAda";
 
 /**
  * Simpan pindaian SK hukuman disiplin bila formulir menyertakannya. Pemeriksaannya sama dengan berkas
