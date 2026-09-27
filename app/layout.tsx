@@ -26,6 +26,13 @@ export const metadata: Metadata = {
   },
   description: "Sistem pengelolaan Kenaikan Gaji Berkala (KGB) pegawai Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan",
   icons: { icon: "/icon.svg" },
+  // Tidak untuk diindeks mesin pencari (lihat juga app/robots.ts dan header X-Robots-Tag di worker-entry.js).
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: { index: false, follow: false, noimageindex: true, "max-snippet": 0, "max-image-preview": "none" },
+  },
 };
 
 export default function RootLayout({

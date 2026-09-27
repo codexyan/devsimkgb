@@ -113,49 +113,68 @@ async function lewatCachePublik(request, pathname, env, ctx) {
   return untukPemanggil;
 }
 
+/** Nilai header yang melarang mesin pencari mengindeks, mengikuti tautan, atau menyimpan salinan halaman. */
+const LARANG_INDEKS = "noindex, nofollow, noarchive, nosnippet, noimageindex";
+
+/** Salinan jawaban dengan header X-Robots-Tag; header jawaban asli bisa tidak boleh diubah. */
+function tanpaIndeks(res) {
+  const salinan = new Response(res.body, res);
+  salinan.headers.set("x-robots-tag", LARANG_INDEKS);
+  return salinan;
+}
+
 export default {
   ...openNextWorker,
   async fetch(request, env, ctx) {
-    const { pathname } = new URL(request.url);
-    if (bolehDariCache(request, pathname)) return lewatCachePublik(request, pathname, env, ctx);
-    if (pathname.replace(/\/+$/, "") !== PATH_CEK_KGB) return openNextWorker.fetch(request, env, ctx);
-
-    const ip = alamatIp(request);
-    if (await melebihiBatasCekKgb(ip, env, Date.now())) {
-      return new Response(
-        JSON.stringify({ error: "Terlalu banyak permintaan cek status. Coba lagi dalam satu menit." }),
-        { status: 429, headers: { "content-type": "application/json; charset=utf-8", "retry-after": "60" } },
-      );
-    }
-    const res = await openNextWorker.fetch(request, env, ctx);
-    if (res.status === 404) tambahHitungan(hitunganTidakDitemukan, ip, Date.now());
-    return res;
+    return tanpaIndeks(await layani(request, env, ctx));
   },
   async scheduled(controller, env, ctx) {
-    ctx.waitUntil(
-      (async () => {
-        try {
-          if (!env.CRON_SECRET) {
-            console.error("[cron] CRON_SECRET belum diset; endpoint cron akan menolak panggilan. Set dengan: wrangler secret put CRON_SECRET");
-          }
-          const res = await env.WORKER_SELF_REFERENCE.fetch(
-            new Request("https://sim-kgb.internal/api/cron/notifikasi", {
-              headers: { authorization: `Bearer ${env.CRON_SECRET ?? ""}` },
-            }),
-          );
-          if (!res.ok) {
-            const keterangan =
-              res.status === 401
-                ? " (CRON_SECRET tidak cocok)"
-                : res.status === 503
-                  ? " (CRON_SECRET belum dikonfigurasi)"
-                  : "";
-            console.error(`[cron] notifikasi gagal: HTTP ${res.status}${keterangan}:`, await res.text());
-          }
-        } catch (err) {
-          console.error("[cron] notifikasi error:", err);
-        }
-      })(),
-    );
+    return jadwal(controller, env, ctx);
   },
 };
+
+async function layani(request, env, ctx) {
+  const { pathname } = new URL(request.url);
+  if (bolehDariCache(request, pathname)) return lewatCachePublik(request, pathname, env, ctx);
+  if (pathname.replace(/\/+$/, "") !== PATH_CEK_KGB) return openNextWorker.fetch(request, env, ctx);
+
+  const ip = alamatIp(request);
+  if (await melebihiBatasCekKgb(ip, env, Date.now())) {
+    return new Response(
+      JSON.stringify({ error: "Terlalu banyak permintaan cek status. Coba lagi dalam satu menit." }),
+      { status: 429, headers: { "content-type": "application/json; charset=utf-8", "retry-after": "60" } },
+    );
+  }
+  const res = await openNextWorker.fetch(request, env, ctx);
+  if (res.status === 404) tambahHitungan(hitunganTidakDitemukan, ip, Date.now());
+  return res;
+}
+
+async function jadwal(controller, env, ctx) {
+  ctx.waitUntil(
+    (async () => {
+      try {
+        if (!env.CRON_SECRET) {
+          console.error("[cron] CRON_SECRET belum diset; endpoint cron akan menolak panggilan. Set dengan: wrangler secret put CRON_SECRET");
+        }
+        const res = await env.WORKER_SELF_REFERENCE.fetch(
+          new Request("https://sim-kgb.internal/api/cron/notifikasi", {
+            headers: { authorization: `Bearer ${env.CRON_SECRET ?? ""}` },
+          }),
+        );
+        if (!res.ok) {
+          const keterangan =
+            res.status === 401
+              ? " (CRON_SECRET tidak cocok)"
+              : res.status === 503
+                ? " (CRON_SECRET belum dikonfigurasi)"
+                : "";
+          console.error(`[cron] notifikasi gagal: HTTP ${res.status}${keterangan}:`, await res.text());
+        }
+      } catch (err) {
+        console.error("[cron] notifikasi error:", err);
+      }
+    })(),
+  );
+}
+

@@ -1,0 +1,3 @@
+# Aset statis (logo, huruf, skrip) dilayani Cloudflare tanpa melewati worker; header ini melarang pengindeksannya.
+/*
+  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex
