@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { infoStatusKgb } from "@/lib/statusKgb";
+import { kurangiGerak as kurangiGerakPengguna } from "@/lib/ui/gerak";
 
 /* Bentuk tanggapan GET /api/public/cek-kgb. Semua kolom diperlakukan opsional
    karena data lama dapat memuat kolom kosong. */
@@ -108,7 +109,7 @@ export default function CekStatus() {
   // Pesan galat tidak mengambil fokus, supaya NIP bisa langsung diperbaiki.
   useEffect(() => {
     if (!panelBuka) return;
-    const kurangiGerak = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const kurangiGerak = kurangiGerakPengguna();
     const panel = wadahRef.current?.querySelector<HTMLElement>(".cs-panel");
     if (hasil) judulRef.current?.focus({ preventScroll: true });
     panel?.scrollIntoView({ block: "nearest", behavior: kurangiGerak ? "auto" : "smooth" });

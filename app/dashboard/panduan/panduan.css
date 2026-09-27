@@ -671,3 +671,173 @@ html[data-dash-theme="dark"] .pub.pg-dasbor .pub-steps > li::before {
     scroll-snap-align: start;
   }
 }
+
+/* ── Timeline langkah: rel progres yang terisi mengikuti gulir ─────────────
+   Tiap langkah menjadi kartu tipis; garis di kiri terisi seiring pembaca menggulir, dan nomor langkah menyala
+   ketika garis bacanya (sekitar 40% dari atas area gulir) mencapainya. Semua gerak berbasis gulir
+   (animation-timeline: view()), hanya transform dan opacity, jadi dijalankan compositor, dan hanya aktif
+   selama elemennya berada di rentang gulir. Tanpa dukungan peramban atau bila gerak dikurangi, timeline tampil
+   lengkap dan diam. */
+.pub.pg-dasbor .pub-steps {
+  position: relative;
+  --rel-x: 1.05rem;
+  --pil-tengah: 0.95rem;
+}
+
+/* Garis dasar tunggal untuk seluruh daftar, menggantikan potongan garis per langkah. */
+.pub.pg-dasbor .pub-steps > li::after {
+  content: none;
+}
+
+.pub.pg-dasbor .pub-steps::before,
+.pub.pg-dasbor .pub-steps::after {
+  content: "";
+  position: absolute;
+  top: var(--pil-tengah);
+  bottom: 1.5rem;
+  left: calc(var(--rel-x) - 1px);
+  width: 2px;
+  border-radius: 2px;
+}
+
+.pub.pg-dasbor .pub-steps::before {
+  background: var(--line);
+}
+
+/* Isian rel: gradien biru ke emas, diskalakan dari atas. */
+.pub.pg-dasbor .pub-steps::after {
+  background: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--emas)));
+  transform-origin: 50% 0;
+}
+
+.pub.pg-dasbor .pub-steps > li {
+  padding-bottom: 1rem;
+}
+
+.pub.pg-dasbor .pub-steps > li:last-child {
+  padding-bottom: 0;
+}
+
+/* Nomor langkah: pil di atas rel, dengan cincin latar agar rel tampak menembus di belakangnya. */
+.pub.pg-dasbor .pub-steps > li::before {
+  z-index: 1;
+  box-shadow: 0 0 0 4px var(--card);
+  transition: box-shadow 200ms var(--ease);
+}
+
+.pub.pg-dasbor .pg-langkah {
+  position: relative;
+  padding: 0.95rem 1.1rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sunken);
+  transition: border-color 200ms var(--ease), background-color 200ms var(--ease), transform 300ms var(--ease-out);
+}
+
+.pub.pg-dasbor .pg-langkah:hover {
+  border-color: var(--line-strong);
+  transform: translate3d(2px, 0, 0);
+}
+
+.pub.pg-dasbor .pg-langkah > :last-child {
+  margin-bottom: 0;
+}
+
+.pub.pg-dasbor .pg-langkah .pub-step-title {
+  padding-top: 0;
+}
+
+/* Pelaku langkah sebagai chip berikon orang. */
+.pub.pg-dasbor .pg-langkah .pub-step-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0.45rem 0 0.65rem;
+  padding: 2px 10px 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 0.8125rem;
+}
+
+.pub.pg-dasbor .pg-langkah .pub-step-who::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  flex: none;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Hasil langkah sebagai pita di kaki kartu. */
+.pub.pg-dasbor .pg-langkah .pg-hasil {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0.75rem -1.1rem -1rem;
+  padding: 0.6rem 1.1rem 0.7rem;
+  border-top: 1px dashed var(--line);
+  border-radius: 0 0 13px 13px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  font-size: 0.9375rem;
+}
+
+/* Rel terisi dari saat awal daftar melewati garis baca (40% dari atas) sampai ujungnya melewatinya; nomor langkah
+   menyala ketika garis baca mencapainya; kartu masuk halus dari kanan. Berlaku bila gerak boleh menurut pilihan
+   animasi pengguna (html[data-gerak], lib/ui/gerak.ts), atau menurut pengaturan perangkat bila atribut belum ada. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    html:not([data-gerak]) .pub.pg-dasbor .pub-steps::after {
+      animation: pgRelIsi linear both;
+      animation-timeline: view();
+      animation-range: cover 60vh cover calc(100% - 40vh);
+    }
+    html:not([data-gerak]) .pub.pg-dasbor .pub-steps > li::before {
+      animation: pgNyala linear backwards;
+      animation-timeline: view();
+      animation-range: entry 100% cover 55%;
+    }
+    html:not([data-gerak]) .pub.pg-dasbor .pg-langkah {
+      animation: pgMasukLangkah linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 80%;
+    }
+  }
+  html[data-gerak="gerak"] .pub.pg-dasbor .pub-steps::after {
+    animation: pgRelIsi linear both;
+    animation-timeline: view();
+    animation-range: cover 60vh cover calc(100% - 40vh);
+  }
+  html[data-gerak="gerak"] .pub.pg-dasbor .pub-steps > li::before {
+    animation: pgNyala linear backwards;
+    animation-timeline: view();
+    animation-range: entry 100% cover 55%;
+  }
+  html[data-gerak="gerak"] .pub.pg-dasbor .pg-langkah {
+    animation: pgMasukLangkah linear backwards;
+    animation-timeline: view();
+    animation-range: entry 0% entry 80%;
+  }
+}
+
+@keyframes pgRelIsi {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes pgNyala {
+  from { opacity: 0.35; transform: scale(0.82); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pgMasukLangkah {
+  from { opacity: 0; transform: translate3d(14px, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+@media print {
+  .pub.pg-dasbor .pub-steps::after { transform: none; }
+  .pub.pg-dasbor .pg-langkah { background: none; }
+}

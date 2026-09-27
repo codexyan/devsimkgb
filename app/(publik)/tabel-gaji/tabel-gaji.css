@@ -439,3 +439,473 @@
     gap: 10px;
   }
 }
+
+
+
+/* ── Kalkulator kenaikan pangkat dan KGB (KalkulatorKp.tsx) ────────────────
+   Satu kartu: isian di kiri, hasil di kanan. Gerak hanya untuk memberi tahu bahwa hasil berubah: kartu
+   "sesudah" dan baris proyeksi masuk sekali (fill backwards, jadi tidak ada lapisan animasi yang tertinggal),
+   angka gaji bergulir lewat skrip. Mode gerak dikurangi dimatikan oleh aturan global di publik.css. */
+.pub .tk {
+  margin-bottom: clamp(56px, 7vw, 96px);
+  padding: clamp(20px, 3vw, 36px);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-xl);
+  background: var(--kartu);
+  box-shadow: var(--bayang);
+}
+
+.pub .tk-kepala {
+  max-width: 44rem;
+}
+
+.pub .tk-judul {
+  margin: 16px 0 0;
+  font-family: var(--huruf-judul);
+  font-size: clamp(1.625rem, 1.2rem + 1.2vw, 2.25rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+}
+
+.pub .tk-sub {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.pub .tk-isi {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: clamp(20px, 3vw, 40px);
+  margin-top: clamp(20px, 3vw, 32px);
+}
+
+.pub .tk-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pub .tk-baris2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pub .tk-bidang {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pub .tk-bidang > span,
+.pub .tk-bidang legend {
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.pub .tk-bidang em {
+  margin-left: 4px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.pub .tk-bidang :is(select, input),
+.pub .tk-mkg-isi label {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--field-line);
+  border-radius: 14px;
+  background: var(--putih);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  transition: border-color 320ms var(--ease), box-shadow 420ms var(--ease-out);
+}
+
+.pub .tk-bidang :is(select, input) {
+  padding: 0 14px;
+}
+
+.pub .tk-bidang :is(select, input):focus-visible,
+.pub .tk-mkg-isi label:focus-within {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink), 0 0 0 5px rgba(12, 26, 56, 0.07);
+}
+
+.pub .tk-mkg-isi {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.pub .tk-mkg-isi label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.pub .tk-mkg-isi input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pub .tk-mkg-isi input:focus-visible {
+  outline: none;
+}
+
+.pub .tk-bidang > .tk-bantu {
+  margin-top: 6px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Hasil */
+.pub .tk-hasil {
+  min-width: 0;
+  padding: clamp(16px, 2.2vw, 24px);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--bg-atas);
+}
+
+.pub .tk-galat {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--bad-text);
+}
+
+.pub .tk-banding {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 12px;
+}
+
+.pub .tk-sisi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px;
+  border-radius: var(--radius);
+}
+
+.pub .tk-sisi-baru {
+  border: 1px solid var(--line);
+  background: var(--kartu);
+  box-shadow: var(--bayang);
+  animation: tkMasuk 520ms var(--ease-out) backwards;
+}
+
+.pub .tk-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pub .tk-gol {
+  font-family: var(--huruf-judul);
+  font-size: clamp(1.75rem, 1.4rem + 1vw, 2.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+}
+
+.pub .tk-rinci {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.pub .tk-uang {
+  margin-top: 6px;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--tinta);
+}
+
+.pub .tk-uang-besar {
+  font-size: clamp(1.25rem, 1.05rem + 0.6vw, 1.5rem);
+  color: var(--ink);
+}
+
+.pub .tk-panah {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  color: var(--muted);
+}
+
+.pub .tk-panah svg {
+  width: 22px;
+  height: 22px;
+}
+
+.pub .tk-chip-baris {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.pub .tk-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--sunken);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.pub .tk-chip[data-nada="naik"] {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.pub .tk-chip[data-nada="turun"] {
+  background: var(--bad-bg);
+  color: var(--bad-text);
+}
+
+.pub .tk-chip[data-nada="potong"] {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.pub .tk-peringatan {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--warn-line);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.pub .tk-sub-judul {
+  margin: 22px 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Proyeksi KGB sebagai linimasa: titik pada garis rambut, tanggal di kiri */
+.pub .tk-garis {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pub .tk-garis::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 5px;
+  width: 1px;
+  background: var(--line);
+}
+
+.pub .tk-garis li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 4px 14px;
+  padding: 6px 0 12px 26px;
+  animation: tkMasuk 480ms var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+.pub .tk-garis li::before {
+  content: "";
+  position: absolute;
+  top: 11px;
+  left: 0;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--kartu);
+}
+
+.pub .tk-garis li[data-sebelum]::before {
+  border-color: var(--line-strong);
+  border-style: dashed;
+}
+
+.pub .tk-garis-waktu {
+  padding-top: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.pub .tk-garis-isi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.pub .tk-garis-isi b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pub .tk-garis li[data-sebelum] :is(.tk-garis-waktu, .tk-garis-isi, .tk-garis-isi b) {
+  color: var(--muted);
+}
+
+.pub .tk-naik {
+  color: var(--ok-text);
+  font-size: 13px;
+}
+
+.pub .tk-catat {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pub .tk-tandai {
+  margin-top: 10px;
+}
+
+.pub .tk-aturan {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 28px;
+  margin: clamp(20px, 3vw, 32px) 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--line-soft);
+  list-style: none;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.pub .tk-aturan b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+@keyframes tkMasuk {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+}
+
+/* Sorotan dari kalkulator: biru untuk gaji sesudah KP, abu untuk sebelumnya */
+.pub .tb-tabel-bagian {
+  scroll-margin-top: calc(var(--nav) + 16px);
+}
+
+.pub .tb-tabel tbody td[data-sorot="baru"],
+.pub .tb-sorot-contoh[data-sorot="baru"] {
+  background: var(--info-bg);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.pub .tb-tabel tbody td[data-sorot="baru"] {
+  animation: tbSorot 900ms var(--ease-out) backwards;
+}
+
+.pub .tb-tabel tbody td[data-sorot="lama"],
+.pub .tb-sorot-contoh[data-sorot="lama"] {
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--ink);
+}
+
+@keyframes tbSorot {
+  from {
+    box-shadow: inset 0 0 0 8px var(--accent);
+  }
+}
+
+.pub .tb-sorot-ket {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.pub .tb-sorot-contoh {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+}
+
+.pub .tb-sorot-ket .tb-cari-hapus {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+@media (max-width: 860px) {
+  .pub .tk-isi {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .pub .tk-baris2,
+  .pub .tk-aturan,
+  .pub .tk-banding,
+  .pub .tk-garis li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pub .tk-panah {
+    width: auto;
+    height: 20px;
+    transform: rotate(90deg);
+  }
+}

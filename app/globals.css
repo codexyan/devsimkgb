@@ -112,10 +112,13 @@ html:has(.pub:not(.pg-dasbor)) {
 
 html { -webkit-font-smoothing: antialiased; }
 
+/* Gerak boleh: pilihan pengguna (html[data-gerak], lib/ui/gerak.ts), atau pengaturan perangkat bila atribut belum terpasang. */
 @media (prefers-reduced-motion: no-preference) {
-  html { scroll-behavior: smooth; }
-  body { transition: background-color 120ms ease, color 120ms ease; }
+  html:not([data-gerak]) { scroll-behavior: smooth; }
+  html:not([data-gerak]) body { transition: background-color 120ms ease, color 120ms ease; }
 }
+html[data-gerak="gerak"] { scroll-behavior: smooth; }
+html[data-gerak="gerak"] body { transition: background-color 120ms ease, color 120ms ease; }
 
 body {
   background: var(--background);

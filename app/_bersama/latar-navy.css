@@ -84,9 +84,13 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ln-cahaya,
-  .ln-kisi {
+/* Gerak dikurangi: pilihan pengguna (html[data-gerak], lib/ui/gerak.ts), atau pengaturan perangkat bila atribut belum terpasang. */
+@media (prefers-reduced-motion: reduce) {html:not([data-gerak]) .ln-cahaya,
+html:not([data-gerak]) .ln-kisi {
     animation: none !important;
   }
 }
+html[data-gerak="kurangi"] .ln-cahaya,
+html[data-gerak="kurangi"] .ln-kisi {
+    animation: none !important;
+  }

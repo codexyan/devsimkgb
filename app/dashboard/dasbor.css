@@ -1886,13 +1886,18 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 
 
 /* ── Gerak ─────────────────────────────────────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  .dsb-muncul,
-  .dsb-kerangka,
-  .dsb-putar {
+/* Gerak dikurangi: pilihan pengguna (html[data-gerak], lib/ui/gerak.ts), atau pengaturan perangkat bila atribut belum terpasang. */
+@media (prefers-reduced-motion: reduce) {html:not([data-gerak]) .dsb-muncul,
+html:not([data-gerak]) .dsb-kerangka,
+html:not([data-gerak]) .dsb-putar {
     animation: none !important;
   }
 }
+html[data-gerak="kurangi"] .dsb-muncul,
+html[data-gerak="kurangi"] .dsb-kerangka,
+html[data-gerak="kurangi"] .dsb-putar {
+    animation: none !important;
+  }
 
 
 /* ── Notifikasi ────────────────────────────────────────────────────────── */

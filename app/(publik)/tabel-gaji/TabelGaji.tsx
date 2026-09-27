@@ -3,10 +3,13 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { BarisTanggaGaji } from "@/lib/tabelGaji";
 import { anakBerlaku, kelompokGolongan } from "../kgb/tangga/tata";
+import { SOROT_TABEL, type SorotTabel } from "./sorot";
+import { kurangiGerak as kurangiGerakPengguna } from "@/lib/ui/gerak";
 
 /* Tabel gaji pokok digital per golongan. Tab memilih golongan I sampai IV; isian masa kerja menandai sel
    yang berlaku di tiap kolom (MKG terbesar yang tidak melebihi masa kerja, sama dengan cara SIM-KGB
-   menghitung). Mengeklik sel mengisi masa kerja itu; pengguna keyboard memakai isian yang sama. */
+   menghitung). Mengeklik sel mengisi masa kerja itu; pengguna keyboard memakai isian yang sama. Kalkulator
+   kenaikan pangkat di atasnya dapat menyorot sel gaji lama dan baru (sorot.ts). */
 
 const ROMAWI = ["I", "II", "III", "IV"];
 const angka = (n: number) => new Intl.NumberFormat("id-ID").format(n);
@@ -18,6 +21,19 @@ export default function TabelGaji({ baris }: { baris: BarisTanggaGaji[] }) {
   const [teksMkg, setTeksMkg] = useState("");
   const tabRef = useRef<(HTMLButtonElement | null)[]>([]);
   const wadahRef = useRef<HTMLDivElement>(null);
+  const [sorot, setSorot] = useState<SorotTabel | null>(null);
+
+  // Sorotan dari kalkulator: pindah ke tab golongan tujuan agar sel gaji barunya langsung terlihat.
+  useEffect(() => {
+    const saatSorot = (e: Event) => {
+      const detail = (e as CustomEvent<SorotTabel>).detail;
+      if (!detail) return;
+      setSorot(detail);
+      setKelompok(kelompokGolongan(detail.baru.golongan));
+    };
+    window.addEventListener(SOROT_TABEL, saatSorot);
+    return () => window.removeEventListener(SOROT_TABEL, saatSorot);
+  }, []);
 
   const kolom = baris.filter((b) => kelompokGolongan(b.golongan) === kelompok);
   const daftarMkg = [...new Set(kolom.flatMap((b) => b.anak.map((a) => a.mkg)))].sort((a, b) => a - b);
@@ -65,7 +81,7 @@ export default function TabelGaji({ baris }: { baris: BarisTanggaGaji[] }) {
     if (!wadah || !tr || wadah.scrollHeight <= wadah.clientHeight) return;
     const kepala = wadah.querySelector<HTMLElement>("thead")?.offsetHeight ?? 0;
     const atas = tr.offsetTop - kepala - 8;
-    const kurangiGerak = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const kurangiGerak = kurangiGerakPengguna();
     wadah.scrollTo({ top: Math.max(0, atas), behavior: kurangiGerak ? "auto" : "smooth" });
   };
 
@@ -149,6 +165,17 @@ export default function TabelGaji({ baris }: { baris: BarisTanggaGaji[] }) {
         {ringkasan}
       </p>
 
+      {sorot && (
+        <p className="tb-sorot-ket">
+          <span className="tb-sorot-contoh" data-sorot="lama" aria-hidden="true" /> {sorot.lama.golongan} sebelum kenaikan
+          pangkat
+          <span className="tb-sorot-contoh" data-sorot="baru" aria-hidden="true" /> {sorot.baru.golongan} sesudahnya
+          <button type="button" className="tb-cari-hapus" onClick={() => setSorot(null)}>
+            Hapus sorotan
+          </button>
+        </p>
+      )}
+
       <p className="tb-geser">Tabel dapat digeser ke samping untuk melihat kolom lainnya.</p>
 
       <div
@@ -191,8 +218,22 @@ export default function TabelGaji({ baris }: { baris: BarisTanggaGaji[] }) {
                 {kolom.map((b, k) => {
                   const a = b.anak.find((x) => x.mkg === m);
                   const aktif = mkgSah && berlaku[k]?.mkg === m;
+                  const jenisSorot = !a || !sorot
+                    ? undefined
+                    : b.golongan === sorot.baru.golongan && b.anak[anakBerlaku(b.anak, sorot.baru.mkg)]?.mkg === m
+                      ? "baru"
+                      : b.golongan === sorot.lama.golongan && b.anak[anakBerlaku(b.anak, sorot.lama.mkg)]?.mkg === m
+                        ? "lama"
+                        : undefined;
                   return (
-                    <td key={b.golongan} data-k={k} data-gaji={a ? "1" : undefined} data-berlaku={aktif ? "1" : undefined}>
+                    <td
+                      key={b.golongan}
+                      data-k={k}
+                      data-gaji={a ? "1" : undefined}
+                      data-berlaku={aktif ? "1" : undefined}
+                      data-sorot={jenisSorot}
+                      title={jenisSorot === "baru" ? "Gaji pokok sesudah kenaikan pangkat" : jenisSorot === "lama" ? "Gaji pokok sebelum kenaikan pangkat" : undefined}
+                    >
                       {a ? angka(a.gaji) : ""}
                     </td>
                   );

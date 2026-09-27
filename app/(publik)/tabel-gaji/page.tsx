@@ -4,12 +4,13 @@ import { tanggaGaji } from "@/lib/tabelGaji";
 import Kata from "../Kata";
 import LatarNavy from "@/app/_bersama/LatarNavy";
 import TabelGaji from "./TabelGaji";
+import KalkulatorKp from "./KalkulatorKp";
 import "./tabel-gaji.css";
 
 export const metadata: Metadata = {
   title: "Tabel Gaji Pokok PNS",
   description:
-    "Daftar gaji pokok Pegawai Negeri Sipil menurut golongan ruang dan masa kerja golongan, sesuai Lampiran Peraturan Pemerintah Nomor 5 Tahun 2024.",
+    "Daftar gaji pokok Pegawai Negeri Sipil menurut golongan ruang dan masa kerja golongan, sesuai Lampiran Peraturan Pemerintah Nomor 5 Tahun 2024, dengan simulasi kenaikan pangkat dan KGB sesudahnya.",
 };
 
 export default function HalamanTabelGaji() {
@@ -26,7 +27,8 @@ export default function HalamanTabelGaji() {
             <div className="tb-pengantar masuk" style={{ "--d": 180 } as React.CSSProperties}>
               <p className="pub-lead">
                 Gaji pokok menurut golongan ruang dan masa kerja golongan (MKG), berlaku sejak 1 Januari 2024. Kenaikan
-                gaji berkala memindahkan gaji pokok ke anak tangga berikutnya pada kolom yang sama.
+                gaji berkala memindahkan gaji pokok ke anak tangga berikutnya pada kolom yang sama; kenaikan pangkat
+                memindahkannya ke kolom golongan yang baru. <a href="#kalkulator">Simulasikan kenaikan pangkat</a>.
               </p>
               <p className="pub-meta">
                 Angka di halaman ini adalah tabel yang dipakai SIM-KGB untuk menghitung KGB. Seluruh 272 selnya
@@ -39,6 +41,10 @@ export default function HalamanTabelGaji() {
 
       <div className="pub-container tb">
         <div className="masuk" style={{ "--d": 260 } as React.CSSProperties}>
+          <KalkulatorKp />
+        </div>
+
+        <div id="tabel-gaji" className="tb-tabel-bagian">
           <TabelGaji baris={tanggaGaji()} />
         </div>
 

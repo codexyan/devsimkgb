@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
+import { SKRIP_GERAK_AWAL } from "@/lib/ui/gerakAwal";
 
 // Teks isi seluruh aplikasi (dashboard dan halaman publik)
 const inter = Inter({
@@ -47,6 +48,8 @@ export default function RootLayout({
             __html: `try{if(location.pathname.indexOf("/dashboard")===0){document.documentElement.setAttribute("data-dash-theme",localStorage.getItem("kgb-theme")==="dark"?"dark":"light")}}catch(e){}`,
           }}
         />
+        {/* Pilihan animasi (lib/ui/gerak.ts): dipasang sebelum hydration di semua halaman, publik maupun dashboard. */}
+        <script dangerouslySetInnerHTML={{ __html: SKRIP_GERAK_AWAL }} />
         {children}
       </body>
     </html>

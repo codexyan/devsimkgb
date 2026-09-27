@@ -1,21 +1,10 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useKurangiGerakBerlaku } from "@/lib/ui/gerak";
 
-/* Preferensi prefers-reduced-motion yang ikut berubah bila pengguna menggantinya saat halaman terbuka.
-   Server dan hidrasi pertama menganggap gerak boleh; gaya CSS tetap menjadi pengaman utama. */
-const kueri = "(prefers-reduced-motion: reduce)";
-
-function langganan(cb: () => void) {
-  const mq = window.matchMedia(kueri);
-  mq.addEventListener("change", cb);
-  return () => mq.removeEventListener("change", cb);
-}
-
+/* Apakah gerak dikurangi, menurut pilihan animasi pengguna (lib/ui/gerak.ts) atau pengaturan perangkat.
+   Ikut berubah bila salah satunya diganti saat halaman terbuka. Server dan hidrasi pertama menganggap gerak
+   boleh; gaya CSS tetap menjadi pengaman utama. */
 export function useKurangiGerak(): boolean {
-  return useSyncExternalStore(
-    langganan,
-    () => window.matchMedia(kueri).matches,
-    () => false,
-  );
+  return useKurangiGerakBerlaku();
 }

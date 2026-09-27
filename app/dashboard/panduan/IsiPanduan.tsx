@@ -125,6 +125,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                 </p>
                 <ol className="pub-steps">
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">UPT menyiapkan dan mengajukan usulan</h3>
                     <p className="pub-step-who">Admin UPT dan Kepala UPT</p>
                     <p>
@@ -134,8 +135,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       mengajukan.
                     </p>
                     <p className="pg-hasil">Hasil: usulan dan surat masuk ke Kanwil.</p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Agenda, disposisi, dan tinjauan usulan</h3>
                     <p className="pub-step-who">Tata Usaha, Kepala Kanwil, dan Tim SDM KGB</p>
                     <p>
@@ -145,8 +148,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       proses KGB pegawainya tertahan.
                     </p>
                     <p className="pg-hasil">Hasil: data pegawai sesuai SK yang dilampirkan UPT.</p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Input KGB dan Buat SK</h3>
                     <p className="pub-step-who">Tim SDM KGB</p>
                     <p>
@@ -156,14 +161,18 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                     <p className="pg-hasil">
                       Hasil: status <Status status="sedang_diproses" />.
                     </p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Tanda tangan elektronik SK</h3>
                     <p className="pub-step-who">Kepala Kanwil, atau Plh, Plt, atau Direktur Jenderal sesuai keadaan</p>
                     <p>SK versi Srikandi ditandatangani secara elektronik di Srikandi.</p>
                     <p className="pg-hasil">Hasil: SK sah dan siap dikirim.</p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Pengiriman SK</h3>
                     <p className="pub-step-who">Tim SDM KGB</p>
                     <p>
@@ -171,8 +180,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       satker.
                     </p>
                     <p className="pg-hasil">Hasil: ketiga penerima memegang SK yang sama.</p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Unggah SK ke SIM-KGB</h3>
                     <p className="pub-step-who">Tim SDM KGB</p>
                     <p>
@@ -182,8 +193,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                     <p className="pg-hasil">
                       Hasil: status <Status status="menunggu_keuangan" />.
                     </p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Rekam di Gaji Web dan jadwal berikutnya</h3>
                     <p className="pub-step-who">Keuangan Kanwil untuk pegawai Kanwil; keuangan UPT untuk pegawai UPT</p>
                     <p>
@@ -196,6 +209,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       Hasil: status <Status status="selesai" />, dan KGB berikutnya tercatat{" "}
                       <Status status="belum_diproses" />.
                     </p>
+                  </div>
                   </li>
                 </ol>
                 <div className="pub-note">
@@ -1068,6 +1082,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                 </p>
                 <ol className="pub-steps">
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Tinjau usulan UPT</h3>
                     <p className="pub-step-who">
                       Tim SDM KGB atau Super Admin, menu Usulan UPT atau tombol Tinjau usulan UPT di Antrian kerja KGB
@@ -1083,8 +1098,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       dan SK-nya belum diunggah, perhitungannya disesuaikan otomatis saat usulan disetujui. Selama usulan
                       menunggu, baris pegawai bertanda Tertahan usulan UPT dan langkah prosesnya ditolak.
                     </p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Periksa data pegawai</h3>
                     <p className="pub-step-who">Tim SDM, menu Data Pegawai</p>
                     <p>
@@ -1111,8 +1128,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       Golongan, masa kerja golongan, dan TMT KGB tidak dapat diubah selama KGB pegawai berstatus{" "}
                       <Status status="sedang_diproses" /> atau <Status status="menunggu_keuangan" />.
                     </p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Pastikan data penandatangan berlaku</h3>
                     <p className="pub-step-who">Super Admin, menu Pengaturan</p>
                     <p>
@@ -1120,8 +1139,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       akan dibuat: Kepala Kanwil, atau Plh atau Plt dengan dasar penunjukannya. Untuk KGB milik Kepala
                       Kanwil, data Direktur Jenderal juga harus terisi.
                     </p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Input KGB</h3>
                     <p className="pub-step-who">Tim SDM, menu Dashboard atau Proses KGB</p>
                     <p>
@@ -1162,8 +1183,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       Input setelah batas proses tetap diterima dan KGB ditandai <TandaRapelan />. Tanda ini dihitung
                       otomatis dari tanggal Input KGB dan tidak dapat diubah Tim SDM.
                     </p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Buat SK</h3>
                     <p className="pub-step-who">Tim SDM, kartu atau baris berstatus Sedang Diproses</p>
                     <p>
@@ -1183,8 +1206,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       SK ditujukan kepada Kepala KPPN mitra satker menurut Unit Kerja pegawai. Bila Unit Kerja belum sesuai
                       daftar satker, SK tidak dapat dibuat atau diunduh ulang sampai Data Pegawai diperbarui.
                     </p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Tanda tangan elektronik di Srikandi</h3>
                     <p className="pub-step-who">Tim SDM menyiapkan naskah; penandatangan melakukan TTE</p>
                     <p>
@@ -1198,8 +1223,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       tembusan yang diisi saat registrasi; pada alur Srikandi, pengiriman dapat merupakan langkah tersendiri
                       setelah tanda tangan.
                     </p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Unggah SK yang sudah ditandatangani</h3>
                     <p className="pub-step-who">Tim SDM, kartu atau baris berstatus Sedang Diproses</p>
                     <p>
@@ -1210,8 +1237,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       langsung dapat diunduh UPT-nya dan menunggu keuangan satker merekamnya di Gaji Web (ubin Di
                       keuangan, bagian rekam UPT).
                     </p>
+                  </div>
                   </li>
                   <li>
+                    <div className="pg-langkah">
                     <h3 className="pub-step-title">Bila ada data yang salah</h3>
                     <p className="pub-step-who">
                       Tim SDM, kartu Sedang Diproses di Dashboard atau Detail KGB di menu Proses KGB
@@ -1228,6 +1257,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       Hapus catatan hukuman disiplin itu terlebih dahulu, batalkan KGB, lalu catat kembali hukuman disiplin
                       setelah KGB diinput ulang.
                     </p>
+                  </div>
                   </li>
                 </ol>
 

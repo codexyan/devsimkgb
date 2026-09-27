@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { jadwalPengusulan } from "./jadwalPengusulan";
+import { jadwalPengusulan, ruasTahap, sekarangJadwal } from "./jadwalPengusulan";
 import { hitungDeadlineSDM, hitungKirimSurat, hitungRekonGaji } from "./tabelGaji";
 import { statusJamLayanan } from "./jamLayanan";
 
@@ -76,3 +76,40 @@ test("surat usulan dikirim 1 sampai 10 bulan kedua sebelum TMT, sebelum batas in
   // Pergantian tahun: TMT 1 Januari 2027 → surat November 2026.
   assert.equal(iso(hitungKirimSurat(tgl(2027, 1, 1)).mulai), "2026-11-01");
 });
+
+test("penanda hari ini: tahap berjalan, sisa hari, dan urutan surat → input → rekon", () => {
+  const [b] = jadwalPengusulan(1, tgl(2026, 9, 18)); // TMT 1 November 2026
+  const pada = (bulan: number, hari: number) => sekarangJadwal(b, tgl(2026, bulan, hari));
+
+  // Surat dan input dibuka bersamaan; selama surat masih boleh dikirim, surat yang ditampilkan.
+  assert.deepEqual(pick(pada(9, 7)), ["berjalan", "surat", 4, "Kirim surat · 4 hari lagi"]);
+  assert.deepEqual(pick(pada(9, 10)), ["berjalan", "surat", 1, "Kirim surat · hari terakhir"]);
+  assert.deepEqual(pick(pada(9, 11)), ["berjalan", "input", 10, "Input SIM-KGB · 10 hari lagi"]);
+  assert.deepEqual(pick(pada(9, 20)), ["berjalan", "input", 1, "Input SIM-KGB · hari terakhir"]);
+  assert.deepEqual(pick(pada(9, 21)), ["menunggu", "rekon", 10, "Menunggu rekon · 10 hari lagi"]);
+  assert.deepEqual(pick(pada(9, 30)), ["menunggu", "rekon", 1, "Menunggu rekon · besok"]);
+  assert.deepEqual(pick(pada(10, 1)), ["berjalan", "rekon", 15, "Rekon Gaji Web · 15 hari lagi"]);
+  assert.deepEqual(pick(pada(10, 16)), ["selesai", null, 0, "Rekon gaji selesai"]);
+  assert.deepEqual(pick(pada(8, 28)), ["menunggu", "surat", 4, "Dibuka 4 hari lagi"]);
+});
+
+test("posisi hari ini dan ruas tahap pada garis kemajuan", () => {
+  const [b] = jadwalPengusulan(1, tgl(2026, 9, 18)); // rentang 1 September sampai 15 Oktober = 45 hari
+  assert.equal(sekarangJadwal(b, tgl(2026, 8, 31)).posisi, null);
+  assert.equal(sekarangJadwal(b, tgl(2026, 10, 16)).posisi, null);
+  assert.equal(sekarangJadwal(b, tgl(2026, 9, 1)).posisi, 0.5 / 45);
+  assert.equal(sekarangJadwal(b, tgl(2026, 10, 15)).posisi, 44.5 / 45);
+  assert.deepEqual(
+    ruasTahap(b).map((r) => [r.tahap, Math.round(r.awal * 45), Math.round(r.akhir * 45)]),
+    [["surat", 0, 10], ["input", 0, 20], ["rekon", 30, 45]],
+  );
+});
+
+test("kartu jadwal membawa penanda hari ini: hari ini 27 September menunggu surat TMT Desember", () => {
+  const [b] = jadwalPengusulan(1, tgl(2026, 9, 27));
+  assert.equal(iso(b.tmt), "2026-12-01");
+  assert.equal(b.sekarang.teks, "Dibuka 4 hari lagi");
+  assert.equal(b.sekarang.posisi, null);
+});
+
+const pick = (s: ReturnType<typeof sekarangJadwal>) => [s.keadaan, s.tahap, s.sisaHari, s.teks];

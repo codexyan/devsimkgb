@@ -1028,7 +1028,33 @@ html[data-muncul="siap"] .pub .beranda [data-muncul]:not([data-muncul="1"]) {
 }
 
 .pub .jd-rinci dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   color: var(--muted);
+}
+
+/* Warna tahap: sama pada titik keterangan dan ruas garis kemajuan */
+.pub .jd-titik,
+.pub .jd-ruas {
+  --warna-tahap: var(--biru);
+}
+
+.pub [data-tahap="input"].jd-titik,
+.pub [data-tahap="input"].jd-ruas {
+  --warna-tahap: color-mix(in srgb, var(--biru) 38%, var(--kartu));
+}
+
+.pub [data-tahap="rekon"].jd-titik,
+.pub [data-tahap="rekon"].jd-ruas {
+  --warna-tahap: var(--emas-garis);
+}
+
+.pub .jd-titik {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--warna-tahap);
 }
 
 .pub .jd-rinci dd {
@@ -1038,14 +1064,112 @@ html[data-muncul="siap"] .pub .beranda [data-muncul]:not([data-muncul="1"]) {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Garis tiga tahap dan penanda hari ini ── */
+.pub .jd-lini {
+  position: relative;
+  height: 6px;
+  margin: auto 0 0;
+  border-radius: 999px;
+  background: var(--line-soft);
+}
+
+/* Beri ruang untuk label "Hari ini" di atas garis */
+.pub .jd-rinci + .jd-lini {
+  margin-top: 30px;
+}
+
+.pub .jd-ruas {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--awal) * 100%);
+  width: calc((var(--akhir) - var(--awal)) * 100%);
+  border-radius: 999px;
+  background: var(--warna-tahap);
+  opacity: 0.55;
+  transform-origin: 0 50%;
+  animation: jdRuas 700ms var(--ease-out) backwards;
+}
+
+/* Surat tergambar di atas input: keduanya dibuka bersamaan, surat tutup lebih dulu */
+.pub .jd-ruas[data-tahap="surat"] {
+  z-index: 1;
+  animation-delay: 120ms;
+}
+
+.pub .jd-ruas[data-tahap="rekon"] {
+  animation-delay: 240ms;
+}
+
+.pub .jd-ruas[data-kini] {
+  opacity: 1;
+}
+
+/* Waktu yang sudah lewat dalam rentang ini, diarsir tipis */
+.pub .jd-lewat {
+  position: absolute;
+  z-index: 2;
+  inset: 0 auto 0 0;
+  width: calc(var(--posisi) * 100%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+  transform-origin: 0 50%;
+  animation: jdRuas 900ms var(--ease-out) 300ms backwards;
+}
+
+.pub .jd-kini {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: calc(var(--posisi) * 100%);
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px var(--kartu);
+  animation: jdKini 500ms var(--ease-out) 900ms backwards;
+}
+
+.pub .jd-kartu[data-keadaan="terbuka"] .jd-kini {
+  box-shadow: 0 0 0 3px var(--emas-lembut);
+}
+
+/* Label bergeser mengikuti posisi agar tetap di dalam kartu, dari rata kiri sampai rata kanan */
+.pub .jd-kini-label {
+  position: absolute;
+  bottom: 18px;
+  left: 6px;
+  transform: translateX(calc(var(--posisi) * -100%));
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+@keyframes jdRuas {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes jdKini {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
 .pub .jd-keadaan {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
   gap: 8px;
-  margin: auto 0 0;
+  margin: 0;
   padding: 14px 0 0;
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
 

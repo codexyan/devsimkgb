@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { kurangiGerak as kurangiGerakPengguna } from "@/lib/ui/gerak";
 
 /* Tombol kembali ke atas. Baru muncul setelah bagian atas halaman lewat, ditentukan lewat
    IntersectionObserver pada penanda #puncak di layout, bukan pendengar gulir. */
@@ -24,7 +25,7 @@ export default function DokPublik() {
       tabIndex={tampak ? 0 : -1}
       aria-label="Kembali ke atas"
       onClick={() => {
-        const kurangiGerak = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const kurangiGerak = kurangiGerakPengguna();
         window.scrollTo({ top: 0, behavior: kurangiGerak ? "auto" : "smooth" });
         document.getElementById("konten")?.focus({ preventScroll: true });
       }}

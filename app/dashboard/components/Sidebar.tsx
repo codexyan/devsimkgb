@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { ROLES, ROLE_LABEL } from "@/lib/auth";
 import { useThemeMode } from "@/lib/ui/themeMode";
+import { LABEL_GERAK, usePilihanGerak, useKurangiGerakBerlaku, type PilihanGerak } from "@/lib/ui/gerak";
 
 interface SidebarProps {
   role: string;
@@ -45,6 +46,7 @@ const Ic = {
   close:     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>,
   gear:      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>,
   sun:       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><circle cx="12" cy="12" r="4.4"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.2 5.2l1.7 1.7M17.1 17.1l1.7 1.7M18.8 5.2l-1.7 1.7M6.9 17.1l-1.7 1.7"/></svg>,
+  gerak:     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4M5 7h6M5 17h6"/><circle cx="16.5" cy="12" r="4.5"/></svg>,
   moon:      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20.6 14.2A8.6 8.6 0 0 1 9.8 3.4a8.6 8.6 0 1 0 10.8 10.8z"/></svg>,
   chevDown:  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>,
   cadangan:  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>,
@@ -322,6 +324,12 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
   const [showNotif,   setShowNotif]   = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [themeMode, toggleTheme]      = useThemeMode();
+  // Pilihan animasi (lib/ui/gerak.ts): berputar Ikuti perangkat → Nyala → Kurangi.
+  const [pilihanGerak, ubahGerak]     = usePilihanGerak();
+  const gerakDikurangi                = useKurangiGerakBerlaku();
+  const gerakBerikut: Record<PilihanGerak, PilihanGerak> = { sistem: "nyala", nyala: "kurangi", kurangi: "sistem" };
+  const keteranganGerak =
+    `Animasi: ${LABEL_GERAK[pilihanGerak]}${pilihanGerak === "sistem" ? (gerakDikurangi ? " (perangkat mematikan animasi)" : " (nyala)") : ""}. Klik untuk mengganti.`;
   // Di bawah 640px sidebar berupa laci dan layar terlalu sempit untuk panel selebar 296px yang
   // dipasang pada offset sidebar; panel dibuat melebar mengikuti layar. Dibaca dari matchMedia, dengan
   // hasil render server selalu "lebar" agar hidrasi tidak berbeda.
@@ -839,6 +847,38 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
             {expanded && (
               <span style={{ fontSize: "12px", fontWeight: 500 }}>
                 {themeMode === "dark" ? "Mode Terang" : "Mode Gelap"}
+              </span>
+            )}
+          </button>
+
+          {/* Pilihan animasi: perangkat kantor sering mematikan efek animasi, sehingga gerak SIM-KGB ikut mati. */}
+          <button
+            onClick={() => ubahGerak(gerakBerikut[pilihanGerak])}
+            title={keteranganGerak}
+            aria-label={keteranganGerak}
+            className="sb-btn"
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: expanded ? "10px" : 0,
+              justifyContent: expanded ? "flex-start" : "center",
+              padding: expanded ? "7px 10px" : "7px",
+              borderRadius: "9px",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              color: SB.text,
+            }}
+          >
+            <span style={{ flexShrink: 0, display: "flex", color: gerakDikurangi ? SB.icon : SB.goldHi }}>{Ic.gerak}</span>
+            {expanded && (
+              <span style={{ fontSize: "12px", fontWeight: 500, display: "flex", flexDirection: "column", lineHeight: 1.25, textAlign: "left" }}>
+                Animasi: {LABEL_GERAK[pilihanGerak]}
+                {pilihanGerak === "sistem" && gerakDikurangi && (
+                  <span style={{ fontSize: "10px", fontWeight: 400, color: SB.icon }}>Perangkat mematikan animasi</span>
+                )}
               </span>
             )}
           </button>

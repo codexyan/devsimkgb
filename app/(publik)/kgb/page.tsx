@@ -216,7 +216,7 @@ export default async function HalamanBeranda() {
             label="Jadwal"
             id="judul-jadwal"
             judul="Jadwal pengusulan"
-            keterangan="Dihitung dari hari ini. Kirim surat sebelum input dibuka; SK harus selesai sebelum keuangan merekon gaji di Gaji Web, agar gaji baru terbayar mulai TMT."
+            keterangan="Dihitung dari hari ini dan bergeser sendiri ke TMT berikutnya setelah batas input Tim SDM lewat. SK harus selesai sebelum keuangan merekon gaji di Gaji Web, agar gaji baru terbayar mulai TMT."
             aksi={
               <a href="#info-jadwal" className="sx-tautan">
                 Aturan jadwal
@@ -238,26 +238,53 @@ export default async function HalamanBeranda() {
                 <p className="jd-tmt">{formatTanggalId(b.tmt)}</p>
                 <dl className="jd-rinci">
                   <div>
-                    <dt>Kirim surat</dt>
+                    <dt><span className="jd-titik" data-tahap="surat" aria-hidden="true" />Kirim surat</dt>
                     <dd>
                       {tanggalBulan(b.kirimSurat)} sampai {tanggalPendek(b.kirimSuratBatas)}
                     </dd>
                   </div>
                   <div>
-                    <dt>Input SIM-KGB</dt>
+                    <dt><span className="jd-titik" data-tahap="input" aria-hidden="true" />Input SIM-KGB</dt>
                     <dd>
                       {tanggalBulan(b.inputDibuka)} sampai {tanggalPendek(b.batasInput)}
                     </dd>
                   </div>
                   <div>
-                    <dt>Rekon Gaji Web</dt>
+                    <dt><span className="jd-titik" data-tahap="rekon" aria-hidden="true" />Rekon Gaji Web</dt>
                     <dd>
                       {tanggalBulan(b.rekonMulai)} sampai {tanggalPendek(b.rekonBatas)}
                     </dd>
                   </div>
                 </dl>
-                <p className="jd-keadaan">
-                  {b.keadaan === "terbuka" ? "Input sedang dibuka" : `Dibuka ${tanggalPendek(b.inputDibuka)}`}
+                {/* Garis tiga tahap dari kirim surat sampai akhir rekon, dengan penanda hari ini bila jatuh di dalamnya.
+                    Hiasan saja: tahap dan sisa harinya sudah tertulis pada kalimat di bawahnya. */}
+                <div
+                  className="jd-lini"
+                  aria-hidden="true"
+                  style={{ "--posisi": b.sekarang.posisi ?? 0 } as React.CSSProperties}
+                >
+                  {b.ruas.map((r) => (
+                    <span
+                      key={r.tahap}
+                      className="jd-ruas"
+                      data-tahap={r.tahap}
+                      data-kini={b.sekarang.keadaan === "berjalan" && b.sekarang.tahap === r.tahap ? "" : undefined}
+                      style={{ "--awal": r.awal, "--akhir": r.akhir } as React.CSSProperties}
+                    />
+                  ))}
+                  {b.sekarang.posisi !== null && (
+                    <>
+                      <span className="jd-lewat" />
+                      <span className="jd-kini">
+                        <span className="jd-kini-label">Hari ini</span>
+                      </span>
+                    </>
+                  )}
+                </div>
+                <p className="jd-keadaan" data-sekarang={b.sekarang.keadaan}>
+                  {b.sekarang.keadaan === "menunggu" && b.sekarang.tahap === "surat"
+                    ? `Dibuka ${tanggalPendek(b.kirimSurat)} · ${b.sekarang.sisaHari === 1 ? "besok" : `${b.sekarang.sisaHari} hari lagi`}`
+                    : b.sekarang.teks}
                 </p>
               </li>
             ))}

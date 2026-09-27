@@ -178,5 +178,6 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
 .kgbm-item-data div { display: flex; gap: 6px; min-width: 0; }
 .kgbm-item-data dt { color: var(--dt5); flex-shrink: 0; }
 .kgbm-item-data dd { margin: 0; color: var(--dtn); font-weight: 500; overflow-wrap: anywhere; }
-@media (prefers-reduced-motion: reduce) { .kgbm-latar, .kgbm-panel { animation: none; } .kgbm-putar { animation-duration: 2.4s; } }
+@media (prefers-reduced-motion: reduce) { html:not([data-gerak]) .kgbm-latar, html:not([data-gerak]) .kgbm-panel { animation: none; } html:not([data-gerak]) .kgbm-putar { animation-duration: 2.4s; } }
+html[data-gerak="kurangi"] .kgbm-latar, html[data-gerak="kurangi"] .kgbm-panel { animation: none; } html[data-gerak="kurangi"] .kgbm-putar { animation-duration: 2.4s; }
 `;

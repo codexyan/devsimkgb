@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { cariPeran, daftarUntuk, PERAN, pilihanSah, SEMUA, type BagianPanduan } from "./peran";
+import { kurangiGerak as kurangiGerakPengguna } from "@/lib/ui/gerak";
 
 /* Navigasi panduan dashboard. Bagian yang tampil mengikuti peran akun yang masuk (dipilih server, jadi tidak
    ada kedipan); pembaca boleh beralih ke peran lain atau membaca seluruhnya. Pilihan dipasang pada atribut
@@ -15,7 +16,7 @@ interface KeadaanPanduan {
 
 const KonteksPanduan = createContext<KeadaanPanduan>({ pilihan: SEMUA, pilih: () => {} });
 
-const kurangiGerak = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const kurangiGerak = () => kurangiGerakPengguna();
 
 function gulirKe(id: string) {
   requestAnimationFrame(() => {
