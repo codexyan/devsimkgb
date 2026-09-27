@@ -106,7 +106,7 @@ html[data-dash-theme="dark"] .bg-gray-50 { background-color: var(--sub); }
 
 /* Halaman publik: latar kanvas (area overscroll di luar .pub) sama dengan
    latar halaman publik. */
-html:has(.pub) {
+html:has(.pub:not(.pg-dasbor)) {
   background-color: #f6f8fb;
 }
 

@@ -47,6 +47,7 @@ const Ic = {
   sun:       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><circle cx="12" cy="12" r="4.4"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.2 5.2l1.7 1.7M17.1 17.1l1.7 1.7M18.8 5.2l-1.7 1.7M6.9 17.1l-1.7 1.7"/></svg>,
   moon:      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20.6 14.2A8.6 8.6 0 0 1 9.8 3.4a8.6 8.6 0 1 0 10.8 10.8z"/></svg>,
   chevDown:  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>,
+  cadangan:  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>,
   dot:       <svg width="7" height="7" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="3"/></svg>,
 };
 
@@ -131,9 +132,13 @@ const menuAdminUpt: Entry[] = [
   { href: "/dashboard/upt/riwayat", label: "Riwayat", icon: Ic.history },
   { href: "/dashboard/profile", label: "Profil Saya", icon: Ic.person },
 ];
-// Panduan berada di halaman publik; dibuka di tab baru agar pekerjaan di dashboard tidak hilang.
+// Panduan kerja per peran di dalam dashboard; halaman publik hanya memuat info untuk pegawai.
 const menuBantuan: Leaf[] = [
-  { href: "/panduan", label: "Panduan", icon: Ic.book, newTab: true },
+  { href: "/dashboard/panduan", label: "Panduan", icon: Ic.book },
+];
+// Cadangan data bulanan wajib untuk semua peran selama SIM-KGB disempurnakan (ADR-018).
+const menuCadangan: Leaf[] = [
+  { href: "/dashboard/cadangan", label: "Cadangkan data", icon: Ic.cadangan },
 ];
 const menuAdmin = [
   { href: "/dashboard/users",         label: "Pengguna",      icon: Ic.person  },
@@ -565,7 +570,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
 
           {/* Bantuan (semua peran, termasuk keuangan) */}
           <GroupLabel text="Bantuan" expanded={expanded} />
-          {menuBantuan.map((item) => (
+          {[...menuBantuan, ...menuCadangan].map((item) => (
             <NavItem
               key={item.href}
               {...item}

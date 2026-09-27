@@ -140,6 +140,7 @@ async function utama() {
       role: ROLES.ADMIN_UPT,
       createdAt: new Date(),
       satker: r.kodeSatker,
+      cadanganTerakhirAt: null,
     });
     // Pelakunya skrip, bukan pengguna yang login, jadi userId dikosongkan seperti entri Sistem.
     logAudit({

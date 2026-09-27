@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Sidebar from "./Sidebar";
+import PengingatCadangan from "./cadangan/PengingatCadangan";
 import { RoleContext, UserContext } from "./RoleContext";
 import { useDialogModal } from "./useDialogModal";
 import { useThemeMode } from "@/lib/ui/themeMode";
@@ -160,6 +161,7 @@ export default function DashboardShell({ nama, nip, role, sesiTimeoutMenit = 60,
       >
         <RoleContext.Provider value={role}>
           <UserContext.Provider value={{ nama, nip, role }}>
+            <PengingatCadangan />
             {children}
           </UserContext.Provider>
         </RoleContext.Provider>

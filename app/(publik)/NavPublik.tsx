@@ -16,11 +16,11 @@ const TAUTAN: Tautan[] = [
   { href: "/kgb#beranda", label: "Cek status", bagian: "beranda" },
   { href: "/kgb#alur", label: "Alur", bagian: "alur" },
   { href: "/kgb#jadwal", label: "Jadwal", bagian: "jadwal" },
+  { href: "/kgb#info-pegawai", label: "Info pegawai", bagian: "info-pegawai" },
   { href: "/tabel-gaji", label: "Tabel gaji" },
-  { href: "/panduan", label: "Panduan" },
 ];
 
-const BAGIAN_BERANDA = ["beranda", "alur", "jadwal", "status", "bantuan"];
+const BAGIAN_BERANDA = ["beranda", "alur", "jadwal", "status", "info-pegawai", "bantuan"];
 
 /* Nav publik. Di puncak halaman bilahnya menyatu dengan latar; setelah digulir ia mendapat latar kaca dan
    garis kemajuan baca. Titik kecil di bawah tautan menandai halaman atau bagian yang aktif. Di layar

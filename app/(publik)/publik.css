@@ -1,6 +1,7 @@
 /* ══════════════════════════════════════════════════════════════════════
    publik.css: gaya bersama halaman publik SIM-KGB
-   (/kgb, /tabel-gaji, /panduan, /login)
+   (/kgb, /tabel-gaji, /login), juga dipakai isi panduan dashboard
+   (/dashboard/panduan, di dalam pembungkus .pub.pg-dasbor)
 
    Diimpor app/(publik)/layout.tsx. Semua selektor di bawah .pub sehingga
    dashboard tidak terpengaruh. Kerangka (nav, kaki, dok) ada di kerangka.css;

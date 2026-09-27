@@ -22,22 +22,22 @@ export const metadata: Metadata = {
 // Jadwal pengusulan dihitung dari tanggal hari ini (WITA), jadi halaman dirender per permintaan.
 export const dynamic = "force-dynamic";
 
-/* Tujuh langkah satu usulan KGB, sama dengan alur singkat di panduan. */
+/* Enam langkah satu usulan KGB, sama dengan alur singkat di panduan dashboard (app/dashboard/panduan). */
 const LANGKAH: { judul: string; pelaksana: string; isi: string; status?: StatusKgb }[] = [
   {
-    judul: "UPT mengirim surat permohonan",
-    pelaksana: "Admin kepegawaian dan Kepala UPT",
-    isi: "Surat berisi daftar pegawai yang diusulkan beserta lampirannya, ditandatangani elektronik dan dikirim lewat Srikandi kepada Kepala Kanwil.",
+    judul: "UPT menyiapkan dan mengajukan usulan",
+    pelaksana: "Admin UPT dan Kepala UPT",
+    isi: "Data pegawai yang KGB-nya jatuh tempo diperiksa di SIM-KGB, perbaikan dan berkas SK dasarnya disiapkan, lalu diajukan ke Kanwil bersama surat usulan Srikandi yang ditandatangani Kepala UPT.",
   },
   {
-    judul: "Agenda dan disposisi",
-    pelaksana: "Tata Usaha, Kepala Kanwil, Kabag TU dan Umum",
-    isi: "Tata Usaha mencatat surat pada Lembar Disposisi. Kepala Kanwil memberi disposisi yang diteruskan kepada Ketua Tim SDM.",
+    judul: "Kanwil meninjau usulan",
+    pelaksana: "Tim SDM Kanwil",
+    isi: "Surat dicatat dan didisposisikan. Usulan perbaikan data disetujui atau dikembalikan untuk diperbaiki; selama belum ditinjau, proses KGB pegawainya tertahan.",
   },
   {
     judul: "Input KGB dan buat SK",
     pelaksana: "Tim SDM Kanwil",
-    isi: "Data dicocokkan dengan lampiran. Masa kerja dan gaji pokok baru dihitung dari tabel gaji, lalu SK dibuat di SIM-KGB.",
+    isi: "Masa kerja dan gaji pokok baru dihitung dari tabel gaji PP 5/2024, lalu SK dibuat di SIM-KGB.",
     status: "sedang_diproses",
   },
   {
@@ -46,27 +46,22 @@ const LANGKAH: { judul: string; pelaksana: string; isi: string; status?: StatusK
     isi: "SK versi Srikandi ditandatangani secara elektronik oleh pejabat yang berwenang pada tanggal SK.",
   },
   {
-    judul: "Pengiriman SK",
+    judul: "Unggah dan kirim SK",
     pelaksana: "Tim SDM Kanwil",
-    isi: "SK yang sudah ditandatangani dikirim kepada UPT pengusul, bagian keuangan UPT, dan KPPN mitra satker.",
-  },
-  {
-    judul: "Unggah SK ke SIM-KGB",
-    pelaksana: "Tim SDM Kanwil",
-    isi: "Berkas PDF SK yang sudah ditandatangani diunggah lewat tombol Unggah SK TTE.",
+    isi: "SK bertanda tangan diunggah ke SIM-KGB, sehingga langsung dapat diunduh UPT, dan dikirim kepada UPT serta KPPN mitra satker.",
     status: "menunggu_keuangan",
   },
   {
-    judul: "Konfirmasi keuangan",
-    pelaksana: "Bagian keuangan",
-    isi: "SK diperiksa dan dikonfirmasi, termasuk bila ada rapelan. SIM-KGB lalu menjadwalkan KGB berikutnya.",
+    judul: "Rekam di Gaji Web",
+    pelaksana: "Keuangan Kanwil atau keuangan satker",
+    isi: "Pegawai Kanwil oleh keuangan Kanwil; pegawai UPT oleh keuangan satkernya lewat akun Admin UPT. Rapelan ditetapkan, SK direkam di Gaji Web, lalu SIM-KGB menjadwalkan KGB berikutnya.",
     status: "selesai",
   },
 ];
 
 const FAKTA = [
   { nilai: "2 tahun", label: "Selang kenaikan gaji berkala" },
-  { nilai: "7 tahap", label: "Dari surat UPT sampai konfirmasi keuangan" },
+  { nilai: "6 tahap", label: "Dari usulan UPT sampai direkam di Gaji Web" },
   { nilai: "PP 5/2024", label: "Dasar tabel gaji pokok yang dipakai" },
 ];
 
@@ -146,7 +141,8 @@ export default async function HalamanBeranda() {
                 <CekStatus />
               </div>
               <p className="hr-bantu masuk" style={{ "--d": 380 } as React.CSSProperties}>
-                Admin UPT yang akan mengusulkan? <Link href="/panduan#untuk-upt">Baca panduan menyiapkan surat</Link>
+                Admin UPT atau petugas Kanwil? <Link href="/login">Masuk ke SIM-KGB</Link> untuk membaca panduan sesuai
+                peran Anda.
               </p>
             </div>
 
@@ -174,7 +170,7 @@ export default async function HalamanBeranda() {
             label="Alur"
             id="judul-alur"
             judul="Perjalanan satu usulan"
-            keterangan="Dari surat UPT sampai SK dikonfirmasi keuangan. Status KGB berubah di tiga titik sepanjang jalan."
+            keterangan="Dari usulan UPT sampai SK direkam keuangan di Gaji Web. Status KGB berubah di tiga titik sepanjang jalan."
           />
 
           <ol className="al">
@@ -198,10 +194,13 @@ export default async function HalamanBeranda() {
             ))}
             <li className="al-kartu al-ajak pub-navy" data-muncul="" style={{ "--i": LANGKAH.length } as React.CSSProperties}>
               <LatarNavy />
-              <p className="al-ajak-judul">Tujuh langkah, satu SK.</p>
-              <p className="al-ajak-isi">Rincian tiap langkah, contoh surat, dan lembar disposisi ada di panduan.</p>
-              <Link href="/panduan#ringkasan" className="al-ajak-tautan">
-                Alur lengkap di panduan
+              <p className="al-ajak-judul">Enam langkah, satu SK.</p>
+              <p className="al-ajak-isi">
+                Rincian tiap langkah untuk petugas UPT dan Kanwil ada di panduan di dalam SIM-KGB, sesuai peran
+                masing-masing.
+              </p>
+              <Link href="/login" className="al-ajak-tautan">
+                Masuk untuk petugas
                 {Panah}
               </Link>
             </li>
@@ -219,10 +218,10 @@ export default async function HalamanBeranda() {
             judul="Jadwal pengusulan"
             keterangan="Dihitung dari hari ini. Kirim surat sebelum input dibuka; SK harus selesai sebelum keuangan merekon gaji di Gaji Web, agar gaji baru terbayar mulai TMT."
             aksi={
-              <Link href="/panduan#jadwal" className="sx-tautan">
+              <a href="#info-jadwal" className="sx-tautan">
                 Aturan jadwal
                 {Panah}
-              </Link>
+              </a>
             }
           />
 
@@ -274,7 +273,10 @@ export default async function HalamanBeranda() {
             </li>
             <li data-muncul="" style={{ "--i": 1 } as React.CSSProperties}>
               <h3>Surat tetap wajib</h3>
-              <p>Walaupun data pegawai sudah ada di SIM-KGB, surat UPT tetap menjadi dasar agenda dan disposisi.</p>
+              <p>
+                Usulan disiapkan di SIM-KGB, tetapi surat usulan UPT lewat Srikandi tetap menjadi dasar agenda dan
+                disposisi di Kanwil.
+              </p>
             </li>
             <li data-muncul="" style={{ "--i": 2 } as React.CSSProperties}>
               <h3>Terlambat tetap diproses</h3>
@@ -284,21 +286,21 @@ export default async function HalamanBeranda() {
               <h3>Baru diangkat PNS</h3>
               <p>
                 Masa kerja golongan dihitung sejak TMT CPNS, jadi KGB pertama tidak bergeser walau SK pengangkatan PNS
-                terbit belakangan. <Link href="/panduan#cpns-pns">Cara menghitung dan merapelnya</Link>.
+                terbit belakangan. <a href="#info-cpns">Cara menghitung dan merapelnya</a>.
               </p>
             </li>
             <li data-muncul="" style={{ "--i": 4 } as React.CSSProperties}>
               <h3>Setelah naik pangkat</h3>
               <p>
                 Golongan baru memotong masa kerja golongan, sehingga dasar gaji KGB berikutnya berubah, tetapi jadwal dua
-                tahunannya tetap. <Link href="/panduan#kenaikan-pangkat">Aturan potongannya</Link>.
+                tahunannya tetap. <a href="#info-pangkat">Aturan potongannya</a>.
               </p>
             </li>
             <li data-muncul="" style={{ "--i": 5 } as React.CSSProperties}>
               <h3>Akun untuk UPT</h3>
               <p>
-                UPT dapat meminta akun lihat-saja untuk memantau jadwal KGB pegawainya sendiri dan mengunduh SK yang
-                sudah selesai. <Link href="/panduan#untuk-upt">Cara memintanya</Link>.
+                Setiap UPT memegang akun Admin UPT untuk menyiapkan usulan, melaporkan mutasi dan hukuman disiplin,
+                mengunduh SK begitu diunggah Kanwil, dan menandai SK yang sudah direkam di Gaji Web satker.
               </p>
             </li>
           </ul>
@@ -315,10 +317,10 @@ export default async function HalamanBeranda() {
             judul="Arti status"
             keterangan="Status yang tampil saat NIP dicek, berurutan sesuai tahap usulan yang sedang berjalan."
             aksi={
-              <Link href="/panduan#pertanyaan" className="sx-tautan">
+              <a href="#info-tanya" className="sx-tautan">
                 Pertanyaan umum
                 {Panah}
-              </Link>
+              </a>
             }
           />
 
@@ -349,7 +351,132 @@ export default async function HalamanBeranda() {
                 </dt>
                 <dd>Tanda tambahan, bukan status: KGB diinput setelah batas waktu. TMT tetap sama.</dd>
               </div>
+              <div>
+                <dt>
+                  <span className="pub-status st-tanda">Tertahan usulan UPT</span>
+                </dt>
+                <dd>
+                  Keterangan di SIM-KGB, bukan status: satker mengusulkan perbaikan data pegawai, dan proses KGB-nya
+                  menunggu Kanwil meninjau usulan itu. Status di halaman ini tidak berubah sampai usulan ditinjau.
+                </dd>
+              </div>
             </dl>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Info untuk pegawai ───────────────────────────────────────────── */}
+      <section id="info-pegawai" className="sx" aria-labelledby="judul-info">
+        <div className="pub-container">
+          <KepalaBagian
+            nomor={4}
+            label="Info pegawai"
+            id="judul-info"
+            judul="Yang perlu Anda ketahui"
+            keterangan="Aturan KGB yang paling sering ditanyakan pegawai. Langkah kerja petugas ada di panduan di dalam SIM-KGB."
+          />
+
+          <div className="ip-kisi">
+            <article className="ip-kartu" id="info-jadwal" data-muncul="" style={{ "--i": 0 } as React.CSSProperties}>
+              <h3>Kapan KGB diberikan</h3>
+              <ul>
+                <li>
+                  Setiap 2 tahun. PNS yang pertama kali diangkat dalam golongan II/a menerima KGB pertama setelah masa
+                  kerja 1 tahun, lalu setiap 2 tahun.
+                </li>
+                <li>TMT KGB jatuh pada tanggal 1 bulan ketika masa kerja golongan yang dipersyaratkan tercapai.</li>
+                <li>
+                  Syaratnya masa kerja golongan tercapai dan penilaian kinerja sekurang-kurangnya cukup (PP 7/1977
+                  Pasal 11).
+                </li>
+                <li>
+                  KGB ditunda bila pegawai menjalani hukuman disiplin yang menunda KGB, atau penilaian kinerjanya belum
+                  memenuhi syarat.
+                </li>
+                <li>
+                  Usulan yang terlambat tetap diproses. TMT tidak bergeser; selisih gaji dibayar sebagai kekurangan
+                  gaji.
+                </li>
+              </ul>
+            </article>
+
+            <article className="ip-kartu" id="info-cpns" data-muncul="" style={{ "--i": 1 } as React.CSSProperties}>
+              <h3>KGB pertama setelah CPNS menjadi PNS</h3>
+              <ul>
+                <li>
+                  Masa kerja golongan dihitung sejak TMT CPNS, bukan TMT PNS. KGB pertama tidak bergeser walau SK
+                  pengangkatan PNS terbit belakangan.
+                </li>
+                <li>
+                  Selama berstatus CPNS gaji dibayar 80 persen dari gaji pokok; gaji pokoknya tetap naik pada TMT KGB.
+                </li>
+                <li>
+                  Yang dirapel hanya bulan yang terlanjur dibayar dengan gaji pokok lama. Periksa gaji pokok pada SK
+                  pengangkatan PNS: bila sudah memakai gaji pokok hasil KGB, sejak TMT PNS tidak ada lagi kekurangan.
+                </li>
+                <li>KGB berikutnya tetap 2 tahun setelah KGB pertama.</li>
+              </ul>
+            </article>
+
+            <article className="ip-kartu" id="info-pangkat" data-muncul="" style={{ "--i": 2 } as React.CSSProperties}>
+              <h3>Setelah naik pangkat</h3>
+              <ul>
+                <li>
+                  Naik dari golongan I ke II/a memotong masa kerja golongan 6 tahun; dari golongan II ke III/a
+                  memotong 5 tahun. Kenaikan di dalam golongan yang sama, misalnya III/a ke III/b, tidak memotong.
+                </li>
+                <li>Golongan dan gaji pokok yang menjadi dasar KGB berikutnya ikut berubah.</li>
+                <li>
+                  Jadwal KGB tetap: 2 tahun dihitung dari KGB terakhir, tidak diulang dari tanggal kenaikan pangkat.
+                </li>
+              </ul>
+            </article>
+          </div>
+
+          <div className="ip-tanya" id="info-tanya">
+            <h3 className="ip-tanya-judul">Pertanyaan umum</h3>
+            <div className="pub-faq">
+              <details>
+                <summary>NIP saya tidak ditemukan</summary>
+                <p>
+                  Periksa kembali NIP yang diketik. Bila tetap tidak ditemukan, data Anda belum terdaftar atau NIP-nya
+                  tercatat keliru. Minta admin kepegawaian satker Anda mendaftarkan atau membetulkannya lewat SIM-KGB;
+                  perubahannya berlaku setelah disetujui Kanwil.
+                </p>
+              </details>
+              <details>
+                <summary>Status KGB saya tidak berubah dalam waktu lama</summary>
+                <p>
+                  Belum Diproses biasanya berarti jendela proses belum dibuka, usulan dari satker belum masuk, atau
+                  usulan perbaikan data Anda masih ditinjau Kanwil. Sedang Diproses berarti SK sedang disiapkan atau
+                  menunggu tanda tangan elektronik. Menunggu Keuangan berarti SK sudah terbit dan menunggu direkam di
+                  Gaji Web oleh keuangan Kanwil atau keuangan satker Anda. Bila jauh melewati jadwal, tanyakan melalui
+                  admin kepegawaian satker.
+                </p>
+              </details>
+              <details>
+                <summary>Usulan terlambat dikirim. Apakah KGB hilang?</summary>
+                <p>
+                  Tidak. KGB tetap diproses dan TMT tidak bergeser. Bila SK terbit setelah TMT, selisih gaji sejak TMT
+                  dibayarkan sebagai kekurangan gaji: operator gaji satker merekam SK di Gaji Web, lalu satker
+                  mengajukan SPM-LS kekurangan gaji ke KPPN.
+                </p>
+              </details>
+              <details>
+                <summary>Saya pindah satker atau berhenti sebelum SK terbit</summary>
+                <p>
+                  Admin kepegawaian satker asal melaporkannya lewat SIM-KGB, lalu Kanwil mencatatnya. Satker tempat Anda
+                  bertugas menentukan KPPN mitra yang menjadi tujuan SK.
+                </p>
+              </details>
+              <details>
+                <summary>Apakah saya perlu akun SIM-KGB?</summary>
+                <p>
+                  Tidak. Status KGB dapat dicek dengan NIP di halaman ini. Akun SIM-KGB hanya untuk Tim SDM dan keuangan
+                  Kanwil serta Admin UPT.
+                </p>
+              </details>
+            </div>
           </div>
         </div>
       </section>
@@ -364,17 +491,17 @@ export default async function HalamanBeranda() {
                 Butuh bantuan?
               </h2>
               <p>
-                Tim SDM Kanwil Ditjenpas Kalimantan Selatan melayani pertanyaan KGB pada jam kerja. Admin UPT dianjurkan
-                membaca panduan sebelum mengirim surat permohonan.
+                Tim SDM Kanwil Ditjenpas Kalimantan Selatan melayani pertanyaan KGB pada jam kerja. Pegawai bertanya
+                melalui admin kepegawaian satkernya; petugas membaca panduan di dalam SIM-KGB.
               </p>
               <div className="bt-aksi">
-                <Link href="/panduan" className="bt-btn">
-                  Baca panduan KGB
+                <Link href="/login" className="bt-btn">
+                  Masuk ke SIM-KGB
                   {Panah}
                 </Link>
-                <Link href="/login" className="bt-btn-kedua">
-                  Masuk ke SIM-KGB
-                </Link>
+                <a href="#info-tanya" className="bt-btn-kedua">
+                  Pertanyaan umum
+                </a>
               </div>
             </div>
 

@@ -145,7 +145,7 @@ export default function LoginPage() {
       <div className="lg-kolom">
         <h1 className="pub-h1 lg-judul">Masuk ke SIM-KGB</h1>
         <p className="pub-lead lg-lead">
-          Khusus Tim SDM, keuangan, dan pengelola kepegawaian Kanwil Ditjenpas Kalimantan Selatan.
+          Khusus Tim SDM dan keuangan Kanwil Ditjenpas Kalimantan Selatan serta Admin UPT di wilayahnya.
         </p>
         <p className="lg-publik">
           Pegawai yang ingin melihat status KGB tidak perlu masuk. <Link href="/kgb">Cek status KGB</Link>

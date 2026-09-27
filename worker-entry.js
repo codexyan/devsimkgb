@@ -76,7 +76,7 @@ async function melebihiBatasCekKgb(ip, env, sekarang) {
 }
 
 /* Halaman publik yang isinya sama untuk semua orang dan hanya berubah harian. */
-const HALAMAN_PUBLIK = new Set(["/kgb", "/panduan", "/tabel-gaji"]);
+const HALAMAN_PUBLIK = new Set(["/kgb", "/tabel-gaji"]);
 /** Berapa lama jawaban halaman publik disimpan di cache tepi. */
 const UMUR_CACHE_PUBLIK_DETIK = 300;
 

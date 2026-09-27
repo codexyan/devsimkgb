@@ -1,356 +1,179 @@
-/* panduan.css: halaman /panduan. Semua kelas berawalan pg- dan berada di bawah .pub; kelas bersama ada di
-   ../publik.css.
+/* panduan.css: panduan SIM-KGB di dashboard (/dashboard/panduan). Isinya memakai kelas bersama halaman publik
+   (app/(publik)/publik.css, semuanya di bawah .pub); kelas khusus panduan berawalan pg-.
 
-   Panduan berperan: pembaca memilih peran di panel navy, lalu hanya bagian untuk peran itu yang tampil,
-   berurutan dan diakhiri tautan ke bagian berikutnya (lihat NavigasiPanduan.tsx dan peran.ts). Isinya
-   tetap disusun seperti dokumen: kolom baca sekitar 68ch, judul bagian bernomor, dan daftar isi yang
-   mengikuti posisi baca (rel di layar lebar, bilah lengket di ponsel). */
+   Panduan berperan: bagian yang tampil mengikuti atribut data-peran pada pembungkus .pg-dasbor, yang diisi dari
+   role akun lalu dapat diganti pembaca (NavigasiPanduan.tsx, peran.ts). Isinya tetap disusun seperti dokumen:
+   kolom baca sekitar 68ch, judul bagian bernomor, dan daftar isi yang mengikuti posisi baca (rel di layar
+   lebar, bilah lengket di ponsel). */
 
 
-/* ── Kepala: panel navy berisi pilihan peran ───────────────────────────── */
-.pub .pg-hero {
-  padding-bottom: clamp(40px, 6vw, 80px);
+/* ── Menyatu dengan dashboard ──────────────────────────────────────────────
+   Token publik dipetakan ke kartu dashboard; mode gelap dashboard (data-dash-theme) membalik tokennya. Area
+   gulirnya <main> dashboard, jadi tidak ada bilah nav publik yang perlu diberi jarak (--nav 0). */
+.pub.pg-dasbor {
+  --bg: transparent;
+  --bg-atas: var(--sub);
+  --kartu: var(--card);
+  --putih: var(--card);
+  --nav: 0px;
+  flex: none;
+  min-height: 0;
+  margin-top: 16px;
+  padding: clamp(16px, 2.6vw, 36px);
+  border: 1px solid var(--ln1);
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--bayang-kartu);
+  overflow-x: visible;
 }
 
-.pub .pg-kepala {
-  max-width: 44rem;
+html[data-dash-theme="dark"] .pub.pg-dasbor {
+  --sunken: rgba(255, 255, 255, 0.04);
+  --pasir: rgba(255, 255, 255, 0.09);
+  --line: rgba(255, 255, 255, 0.09);
+  --line-soft: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --field-line: #66728b;
+  --ink: #eef2fb;
+  --tinta: #e3e9f7;
+  --text: #c5cee0;
+  --muted: #8390a8;
+  --accent: #8fb0ff;
+  --accent-hover: #eef2fb;
+  --emas: #f5cd67;
+  --emas-lembut: rgba(245, 158, 11, 0.12);
+  --biru: #93b3f5;
+  --info-bg: rgba(96, 165, 250, 0.13);
+  --warn-bg: rgba(245, 158, 11, 0.12);
+  --warn-text: #f5cd67;
+  --warn-line: rgba(245, 158, 11, 0.36);
+  --ok-bg: rgba(52, 211, 153, 0.12);
+  --ok-text: #34d399;
+  --bad-bg: rgba(239, 68, 68, 0.12);
+  --bad-text: #f87171;
+  --wait-bg: rgba(167, 139, 250, 0.15);
+  --wait-text: #b79df8;
+  --bayang: none;
+  color-scheme: dark;
 }
 
-.pub .pg-atas {
-  justify-self: start;
+/* Di layar sempit tombol menu dashboard melayang di pojok kiri atas; bilah daftar isi lengket di bawahnya. */
+@media (max-width: 1023px) {
+  .pub.pg-dasbor {
+    --nav: 52px;
+  }
 }
 
-.pub .pg-judul {
-  margin: 22px 0 0;
+/* Judul bagian dashboard lebih ringkas daripada judul halaman publik */
+.pub.pg-dasbor .pub-h2 {
+  font-size: clamp(1.5rem, 1.2rem + 0.9vw, 2rem);
 }
 
-.pub .pub-lead.pg-lead {
-  max-width: 50ch;
-  margin: 18px 0 0;
+html[data-dash-theme="dark"] .pub.pg-dasbor .pg-bagian > .pub-h2::before {
+  color: #0d1730;
 }
 
 
-/* ── Kartu peran ───────────────────────────────────────────────────────── */
-.pub .pg-pilih {
-  margin-top: clamp(32px, 5vw, 52px);
-}
-
-.pub .pg-pilih-daftar {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.pub .pg-pilih-daftar li {
-  animation: pubMasuk 800ms var(--ease-out) both;
-  animation-delay: calc(320ms + var(--i, 0) * 70ms);
-}
-
-/* Kartu kaca di atas navy; yang terpilih menjadi putih dengan tinta navy */
-.pub .pg-pilih-kartu {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas:
-    "ikon label"
-    "ikon ringkas"
-    "ikon meta";
-  column-gap: 16px;
-  width: 100%;
-  height: 100%;
-  padding: 20px 20px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  transition:
-    background-color 420ms var(--ease),
-    border-color 420ms var(--ease),
-    color 420ms var(--ease),
-    box-shadow 500ms var(--ease),
-    transform 600ms var(--ease-out);
-}
-
-.pub .pg-pilih-kartu:hover {
-  border-color: rgba(255, 255, 255, 0.32);
-  background: rgba(255, 255, 255, 0.11);
-  transform: translate3d(0, -3px, 0);
-}
-
-.pub .pg-pilih-kartu:active {
-  transform: scale(0.985);
-  transition-duration: 120ms;
-}
-
-.pub .pg-pilih-kartu[aria-pressed="true"] {
-  border-color: #ffffff;
-  background: #ffffff;
-  color: #0c1a38;
-  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.55);
-}
-
-.pub .pg-pilih-ikon {
-  grid-area: ikon;
+/* ── Pilihan peran ─────────────────────────────────────────────────────── */
+.pub .pg-peran {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #cfe0ff;
-  transition: background-color 420ms var(--ease), color 420ms var(--ease);
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: clamp(24px, 4vw, 40px);
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+  scroll-margin-top: 16px;
 }
 
-.pub .pg-pilih-ikon svg {
-  width: 22px;
-  height: 22px;
-}
-
-.pub .pg-pilih-kartu[aria-pressed="true"] .pg-pilih-ikon {
-  background: linear-gradient(135deg, #1b3d86, #0c2050);
-  color: #ffffff;
-}
-
-.pub .pg-pilih-label {
-  grid-area: label;
-  font-family: var(--huruf-judul);
-  font-size: 1.125rem;
-  font-weight: 500;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-}
-
-.pub .pg-pilih-ringkas {
-  grid-area: ringkas;
-  margin-top: 4px;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: rgba(222, 232, 255, 0.72);
-  transition: color 420ms var(--ease);
-}
-
-.pub .pg-pilih-kartu[aria-pressed="true"] .pg-pilih-ringkas {
-  color: #45506a;
-}
-
-.pub .pg-pilih-meta {
-  grid-area: meta;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: rgba(222, 232, 255, 0.6);
-  transition: color 420ms var(--ease);
-}
-
-.pub .pg-pilih-kartu[aria-pressed="true"] .pg-pilih-meta {
-  color: #1b3f8f;
-}
-
-.pub .pg-pilih-panah {
-  width: 13px;
-  height: 13px;
-  transition: transform 600ms var(--ease-out);
-}
-
-.pub .pg-pilih-kartu:hover .pg-pilih-panah {
-  transform: translate3d(3px, 0, 0);
-}
-
-.pub .pg-pilih-semua {
-  margin: 20px 0 0;
+.pub .pg-peran-ket {
+  flex: 1 1 22rem;
+  margin: 0;
   font-size: 14px;
+  line-height: 1.55;
   color: var(--muted);
 }
 
-.pub .pg-pilih-semua button {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: #ffffff;
+.pub .pg-peran-ket b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.pub .pg-peran-jumlah {
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.pub .pg-peran-pilihan {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pub .pg-peran-pilihan button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
   font: inherit;
+  font-size: 13px;
   font-weight: 500;
-  text-decoration: underline;
-  text-decoration-color: rgba(255, 255, 255, 0.4);
-  text-underline-offset: 0.3em;
   cursor: pointer;
+  transition: background-color 150ms var(--ease), color 150ms var(--ease), border-color 150ms var(--ease);
 }
 
-.pub .pg-pilih-semua button:hover,
-.pub .pg-pilih-semua button[aria-pressed="true"] {
-  text-decoration-color: var(--emas-isi);
+.pub .pg-peran-pilihan button:hover {
+  border-color: var(--ink);
+  color: var(--ink);
 }
 
-@media (max-width: 960px) {
-  .pub .pg-pilih-daftar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.pub .pg-peran-pilihan button[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--kartu);
 }
 
-@media (max-width: 600px) {
-  .pub .pg-pilih-daftar {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-  }
+.pub .pg-peran-pilihan button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
-  .pub .pg-pilih-kartu {
-    padding: 16px;
-    border-radius: 18px;
-  }
+/* Titik emas menandai peran akun sendiri */
+.pub .pg-peran-milik {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--emas-isi);
+}
+
+/* Keterangan yang bukan status (mis. "Tertahan usulan UPT") */
+.pub .pub-status.pg-tanda {
+  border-style: dashed;
+  border-color: var(--line-strong);
 }
 
 
 /* ── Tampil menurut peran ──────────────────────────────────────────────────
-   Skrip awal di halaman memasang <html data-panduan="siap">; NavigasiPanduan memasang data-peran saat
-   pembaca memilih. Tanpa pilihan hanya petunjuk yang tampil; dengan pilihan hanya bagian yang atribut
-   data-peran-nya memuat peran itu. Tanpa JavaScript tidak ada atribut, jadi seluruh panduan tampil. */
-.pub .pg {
-  padding-top: clamp(40px, 6vw, 72px);
-}
-
-.pub .pg-petunjuk {
+   Hanya bagian yang atribut data-peran-nya memuat peran yang dipilih; "semua" menampilkan seluruhnya. */
+.pub.pg-dasbor[data-peran] .pg-bagian {
   display: none;
 }
 
-html[data-panduan="siap"]:not([data-peran]) .pub .pg-petunjuk {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 140px;
-  margin: 0;
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-lg);
-  color: var(--muted);
-  font-size: 15px;
-  animation: pubMasuk 700ms var(--ease-out) both;
-}
-
-html[data-panduan="siap"]:not([data-peran]) .pub .pg-petunjuk::before {
-  content: "↑";
-  font-size: 18px;
-  color: var(--ink);
-  animation: pgNaik 1800ms var(--ease-io) infinite;
-}
-
-@keyframes pgNaik {
-  50% {
-    transform: translate3d(0, -5px, 0);
-  }
-}
-
-html[data-panduan="siap"]:not([data-peran]) .pub .pg-wadah {
-  display: none;
-}
-
-html[data-panduan="siap"] .pub .pg-bagian {
-  display: none;
-}
-
-html[data-panduan="siap"][data-peran="semua"] .pub .pg-bagian,
-html[data-panduan="siap"][data-peran="upt"] .pub .pg-bagian[data-peran~="upt"],
-html[data-panduan="siap"][data-peran="tu"] .pub .pg-bagian[data-peran~="tu"],
-html[data-panduan="siap"][data-peran="sdm"] .pub .pg-bagian[data-peran~="sdm"],
-html[data-panduan="siap"][data-peran="keuangan"] .pub .pg-bagian[data-peran~="keuangan"],
-html[data-panduan="siap"][data-peran="super"] .pub .pg-bagian[data-peran~="super"],
-html[data-panduan="siap"][data-peran="pegawai"] .pub .pg-bagian[data-peran~="pegawai"] {
+.pub.pg-dasbor[data-peran="semua"] .pg-bagian,
+.pub.pg-dasbor[data-peran="upt"] .pg-bagian[data-peran~="upt"],
+.pub.pg-dasbor[data-peran="sdm"] .pg-bagian[data-peran~="sdm"],
+.pub.pg-dasbor[data-peran="hukdis"] .pg-bagian[data-peran~="hukdis"],
+.pub.pg-dasbor[data-peran="keuangan"] .pg-bagian[data-peran~="keuangan"],
+.pub.pg-dasbor[data-peran="super"] .pg-bagian[data-peran~="super"] {
   display: block;
-  animation: pubMasuk 800ms var(--ease-out) both;
-}
-
-html[data-panduan="siap"][data-peran] .pub .pg-wadah {
-  animation: pubMasuk 700ms var(--ease-out) both;
-}
-
-
-/* ── Peran yang sedang dibaca ──────────────────────────────────────────── */
-.pub .pg-aktif {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 16px;
-  margin-bottom: clamp(32px, 5vw, 56px);
-  padding: 14px 14px 14px 16px;
-  border: 1px solid var(--line-soft);
-  border-radius: 20px;
-  background: var(--kartu);
-  box-shadow: var(--bayang);
-}
-
-.pub .pg-aktif-ikon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 13px;
-  background: linear-gradient(135deg, #1b3d86, #0c2050);
-  color: #ffffff;
-}
-
-.pub .pg-aktif-ikon svg {
-  width: 20px;
-  height: 20px;
-}
-
-.pub .pg-aktif-teks {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  margin-right: auto;
-  line-height: 1.3;
-}
-
-.pub .pg-aktif-teks span {
-  font-size: 12.5px;
-  color: var(--muted);
-}
-
-.pub .pg-aktif-teks b {
-  font-family: var(--huruf-judul);
-  font-size: 1.125rem;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-
-.pub .pg-aktif-jumlah {
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--sunken);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.pub .pg-aktif-ganti {
-  min-height: 42px;
-  padding: 0 18px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color 320ms var(--ease), background-color 320ms var(--ease);
-}
-
-.pub .pg-aktif-ganti:hover {
-  border-color: var(--ink);
-  background: var(--bg-atas);
+  animation: pubMasuk 600ms var(--ease-out) both;
 }
 
 
@@ -778,10 +601,8 @@ html[data-panduan="siap"][data-peran] .pub .pg-wadah {
 @media print {
   .pub .pg-daftar,
   .pub .pg-bilah,
-  .pub .pg-pilih,
-  .pub .pg-aktif,
-  .pub .pg-lanjut,
-  .pub .pg-petunjuk {
+  .pub .pg-peran,
+  .pub .pg-lanjut {
     display: none !important;
   }
 
@@ -790,7 +611,7 @@ html[data-panduan="siap"][data-peran] .pub .pg-wadah {
   }
 
   /* Cetakan selalu memuat seluruh panduan, apa pun peran yang dipilih */
-  html[data-panduan] .pub :is(.pg-wadah, .pg-bagian) {
+  .pub.pg-dasbor .pg-bagian {
     display: block !important;
   }
 }

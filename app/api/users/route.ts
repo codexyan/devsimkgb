@@ -21,7 +21,7 @@ export async function GET() {
   }
 
   const all = await db.user.findMany({ orderBy: { field: "createdAt", dir: "desc" } });
-  const users = all.map((u) => ({ id: u.id, nip: u.nip, nama: u.nama, role: u.role, satker: u.satker ?? null, createdAt: u.createdAt }));
+  const users = all.map((u) => ({ id: u.id, nip: u.nip, nama: u.nama, role: u.role, satker: u.satker ?? null, createdAt: u.createdAt, cadanganTerakhirAt: u.cadanganTerakhirAt ?? null }));
   return NextResponse.json(users);
 }
 
@@ -83,6 +83,7 @@ export async function POST(req: Request) {
     role,
     createdAt: new Date(),
     satker: satker.satker,
+    cadanganTerakhirAt: null,
   };
   await db.user.create(user);
 

@@ -22,6 +22,8 @@ export interface UserRow {
   jabatan: string | null; email: string | null; role: string; createdAt: Date | null;
   /** Kode satker (lib/satker.ts) untuk peran admin_upt; kosong untuk peran Kanwil. */
   satker: string | null;
+  /** Kapan akun ini terakhir mengunduh cadangan data bulanan (ADR-018); kosong bila belum pernah. */
+  cadanganTerakhirAt: Date | null;
 }
 
 export interface PegawaiRow {
@@ -166,7 +168,7 @@ export type { PenandatanganRow };
 export const defs = {
   User: {
     tab: "User",
-    columns: [s("id"), s("nip"), s("password"), s("nama"), s("jabatan"), s("email"), s("role"), d("createdAt"), s("satker")],
+    columns: [s("id"), s("nip"), s("password"), s("nama"), s("jabatan"), s("email"), s("role"), d("createdAt"), s("satker"), d("cadanganTerakhirAt")],
   },
   ProfileChangeRequest: {
     tab: "ProfileChangeRequest",

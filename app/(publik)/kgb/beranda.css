@@ -1394,3 +1394,76 @@ html[data-muncul="siap"] .pub .beranda [data-muncul]:not([data-muncul="1"]) {
     border-radius: var(--radius-lg);
   }
 }
+
+/* Enam langkah: kartu ajakan menutup baris terakhir selebar dua kolom (4 kolom dan 2 kolom). */
+@media (min-width: 601px) {
+  .pub .al-ajak {
+    grid-column: span 2;
+  }
+}
+
+/* Keterangan di luar status (mis. "Tertahan usulan UPT"): netral, bukan warna status. */
+.pub .pub-status.st-tanda {
+  border-style: dashed;
+  border-color: var(--line-strong);
+}
+
+/* ── Info untuk pegawai ─────────────────────────────────────────────────── */
+.pub .ip-kisi {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.pub .ip-kartu {
+  padding: clamp(20px, 2.4vw, 28px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--kartu);
+  scroll-margin-top: calc(var(--nav) + 16px);
+}
+
+.pub .ip-kartu h3 {
+  margin: 0;
+  font-family: var(--huruf-judul);
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.pub .ip-kartu ul {
+  margin: 12px 0 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.pub .ip-kartu li::marker {
+  color: var(--muted);
+}
+
+.pub .ip-kartu li + li {
+  margin-top: 8px;
+}
+
+.pub .ip-tanya {
+  margin-top: clamp(36px, 5vw, 56px);
+  scroll-margin-top: calc(var(--nav) + 16px);
+}
+
+.pub .ip-tanya-judul {
+  margin: 0 0 12px;
+  font-family: var(--huruf-judul);
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+@media (max-width: 960px) {
+  .pub .ip-kisi {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

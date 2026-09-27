@@ -5,7 +5,7 @@ import Link from "next/link";
 import { infoStatusKgb } from "@/lib/statusKgb";
 
 /* Bentuk tanggapan GET /api/public/cek-kgb. Semua kolom diperlakukan opsional
-   karena data berasal dari spreadsheet dan bisa kosong. */
+   karena data lama dapat memuat kolom kosong. */
 interface KgbTerbaru {
   status?: string | null;
   tmtKgbBaru?: string | null;

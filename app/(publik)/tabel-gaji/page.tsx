@@ -66,7 +66,7 @@ export default function HalamanTabelGaji() {
                 <a href="https://peraturan.bpk.go.id/Details/276755/pp-no-5-tahun-2024">
                   Peraturan Pemerintah Nomor 5 Tahun 2024
                 </a>
-                . Jadwal dan cara pengusulan KGB ada di <Link href="/panduan#jadwal">panduan</Link>.
+                . Jadwal KGB dan aturannya ada di <Link href="/kgb#info-pegawai">info untuk pegawai</Link>.
               </p>
             </li>
           </ul>

@@ -50,6 +50,7 @@ async function main() {
     role: ROLE,
     createdAt: new Date(),
     satker: null,
+    cadanganTerakhirAt: null,
   });
 
   console.log("✓ Super Admin dibuat di Google Sheets (tab User):");

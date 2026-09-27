@@ -246,7 +246,7 @@ export default function FormulirUsulan({
       const nama = isian.nama || pegawai?.nama || "pegawai";
       onSelesai(
         dikembalikan
-          ? `Perbaikan data ${nama} tersimpan. Kirim ulang ke Kanwil dari panel Data disiapkan.`
+          ? `Perbaikan data ${nama} tersimpan. Kirim ulang lewat Ajukan ke Kanwil di daftar Perlu dikerjakan.`
           : draf
             ? `Draf data ${nama} diperbarui. Ajukan ke Kanwil bila sudah lengkap.`
             : `Data ${nama} tersimpan sebagai draf. Lengkapi kapan saja, lalu ajukan bersama pegawai lain dalam satu surat.`,
@@ -291,7 +291,7 @@ export default function FormulirUsulan({
       {dikembalikan && (
         <Catatan nada="amber">
           Kanwil mengembalikan usulan ini untuk diperbaiki: {draf?.alasanTolak ?? "tanpa catatan"}. Betulkan yang
-          disebut lalu simpan; usulannya belum kembali ke Kanwil sampai dikirim ulang dari panel Data disiapkan.
+          disebut lalu simpan; usulannya belum kembali ke Kanwil sampai dikirim ulang lewat Ajukan ke Kanwil di daftar Perlu dikerjakan.
         </Catatan>
       )}
       <Catatan>

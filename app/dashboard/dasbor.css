@@ -2262,3 +2262,18 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
   .hkd-laporan-baris { grid-template-columns: minmax(0, 1fr); }
   .hkd-aksi { justify-content: flex-start; }
 }
+
+/* ── Cadangan data bulanan (ADR-018) ──────────────────────────────────── */
+.cdg-spanduk { margin: 12px 16px 0; }
+.cdg-spanduk a { font-weight: 600; text-decoration: underline; }
+.cdg-daftar { margin: 0; padding-left: 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 16px; font-size: 13px; color: var(--dt2); }
+.cdg-pilih { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dt2); }
+.cdg-tirai { position: fixed; inset: 0; background: rgba(9, 17, 53, 0.45); backdrop-filter: blur(4px); z-index: 9990; }
+.cdg-wadah { position: fixed; inset: 0; z-index: 9991; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.cdg-jendela {
+  background: var(--paper); border: 1px solid var(--frost-border); border-radius: 14px; width: 100%; max-width: 440px;
+  padding: 22px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 60px rgba(9, 17, 53, 0.2);
+}
+.cdg-jendela h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--midnight-ink); }
+.cdg-jendela p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--slate); }
+.cdg-aksi { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }

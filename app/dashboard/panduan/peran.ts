@@ -1,5 +1,5 @@
-/* Isi panduan dan peran pembacanya. Dipakai halaman server (atribut data-peran di tiap bagian, skrip awal)
-   dan komponen peramban (pilihan peran, daftar isi, tautan bagian berikutnya), jadi tanpa React. */
+/* Isi panduan dashboard dan peran pembacanya. Dipakai halaman server (atribut data-peran di tiap bagian) dan
+   komponen peramban (pilihan peran, daftar isi, tautan bagian berikutnya), jadi tanpa React. */
 
 export const DAFTAR_ISI = [
   { id: "ringkasan", judul: "Alur singkat" },
@@ -7,10 +7,11 @@ export const DAFTAR_ISI = [
   { id: "jadwal", judul: "Kapan KGB diberikan dan diusulkan" },
   { id: "cpns-pns", judul: "KGB pertama setelah CPNS jadi PNS" },
   { id: "kenaikan-pangkat", judul: "Kenaikan pangkat dan KGB" },
-  { id: "untuk-upt", judul: "Untuk admin UPT" },
+  { id: "untuk-upt", judul: "Untuk Admin UPT" },
   { id: "di-kanwil", judul: "Di Kanwil: agenda dan disposisi" },
   { id: "di-sim-kgb", judul: "Di SIM-KGB: langkah Tim SDM" },
-  { id: "keuangan", judul: "Konfirmasi keuangan" },
+  { id: "hukdis", judul: "Hukuman disiplin dari UPT" },
+  { id: "keuangan", judul: "Konfirmasi keuangan Kanwil" },
   { id: "pengiriman-sk", judul: "Pengiriman SK dan KPPN mitra" },
   { id: "contoh-kasus", judul: "Contoh kasus usulan satu UPT" },
   { id: "status", judul: "Arti status" },
@@ -32,44 +33,50 @@ export interface Peran {
 export const PERAN: readonly Peran[] = [
   {
     id: "upt",
-    label: "Admin kepegawaian UPT",
-    ringkas: "Menyiapkan usulan KGB tepat waktu, lalu merekam SK yang terbit di Gaji Web satker.",
-    bagian: ["ringkasan", "jadwal", "cpns-pns", "kenaikan-pangkat", "untuk-upt", "contoh-kasus", "status", "pertanyaan"],
-  },
-  {
-    id: "tu",
-    label: "Tata Usaha Kanwil",
-    ringkas: "Mencatat surat masuk dan meneruskan disposisi.",
-    bagian: ["ringkasan", "di-kanwil"],
+    label: "Admin UPT",
+    ringkas: "Menyiapkan usulan data, melaporkan mutasi dan hukuman disiplin, lalu merekam SK yang terbit di Gaji Web satker.",
+    bagian: ["ringkasan", "jadwal", "cpns-pns", "kenaikan-pangkat", "untuk-upt", "hukdis", "contoh-kasus", "status", "pertanyaan"],
   },
   {
     id: "sdm",
-    label: "Tim SDM Kanwil",
-    ringkas: "Memeriksa data, input KGB, membuat dan mengirim SK.",
-    bagian: ["ringkasan", "kewenangan", "jadwal", "cpns-pns", "kenaikan-pangkat", "di-sim-kgb", "pengiriman-sk", "contoh-kasus", "status"],
+    label: "Tim SDM KGB",
+    ringkas: "Meninjau usulan UPT, input KGB, lalu membuat, mengunggah, dan mengirim SK.",
+    bagian: [
+      "ringkasan", "kewenangan", "jadwal", "cpns-pns", "kenaikan-pangkat", "di-kanwil", "di-sim-kgb",
+      "pengiriman-sk", "contoh-kasus", "status", "pertanyaan",
+    ],
+  },
+  {
+    id: "hukdis",
+    label: "Tim SDM Hukdis",
+    ringkas: "Meninjau laporan hukuman disiplin dari UPT, mencatatnya, dan memantau dampaknya pada KGB.",
+    bagian: ["ringkasan", "jadwal", "hukdis", "status", "dasar-hukum"],
   },
   {
     id: "keuangan",
-    label: "Bagian keuangan",
-    ringkas: "Mengonfirmasi SK pegawai Kanwil dan merekamnya di Gaji Web; SK pegawai UPT dipegang keuangan UPT.",
-    bagian: ["ringkasan", "jadwal", "cpns-pns", "keuangan", "pengiriman-sk", "dasar-hukum"],
+    label: "Keuangan Kanwil",
+    ringkas: "Mengonfirmasi SK pegawai Kanwil dan merekamnya di Gaji Web; SK pegawai UPT direkam keuangan satkernya.",
+    bagian: ["ringkasan", "jadwal", "cpns-pns", "keuangan", "pengiriman-sk", "status", "dasar-hukum"],
   },
   {
     id: "super",
     label: "Super Admin",
-    ringkas: "Mengatur penandatangan, jadwal proses, dan keadaan khusus.",
-    bagian: ["ringkasan", "kewenangan", "di-sim-kgb", "dasar-hukum"],
-  },
-  {
-    id: "pegawai",
-    label: "Pegawai",
-    ringkas: "Memahami jadwal dan arti status KGB Anda.",
-    bagian: ["ringkasan", "jadwal", "cpns-pns", "kenaikan-pangkat", "status", "pertanyaan"],
+    ringkas: "Mengatur penandatangan, jadwal proses, dan keadaan khusus, serta meninjau usulan UPT.",
+    bagian: ["ringkasan", "kewenangan", "di-sim-kgb", "hukdis", "keuangan", "pertanyaan", "dasar-hukum"],
   },
 ];
 
 /** Pilihan "baca seluruh panduan". */
 export const SEMUA = "semua";
+
+/** Peran panduan untuk role akun; null bila role tidak dikenal (panduan lengkap yang tampil). */
+export const PERAN_UNTUK_ROLE: Record<string, string> = {
+  admin_upt: "upt",
+  sdm_kgb: "sdm",
+  sdm_hukdis: "hukdis",
+  keuangan: "keuangan",
+  superAdminCore: "super",
+};
 
 export function cariPeran(id: string | null | undefined): Peran | null {
   return PERAN.find((p) => p.id === id) ?? null;

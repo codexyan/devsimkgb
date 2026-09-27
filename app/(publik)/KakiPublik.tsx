@@ -8,8 +8,8 @@ const HALAMAN = [
   { href: "/kgb#alur", label: "Alur pengajuan" },
   { href: "/kgb#jadwal", label: "Jadwal pengusulan" },
   { href: "/kgb#status", label: "Arti status" },
+  { href: "/kgb#info-pegawai", label: "Info untuk pegawai" },
   { href: "/tabel-gaji", label: "Tabel gaji PNS" },
-  { href: "/panduan", label: "Panduan KGB" },
 ];
 
 const LAYANAN_TERKAIT = [

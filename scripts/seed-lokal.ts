@@ -89,7 +89,7 @@ async function main() {
     idPengguna[a.role] = id;
     await db.user.create({
       id, nip: a.nip, password: await bcrypt.hash(a.password, 10), nama: a.nama,
-      jabatan: null, email: null, role: a.role, createdAt: new Date(), satker: a.satker ?? null,
+      jabatan: null, email: null, role: a.role, createdAt: new Date(), satker: a.satker ?? null, cadanganTerakhirAt: null,
     });
   }
 

@@ -8,6 +8,7 @@ import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 import { useDashUser } from "@/app/dashboard/components/RoleContext";
 import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
 import { formatTanggalId } from "@/lib/waktu";
+import { statusCadangan } from "@/lib/cadangan";
 
 interface User {
   id: string;
@@ -17,6 +18,8 @@ interface User {
   /** Kode satker untuk peran admin_upt; kosong untuk peran Kanwil. */
   satker?: string | null;
   createdAt: string;
+  /** Cadangan data bulanan terakhir (ADR-018); kosong bila belum pernah. */
+  cadanganTerakhirAt?: string | null;
 }
 
 interface ReassignCounts {
@@ -318,6 +321,7 @@ export default function UsersPage() {
                       <th scope="col">Peran</th>
                       <th scope="col">Satuan kerja</th>
                       <th scope="col">Dibuat</th>
+                      <th scope="col">Cadangan terakhir</th>
                       <th scope="col" className="kanan">Tindakan</th>
                     </tr>
                   </thead>
@@ -354,6 +358,22 @@ export default function UsersPage() {
                           </td>
                           <td className="whitespace-nowrap dsb-kecil">
                             {formatTanggalId(new Date(u.createdAt), { day: "numeric", month: "short", year: "2-digit" })}
+                          </td>
+                          <td className="whitespace-nowrap dsb-kecil">
+                            {(() => {
+                              // Kepatuhan cadangan bulanan (ADR-018): merah bila sudah lewat 30 hari.
+                              const s = statusCadangan(u.cadanganTerakhirAt ?? null, u.createdAt, new Date());
+                              const nada = s.keadaan === "wajib" ? "merah" : s.keadaan === "ingat" ? "kuning" : "hijau";
+                              return (
+                                <span title={`Batas berikutnya ${formatTanggalId(s.jatuhTempo, { day: "numeric", month: "short", year: "numeric" })}`}>
+                                  <span className="dsb-titik" data-nada={nada} aria-hidden="true" />{" "}
+                                  {s.terakhir
+                                    ? formatTanggalId(s.terakhir, { day: "numeric", month: "short", year: "2-digit" })
+                                    : "Belum pernah"}
+                                  {s.keadaan === "wajib" ? " · lewat batas" : ""}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="kanan">
                             <span className="dsb-aksi">

@@ -44,6 +44,10 @@ export const GAYA_MODAL_KGB = `
 .kgbm-amber { background: var(--amber-solid); color: #fff; }
 .kgbm-tombol-kecil { padding: 5px 10px; border-radius: 8px; font-size: 11px; }
 .kgbm-label { display: block; font-size: 12px; font-weight: 500; color: var(--dt2); margin-bottom: 4px; }
+/* Isian di dalam label diberi jarak dari judulnya dan dari isian sebelumnya (mis. kotak cari lalu daftar
+   pilihannya), agar tidak saling menempel. */
+.kgbm-label > .kgbm-input { display: block; margin-top: 6px; }
+.kgbm-label > .kgbm-bantuan { display: block; margin-top: 4px; }
 /* Isian wajib ditandai bintang merah, bukan dengan mewarnai seluruh labelnya: label merah membuat
    setengah formulir tampak seperti peringatan, sedangkan yang perlu terbaca hanyalah tandanya. */
 .kgbm-wajib::after { content: "*"; color: var(--st-red); margin-left: 3px; font-weight: 700; }

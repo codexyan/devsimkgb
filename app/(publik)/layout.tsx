@@ -6,7 +6,7 @@ import Muncul from "./Muncul";
 import "./publik.css";
 import "./kerangka.css";
 
-/* Kerangka bersama halaman publik (/kgb, /tabel-gaji, /panduan, /login). Token dan kelas didokumentasikan
+/* Kerangka bersama halaman publik (/kgb, /tabel-gaji, /login). Token dan kelas didokumentasikan
    di awal publik.css; nav, kaki, dan dok di kerangka.css. */
 export default function LayoutPublik({ children }: Readonly<{ children: ReactNode }>) {
   return (

@@ -32,8 +32,8 @@ export default async function LoginLayout({ children }: Readonly<{ children: Rea
           </div>
           <TanggaMasuk baris={tanggaGaji()} />
           <p className="lg-sisi-teks">
-            Usulan KGB dihitung dari tabel gaji, SK dibuat dan diunggah, lalu dikonfirmasi bagian keuangan. Semua
-            tahapnya tercatat di satu tempat.
+            Usulan UPT ditinjau Kanwil, KGB dihitung dari tabel gaji, SK dibuat dan diunggah, lalu direkam keuangan
+            di Gaji Web. Semua tahapnya tercatat di satu tempat.
           </p>
         </aside>
         <div className="lg-utama masuk" style={{ "--d": 120 } as React.CSSProperties}>

@@ -29,12 +29,13 @@ export const STATUS_KGB: Record<StatusKgb, InfoStatusKgb> = {
   },
   menunggu_keuangan: {
     label: "Menunggu Keuangan",
-    keterangan: "SK sudah ditandatangani dan diunggah, dan sedang menunggu konfirmasi bagian keuangan.",
+    keterangan:
+      "SK sudah ditandatangani dan diunggah. Keuangan Kanwil (pegawai Kanwil) atau keuangan satker (pegawai UPT) sedang memeriksanya dan merekamnya di Gaji Web.",
     kelas: "pub-status-keuangan",
   },
   selesai: {
     label: "Selesai",
-    keterangan: "SK sudah terbit dan KGB sudah tercatat selesai di SIM-KGB.",
+    keterangan: "SK sudah terbit dan direkam keuangan di Gaji Web; KGB tercatat selesai di SIM-KGB.",
     kelas: "pub-status-selesai",
   },
   ditolak: {
