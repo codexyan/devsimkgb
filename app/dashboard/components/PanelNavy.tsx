@@ -52,6 +52,7 @@ export function PanelNavy({
   diperbarui,
   onMuatUlang,
   memuat = false,
+  ringkas = false,
   children,
 }: {
   label: string;
@@ -60,10 +61,12 @@ export function PanelNavy({
   diperbarui?: Date | null;
   onMuatUlang?: () => void;
   memuat?: boolean;
+  /** Pita setinggi satu baris, untuk halaman yang kartu utamanya butuh seluruh tinggi layar. */
+  ringkas?: boolean;
   children?: ReactNode;
 }) {
   return (
-    <section className="dsb-navy dsb-pita dsb-muncul" aria-labelledby="dsb-sapaan">
+    <section className="dsb-navy dsb-pita dsb-muncul" data-ringkas={ringkas ? "" : undefined} aria-labelledby="dsb-sapaan">
       <LatarNavy />
       <div className="dsb-pita-atas">
         <div className="min-w-0">

@@ -12,7 +12,9 @@ import type { Nada } from "@/app/dashboard/components/PanelNavy";
 
 export interface BarisPantau {
   kode: string;
+  /** Nama ringkas (ADR-013); nama lengkap di tooltip. */
   nama: string;
+  namaLengkap?: string;
   kanwil: boolean;
   lewat: number;
   perluInput: number;
@@ -96,10 +98,12 @@ export default function PanelPantauSatker({
                 className="dsb-satker-pilih"
                 aria-pressed={terpilih === b.kode}
                 onClick={() => onPilih(terpilih === b.kode ? null : b.kode)}
-                title={b.nama}
+                title={b.namaLengkap ?? b.nama}
               >
                 <span className="dsb-nama">{b.nama}</span>
-                <span className="dsb-satker-angka">{b.kanwil ? "Kanwil" : "UPT"}</span>
+                <span className="dsb-satker-angka" title="Pegawai di antrian">
+                  {b.lewat + b.perluInput + b.diproses + b.diKeuangan}
+                </span>
                 <span className="dsb-satker-tanda">
                   {tanda.length === 0 ? <span>Tidak ada pekerjaan</span> : tanda.map((t) => <span key={t.teks} data-nada={t.nada}>{t.teks}</span>)}
                 </span>

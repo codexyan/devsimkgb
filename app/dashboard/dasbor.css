@@ -46,7 +46,7 @@
 }
 
 @media (min-width: 1200px) {
-  .dsb-dasbor-isi { grid-template-columns: minmax(0, 1fr) clamp(300px, 24vw, 420px); }
+  .dsb-dasbor-isi { grid-template-columns: minmax(0, 1fr) clamp(290px, 22vw, 400px); }
 }
 
 .dsb-samping {
@@ -113,6 +113,12 @@ html[data-dash-theme="dark"] .dsb-navy { box-shadow: inset 0 0 0 1px rgba(255, 2
 .dsb-pita {
   border-radius: 14px;
 }
+
+/* Pita ringkas: satu baris sapaan dan keterangan, agar kartu utama di bawahnya mendapat tinggi layar (ADR-013). */
+.dsb-pita[data-ringkas] .dsb-pita-atas { align-items: center; padding: 12px 20px; }
+.dsb-pita[data-ringkas] .dsb-pita-label { display: none; }
+.dsb-pita[data-ringkas] .dsb-sapaan { margin: 0; font-size: clamp(1.125rem, 1rem + 0.4vw, 1.375rem); }
+.dsb-pita[data-ringkas] .dsb-pita-meta { font-size: 12.5px; }
 
 .dsb-pita-atas {
   display: flex;
@@ -1189,6 +1195,98 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 .dsb-lini-legenda { margin: 8px 0 0; }
 .dsb-lini-kotak { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 2px; vertical-align: 0; }
 .dsb-lini-kotak[data-emas] { background: var(--emas-isi); }
+
+/* ── Antrian kerja: kepala satu baris, tab tahap, tabel padat (ADR-013) ── */
+.dsb-antrian-kepala { flex-wrap: nowrap; gap: 12px; }
+.dsb-antrian-kepala .dsb-panel-judul { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsb-antrian-alat { display: flex; flex: 0 1 auto; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; margin-left: auto; }
+.dsb-pilih-satker { flex: 0 1 200px; min-width: 130px; }
+.dsb-cari-antrian { flex: 0 1 190px; min-width: 110px; }
+.dsb-antrian-alat .dsb-segmen { flex: none; flex-wrap: nowrap; }
+/* Tombol Daftar/Papan cukup ikon kecuali di layar lebar; judulnya tetap di tooltip. */
+.dsb-label-tampilan { display: none; }
+@media (min-width: 1600px) { .dsb-label-tampilan { display: inline; } }
+
+.dsb-tahap {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-top: 1px solid var(--ln2);
+  border-bottom: 1px solid var(--ln2);
+}
+.dsb-tahap-ubin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 9px 14px 10px;
+  border: 0;
+  border-right: 1px solid var(--ln2);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.dsb-tahap-ubin:last-child { border-right: 0; }
+.dsb-tahap-ubin:hover { background: var(--sub); }
+.dsb-tahap-ubin[aria-pressed="true"] { background: var(--tint-navy); box-shadow: inset 0 -2px 0 var(--navy-solid); }
+.dsb-tahap-label { font-size: 12px; font-weight: 500; color: var(--dt4); }
+.dsb-tahap-angka {
+  font-family: var(--huruf-judul);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--dtn);
+}
+.dsb-tahap-angka small { margin-left: 3px; font-family: inherit; font-size: 12.5px; letter-spacing: 0; color: var(--dt5); }
+.dsb-tahap-ubin[data-nada="merah"] .dsb-tahap-angka { color: var(--st-red); }
+.dsb-tahap-meta { overflow: hidden; font-size: 11.5px; color: var(--dt5); text-overflow: ellipsis; white-space: nowrap; }
+.dsb-tahap-meta[data-nada="merah"] { color: var(--st-red); }
+.dsb-tahap-meta[data-nada="ungu"] { color: var(--st-violet); }
+.dsb-tahap-meta[data-nada="hijau"] { color: var(--st-green); }
+.dsb-tahap-bar { display: block; height: 3px; margin-top: 5px; overflow: hidden; border-radius: 999px; background: var(--ln1); }
+.dsb-tahap-bar > span { display: block; height: 100%; background: var(--st-green); }
+
+/* Layar sempit: ubin tahap digeser mendatar, tidak diperas */
+@media (max-width: 760px) {
+  .dsb-antrian-kepala { flex-wrap: wrap; }
+  .dsb-tahap { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(128px, 1fr); overflow-x: auto; scrollbar-width: thin; }
+  .dsb-antrian-alat { width: 100%; justify-content: flex-start; margin-left: 0; }
+  .dsb-pilih-satker, .dsb-cari-antrian { flex: 1 1 120px; min-width: 0; }
+}
+
+/* Baris tabel antrian lebih rapat agar lebih banyak pegawai terlihat tanpa menggulir */
+.dsb-tabel-padat :is(td, th) { padding-right: 12px; padding-left: 12px; }
+.dsb-tabel-padat :is(td, th):first-child { padding-left: 16px; }
+.dsb-tabel-padat td { padding-top: 7px; padding-bottom: 7px; }
+.dsb-tabel-padat .dsb-status { white-space: nowrap; }
+.dsb-tabel-padat td .dsb-kecil { font-size: 11.5px; }
+
+/* Lini masa tegak di kolom pendamping: satu baris per bulan, dua lajur (ADR-013). */
+.dsb-lini[data-tegak] { padding: 6px 10px 10px; }
+.dsb-lini[data-tegak] .dsb-lini-daftar { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.dsb-lini[data-tegak] .dsb-lini-sel {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 1px 10px;
+  padding: 4px 8px;
+  border-color: transparent;
+  border-radius: 8px;
+}
+.dsb-lini[data-tegak] .dsb-lini-sel:hover { border-color: var(--ln1); }
+.dsb-lini[data-tegak] .dsb-lini-sel[data-terbuka] { box-shadow: inset 3px 0 0 var(--emas-isi); }
+.dsb-lini[data-tegak] .dsb-lini-kepala { display: contents; }
+.dsb-lini[data-tegak] .dsb-lini-bulan { grid-column: 1; grid-row: 1; }
+.dsb-lini[data-tegak] .dsb-lini-bar { grid-column: 2; grid-row: 1; }
+.dsb-lini[data-tegak] .dsb-lini-total { grid-column: 3; grid-row: 1; justify-self: end; font-size: 15px; }
+/* Baris kedua: rentang jendela di kiri, keadaannya di kanan, keduanya pada lajur penuh. */
+.dsb-lini[data-tegak] .dsb-lini-jendela { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+.dsb-lini[data-tegak] .dsb-lini-keadaan { grid-column: 1 / -1; grid-row: 2; justify-self: end; font-size: 11px; }
+.dsb-lini[data-tegak] .dsb-lini-legenda { gap: 2px 10px; font-size: 11px; }
 
 
 /* ── Halaman modul: kepala terang, kartu angka ─────────────────────────── */

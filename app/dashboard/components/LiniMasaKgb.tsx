@@ -18,15 +18,17 @@ export interface EntriLiniMasa {
 
 const URUTAN: { k: KelompokLiniMasa; label: string; warna: string }[] = [
   { k: "selesai", label: "selesai", warna: "var(--st-green)" },
-  { k: "keuangan", label: "di keuangan", warna: "var(--st-violet)" },
+  { k: "keuangan", label: "keuangan", warna: "var(--st-violet)" },
   { k: "proses", label: "diproses", warna: "var(--navy-solid)" },
-  { k: "belum", label: "belum diinput", warna: "var(--amber-solid, var(--st-amber))" },
+  { k: "belum", label: "belum", warna: "var(--amber-solid, var(--st-amber))" },
   { k: "lewat", label: "lewat batas", warna: "var(--st-red)" },
 ];
 
-/** Dua bulan TMT ke belakang sampai lima ke depan: jendela yang baru lewat, yang terbuka, dan yang akan datang. */
-const MUNDUR = 2;
-const MAJU = 5;
+/**
+ * Bulan TMT yang ditampilkan: jendela yang baru lewat, yang terbuka, dan yang akan datang. Versi tegak di
+ * kolom pendamping lebih pendek agar panel di bawahnya tetap terlihat.
+ */
+const RENTANG = { mendatar: { mundur: 2, maju: 5 }, tegak: { mundur: 1, maju: 4 } };
 
 function kunciBulan(t: Date): string {
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}`;
@@ -36,10 +38,13 @@ export default function LiniMasaKgb({
   entri,
   bulanTerpilih,
   onPilih,
+  tegak = false,
 }: {
   entri: readonly EntriLiniMasa[];
   bulanTerpilih: string | null;
   onPilih: (bulan: string | null) => void;
+  /** Satu baris per bulan, untuk kolom pendamping yang sempit (ADR-013). */
+  tegak?: boolean;
 }) {
   const hariIni = new Date();
   hariIni.setHours(0, 0, 0, 0);
@@ -53,10 +58,11 @@ export default function LiniMasaKgb({
     perBulan.set(kunci, hitung);
   }
 
-  const bulan = Array.from({ length: MUNDUR + MAJU + 1 }, (_, i) => new Date(hariIni.getFullYear(), hariIni.getMonth() - MUNDUR + i, 1));
+  const { mundur, maju } = RENTANG[tegak ? "tegak" : "mendatar"];
+  const bulan = Array.from({ length: mundur + maju + 1 }, (_, i) => new Date(hariIni.getFullYear(), hariIni.getMonth() - mundur + i, 1));
 
   return (
-    <div className="dsb-lini">
+    <div className="dsb-lini" data-tegak={tegak ? "" : undefined}>
       <ol className="dsb-lini-daftar">
         {bulan.map((tmt) => {
           const kunci = kunciBulan(tmt);
@@ -121,7 +127,7 @@ export default function LiniMasaKgb({
         ))}
         <span>
           <span className="dsb-lini-kotak" data-emas="" aria-hidden="true" />
-          jendela input terbuka
+          terbuka
         </span>
       </p>
     </div>
