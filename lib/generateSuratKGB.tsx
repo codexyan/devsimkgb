@@ -274,7 +274,8 @@ export function SuratKGBDocument(props: SuratKGBProps) {
   const garisLebar = lebar - kanan + 2.27 - garisKiri;
 
   // KGB milik pimpinan Kanwil ditandatangani Dirjen, sehingga suratnya berkop Direktorat Jenderal.
-  const barisKop = penandatangan.jenis === "dirjen" ? t.kop.barisDitjen : t.kop.baris;
+  // Satu kop untuk semua surat; varian kop Direktorat Jenderal ditiadakan (ADR-019).
+  const barisKop = t.kop.baris;
   const logo =
     t.kop.logo === "tanpa"
       ? null

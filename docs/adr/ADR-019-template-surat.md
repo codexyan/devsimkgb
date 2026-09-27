@@ -15,8 +15,8 @@ menuntut pembaruan program.
 1. **Template terstruktur** (`lib/templateSurat.ts`, `IsiTemplateSurat`), terdiri dari:
    - kertas (lebar dan tinggi dalam mm, bebas, dengan pilihan cepat A4, F4, dan Legal);
    - margin serta huruf dan spasi;
-   - kop: baris teks untuk surat Kanwil dan untuk surat yang ditandatangani Dirjen, logo (bawaan, tanpa,
-     atau unggahan), letak logo, letak teks, dan garis kop;
+   - kop: baris teks (satu kop untuk semua surat), logo (bawaan, tanpa, atau unggahan), letak logo, letak
+     teks, dan garis kop;
    - Sifat, Lampiran, dan Hal, baris "a.n." dan tanggal, tujuan;
    - empat paragraf isi;
    - tembusan, dengan tanda "kecuali pegawai Kanwil".
@@ -40,7 +40,7 @@ menuntut pembaruan program.
 6. **Logo unggahan** (PNG/JPEG ≤ 500 KB) disimpan di R2 `template/`. Logo disajikan
    `GET /api/template-surat/logo` kepada peran yang menyusun SK.
 7. **Pratinjau** memakai jalur penyusunan PDF yang sama dengan SK sungguhan, dengan data contoh pegawai UPT,
-   pegawai Kanwil, atau pimpinan Kanwil (kop Dirjen).
+   atau pegawai Kanwil.
 
 ## Akibat
 
@@ -48,3 +48,9 @@ menuntut pembaruan program.
   penyimpanan versi dijawab 503.
 - Ukuran kertas bebas membuat isi bisa melebihi satu halaman bila margin atau huruf dibesarkan. Pratinjau
   menunjukkannya sebelum versi disimpan.
+
+## Pembaruan 27 September 2026
+
+Varian kop Direktorat Jenderal dihapus atas permintaan pengguna: Kanwil tidak memakai kop Dirjen. Semua SK,
+termasuk yang ditandatangani Direktur Jenderal, memakai kop yang sama (`kop.baris`). Versi template lama yang
+masih menyimpan `barisDitjen` tetap terbaca; kolom itu diabaikan saat dinormalisasi.

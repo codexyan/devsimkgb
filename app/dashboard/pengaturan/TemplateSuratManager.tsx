@@ -39,7 +39,7 @@ const NADA_KEADAAN: Record<KeadaanVersi, [string, string]> = {
   riwayat: ["navy", "Riwayat"],
 };
 
-type Contoh = "upt" | "kanwil" | "dirjen";
+type Contoh = "upt" | "kanwil";
 
 /** Data contoh untuk pratinjau: pegawai UPT, pegawai Kanwil, atau pimpinan Kanwil yang SK-nya ditandatangani Dirjen. */
 function dataContoh(contoh: Contoh, template: IsiTemplateSurat): DataSuratKGB {
@@ -65,10 +65,7 @@ function dataContoh(contoh: Contoh, template: IsiTemplateSurat): DataSuratKGB {
       tmtKgbBaru: new Date(2026, 10, 1),
       tmtKgbBerikutnya: new Date(2028, 10, 1),
     },
-    penandatangan:
-      contoh === "dirjen"
-        ? { jenis: "dirjen", jabatan: "Direktur Jenderal Pemasyarakatan", nama: "NAMA DIREKTUR JENDERAL" }
-        : { jenis: "definitif", jabatan: "Kepala Kantor Wilayah", nama: "NAMA KEPALA KANTOR WILAYAH" },
+    penandatangan: { jenis: "definitif", jabatan: "Kepala Kantor Wilayah", nama: "NAMA KEPALA KANTOR WILAYAH" },
     dasarHukum: "Nomor 5 Tahun 2024",
     template,
   };
@@ -105,7 +102,6 @@ export default function TemplateSuratManager({ bolehUbah }: { bolehUbah: boolean
   const [versi, setVersi] = useState<VersiTampil[]>([]);
   const [isi, setIsi] = useState<IsiTemplateSurat>(() => salin(TEMPLATE_BAWAAN));
   const [dasarLabel, setDasarLabel] = useState("templat bawaan");
-  const [tabKop, setTabKop] = useState<"baris" | "barisDitjen">("baris");
   const [berlakuMulai, setBerlakuMulai] = useState(() => isoTanggalLokal(hariIniWita()));
   const [catatan, setCatatan] = useState("");
   const [menyimpan, setMenyimpan] = useState(false);
@@ -265,8 +261,8 @@ export default function TemplateSuratManager({ bolehUbah }: { bolehUbah: boolean
     setPesan(v ? `Formulir diisi dari versi ${v.versi}. Ubah lalu simpan sebagai versi baru.` : "Formulir diisi dari templat bawaan.");
   }
 
-  const barisKop = isi.kop[tabKop];
-  const ubahKop = (i: number, f: (b: BarisKop) => void) => ubah((t) => f(t.kop[tabKop][i]));
+  const barisKop = isi.kop.baris;
+  const ubahKop = (i: number, f: (b: BarisKop) => void) => ubah((t) => f(t.kop.baris[i]));
   const pindah = <T,>(daftar: T[], i: number, arah: -1 | 1) => {
     const j = i + arah;
     if (j < 0 || j >= daftar.length) return;
@@ -339,14 +335,6 @@ export default function TemplateSuratManager({ bolehUbah }: { bolehUbah: boolean
           {/* ── Kop ───────────────────────────────────────────────── */}
           <section className="tpl-kelompok" aria-labelledby="tpl-kop">
             <h3 id="tpl-kop">Kop surat</h3>
-            <div className="dsb-segmen" role="group" aria-label="Varian kop">
-              <button type="button" aria-pressed={tabKop === "baris"} onClick={() => setTabKop("baris")}>
-                Ditandatangani Kanwil
-              </button>
-              <button type="button" aria-pressed={tabKop === "barisDitjen"} onClick={() => setTabKop("barisDitjen")}>
-                Ditandatangani Dirjen
-              </button>
-            </div>
             <ol className="tpl-daftar">
               {barisKop.map((b, i) => (
                 <li key={i} className="tpl-baris-kop">
@@ -363,9 +351,9 @@ export default function TemplateSuratManager({ bolehUbah }: { bolehUbah: boolean
                     <Angka label="Geser" satuan="pt" nilai={b.geserPt} onUbah={(n) => ubahKop(i, (x) => { x.geserPt = n; })} />
                     <Angka label="Jarak atas" satuan="pt" nilai={b.jarakAtasPt} onUbah={(n) => ubahKop(i, (x) => { x.jarakAtasPt = n; })} />
                     <span className="tpl-urut">
-                      <button type="button" className="dsb-ikon-tombol" aria-label="Naikkan" onClick={() => ubah((t) => pindah(t.kop[tabKop], i, -1))}>↑</button>
-                      <button type="button" className="dsb-ikon-tombol" aria-label="Turunkan" onClick={() => ubah((t) => pindah(t.kop[tabKop], i, 1))}>↓</button>
-                      <button type="button" className="dsb-ikon-tombol" data-nada="merah" aria-label={`Hapus baris kop ${i + 1}`} onClick={() => ubah((t) => { t.kop[tabKop].splice(i, 1); })}>×</button>
+                      <button type="button" className="dsb-ikon-tombol" aria-label="Naikkan" onClick={() => ubah((t) => pindah(t.kop.baris, i, -1))}>↑</button>
+                      <button type="button" className="dsb-ikon-tombol" aria-label="Turunkan" onClick={() => ubah((t) => pindah(t.kop.baris, i, 1))}>↓</button>
+                      <button type="button" className="dsb-ikon-tombol" data-nada="merah" aria-label={`Hapus baris kop ${i + 1}`} onClick={() => ubah((t) => { t.kop.baris.splice(i, 1); })}>×</button>
                     </span>
                   </span>
                 </li>
@@ -375,17 +363,17 @@ export default function TemplateSuratManager({ bolehUbah }: { bolehUbah: boolean
               type="button"
               className="dsb-tombol dsb-tombol-kecil"
               data-jenis="garis"
-              onClick={() => ubah((t) => { t.kop[tabKop].push({ teks: "", tebal: false, ukuranPt: 10, geserPt: 0, jarakAtasPt: 0 }); })}
+              onClick={() => ubah((t) => { t.kop.baris.push({ teks: "", tebal: false, ukuranPt: 10, geserPt: 0, jarakAtasPt: 0 }); })}
             >
               + Baris kop
             </button>
             <p className="dsb-kecil" style={{ margin: 0 }}>Alamat surel di baris kop dicetak miring biru. Geser menggeser baris ke kanan (positif) atau kiri (negatif) dari tengah.</p>
 
-            <div className="tpl-kisi2">
+            <div className="tpl-logo">
               <label className="tpl-bidang">
                 <span className="tpl-label">Logo</span>
                 <select
-                  className="dsb-pilih"
+                  className="dsb-pilih tpl-penuh"
                   value={isi.kop.logo === "bawaan" || isi.kop.logo === "tanpa" ? isi.kop.logo : "unggahan"}
                   onChange={(e) => ubah((t) => { if (e.target.value !== "unggahan") t.kop.logo = e.target.value; })}
                 >
@@ -395,26 +383,32 @@ export default function TemplateSuratManager({ bolehUbah }: { bolehUbah: boolean
                 </select>
               </label>
               {bolehUbah && (
-                <label className="tpl-bidang">
-                  <span className="tpl-label">Unggah logo (PNG/JPEG, maks. 500 KB)</span>
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    className="dsb-cari"
-                    disabled={mengunggah}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void unggahLogo(f);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
+                <div className="tpl-bidang">
+                  <span className="tpl-label">Ganti logo</span>
+                  <label className="dsb-tombol dsb-tombol-kecil tpl-unggah" data-jenis="garis" aria-disabled={mengunggah || undefined}>
+                    {mengunggah ? "Mengunggah…" : "Unggah PNG/JPEG"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="sr-only"
+                      disabled={mengunggah}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void unggahLogo(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <span className="tpl-bantu">Paling besar 500 KB. Latar transparan paling rapi.</span>
+                </div>
               )}
+            </div>
+            <div className="tpl-kisi2">
               <Angka label="Logo dari kiri" satuan="mm" nilai={isi.kop.logoKiriMm} onUbah={(n) => ubah((t) => { t.kop.logoKiriMm = n; })} />
               <Angka label="Logo dari atas" satuan="mm" nilai={isi.kop.logoAtasMm} onUbah={(n) => ubah((t) => { t.kop.logoAtasMm = n; })} />
               <Angka label="Ukuran logo" satuan="mm" nilai={isi.kop.logoUkuranMm} onUbah={(n) => ubah((t) => { t.kop.logoUkuranMm = n; })} />
               <Angka label="Teks kop dari atas" satuan="mm" nilai={isi.kop.teksAtasMm} onUbah={(n) => ubah((t) => { t.kop.teksAtasMm = n; })} />
-              <Angka label="Teks kop dari margin kiri" satuan="mm" nilai={isi.kop.teksIndenMm} onUbah={(n) => ubah((t) => { t.kop.teksIndenMm = n; })} />
+              <Angka label="Inden teks kop" satuan="mm" nilai={isi.kop.teksIndenMm} onUbah={(n) => ubah((t) => { t.kop.teksIndenMm = n; })} />
               <Angka label="Garis kop dari atas" satuan="mm" nilai={isi.kop.garisAtasMm} onUbah={(n) => ubah((t) => { t.kop.garisAtasMm = n; })} />
             </div>
             <label className="tpl-cek">
@@ -425,13 +419,13 @@ export default function TemplateSuratManager({ bolehUbah }: { bolehUbah: boolean
           {/* ── Kepala dan tujuan ─────────────────────────────────── */}
           <section className="tpl-kelompok" aria-labelledby="tpl-kepala">
             <h3 id="tpl-kepala">Kepala dan tujuan</h3>
-            <div className="tpl-kisi2">
+            <div className="tpl-kisi2 tpl-kisi-teks">
               {([
                 ["sifat", "Sifat"],
                 ["lampiran", "Lampiran"],
                 ["hal", "Hal"],
-                ["atasNama", "Baris di bawah Hal (kosongkan bila tidak perlu)"],
-                ["tanggal", "Tanggal surat (kanan atas)"],
+                ["atasNama", "Baris di bawah Hal"],
+                ["tanggal", "Tanggal surat"],
               ] as const).map(([k, label]) => (
                 <label key={k} className="tpl-bidang">
                   <span className="tpl-label">{label}</span>
@@ -444,6 +438,7 @@ export default function TemplateSuratManager({ bolehUbah }: { bolehUbah: boolean
                 </label>
               ))}
             </div>
+            <p className="tpl-bantu" style={{ margin: 0 }}>Baris di bawah Hal boleh dikosongkan. Tanggal surat dicetak di kanan atas.</p>
             <label className="tpl-bidang">
               <span className="tpl-label">Tujuan (tiap baris dicetak sebagai baris sendiri)</span>
               <textarea
@@ -537,7 +532,6 @@ export default function TemplateSuratManager({ bolehUbah }: { bolehUbah: boolean
               <select className="dsb-pilih" value={contoh} onChange={(e) => setContoh(e.target.value as Contoh)} aria-label="Contoh pegawai">
                 <option value="upt">Pegawai UPT</option>
                 <option value="kanwil">Pegawai Kanwil</option>
-                <option value="dirjen">Pimpinan Kanwil (kop Dirjen)</option>
               </select>
             </div>
             {kesalahan.length > 0 ? (
@@ -629,9 +623,19 @@ const GAYA = `
 .tpl-samping { display: grid; gap: 14px; min-width: 0; }
 .tpl-kelompok { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--ln1); border-radius: 12px; background: var(--card); }
 .tpl-kelompok h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--dtn); }
-.tpl-kisi2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-.tpl-bidang { display: grid; gap: 4px; min-width: 0; }
-.tpl-label { font-size: 12px; font-weight: 600; color: var(--dt2); }
+.tpl-kisi2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px 10px; align-items: stretch; }
+/* Label di atas, isian di bawah; dalam satu baris kisi semua isian rata bawah walau labelnya berbeda panjang. */
+.tpl-bidang { display: grid; grid-template-rows: 1fr auto; gap: 4px; min-width: 0; }
+.tpl-label { align-self: end; font-size: 12px; font-weight: 600; color: var(--dt2); line-height: 1.3; }
+.tpl-bantu { font-size: 11px; color: var(--dt5); line-height: 1.4; }
+.tpl-bidang .tpl-bantu { grid-row: 3; }
+.tpl-penuh { width: 100%; min-width: 0; }
+/* Isian teks butuh ruang lebih lebar daripada isian angka. */
+.tpl-kisi-teks { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.tpl-kisi-teks .dsb-cari { width: 100%; min-width: 0; }
+.tpl-logo { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; align-items: start; }
+.tpl-unggah { position: relative; justify-self: start; min-height: 32px; cursor: pointer; }
+.tpl-unggah[aria-disabled] { opacity: .6; pointer-events: none; }
 .tpl-isian { position: relative; display: block; }
 .tpl-isian .dsb-cari { width: 100%; min-width: 0; flex: none; padding-right: 36px; }
 .tpl-satuan { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--dt5); pointer-events: none; }
@@ -644,6 +648,8 @@ const GAYA = `
 .tpl-teks { width: 100%; }
 .tpl-area { width: 100%; resize: vertical; min-height: 56px; line-height: 1.45; }
 .tpl-cek { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dt2); white-space: nowrap; }
+/* Kotak "Tebal" dan tombol urut setinggi isian angka, agar sebaris dengan kotaknya. */
+.tpl-baris-atur .tpl-cek, .tpl-baris-atur .tpl-urut { height: 32px; }
 .tpl-urut { display: inline-flex; gap: 4px; align-items: center; }
 .tpl-chip { display: flex; flex-wrap: wrap; gap: 6px; }
 .tpl-chip .dsb-tag { cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; }

@@ -44,10 +44,8 @@ export interface IsiTemplateSurat {
   margin: { atasMm: number; bawahMm: number; kiriMm: number; kananMm: number };
   huruf: { ukuranPt: number; spasi: number };
   kop: {
-    /** Baris kop untuk surat yang ditandatangani pejabat Kanwil. */
+    /** Baris kop, dipakai semua surat apa pun penandatangannya. */
     baris: BarisKop[];
-    /** Baris kop bila penandatangannya Direktur Jenderal. */
-    barisDitjen: BarisKop[];
     /** "bawaan" (logo Kementerian), "tanpa", atau kunci berkas logo unggahan di R2 ("template/…"). */
     logo: string;
     logoKiriMm: number;
@@ -171,11 +169,6 @@ export const TEMPLATE_BAWAAN: IsiTemplateSurat = {
         tebal: false, ukuranPt: 10, geserPt: -7.1, jarakAtasPt: 0,
       },
     ],
-    // KGB milik pimpinan Kanwil ditandatangani Dirjen, sehingga suratnya berkop Direktorat Jenderal.
-    barisDitjen: [
-      KOP_BARIS_1,
-      { teks: "DIREKTORAT JENDERAL PEMASYARAKATAN", tebal: true, ukuranPt: 11, geserPt: 0.6, jarakAtasPt: 3.7 },
-    ],
     logo: "bawaan",
     logoKiriMm: ptKeMm(67.1),
     logoAtasMm: ptKeMm(32.7),
@@ -266,7 +259,6 @@ export function normalisasiTemplate(masukan: unknown): IsiTemplateSurat {
     huruf: { ukuranPt: num(huruf.ukuranPt, b.huruf.ukuranPt), spasi: num(huruf.spasi, b.huruf.spasi) },
     kop: {
       baris: barisKop(kop.baris, b.kop.baris),
-      barisDitjen: barisKop(kop.barisDitjen, b.kop.barisDitjen),
       logo: str(kop.logo, b.kop.logo) || "bawaan",
       logoKiriMm: num(kop.logoKiriMm, b.kop.logoKiriMm),
       logoAtasMm: num(kop.logoAtasMm, b.kop.logoAtasMm),
@@ -311,7 +303,6 @@ export function kunciLogoSah(kunci: string): boolean {
 function semuaTeks(t: IsiTemplateSurat): [string, string][] {
   return [
     ...t.kop.baris.map((b, i): [string, string] => [`Kop baris ${i + 1}`, b.teks]),
-    ...t.kop.barisDitjen.map((b, i): [string, string] => [`Kop Ditjen baris ${i + 1}`, b.teks]),
     ["Sifat", t.kepala.sifat],
     ["Lampiran", t.kepala.lampiran],
     ["Hal", t.kepala.hal],
@@ -339,7 +330,7 @@ export function periksaTemplate(t: IsiTemplateSurat): string[] {
   if (t.kertas.tinggiMm - atasMm - bawahMm < 120) galat.push("Tinggi isi surat (kertas dikurangi margin atas dan bawah) paling sedikit 120 mm.");
   if (!antara(t.huruf.ukuranPt, 7, 16)) galat.push("Ukuran huruf isi harus 7–16 pt.");
   if (!antara(t.huruf.spasi, 0.9, 2.5)) galat.push("Spasi baris harus 0,9–2,5.");
-  for (const [nama, daftar] of [["Kop", t.kop.baris], ["Kop Ditjen", t.kop.barisDitjen]] as const) {
+  for (const [nama, daftar] of [["Kop", t.kop.baris]] as const) {
     if (daftar.length > 8) galat.push(`${nama} paling banyak 8 baris.`);
     if (daftar.some((b) => !antara(b.ukuranPt, 6, 24))) galat.push(`Ukuran huruf ${nama.toLowerCase()} harus 6–24 pt.`);
     if (daftar.some((b) => !antara(b.geserPt, -100, 100) || !antara(b.jarakAtasPt, 0, 60)))
