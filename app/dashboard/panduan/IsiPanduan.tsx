@@ -1710,7 +1710,9 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                 </h2>
                 <p>
                   Status yang sama tampil di SIM-KGB dan di halaman <Link href="/kgb">Cek status</Link> publik, yang
-                  dibuka pegawai dengan NIP. Pegawai tidak memerlukan akun.
+                  dibuka pegawai dengan NIP dan tempat lahir. Pegawai tidak memerlukan akun. Halaman publik hanya
+                  menampilkan status, tanggal, dan nama yang disamarkan, jadi pastikan tempat lahir pegawai tercatat
+                  di data pegawai; tanpa itu pegawai tidak dapat mengecek statusnya.
                 </p>
                 <div className="pub-table-wrap" tabIndex={0} role="region" aria-label="Tabel arti status KGB">
                   <table className="pub-table">

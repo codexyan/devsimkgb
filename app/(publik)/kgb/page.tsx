@@ -134,7 +134,7 @@ export default async function HalamanBeranda() {
                 </span>
               </h1>
               <p className="hr-lead masuk" style={{ "--d": 220 } as React.CSSProperties}>
-                Cek status KGB dengan NIP, lalu lihat kapan anak tangga berikutnya tiba. Untuk pegawai Kanwil Ditjenpas
+                Cek status KGB dengan NIP dan tempat lahir, lalu lihat kapan anak tangga berikutnya tiba. Untuk pegawai Kanwil Ditjenpas
                 Kalimantan Selatan dan UPT di wilayahnya.
               </p>
               <div className="hr-cari masuk" style={{ "--d": 300 } as React.CSSProperties}>
@@ -499,7 +499,7 @@ export default async function HalamanBeranda() {
               <details>
                 <summary>Apakah saya perlu akun SIM-KGB?</summary>
                 <p>
-                  Tidak. Status KGB dapat dicek dengan NIP di halaman ini. Akun SIM-KGB hanya untuk Tim SDM dan keuangan
+                  Tidak. Status KGB dapat dicek dengan NIP dan tempat lahir di halaman ini. Akun SIM-KGB hanya untuk Tim SDM dan keuangan
                   Kanwil serta Admin UPT.
                 </p>
               </details>

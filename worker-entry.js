@@ -22,7 +22,8 @@ const PATH_CEK_KGB = "/api/public/cek-kgb";
 // Semua permintaan per IP dibatasi longgar, karena pegawai satu kantor (satu alamat IP) dapat
 // mengecek status bersamaan. Batas ketat hanya untuk NIP yang tidak ditemukan (jawaban 404),
 // yaitu pola menebak NIP.
-const BATAS_CEK_KGB_PER_MENIT = 60;
+// Cadangan bila binding CEK_KGB_RATE_LIMITER (wrangler.jsonc) tidak tersedia; nilainya sama dengan binding itu.
+const BATAS_CEK_KGB_PER_MENIT = 10;
 const BATAS_CEK_KGB_TIDAK_DITEMUKAN_PER_MENIT = 10;
 const JENDELA_CEK_KGB_MS = 60_000;
 const hitunganCekKgb = new Map();

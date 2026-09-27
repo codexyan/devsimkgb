@@ -5,20 +5,16 @@ import Link from "next/link";
 import { infoStatusKgb } from "@/lib/statusKgb";
 import { kurangiGerak as kurangiGerakPengguna } from "@/lib/ui/gerak";
 
-/* Bentuk tanggapan GET /api/public/cek-kgb. Semua kolom diperlakukan opsional
-   karena data lama dapat memuat kolom kosong. */
+/* Bentuk tanggapan POST /api/public/cek-kgb. Cek publik hanya mengirim yang perlu untuk mengetahui status
+   KGB (lib/cekKgbPublik.ts): nama disamarkan, status, dan tanggal. Semua kolom diperlakukan opsional. */
 interface KgbTerbaru {
   status?: string | null;
   tmtKgbBaru?: string | null;
   flagRapelan?: boolean | string | null;
-  nomorSurat?: string | null;
 }
 
 interface HasilCek {
-  nama?: string | null;
-  jabatan?: string | null;
-  golonganRuang?: string | null;
-  unitKerja?: string | null;
+  namaSamaran?: string | null;
   tmtKgbBerikutnya?: string | null;
   kgbTerbaru?: KgbTerbaru | null;
 }
@@ -75,12 +71,15 @@ const IkonSilang = (
 export default function CekStatus() {
   const id = useId();
   const idNip = `${id}-nip`;
+  const idTempat = `${id}-tempat`;
   const idPetunjuk = `${id}-petunjuk`;
   const idGalatNip = `${id}-galat`;
   const idPanel = `${id}-panel`;
   const idJudul = `${id}-judul`;
 
   const [nip, setNip] = useState("");
+  const [tempatLahir, setTempatLahir] = useState("");
+  const tempatRef = useRef<HTMLInputElement>(null);
   const [galatNip, setGalatNip] = useState("");
   const [memuat, setMemuat] = useState(false);
   const [hasil, setHasil] = useState<HasilCek | null>(null);
@@ -166,6 +165,14 @@ export default function CekStatus() {
       return;
     }
 
+    if (tempatLahir.trim().length < 3) {
+      setGalatNip("Isi tempat lahir sesuai data kepegawaian Anda.");
+      setHasil(null);
+      setGalat(null);
+      tempatRef.current?.focus();
+      return;
+    }
+
     setGalatNip("");
     pengendaliRef.current?.abort();
     const pengendali = new AbortController();
@@ -177,19 +184,23 @@ export default function CekStatus() {
     setGalat(null);
 
     try {
-      const res = await fetch(`/api/public/cek-kgb?nip=${encodeURIComponent(bersih)}`, {
+      // POST, bukan GET: tempat lahir tidak boleh tercatat di alamat, riwayat peramban, atau log server.
+      const res = await fetch("/api/public/cek-kgb", {
+        method: "POST",
         signal: pengendali.signal,
         cache: "no-store",
-        headers: { Accept: "application/json" },
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ nip: bersih, tempatLahir: tempatLahir.trim() }),
       });
       const data: unknown = await res.json().catch(() => null);
       if (nomor !== nomorRef.current) return;
 
       if (res.status === 404) {
         setGalat({
-          judul: "Data tidak ditemukan",
-          pesan: pesanDariApi(data) ?? "Pegawai tidak ditemukan dalam sistem.",
-          saran: "Pastikan NIP sudah benar. Bila tetap tidak ditemukan, hubungi pengelola kepegawaian di satker Anda.",
+          judul: "Data tidak cocok",
+          pesan: pesanDariApi(data) ?? "Data tidak ditemukan atau tempat lahir tidak cocok.",
+          saran:
+            "Tulis tempat lahir seperti di data kepegawaian, mis. Banjarmasin. Bila yakin sudah benar, tempat lahir Anda mungkin belum tercatat: hubungi pengelola kepegawaian di satker Anda.",
         });
       } else if (res.status === 429) {
         setGalat({ judul: "Terlalu banyak pencarian", pesan: "Tunggu sebentar, lalu coba lagi." });
@@ -211,19 +222,15 @@ export default function CekStatus() {
   const kgb = hasil?.kgbTerbaru ?? null;
   const status = typeof kgb?.status === "string" ? kgb.status : "";
   const info = infoStatusKgb(status);
-  const nomorSk = teks(kgb?.nomorSurat);
   // Tanda rapelan hanya berarti untuk KGB yang sudah diinput dan belum dikonfirmasi keuangan.
   const tampilkanRapel =
     kgb !== null && benar(kgb.flagRapelan) && (status === "sedang_diproses" || status === "menunggu_keuangan");
-  const meta = [hasil?.jabatan, hasil?.golonganRuang ? `Golongan ${teks(hasil.golonganRuang)}` : null, hasil?.unitKerja]
-    .map(teks)
-    .filter((s) => s !== "-");
 
   return (
     <div className="cs" ref={wadahRef} data-buka={panelBuka ? "1" : "0"}>
-      <form role="search" aria-label="Cek status KGB berdasarkan NIP" onSubmit={cari} noValidate>
+      <form role="search" aria-label="Cek status KGB berdasarkan NIP dan tempat lahir" onSubmit={cari} noValidate>
         <label htmlFor={idNip} className="cs-label">
-          Cek status KGB dengan NIP
+          Cek status KGB dengan NIP dan tempat lahir
         </label>
         <div className="cs-bidang" aria-busy={memuat}>
           <span className="cs-ikon">{IkonCari}</span>
@@ -260,6 +267,27 @@ export default function CekStatus() {
               {IkonSilang}
             </button>
           )}
+          <span className="cs-pemisah" aria-hidden="true" />
+          <label htmlFor={idTempat} className="pub-visually-hidden">
+            Tempat lahir
+          </label>
+          <input
+            ref={tempatRef}
+            id={idTempat}
+            name="tempat-lahir"
+            className="cs-tempat"
+            type="text"
+            autoComplete="off"
+            enterKeyHint="search"
+            spellCheck={false}
+            placeholder="Tempat lahir"
+            value={tempatLahir}
+            onChange={(e) => {
+              setTempatLahir(e.target.value);
+              if (galatNip) setGalatNip("");
+            }}
+            aria-describedby={idPetunjuk}
+          />
           <kbd className="cs-kbd" aria-hidden="true">
             /
           </kbd>
@@ -269,7 +297,7 @@ export default function CekStatus() {
           </button>
         </div>
         <p id={idPetunjuk} className="pub-visually-hidden">
-          NIP terdiri atas 18 angka.
+          NIP terdiri atas 18 angka. Tempat lahir ditulis seperti di data kepegawaian, huruf besar kecil tidak berpengaruh.
         </p>
         {galatNip && (
           <p id={idGalatNip} className="cs-galat" role="alert">
@@ -298,9 +326,9 @@ export default function CekStatus() {
             <section aria-labelledby={idJudul}>
               <div className="cs-kepala">
                 <h2 id={idJudul} ref={judulRef} tabIndex={-1} className="cs-panel-judul">
-                  {teks(hasil.nama)}
+                  {teks(hasil.namaSamaran)}
                 </h2>
-                {meta.length > 0 && <p className="cs-meta">{meta.join(" · ")}</p>}
+                <p className="cs-meta">Nama disamarkan demi pelindungan data pribadi.</p>
               </div>
 
               <div className="cs-status">
@@ -331,12 +359,6 @@ export default function CekStatus() {
                   <dt>TMT KGB berikutnya</dt>
                   <dd>{tanggal(hasil.tmtKgbBerikutnya, { day: "numeric", month: "long", year: "numeric" })}</dd>
                 </div>
-                {nomorSk !== "-" && (
-                  <div>
-                    <dt>Nomor SK</dt>
-                    <dd>{nomorSk}</dd>
-                  </div>
-                )}
               </dl>
 
               {tampilkanRapel && (

@@ -23,5 +23,10 @@
   "triggers": {
     "crons": ["0 0 * * *"]
   },
+  // Pembatas cek status KGB publik (worker-entry.js): 10 cek per menit per alamat IP, berlaku lintas instance
+  // Worker. namespace_id bebas asal unik di akun Cloudflare ini.
+  "ratelimits": [
+    { "name": "CEK_KGB_RATE_LIMITER", "namespace_id": "4101", "simple": { "limit": 10, "period": 60 } }
+  ],
   "observability": { "enabled": true }
 }
