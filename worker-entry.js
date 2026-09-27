@@ -8,9 +8,12 @@
 // service binding. File .open-next/worker.js dibuat saat `opennextjs-cloudflare
 // build`, sebelum wrangler membundel entry ini.
 //
-// Wrapper ini juga membatasi permintaan cek status KGB publik (/api/public/cek-kgb)
-// per alamat IP, karena endpoint itu tanpa login dan dapat dipakai menebak NIP.
+// Wrapper ini juga membatasi permintaan cek status KGB publik (/api/public/cek-kgb) per alamat IP dan
+// per NIP lewat Durable Object PembatasCekKgb, karena endpoint itu tanpa login dan dapat dipakai menebak
+// NIP atau tempat lahir seseorang.
+import { DurableObject } from "cloudflare:workers";
 import openNextWorker from "./.open-next/worker.js";
+import { AturanPembatasCek, pesanDitahan } from "./lib/pembatasCekKgb.ts";
 
 export {
   DOQueueHandler,
@@ -22,8 +25,8 @@ const PATH_CEK_KGB = "/api/public/cek-kgb";
 // Semua permintaan per IP dibatasi longgar, karena pegawai satu kantor (satu alamat IP) dapat
 // mengecek status bersamaan. Batas ketat hanya untuk NIP yang tidak ditemukan (jawaban 404),
 // yaitu pola menebak NIP.
-// Cadangan bila binding CEK_KGB_RATE_LIMITER (wrangler.jsonc) tidak tersedia; nilainya sama dengan binding itu.
-const BATAS_CEK_KGB_PER_MENIT = 10;
+// Batas cadangan per isolate bila Durable Object dan binding ratelimits sama-sama tidak dapat dipakai.
+const BATAS_CEK_KGB_PER_MENIT = 30;
 const BATAS_CEK_KGB_TIDAK_DITEMUKAN_PER_MENIT = 10;
 const JENDELA_CEK_KGB_MS = 60_000;
 const hitunganCekKgb = new Map();
@@ -56,10 +59,55 @@ function tambahHitungan(peta, ip, sekarang) {
   return entri.jumlah;
 }
 
-// Batas semua permintaan memakai binding Workers Rate Limiting CEK_KGB_RATE_LIMITER bila dikonfigurasi
-// di wrangler.jsonc (disarankan 60 permintaan per 60 detik). Tanpa binding, dan untuk batas NIP yang
-// tidak ditemukan, dipakai hitungan per isolate, yang hanya membatasi sebagian karena permintaan dapat
-// dilayani isolate yang berbeda. Galat pembatas tidak menghalangi permintaan.
+/**
+ * Penghitung tunggal cek status KGB publik untuk semua pusat data (lib/pembatasCekKgb.ts). Satu instance
+ * bernama "global"; hitungan di memori sudah cukup, karena jendelanya hanya menit dan instance tetap hidup
+ * selama ada permintaan. Dipanggil lewat RPC dari fetch di bawah.
+ */
+export class PembatasCekKgb extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.aturan = new AturanPembatasCek();
+  }
+
+  periksa(ip, nip) {
+    return this.aturan.periksa(ip, nip, Date.now());
+  }
+
+  catatGagal(ip, nip) {
+    this.aturan.catatGagal(ip, nip, Date.now());
+  }
+}
+
+/** Stub Durable Object pembatas, atau null bila binding-nya tidak ada. */
+function pembatas(env) {
+  try {
+    return env.PEMBATAS_CEK_KGB ? env.PEMBATAS_CEK_KGB.get(env.PEMBATAS_CEK_KGB.idFromName("global")) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** NIP dari isi permintaan POST, tanpa menghabiskan isi aslinya. */
+async function nipDari(request) {
+  try {
+    const isi = await request.clone().json();
+    return typeof isi?.nip === "string" ? isi.nip.replace(/\s+/g, "") : "";
+  } catch {
+    return "";
+  }
+}
+
+function jawabDitahan(pesan, detik) {
+  return new Response(JSON.stringify({ error: pesan }), {
+    status: 429,
+    headers: { "content-type": "application/json; charset=utf-8", "retry-after": String(detik) },
+  });
+}
+
+// Cadangan bila Durable Object tidak dapat dihubungi: binding Workers Rate Limiting CEK_KGB_RATE_LIMITER,
+// lalu hitungan per isolate. Keduanya hanya membatasi sebagian (Cloudflare menyebut binding itu longgar,
+// dan permintaan dapat dilayani isolate berbeda). Galat pembatas tidak menghalangi permintaan.
 async function melebihiBatasCekKgb(ip, env, sekarang) {
   if ((entriBerjalan(hitunganTidakDitemukan, ip, sekarang)?.jumlah ?? 0) >= BATAS_CEK_KGB_TIDAK_DITEMUKAN_PER_MENIT) {
     return true;
@@ -139,15 +187,30 @@ async function layani(request, env, ctx) {
   if (bolehDariCache(request, pathname)) return lewatCachePublik(request, pathname, env, ctx);
   if (pathname.replace(/\/+$/, "") !== PATH_CEK_KGB) return openNextWorker.fetch(request, env, ctx);
 
+  // Hanya POST yang memeriksa data; GET lama langsung dijawab rute dengan pesan untuk memuat ulang halaman.
+  if (request.method !== "POST") return openNextWorker.fetch(request, env, ctx);
+
   const ip = alamatIp(request);
-  if (await melebihiBatasCekKgb(ip, env, Date.now())) {
-    return new Response(
-      JSON.stringify({ error: "Terlalu banyak permintaan cek status. Coba lagi dalam satu menit." }),
-      { status: 429, headers: { "content-type": "application/json; charset=utf-8", "retry-after": "60" } },
-    );
+  const nip = await nipDari(request);
+  const stub = pembatas(env);
+  let hasil = null;
+  if (stub) {
+    try {
+      hasil = await stub.periksa(ip, nip);
+    } catch (err) {
+      console.error("[cek-kgb] Durable Object pembatas gagal:", err);
+    }
   }
+  if (hasil && !hasil.boleh) return jawabDitahan(pesanDitahan(hasil), hasil.tunggu);
+  if (!hasil && (await melebihiBatasCekKgb(ip, env, Date.now())))
+    return jawabDitahan("Terlalu banyak permintaan cek status. Coba lagi dalam satu menit.", 60);
+
   const res = await openNextWorker.fetch(request, env, ctx);
-  if (res.status === 404) tambahHitungan(hitunganTidakDitemukan, ip, Date.now());
+  // 404: NIP tak dikenal atau tempat lahir salah (jawabannya sengaja sama). Dihitung sebagai percobaan gagal.
+  if (res.status === 404) {
+    tambahHitungan(hitunganTidakDitemukan, ip, Date.now());
+    if (stub) ctx.waitUntil(stub.catatGagal(ip, nip).catch((err) => console.error("[cek-kgb] catat gagal:", err)));
+  }
   return res;
 }
 
