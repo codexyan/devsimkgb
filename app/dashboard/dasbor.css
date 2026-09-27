@@ -28,7 +28,7 @@
 }
 
 .dsb-muncul {
-  animation: dsbMuncul 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: dsbMuncul 360ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
   animation-delay: calc(var(--i, 0) * 40ms);
 }
 
@@ -1619,7 +1619,7 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
   background: rgba(8, 18, 45, 0.5);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
-  animation: admFade 0.2s ease both;
+  animation: admFade 0.2s ease backwards;
 }
 
 /* Tinjau SK: berkas di kiri, data dan keputusan di kanan; pada layar sempit bertumpuk */
@@ -1635,7 +1635,7 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
   background: var(--card);
   box-shadow: 0 40px 80px -30px rgba(8, 18, 45, 0.45);
   outline: none;
-  animation: admRise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: admRise 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 @media (min-width: 1024px) {

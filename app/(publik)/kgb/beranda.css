@@ -311,7 +311,7 @@ html[data-muncul="siap"] .pub .beranda [data-muncul]:not([data-muncul="1"]) {
   border-radius: var(--radius-lg);
   background: var(--kartu);
   box-shadow: var(--bayang-angkat);
-  animation: pubMasuk 600ms var(--ease-out) both;
+  animation: pubMasuk 600ms var(--ease-out) backwards;
 }
 
 .pub .cs-panel-judul {

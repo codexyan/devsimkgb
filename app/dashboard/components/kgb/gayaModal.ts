@@ -5,11 +5,11 @@ export const GAYA_MODAL_KGB = `
 @keyframes kgbm-naik { from { opacity: 0; transform: translateY(16px) scale(.98) } to { opacity: 1; transform: none } }
 @keyframes kgbm-putar { to { transform: rotate(360deg) } }
 .kgbm-latar { position: fixed; inset: 0; z-index: 300; display: flex; align-items: flex-end; justify-content: center;
-  background: rgba(9, 20, 40, .45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: kgbm-pudar .2s ease both; }
+  background: rgba(9, 20, 40, .45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: kgbm-pudar .2s ease backwards; }
 @media (min-width: 640px) { .kgbm-latar { align-items: center; padding: 16px; } }
 .kgbm-panel { position: relative; display: flex; flex-direction: column; width: 100%; max-height: 92dvh; background: var(--card);
   color: var(--dtn); border: 1px solid var(--ln1); border-radius: 16px 16px 0 0; box-shadow: 0 24px 60px rgba(9, 20, 40, .28);
-  outline: none; animation: kgbm-naik .28s cubic-bezier(.22, 1, .36, 1) both; }
+  outline: none; animation: kgbm-naik .28s cubic-bezier(.22, 1, .36, 1) backwards; }
 .kgbm-panel:focus-visible { box-shadow: 0 24px 60px rgba(9, 20, 40, .28); }
 @media (min-width: 640px) { .kgbm-panel { border-radius: 16px; } }
 .kgbm-sm { max-width: 440px; } .kgbm-md { max-width: 580px; } .kgbm-lg { max-width: 1040px; }

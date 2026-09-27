@@ -162,35 +162,35 @@ export function DaftarIsiPanduan() {
   const tandaRef = useRef<HTMLSpanElement>(null);
   const kunci = daftar.map((b) => b.id).join(",");
 
-  // Bagian aktif: judul bagian terakhir yang sudah melewati pita atas layar. Area gulir dashboard adalah
-  // <main>, bukan window, jadi gulir didengar pada fase tangkap di dokumen.
+  // Bagian aktif: bagian terakhir yang bagian atasnya sudah melewati garis 30% dari atas area gulir. Dulu
+  // posisi setiap judul dibaca pada tiap bingkai gulir, yang memaksa peramban menghitung ulang tata letak
+  // halaman sepanjang ini dan membuat gulir tersendat. IntersectionObserver hanya berbunyi saat sebuah bagian
+  // melintasi garis itu, tanpa kerja apa pun di antaranya. Yang diamati bagiannya (<section>), bukan judulnya,
+  // agar satu bagian panjang tetap terhitung aktif selama isinya masih dibaca.
   useEffect(() => {
-    const judul = kunci
-      .split(",")
-      .map((b) => document.getElementById(b))
-      .filter((el): el is HTMLElement => !!el);
-    if (judul.length === 0) return;
-    let bingkai = 0;
-    const periksa = () => {
-      bingkai = 0;
-      const batas = window.innerHeight * 0.3;
-      let terakhir = judul[0].id;
-      for (const el of judul) {
-        if (el.getBoundingClientRect().top <= batas) terakhir = el.id;
-      }
-      setAktif(terakhir);
-    };
-    const saatGulir = () => {
-      if (!bingkai) bingkai = requestAnimationFrame(periksa);
-    };
-    periksa();
-    document.addEventListener("scroll", saatGulir, { passive: true, capture: true });
-    window.addEventListener("resize", saatGulir);
-    return () => {
-      cancelAnimationFrame(bingkai);
-      document.removeEventListener("scroll", saatGulir, { capture: true });
-      window.removeEventListener("resize", saatGulir);
-    };
+    const ids = kunci.split(",").filter(Boolean);
+    const pasangan = ids
+      .map((id) => [document.getElementById(id)?.closest<HTMLElement>(".pg-bagian") ?? null, id] as const)
+      .filter((p): p is readonly [HTMLElement, string] => !!p[0]);
+    if (pasangan.length === 0) return;
+    const bagian = pasangan.map(([el]) => el);
+    const idBagian = new Map<HTMLElement, string>(pasangan);
+    const lewat = new Map<string, boolean>();
+    const akar = bagian[0].closest<HTMLElement>("main");
+    const pengamat = new IntersectionObserver(
+      (entri) => {
+        for (const e of entri) {
+          const id = idBagian.get(e.target as HTMLElement);
+          const garis = e.rootBounds?.bottom ?? window.innerHeight * 0.3;
+          if (id) lewat.set(id, e.boundingClientRect.top <= garis);
+        }
+        const terakhir = [...ids].reverse().find((id) => lewat.get(id)) ?? ids[0];
+        setAktif((lama) => (lama === terakhir ? lama : terakhir));
+      },
+      { root: akar, rootMargin: "0px 0px -70% 0px", threshold: 0 },
+    );
+    for (const el of bagian) pengamat.observe(el);
+    return () => pengamat.disconnect();
   }, [kunci]);
 
   // Penanda tinta bergeser ke butir aktif di rel daftar isi.

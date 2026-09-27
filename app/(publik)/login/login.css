@@ -224,7 +224,7 @@
   align-items: center;
   gap: 8px;
   color: var(--warn-text);
-  animation: pubMasuk 400ms var(--ease-out) both;
+  animation: pubMasuk 400ms var(--ease-out) backwards;
 }
 
 .pub .lg-caps::before {
@@ -237,7 +237,7 @@
 
 .pub .lg-galat {
   margin-top: 1.25rem;
-  animation: pubMasuk 500ms var(--ease-out) both;
+  animation: pubMasuk 500ms var(--ease-out) backwards;
 }
 
 .pub .lg-kirim {

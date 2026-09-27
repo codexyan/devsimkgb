@@ -305,13 +305,13 @@
 }
 
 .pub .pub-transisi {
-  animation: pubMasuk 700ms var(--ease-out) both;
+  animation: pubMasuk 700ms var(--ease-out) backwards;
 }
 
 /* Gerak masuk sekali saat halaman dibuka, berjeda lewat --d (ms). Jeda dijaga pendek untuk isi di atas
    lipatan supaya teks tidak menunggu lama sebelum terbaca penuh. */
 .pub .masuk {
-  animation: pubMasuk 820ms var(--ease-out) both;
+  animation: pubMasuk 820ms var(--ease-out) backwards;
   animation-delay: calc(var(--d, 0) * 1ms);
 }
 
@@ -326,7 +326,7 @@
 
 .pub .kt-isi {
   display: inline-block;
-  animation: pubKata 1000ms var(--ease-out) both;
+  animation: pubKata 1000ms var(--ease-out) backwards;
   animation-delay: calc(60ms + var(--i, 0) * 55ms);
 }
 
@@ -1167,7 +1167,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   overscroll-behavior: contain;
-  animation: pubTirai 360ms var(--ease) both;
+  animation: pubTirai 360ms var(--ease) backwards;
 }
 
 .pub .pub-dialog {
@@ -1181,7 +1181,7 @@ html[data-muncul="siap"] .pub [data-muncul]:not([data-muncul="1"]) .kt-isi {
   background: var(--kartu);
   color: var(--text);
   box-shadow: 0 40px 80px -40px rgba(12, 26, 56, 0.5);
-  animation: pubDialog 600ms var(--ease-out) both;
+  animation: pubDialog 600ms var(--ease-out) backwards;
 }
 
 .pub dialog.pub-dialog::backdrop {

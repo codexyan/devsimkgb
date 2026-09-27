@@ -173,7 +173,7 @@ html[data-dash-theme="dark"] .pub.pg-dasbor .pg-bagian > .pub-h2::before {
 .pub.pg-dasbor[data-peran="keuangan"] .pg-bagian[data-peran~="keuangan"],
 .pub.pg-dasbor[data-peran="super"] .pg-bagian[data-peran~="super"] {
   display: block;
-  animation: pubMasuk 600ms var(--ease-out) both;
+  animation: pubMasuk 600ms var(--ease-out) backwards;
 }
 
 
@@ -613,5 +613,61 @@ html[data-dash-theme="dark"] .pub.pg-dasbor .pg-bagian > .pub-h2::before {
   /* Cetakan selalu memuat seluruh panduan, apa pun peran yang dipilih */
   .pub.pg-dasbor .pg-bagian {
     display: block !important;
+  }
+}
+
+/* ── Gulir halus dan area gulir yang jelas ─────────────────────────────────
+   Satu-satunya area gulir tegak adalah <main> dashboard. Yang boleh bergulir sendiri hanya:
+   - rel daftar isi di layar lebar, bila lebih tinggi dari layar;
+   - daftar isi lipat di ponsel (paling tinggi 62% layar);
+   - tabel yang lebih lebar dari layar (menyamping);
+   - deretan tombol peran di ponsel (menyamping).
+   Gulir di dalamnya tidak merambat ke halaman (overscroll-behavior). */
+.pub .pg-daftar,
+.pub .pg-bilah-daftar {
+  overscroll-behavior: contain;
+}
+
+.pub.pg-dasbor .pub-table-wrap {
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Sengaja tanpa content-visibility: pada panduan sepanjang ini ia memindahkan kerja render ke saat menggulir
+   (bagian baru dirender ketika mendekati layar), dan terukur menambah beban tiap bingkai gulir. */
+
+/* Bilah kemajuan di ponsel mengikuti area gulir terdekat (<main>), bukan dokumen yang memang tidak bergulir. */
+@supports (animation-timeline: scroll()) {
+  .pub.pg-dasbor .pg-bilah-kemajuan {
+    animation-timeline: scroll(nearest);
+  }
+}
+
+/* Mode gelap: nomor langkah memakai pil terang, jadi angkanya gelap (sama dengan nomor bagian). */
+html[data-dash-theme="dark"] .pub.pg-dasbor .pub-steps > li::before {
+  color: #0d1730;
+}
+
+/* Ponsel: tombol peran satu baris yang digeser menyamping, bukan tiga baris yang menumpuk. */
+@media (max-width: 640px) {
+  .pub .pg-peran-pilihan {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    margin-inline: -4px;
+    padding: 2px 4px 4px;
+    -webkit-mask-image: linear-gradient(to right, #000 88%, transparent);
+    mask-image: linear-gradient(to right, #000 88%, transparent);
+  }
+
+  .pub .pg-peran-pilihan::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pub .pg-peran-pilihan button {
+    flex: none;
+    scroll-snap-align: start;
   }
 }

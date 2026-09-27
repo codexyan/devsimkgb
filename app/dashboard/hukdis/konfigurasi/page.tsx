@@ -125,7 +125,7 @@ function AddModal({ form, setForm, onSave, onClose, saving, error, regulasiList 
         width: "100%", maxWidth: "500px", background: "var(--card)",
         borderRadius: "18px", overflow: "hidden", outline: "none",
         boxShadow: "0 24px 64px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)",
-        animation: "slideUp .22s cubic-bezier(.22,1,.36,1) both",
+        animation: "slideUp .22s cubic-bezier(.22,1,.36,1) backwards",
       }}>
         {/* Header */}
         <div style={{ padding: "20px 22px 16px", borderBottom: "1px solid var(--ln2)" }}>

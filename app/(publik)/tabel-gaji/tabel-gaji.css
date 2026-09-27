@@ -206,7 +206,7 @@
   border-spacing: 0;
   font-size: 15px;
   font-variant-numeric: tabular-nums;
-  animation: pubMasuk 520ms var(--ease-out) both;
+  animation: pubMasuk 520ms var(--ease-out) backwards;
 }
 
 .pub .tb-tabel thead th {
