@@ -3,6 +3,7 @@
 // kalender WITA (lib/waktu.ts), karena nilai yang sama bisa tersimpan sebagai tengah malam UTC atau WITA.
 
 import { kgbBerjalanTerbaru } from "./dataPegawai";
+import { normalisasiTempat } from "./cekKgbPublik";
 import { cariSatker } from "./satker";
 import { isoTanggalLokal, tanggalKalender, type NilaiTanggal } from "./waktu";
 
@@ -14,6 +15,8 @@ export interface PegawaiDiperiksa {
   aktif: boolean;
   tmtKgbTerakhir: NilaiTanggal;
   tmtKgbBerikutnya: NilaiTanggal;
+  /** Kunci kedua cek status KGB publik (lib/cekKgbPublik.ts); opsional agar data lama tetap terbaca. */
+  tempatLahir?: string | null;
 }
 
 export interface KgbDiperiksa {
@@ -50,10 +53,26 @@ export interface TemuanTmtBerikutnya extends IdentitasPegawai {
   masalah: MasalahTmtBerikutnya;
 }
 
+export interface TemuanTempatLahir extends IdentitasPegawai {
+  unitKerja: string | null;
+  /** Isi yang tercatat bila ada tetapi terlalu pendek untuk dicocokkan; null bila kosong. */
+  tempatLahir: string | null;
+}
+
 export interface HasilPemeriksaanData {
   unitKerjaTidakDikenal: TemuanUnitKerja[];
   tmtKgbTerakhirTidakSesuai: TemuanTmtTerakhir[];
   tmtKgbBerikutnyaTidakValid: TemuanTmtBerikutnya[];
+  tempatLahirKosong: TemuanTempatLahir[];
+}
+
+/**
+ * true bila tempat lahir tidak dapat dipakai untuk cek status KGB publik: kosong, atau setelah dinormalisasi
+ * kurang dari tiga huruf (aturan yang sama dengan cocokTempatLahir), sehingga pegawai itu tidak dapat mengecek
+ * statusnya sendiri.
+ */
+export function tempatLahirTidakTerpakai(tempatLahir: string | null | undefined): boolean {
+  return normalisasiTempat(tempatLahir).length < 3;
 }
 
 function isoAtauNull(nilai: NilaiTanggal): string | null {
@@ -108,7 +127,8 @@ const urutNama = <T extends IdentitasPegawai>(a: T, b: T) => a.nama.localeCompar
  * Jalankan semua aturan pemeriksaan:
  * 1. pegawai aktif dengan unit kerja terisi yang tidak cocok dengan satker mana pun;
  * 2. pegawai (aktif maupun nonaktif) yang TMT KGB terakhirnya berbeda dengan yang ditunjukkan riwayat KGB;
- * 3. pegawai aktif tanpa TMT KGB berikutnya yang valid.
+ * 3. pegawai aktif tanpa TMT KGB berikutnya yang valid;
+ * 4. pegawai aktif yang tempat lahirnya kosong, sehingga tidak dapat mengecek status KGB di halaman publik.
  */
 export function periksaDataPegawai(pegawai: PegawaiDiperiksa[], riwayatKgb: KgbDiperiksa[]): HasilPemeriksaanData {
   const riwayatPerPegawai = new Map<string, KgbDiperiksa[]>();
@@ -122,6 +142,7 @@ export function periksaDataPegawai(pegawai: PegawaiDiperiksa[], riwayatKgb: KgbD
     unitKerjaTidakDikenal: [],
     tmtKgbTerakhirTidakSesuai: [],
     tmtKgbBerikutnyaTidakValid: [],
+    tempatLahirKosong: [],
   };
 
   for (const p of pegawai) {
@@ -148,11 +169,19 @@ export function periksaDataPegawai(pegawai: PegawaiDiperiksa[], riwayatKgb: KgbD
       if (masalah) {
         hasil.tmtKgbBerikutnyaTidakValid.push({ ...identitas(p), tmtKgbBerikutnya: isoAtauNull(p.tmtKgbBerikutnya), masalah });
       }
+      if (tempatLahirTidakTerpakai(p.tempatLahir)) {
+        const isi = (p.tempatLahir ?? "").trim();
+        hasil.tempatLahirKosong.push({ ...identitas(p), unitKerja: p.unitKerja, tempatLahir: isi || null });
+      }
     }
   }
 
   hasil.unitKerjaTidakDikenal.sort(urutNama);
   hasil.tmtKgbTerakhirTidakSesuai.sort(urutNama);
   hasil.tmtKgbBerikutnyaTidakValid.sort(urutNama);
+  // Dikelompokkan per unit kerja, karena perbaikannya diminta ke satker masing-masing.
+  hasil.tempatLahirKosong.sort(
+    (a, b) => (a.unitKerja ?? "").localeCompare(b.unitKerja ?? "", "id") || urutNama(a, b),
+  );
   return hasil;
 }

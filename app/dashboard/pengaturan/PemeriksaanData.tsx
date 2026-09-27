@@ -105,7 +105,10 @@ export default function PemeriksaanData() {
   }
 
   const totalTemuan = hasil
-    ? hasil.unitKerjaTidakDikenal.length + hasil.tmtKgbTerakhirTidakSesuai.length + hasil.tmtKgbBerikutnyaTidakValid.length
+    ? hasil.unitKerjaTidakDikenal.length +
+      hasil.tmtKgbTerakhirTidakSesuai.length +
+      hasil.tmtKgbBerikutnyaTidakValid.length +
+      (hasil.tempatLahirKosong?.length ?? 0)
     : 0;
 
   return (
@@ -164,6 +167,16 @@ export default function PemeriksaanData() {
               nama: t.nama,
               nip: t.nip,
               keterangan: TEKS_MASALAH[t.masalah](t),
+            }))}
+          />
+          <KelompokTemuan
+            judul="Tempat lahir kosong"
+            penjelasan="Pegawai aktif yang tempat lahirnya kosong atau terlalu pendek. Cek status KGB di halaman publik memerlukan NIP dan tempat lahir, jadi pegawai ini belum dapat mengecek statusnya sendiri. Lengkapi di Data Pegawai, atau minta Admin UPT satkernya mengusulkan perbaikan data."
+            baris={(hasil.tempatLahirKosong ?? []).map((t) => ({
+              pegawaiId: t.pegawaiId,
+              nama: t.nama,
+              nip: t.nip,
+              keterangan: `${t.tempatLahir ? `Tempat lahir tercatat "${t.tempatLahir}", terlalu pendek untuk dicocokkan.` : "Tempat lahir kosong."} Unit kerja: ${t.unitKerja?.trim() || "belum tercatat"}.`,
             }))}
           />
         </div>

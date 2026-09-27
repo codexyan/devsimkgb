@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  tempatLahirTidakTerpakai,
   masalahTmtKgbBerikutnya,
   periksaDataPegawai,
   tmtKgbTerakhirMenurutRiwayat,
@@ -163,4 +164,23 @@ test("periksaDataPegawai: TMT KGB berikutnya tidak valid hanya untuk pegawai akt
       ["tanggal-15", "bukan_tanggal_1", "2027-03-15"],
     ],
   );
+});
+
+test("tempat lahir kosong pada pegawai aktif dilaporkan, dikelompokkan per unit kerja", () => {
+  const dasar = { tmtKgbTerakhir: new Date(2024, 5, 1), tmtKgbBerikutnya: new Date(2026, 5, 1) };
+  const hasil = periksaDataPegawai(
+    [
+      { id: "a", nama: "Budi", nip: "1", unitKerja: "Rutan Rantau", aktif: true, tempatLahir: "", ...dasar },
+      { id: "b", nama: "Andi", nip: "2", unitKerja: "Kanwil", aktif: true, tempatLahir: null, ...dasar },
+      { id: "c", nama: "Citra", nip: "3", unitKerja: "Kanwil", aktif: true, tempatLahir: "Banjarmasin", ...dasar },
+      { id: "d", nama: "Dewi", nip: "4", unitKerja: "Kanwil", aktif: false, tempatLahir: "", ...dasar },
+      { id: "e", nama: "Eko", nip: "5", unitKerja: "Rutan Rantau", aktif: true, tempatLahir: "Bj", ...dasar },
+    ],
+    [],
+  );
+  assert.deepEqual(
+    hasil.tempatLahirKosong.map((t) => [t.nama, t.tempatLahir]),
+    [["Andi", null], ["Budi", null], ["Eko", "Bj"]],
+  );
+  assert.equal(tempatLahirTidakTerpakai("Tanah Laut"), false);
 });
