@@ -379,6 +379,10 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 
 .dsb-tombol[data-nada="hijau"]:hover:not(:disabled) { background: var(--tint-green-bg); }
 
+/* Langkah yang tertahan usulan UPT (ADR-014): tombol utama berwarna ungu, warna yang dipakai untuk usulan. */
+.dsb-tombol[data-nada="ungu"] { border-color: var(--st-violet); background: var(--st-violet); color: #fff; }
+.dsb-tombol[data-nada="ungu"]:hover:not(:disabled) { opacity: 0.9; }
+
 .dsb-tombol-kecil {
   min-height: 28px;
   padding: 0 10px;
@@ -1998,3 +2002,169 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
    ditumpuk menjadi blok di layar sempit, agar tidak menempel pada teks status. */
 .upt-aksi { display: block; margin-top: 6px; }
 .upt-aksi + .upt-aksi { margin-top: 4px; }
+
+/* ── Usulan UPT: daftar per surat dan panel detail (ADR-014) ──────────── */
+.usl-kepala-halaman { align-items: center; }
+.usl-kerja { display: flex; flex-direction: column; overflow: hidden; }
+.usl-alat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ln2);
+}
+.usl-tab { display: flex; flex-wrap: wrap; gap: 4px; }
+.usl-tab button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dt3);
+  cursor: pointer;
+}
+.usl-tab button:hover { background: var(--sub); }
+.usl-tab button[aria-selected="true"] { border-color: var(--ln1); background: var(--tint-navy); color: var(--dtn); }
+.usl-tab-angka {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--ln2);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--dt4);
+}
+.usl-tab-angka[data-nada="kuning"] { background: var(--tint-amber-bg); color: var(--st-amber); }
+.usl-tab-angka[data-nada="ungu"] { background: var(--tint-violet-bg); color: var(--st-violet); }
+.usl-cari { flex: 0 1 280px; min-width: 160px; }
+
+.usl-tata { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); flex: 1 1 auto; min-height: 420px; }
+.usl-daftar-kolom { overflow-y: auto; border-right: 1px solid var(--ln2); background: var(--sub); scrollbar-width: thin; }
+.usl-grup + .usl-grup { border-top: 1px solid var(--ln1); }
+.usl-grup-kepala {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 8px 14px;
+  background: var(--sub);
+  border-bottom: 1px solid var(--ln2);
+}
+.usl-grup-judul { margin: 0; overflow: hidden; font-size: 12.5px; font-weight: 600; color: var(--dtn); text-overflow: ellipsis; white-space: nowrap; }
+.usl-grup-sub { margin: 1px 0 0; font-size: 11.5px; color: var(--dt5); }
+.usl-grup-isi { margin: 0; padding: 6px; list-style: none; }
+.usl-butir {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.usl-butir:hover { background: var(--card); border-color: var(--ln1); }
+.usl-butir[aria-pressed="true"] { background: var(--card); border-color: var(--navy-solid); box-shadow: 0 1px 3px rgba(12, 26, 56, 0.08); }
+.usl-butir-nama { overflow: hidden; font-size: 13.5px; font-weight: 600; color: var(--dtn); text-overflow: ellipsis; white-space: nowrap; }
+.usl-butir-sub { font-size: 11.5px; color: var(--dt5); font-variant-numeric: tabular-nums; }
+.usl-butir-tanda { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.usl-butir-tanda .dsb-tag { font-size: 11px; }
+
+.usl-detail-kolom { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.usl-detail-kepala {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--ln2);
+}
+.usl-detail-nama { margin: 0; font-family: var(--huruf-judul); font-size: 19px; font-weight: 500; letter-spacing: -0.01em; color: var(--dtn); }
+.usl-detail-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--dt4); }
+.usl-detail-isi { flex: 1 1 auto; min-height: 0; padding: 16px 20px; overflow-y: auto; scrollbar-width: thin; }
+.usl-detail-kaki {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--ln2);
+  background: var(--card);
+}
+
+/* Isi tinjauan bersama (DetailUsulan): halaman dan jendela di antrian kerja */
+.usl-detail { display: flex; flex-direction: column; gap: 14px; }
+.usl-bagian { display: flex; flex-direction: column; gap: 8px; }
+.usl-bagian-judul { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--dt4); }
+.usl-bagian-judul span { margin-left: 4px; color: var(--dt5); }
+.usl-beda { margin: 0; padding: 0; list-style: none; border: 1px solid var(--ln1); border-radius: 12px; overflow: hidden; }
+.usl-beda li {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.9fr) minmax(0, 1fr) 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+}
+.usl-beda li + li { border-top: 1px solid var(--ln2); }
+.usl-beda li[data-gaji] { background: var(--tint-amber-bg); }
+.usl-beda-label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--dt3); }
+.usl-beda-lama { overflow-wrap: anywhere; color: var(--dt5); text-decoration: line-through; text-decoration-color: var(--ln0); }
+.usl-beda-panah { color: var(--dt5); text-align: center; }
+.usl-beda-baru { overflow-wrap: anywhere; font-weight: 600; color: var(--dtn); }
+.usl-chip { padding: 1px 6px; border-radius: 999px; background: var(--card); font-size: 10.5px; font-weight: 600; color: var(--st-amber); border: 1px solid var(--tint-amber-ln); }
+.usl-nilai { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 16px; margin: 0; }
+.usl-nilai dt { font-size: 11.5px; color: var(--dt5); }
+.usl-nilai dd { margin: 1px 0 0; font-size: 13px; font-weight: 500; color: var(--dtn); overflow-wrap: anywhere; }
+.usl-baris-info { margin: 0; font-size: 13px; color: var(--dtn); }
+.usl-baris-info span { display: block; font-size: 11.5px; color: var(--dt5); }
+.usl-kutipan { margin: 0; padding: 8px 12px; border-left: 3px solid var(--ln0); border-radius: 0 8px 8px 0; background: var(--sub); font-size: 13px; color: var(--dt2); }
+.usl-berkas { display: flex; flex-wrap: wrap; gap: 6px; }
+.usl-berkas-tombol {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--ln1);
+  border-radius: 8px;
+  background: var(--card);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--dtn);
+  text-decoration: none;
+  cursor: pointer;
+}
+.usl-berkas-tombol:hover { border-color: var(--ln0); }
+.usl-berkas-tombol[aria-pressed="true"] { border-color: var(--navy-solid); background: var(--tint-navy); }
+.usl-pratinjau { display: flex; flex-direction: column; gap: 6px; }
+.usl-pratinjau iframe { width: 100%; height: 440px; border: 1px solid var(--ln1); border-radius: 10px; background: var(--card); }
+.usl-meta { margin: 0; font-size: 11.5px; color: var(--dt5); }
+
+@media (max-width: 899px) {
+  .usl-tata { grid-template-columns: minmax(0, 1fr); }
+  .usl-daftar-kolom { max-height: 320px; border-right: 0; border-bottom: 1px solid var(--ln2); }
+  .usl-beda li { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .usl-beda-label { grid-column: 1 / -1; }
+  .usl-beda-panah { display: none; }
+}
+/* Layar kerja: daftar dan detail mengisi sisa tinggi panel, masing-masing bergulir sendiri */
+@media (min-width: 1200px) and (min-height: 720px) {
+  .dsb-halaman[data-muat-layar] .usl-kerja > .usl-tata { flex: 1 1 0; min-height: 0; }
+  .dsb-halaman[data-muat-layar] .usl-kerja > .usl-tata > * { min-height: 0; }
+}

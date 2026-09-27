@@ -1,6 +1,7 @@
 import { statusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { pesanUsulanMenahan, usulanMenahan } from "@/lib/usulanMenahan";
 import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -220,6 +221,9 @@ export async function POST(req: Request) {
   const pegawai = await db.pegawai.findUnique({ id: pegawaiId });
   if (!pegawai)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
+  // Usulan UPT yang menunggu ditinjau dulu, agar KGB dihitung dari data yang sudah diperbarui (ADR-014).
+  if (await usulanMenahan(pegawai.id))
+    return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama) }, { status: 409 });
 
   if (!isGolonganDikenal(pegawai.golonganRuang)) {
     return NextResponse.json(

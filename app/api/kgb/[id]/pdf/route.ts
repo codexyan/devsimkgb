@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { pesanUsulanMenahan, usulanMenahan } from "@/lib/usulanMenahan";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -104,6 +105,9 @@ export async function POST(
   ]);
   if (!pegawai)
     return NextResponse.json({ error: "Data pegawai tidak ditemukan" }, { status: 404 });
+  // SK tidak dibuat selama usulan UPT pegawai ini belum ditinjau; pratinjau tetap boleh (ADR-014).
+  if (!isPreview && (await usulanMenahan(pegawai.id)))
+    return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama) }, { status: 409 });
 
   // Keadaan pegawai diperiksa ulang di sini, bukan hanya saat Input KGB: jarak input ke TMT sekitar dua
   // bulan, dan hukuman disiplin yang terbit di sela itu membuat SK ini tidak boleh terbit.

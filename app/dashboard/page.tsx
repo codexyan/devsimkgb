@@ -190,8 +190,9 @@ function cocokTahap(pos: PosisiAntrian, tahap: Tahap): boolean {
 }
 
 /** Status di tabel antrian: titik dan teks. */
-function StatusAntrian({ pos, dibatalkan, skDibuat, buka }: { pos: PosisiAntrian; dibatalkan: boolean; skDibuat: boolean; buka: Date | null }) {
+function StatusAntrian({ pos, dibatalkan, skDibuat, buka, tertahan = false }: { pos: PosisiAntrian; dibatalkan: boolean; skDibuat: boolean; buka: Date | null; tertahan?: boolean }) {
   const [nada, teks]: [Nada | undefined, string] =
+    tertahan ? ["ungu", "Tertahan usulan UPT"] :
     // Lamanya lewat batas sudah tertulis di kolom TMT; status cukup menyebut keadaannya.
     pos === "lewat" ? ["merah", dibatalkan ? "Dibatalkan" : "Belum diinput"]
     : pos === "siap" ? ["kuning", dibatalkan ? "Dibatalkan, input ulang" : "Belum diproses"]
@@ -508,7 +509,7 @@ function DashboardMain() {
     tindakan.push({
       id: "usulan-upt",
       nada: "ungu",
-      isi: <><strong>{usulanPerPegawai.size} usulan data UPT</strong> menunggu tinjauan; tombolnya ada di kartu pegawai.</>,
+      isi: <><strong>{usulanPerPegawai.size} usulan data UPT</strong> menunggu tinjauan; proses KGB pegawainya tertahan sampai ditinjau.</>,
       aksi: { label: "Semua usulan", href: "/dashboard/usulan" },
     });
 
@@ -526,19 +527,29 @@ function DashboardMain() {
     setModal(null);
   }
 
-  /** Tombol penanda usulan UPT pada kartu dan baris; membuka tinjauannya di tempat. */
-  function tombolUsulan(p: { id: string }) {
+  /**
+   * Proses KGB tertahan selama usulan UPT pegawai ini menunggu tinjauan dan SK TTE-nya belum diunggah
+   * (ADR-014); server menolak langkahnya dengan aturan yang sama (lib/usulanMenahan.ts).
+   */
+  function tertahanUsulan(p: { id: string }, pos: PosisiAntrian): boolean {
+    return usulanPerPegawai.has(p.id) && pos !== "keuangan" && pos !== "rekam_upt" && pos !== "selesai";
+  }
+
+  /** Tombol tinjauan usulan UPT; tombol utama bila prosesnya sedang tertahan. */
+  function tombolUsulan(p: { id: string }, utama = false) {
     const u = usulanPerPegawai.get(p.id);
     if (!u) return null;
     return (
       <button
         type="button"
         className="dsb-tombol dsb-tombol-kecil"
-        data-jenis="garis"
+        data-jenis={utama ? undefined : "garis"}
+        data-nada={utama ? "ungu" : undefined}
         onClick={() => setUsulanDibuka(u)}
         title="Tinjau usulan data dari UPT"
       >
-        Usulan UPT{u.perubahan.length > 0 ? ` (${u.perubahan.length})` : ""}
+        {utama ? "Tinjau usulan UPT" : "Usulan UPT"}
+        {u.perubahan.length > 0 ? ` (${u.perubahan.length})` : ""}
       </button>
     );
   }
@@ -590,8 +601,11 @@ function DashboardMain() {
     const dibatalkan = p.statusKGB === "ditolak";
     const buka = pos === "terkunci" ? jendelaProsesKgb(p.tmtKgbBerikutnya)?.unlockDate : null;
     const tombol = aksiBaris(p, pos);
+    const tertahan = tertahanUsulan(p, pos);
     const pindah: Partial<Record<KolomPapan, string>> = {};
-    if (kolom === "input") {
+    if (tertahan) {
+      // Tidak ada langkah yang boleh dijalankan sampai usulannya ditinjau (ADR-014).
+    } else if (kolom === "input") {
       pindah.proses = dibatalkan ? "Input ulang KGB" : "Input KGB";
       if (pos === "lewat") pindah.selesai = "Arsip, SK sudah terbit di luar SIM-KGB";
     }
@@ -606,8 +620,7 @@ function DashboardMain() {
     // Kartu yang lewat batas sudah menyebutnya di baris TMT; penanda rapelan hanya untuk yang sudah berjalan.
     if (p.flagRapelan && pos !== "selesai" && pos !== "lewat") tanda.push({ teks: "Berpotensi rapelan", nada: "kuning" });
     if (p.statusHukdis) tanda.push({ teks: `Hukdis${p.tanggalHukdisBerakhir ? ` s.d. ${formatTanggalId(p.tanggalHukdisBerakhir, { day: "numeric", month: "short" })}` : ""}`, nada: "merah" });
-    const usulan = usulanPerPegawai.get(p.id);
-    if (usulan) tanda.push({ teks: "Ada usulan UPT", nada: "ungu" });
+    if (tertahan) tanda.push({ teks: "Tertahan usulan UPT", nada: "ungu" });
     const [catatan, catatanNada]: [string | undefined, Nada | undefined] =
       pos === "terkunci" ? [buka ? `dibuka ${formatTanggalId(buka, { day: "numeric", month: "short" })}` : "belum dibuka", undefined]
       : pos === "keuangan" || pos === "rekam_upt" || pos === "selesai" ? [undefined, undefined]
@@ -627,11 +640,8 @@ function DashboardMain() {
       catatanNada,
       nada: pos === "lewat" ? "merah" : undefined,
       tanda,
-      aksi: tombol || usulan ? (
-        <div className="dsb-aksi" style={{ flexWrap: "wrap", justifyContent: "flex-start" }}>
-          {tombolUsulan(p)}
-          {tombol}
-        </div>
+      aksi: tombol ? (
+        <div className="dsb-aksi" style={{ flexWrap: "wrap", justifyContent: "flex-start" }}>{tombol}</div>
       ) : undefined,
       pindah,
     };
@@ -656,6 +666,26 @@ function DashboardMain() {
 
   /** Tombol aksi baris antrian menurut posisinya. */
   function aksiBaris(p: PegawaiJatuhTempo, pos: PosisiAntrian) {
+    if (tertahanUsulan(p, pos)) {
+      const kgbId = p.kgbId;
+      return (
+        <>
+          {pos === "diproses" && kgbId && (
+            <button type="button" className="dsb-ikon-tombol" data-nada="merah" onClick={() => setModal({ jenis: "batalkan", kgbId, pegawai: pegawaiModal(p) })} title="Batalkan proses KGB" aria-label={`Batalkan proses KGB ${p.nama}`}>
+              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          )}
+          {tombolUsulan(p, true)}
+        </>
+      );
+    }
+    if (usulanPerPegawai.has(p.id) && (pos === "keuangan" || pos === "rekam_upt" || pos === "selesai")) {
+      return <>{tombolUsulan(p)}{aksiBarisTanpaUsulan(p, pos)}</>;
+    }
+    return aksiBarisTanpaUsulan(p, pos);
+  }
+
+  function aksiBarisTanpaUsulan(p: PegawaiJatuhTempo, pos: PosisiAntrian) {
     if (pos === "lewat" || pos === "siap") {
       const dibatalkan = p.statusKGB === "ditolak";
       return (
@@ -855,7 +885,7 @@ function DashboardMain() {
                           )}
                         </td>
                         <td>
-                          <StatusAntrian pos={pos} dibatalkan={p.statusKGB === "ditolak"} skDibuat={p.skSudahDibuat} buka={buka ?? null} />
+                          <StatusAntrian pos={pos} dibatalkan={p.statusKGB === "ditolak"} skDibuat={p.skSudahDibuat} buka={buka ?? null} tertahan={tertahanUsulan(p, pos)} />
                           {p.statusHukdis && (
                             <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-red)" }}>
                               Hukdis{p.tanggalHukdisBerakhir ? ` s.d. ${formatTanggalId(p.tanggalHukdisBerakhir, { day: "numeric", month: "short" })}` : ""}
@@ -863,7 +893,7 @@ function DashboardMain() {
                           )}
                         </td>
                         <td className="kanan">
-                          <div className="dsb-aksi">{tombolUsulan(p)}{aksiBaris(p, pos)}</div>
+                          <div className="dsb-aksi">{aksiBaris(p, pos)}</div>
                         </td>
                       </tr>
                     );

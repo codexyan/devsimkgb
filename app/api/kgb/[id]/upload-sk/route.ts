@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { pesanUsulanMenahan, usulanMenahan } from "@/lib/usulanMenahan";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
@@ -51,6 +52,9 @@ export async function POST(
   const izin = izinUnggahSk({ status: kgb.status, isArsip: kgb.isArsip, skSudahDibuat: suratSudahDibuat(existingSurat) });
   if (!izin.ok)
     return NextResponse.json({ error: izin.error }, { status: 409 });
+  // SK TTE tidak diunggah selama usulan UPT pegawai ini belum ditinjau (ADR-014); arsip lama tidak tertahan.
+  if (izin.jenis === "unggah" && pegawai && (await usulanMenahan(pegawai.id)))
+    return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama) }, { status: 409 });
 
   // Ukuran menurut header diperiksa sebelum isi permintaan dibaca ke memori; ruang tambahan untuk
   // bagian formulir selain berkas.

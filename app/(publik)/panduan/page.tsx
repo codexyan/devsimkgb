@@ -730,7 +730,8 @@ export default async function PanduanPage() {
                 </p>
                 <p>
                   Usulan tidak langsung mengubah data. Super Admin atau Tim SDM KGB meninjaunya lebih dulu, lalu
-                  menyetujui atau menolak dengan alasan. Hasilnya terlihat di panel Usulan terkirim pada dashboard UPT.
+                  menyetujui atau menolak dengan alasan. Selama usulan menunggu tinjauan, proses KGB pegawainya
+                  (Input KGB, Buat SK, Unggah SK TTE) tertahan agar SK dibuat dari data yang sudah diperbarui. Hasilnya terlihat di panel Usulan terkirim pada dashboard UPT.
                   Satu pegawai hanya boleh punya satu usulan yang menunggu, agar antrian tinjauan tidak berisi dua
                   versi yang saling menimpa.
                 </p>

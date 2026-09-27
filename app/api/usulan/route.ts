@@ -5,7 +5,10 @@ import { canProcessKGB } from "@/lib/auth";
 import { BERKAS_USULAN, bandingkanUsulan, nilaiUsulan, ringkasHukdisUsulan, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
-import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
+import type { RiwayatKGBRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
+import { kgbBerjalanTerbaru } from "@/lib/dataPegawai";
+import { suratSudahDibuat, type SuratKgbTersimpan } from "@/lib/prosesKgb";
+import { isoTanggalKalender } from "@/lib/rekapKgb";
 
 export const runtime = "nodejs";
 
@@ -24,11 +27,28 @@ export async function GET(req: Request) {
   const status = new URL(req.url).searchParams.get("status") ?? "";
   // Draf adalah data yang masih disiapkan UPT dan belum diajukan, jadi tidak pernah tampil di Kanwil.
   const saring = status && status !== "draf" ? { status } : { status: { not: "draf" } };
-  const [semuaUsulan, semuaPegawai] = await Promise.all([
+  const [semuaUsulan, semuaPegawai, semuaKgb, semuaSurat] = await Promise.all([
     db.usulanPegawai.findMany({ where: saring }) as Promise<UsulanPegawaiRow[]>,
     db.pegawai.findMany(),
+    db.riwayatKGB.findMany() as Promise<RiwayatKGBRow[]>,
+    db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
   ]);
   const pegawaiById = new Map(semuaPegawai.map((p) => [p.id, p]));
+  const kgbPerPegawai = new Map<string, RiwayatKGBRow[]>();
+  for (const k of semuaKgb) kgbPerPegawai.set(k.pegawaiId, [...(kgbPerPegawai.get(k.pegawaiId) ?? []), k]);
+  const suratByKgb = new Map(semuaSurat.map((sr) => [sr.kgbId, sr]));
+
+  /**
+   * KGB pegawai yang tersentuh bila usulan disetujui (ADR-011, ADR-014): yang sedang berjalan, atau jadwal
+   * Belum Diproses bila tidak ada yang berjalan. Peninjau melihatnya sebelum memutuskan.
+   */
+  const kgbTerdampak = (pegawaiId: string | null) => {
+    if (!pegawaiId) return null;
+    const daftar = kgbPerPegawai.get(pegawaiId) ?? [];
+    const k = kgbBerjalanTerbaru(daftar) ?? daftar.find((x) => x.status === "belum_diproses") ?? null;
+    if (!k) return null;
+    return { status: k.status, tmtKgbBaru: isoTanggalKalender(k.tmtKgbBaru), skDibuat: suratSudahDibuat(suratByKgb.get(k.id)) };
+  };
   const namaSatker = new Map(SATKER.map((s) => [s.kode, s.nama]));
 
   const daftar = semuaUsulan
@@ -55,6 +75,7 @@ export async function GET(req: Request) {
         nomorSkTerakhir: u.nomorSkTerakhir,
         tanggalSkTerakhir: u.tanggalSkTerakhir ? new Date(u.tanggalSkTerakhir).toISOString() : null,
         catatanUpt: u.catatanUpt,
+        kgb: u.status === "menunggu" ? kgbTerdampak(u.pegawaiId) : null,
         diajukanOleh: u.diajukanOleh,
         diajukanAt: u.diajukanAt ? new Date(u.diajukanAt).toISOString() : null,
         ditinjauOleh: u.ditinjauOleh,

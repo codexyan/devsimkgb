@@ -72,6 +72,9 @@ test("KGB yang sedang diproses dihitung ulang, dan SK yang sudah dibuat dilepas 
   await denganDataLokal(async () => {
     const { db, usulan } = await siapkan("sedang_diproses", true);
     const { setujuiUsulan } = await import("./setujuiUsulan");
+    const { usulanMenahan } = await import("./usulanMenahan");
+    // Selama usulannya menunggu, proses KGB pegawai ini tertahan (ADR-014).
+    assert.equal((await usulanMenahan("p1"))?.id, "u1");
     const lama = await db.pegawai.findUnique({ id: "p1" });
     const hasil = await setujuiUsulan(usulan as never, lama, "Peninjau", new Date(), "u1");
     assert.equal(hasil.ok, true);
@@ -86,6 +89,7 @@ test("KGB yang sedang diproses dihitung ulang, dan SK yang sudah dibuat dilepas 
     assert.equal(kgb?.drafNomorSurat, "WP.19-SA.04.04-777");
     assert.equal(await db.suratKGB.findUnique({ kgbId: "k1" }), null, "SK lama harus dibuat ulang");
     assert.equal((await db.usulanPegawai.findUnique({ id: "u1" }))?.status, "disetujui");
+    assert.equal(await usulanMenahan("p1"), null, "setelah disetujui, prosesnya dapat dilanjutkan");
   });
 });
 
