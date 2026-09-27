@@ -1765,7 +1765,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   Pertanyaan umum
                 </h2>
                 <div className="pub-faq">
-                  <details>
+                  <details name="faq-panduan">
                     <summary>Apakah surat permohonan masih wajib walaupun data sudah ada di SIM-KGB?</summary>
                     <p>
                       Ya. Usulan di SIM-KGB adalah data, bukan naskah dinas. Surat permohonan Kepala UPT lewat Srikandi
@@ -1773,7 +1773,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       Tim SDM untuk menerbitkan SK.
                     </p>
                   </details>
-                  <details>
+                  <details name="faq-panduan">
                     <summary>Bolehkah Kepala UPT menandatangani SK KGB?</summary>
                     <p>
                       Tidak. Kepala UPT menandatangani surat permohonan. Kewenangan KGB pegawai Kanwil dan UPT dilimpahkan
@@ -1781,7 +1781,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       sesuai <a href="#kewenangan">tabel penandatangan</a>.
                     </p>
                   </details>
-                  <details>
+                  <details name="faq-panduan">
                     <summary>Mengapa KGB pertama golongan II/a diberikan setelah 1 tahun?</summary>
                     <p>
                       PNS yang pertama kali diangkat dalam golongan II/a menerima KGB pertama setelah mempunyai masa kerja 1
@@ -1791,7 +1791,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       2 tahun.
                     </p>
                   </details>
-                  <details>
+                  <details name="faq-panduan">
                     <summary>NIP pegawai tidak ditemukan di SIM-KGB</summary>
                     <p>
                       Pegawai UPT yang belum tercatat ditambahkan Admin UPT dengan Tambah pegawai atau Unggah daftar, lalu
@@ -1799,7 +1799,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       mencocokkannya dengan SK CPNS sebelum menyetujui.
                     </p>
                   </details>
-                  <details>
+                  <details name="faq-panduan">
                     <summary>Status KGB pegawai tidak berubah dalam waktu lama</summary>
                     <p>
                       Belum Diproses biasanya berarti usulan belum diajukan atau jendela proses belum dibuka. Bila di
@@ -1809,7 +1809,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       Kanwil, atau oleh keuangan satker lewat Sudah direkam di Gaji Web untuk pegawai UPT.
                     </p>
                   </details>
-                  <details>
+                  <details name="faq-panduan">
                     <summary>Usulan terlambat dikirim. Apakah KGB hilang?</summary>
                     <p>
                       Tidak. KGB tetap diproses dan TMT tidak bergeser. Jika SK KGB terbit setelah TMT, selisih gaji sejak
@@ -1817,7 +1817,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       satker mengajukan SPM-LS kekurangan gaji ke KPPN.
                     </p>
                   </details>
-                  <details>
+                  <details name="faq-panduan">
                     <summary>Mengapa tombol Buat SK atau Unggah SK TTE tidak muncul?</summary>
                     <p>
                       Buat SK baru tersedia setelah Input KGB disimpan dan status menjadi Sedang Diproses. Unggah SK TTE
@@ -1826,7 +1826,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       bertanda Tertahan usulan UPT hanya menampilkan Tinjau usulan UPT sampai usulannya ditinjau.
                     </p>
                   </details>
-                  <details>
+                  <details name="faq-panduan">
                     <summary>Bisakah tanda Berpotensi rapelan diubah secara manual?</summary>
                     <p>
                       Tidak. Tanda itu dihitung otomatis: KGB yang diinput setelah batas proses Tim SDM ditandai Berpotensi
@@ -1840,7 +1840,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       <a href="#keadaan-khusus">keadaan khusus</a>).
                     </p>
                   </details>
-                  <details>
+                  <details name="faq-panduan">
                     <summary>Pegawai pindah satker atau berhenti sebelum SK terbit</summary>
                     <p>
                       Admin UPT satker asal memilih Laporkan mutasi pada baris pegawai: mutasi definitif, BKO, selesai
@@ -1849,7 +1849,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       mengubah Unit Kerja maupun KPPN.
                     </p>
                   </details>
-                  <details>
+                  <details name="faq-panduan">
                     <summary>Lupa password SIM-KGB</summary>
                     <p>
                       Akun SIM-KGB hanya untuk pengelola: Tim SDM KGB, Tim SDM Hukdis, Keuangan Kanwil, Admin UPT, dan

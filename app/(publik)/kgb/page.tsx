@@ -461,17 +461,34 @@ export default async function HalamanBeranda() {
           </div>
 
           <div className="ip-tanya" id="info-tanya">
-            <h3 className="ip-tanya-judul">Pertanyaan umum</h3>
-            <div className="pub-faq">
-              <details>
-                <summary>NIP saya tidak ditemukan</summary>
+            <div className="ip-tanya-pengantar" data-muncul="">
+              <p className="ip-tanya-label">Pertanyaan umum</p>
+              <h3 className="ip-tanya-judul">Yang paling sering ditanyakan pegawai</h3>
+              <p className="ip-tanya-lead">
+                Jawaban singkat seputar cek status, keterlambatan, dan kepindahan. Rincian data Anda ditangani pengelola
+                kepegawaian di satker masing-masing.
+              </p>
+              <div className="ip-tanya-bantuan">
                 <p>
-                  Periksa kembali NIP yang diketik. Bila tetap tidak ditemukan, data Anda belum terdaftar atau NIP-nya
-                  tercatat keliru. Minta admin kepegawaian satker Anda mendaftarkan atau membetulkannya lewat SIM-KGB;
-                  perubahannya berlaku setelah disetujui Kanwil.
+                  <b>Masih ada pertanyaan?</b> Hubungi Admin UPT atau pengelola kepegawaian di satker Anda.
+                </p>
+                <a href="#bantuan" className="sx-tautan">
+                  Kontak bantuan
+                  {Panah}
+                </a>
+              </div>
+            </div>
+            <div className="pub-faq" data-muncul="">
+              <details name="faq-publik" style={{ "--i": 0 } as React.CSSProperties}>
+                <summary>NIP atau tempat lahir saya tidak cocok</summary>
+                <p>
+                  Periksa kembali NIP dan tulis tempat lahir seperti di data kepegawaian, misalnya Banjarmasin; huruf besar
+                  kecil dan awalan Kab. atau Kota tidak berpengaruh. Bila tetap tidak cocok, data Anda belum terdaftar,
+                  NIP-nya tercatat keliru, atau tempat lahir Anda belum tercatat. Minta admin kepegawaian satker Anda
+                  membetulkannya lewat SIM-KGB; perubahannya berlaku setelah disetujui Kanwil.
                 </p>
               </details>
-              <details>
+              <details name="faq-publik" style={{ "--i": 1 } as React.CSSProperties}>
                 <summary>Status KGB saya tidak berubah dalam waktu lama</summary>
                 <p>
                   Belum Diproses biasanya berarti jendela proses belum dibuka, usulan dari satker belum masuk, atau
@@ -481,7 +498,7 @@ export default async function HalamanBeranda() {
                   admin kepegawaian satker.
                 </p>
               </details>
-              <details>
+              <details name="faq-publik" style={{ "--i": 2 } as React.CSSProperties}>
                 <summary>Usulan terlambat dikirim. Apakah KGB hilang?</summary>
                 <p>
                   Tidak. KGB tetap diproses dan TMT tidak bergeser. Bila SK terbit setelah TMT, selisih gaji sejak TMT
@@ -489,14 +506,14 @@ export default async function HalamanBeranda() {
                   mengajukan SPM-LS kekurangan gaji ke KPPN.
                 </p>
               </details>
-              <details>
+              <details name="faq-publik" style={{ "--i": 3 } as React.CSSProperties}>
                 <summary>Saya pindah satker atau berhenti sebelum SK terbit</summary>
                 <p>
                   Admin kepegawaian satker asal melaporkannya lewat SIM-KGB, lalu Kanwil mencatatnya. Satker tempat Anda
                   bertugas menentukan KPPN mitra yang menjadi tujuan SK.
                 </p>
               </details>
-              <details>
+              <details name="faq-publik" style={{ "--i": 4 } as React.CSSProperties}>
                 <summary>Apakah saya perlu akun SIM-KGB?</summary>
                 <p>
                   Tidak. Status KGB dapat dicek dengan NIP dan tempat lahir di halaman ini. Akun SIM-KGB hanya untuk Tim SDM dan keuangan

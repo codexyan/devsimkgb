@@ -56,6 +56,11 @@ html[data-muncul="siap"] .pub .beranda [data-muncul]:not([data-muncul="1"]) {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* background-clip: text hanya mewarnai huruf di dalam kotak kata. Dengan line-height 1, ekor huruf
+     (g, j, p, y) menjulur di bawah kotak itu dan tampak terpotong. Ruang bawah ini memperpanjang latar
+     gradasinya; margin negatif menjaga tata letak judul, dan masih di dalam ruang potong .kt (0,2em). */
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
 }
 
 .pub .hr .cs-galat {
@@ -1572,18 +1577,98 @@ html[data-muncul="siap"] .pub .beranda [data-muncul]:not([data-muncul="1"]) {
   margin-top: 8px;
 }
 
+/* Pertanyaan umum: pengantar lengket di kiri, kartu pertanyaan di kanan (satu kolom di layar sempit). */
 .pub .ip-tanya {
-  margin-top: clamp(36px, 5vw, 56px);
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  align-items: start;
+  gap: clamp(28px, 5vw, 72px);
+  margin-top: clamp(48px, 7vw, 88px);
+  padding-top: clamp(32px, 5vw, 56px);
+  border-top: 1px solid var(--line);
   scroll-margin-top: calc(var(--nav) + 16px);
 }
 
+.pub .ip-tanya-pengantar {
+  position: sticky;
+  top: calc(var(--nav) + 28px);
+  display: grid;
+  gap: 14px;
+}
+
+.pub .ip-tanya-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .pub .ip-tanya-judul {
-  margin: 0 0 12px;
+  margin: 0;
   font-family: var(--huruf-judul);
-  font-size: 1.25rem;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-size: clamp(1.75rem, 1.2rem + 1.6vw, 2.5rem);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
   color: var(--ink);
+}
+
+.pub .ip-tanya-lead {
+  margin: 0;
+  max-width: 42ch;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.pub .ip-tanya-bantuan {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--sunken);
+}
+
+.pub .ip-tanya-bantuan p {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.pub .ip-tanya-bantuan b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.pub .ip-tanya .pub-faq {
+  max-width: none;
+}
+
+/* Kartu masuk berurutan ketika daftarnya tampil di layar. */
+html[data-muncul="siap"] .pub .ip-tanya .pub-faq[data-muncul="1"] details {
+  animation: ipKartuMasuk 700ms var(--ease-out) backwards;
+  animation-delay: calc(120ms + var(--i, 0) * 70ms);
+}
+
+@keyframes ipKartuMasuk {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+}
+
+@media (max-width: 900px) {
+  .pub .ip-tanya {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pub .ip-tanya-pengantar {
+    position: static;
+  }
 }
 
 @media (max-width: 960px) {
