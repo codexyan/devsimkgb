@@ -61,3 +61,16 @@ Inventarisasi KGB Kanwil 2026-10-10.zip
   menampilkan "Formulir sudah ditutup" dan kiriman yang terlambat ditolak. Untuk membukanya lagi, Super Admin
   memilih waktu tutup yang baru lalu menekan Simpan; waktu yang sudah lewat ditolak. Kosongkan waktu tutup bila
   formulir dibuka tanpa batas. Untuk menutup lebih awal, hapus centang *Formulir dibuka*.
+
+## Kegiatan lain, mis. pegawai UPT (ADR-022)
+
+1. **Super Admin** membuka *Inventarisasi KGB*, lalu *Kegiatan baru*: pilih template (mis. *Inventarisasi KGB
+   pegawai UPT*), isi nama kegiatan, dan tekan *Buat kegiatan*. Kegiatan baru masih ditutup.
+2. Pada *Pengaturan formulir* kegiatan itu, isi kode akses dan waktu tutup, pilih **Satker sasaran** (tanpa
+   centang berarti semua UPT), centang *Formulir dibuka*, lalu Simpan.
+3. Bagikan tautan kegiatan, `kgb.paskalsel.online/inventarisasi-kgb/<id kegiatan>`, beserta kode aksesnya.
+   Pegawai UPT memilih satkernya di formulir.
+4. ZIP kegiatan UPT dikelompokkan per satker: `<Satker>/01 Pernah KGB/<NIP - Nama>/...`, dan rekapnya memuat
+   kolom *Satker*.
+
+Formulir pegawai Kanwil tetap di `kgb.paskalsel.online/inventarisasi-kgb`, dan kiriman lamanya tidak berubah.

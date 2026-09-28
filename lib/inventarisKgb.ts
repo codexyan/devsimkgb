@@ -8,6 +8,7 @@
 // Nama folder, nama berkas, dan kolom rekap ditentukan di sini (murni dan teruji); skrip Drive hanya
 // membersihkan dan menjalankannya.
 
+import { SATKER } from "./satker";
 import { GOLONGAN_PANGKAT } from "./tabelGaji";
 import { formatTanggalId } from "./waktu";
 
@@ -119,6 +120,8 @@ export interface IsianInventaris {
   tanggalSkPendukung: string;
   nomorWa: string;
   catatan: string;
+  /** Kode satker pengisi; hanya pada kegiatan yang templatenya memakai satker (lib/kegiatanInventaris.ts). */
+  satker?: string;
 }
 
 const RAPIKAN = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -169,8 +172,14 @@ const USIA_MAKS = 65;
  * Kekurangan isian sebelum dikirim; kosong berarti siap. Berkas diperiksa terpisah di formulir. `hariIni`
  * (yyyy-mm-dd) hanya dipakai untuk memeriksa usia.
  */
-export function periksaIsianInventaris(isian: IsianInventaris, hariIni = new Date().toISOString().slice(0, 10)): string[] {
+export function periksaIsianInventaris(
+  isian: IsianInventaris,
+  hariIni = new Date().toISOString().slice(0, 10),
+  /** Kode satker yang boleh dipilih pada kegiatan ini; tanpa nilai berarti kegiatan tanpa isian satker. */
+  satkerBoleh?: readonly string[],
+): string[] {
   const kurang: string[] = [];
+  if (satkerBoleh && !satkerBoleh.includes(isian.satker ?? "")) kurang.push("satker tempat Anda bertugas");
   if (!/^\d{18}$/.test(isian.nip)) kurang.push("NIP harus 18 angka");
   if (RAPIKAN(isian.nama).length < 3) kurang.push("nama lengkap");
   if (RAPIKAN(isian.tempatLahir).length < 3) kurang.push("tempat lahir");
@@ -253,6 +262,7 @@ export const KOLOM_REKAP = [
   "Tanggal SK KP terakhir / SK PNS",
   "Nomor WhatsApp",
   "Catatan",
+  "Satker",
 ] as const;
 
 /**
@@ -287,6 +297,7 @@ export function barisRekap(isian: IsianInventaris): string[] {
     isian.tanggalSkPendukung,
     isian.nomorWa.replace(/[\s-]/g, ""),
     RAPIKAN(isian.catatan),
+    SATKER.find((s) => s.kode === isian.satker)?.nama ?? "",
   ];
 }
 
@@ -326,4 +337,14 @@ export function teksBatas(k: { tutupPada?: string; batas?: string }): string {
   const tanggal = formatTanggalId(tutup, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const jam = formatTanggalId(tutup, { hour: "2-digit", minute: "2-digit", hour12: false }).replace(":", ".");
   return `${tanggal} pukul ${jam} WITA`;
+}
+
+/**
+ * Letak folder kiriman di dalam ZIP: "<Satker>/<Keadaan>/<NIP - Nama>" bila kiriman membawa satker (kegiatan UPT),
+ * selain itu "<Keadaan>/<NIP - Nama>".
+ */
+export function folderKiriman(isian: Pick<IsianInventaris, "keadaan" | "nip" | "nama" | "satker">): string {
+  const satker = SATKER.find((s) => s.kode === isian.satker)?.nama;
+  const dalam = `${FOLDER_KEADAAN[isian.keadaan]}/${namaFolderPegawai(isian.nip, isian.nama)}`;
+  return satker ? `${satker.replace(/[\\/:*?"<>|]/g, " ")}/${dalam}` : dalam;
 }

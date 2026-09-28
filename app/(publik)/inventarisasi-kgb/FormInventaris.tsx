@@ -47,6 +47,7 @@ const KOSONG: IsianInventaris = {
   tanggalSkPendukung: "",
   nomorWa: "",
   catatan: "",
+  satker: "",
 };
 
 /* Satu pertanyaan untuk dua isian: kenaikan pangkat/PI dan PMK setelah KGB terakhir. */
@@ -71,7 +72,14 @@ function galatBerkas(f: File | undefined, aturan: AturanBerkas): string | null {
   return null;
 }
 
-export default function FormInventaris() {
+/** Kegiatan yang sedang diisi (lib/kegiatanInventaris.ts); satker kosong berarti kegiatan tanpa isian satker. */
+export interface KegiatanFormulir {
+  id: string;
+  satker: { kode: string; nama: string }[];
+}
+
+export default function FormInventaris({ kegiatan }: { kegiatan: KegiatanFormulir }) {
+  const pakaiSatker = kegiatan.satker.length > 0;
   const id = useId();
   const [kode, setKode] = useState("");
   const [isian, setIsian] = useState<IsianInventaris>(KOSONG);
@@ -117,7 +125,7 @@ export default function FormInventaris() {
   const lengkap = {
     kode: kode.trim().length >= 4,
     identitas:
-      nipSah && isian.nama.trim().length >= 3 && isian.tempatLahir.trim().length >= 3 && TANGGAL.test(isian.tanggalLahir) && (!lahirNip || isian.tanggalLahir === lahirNip) && isian.jabatan.trim().length >= 2,
+      nipSah && isian.nama.trim().length >= 3 && isian.tempatLahir.trim().length >= 3 && TANGGAL.test(isian.tanggalLahir) && (!lahirNip || isian.tanggalLahir === lahirNip) && isian.jabatan.trim().length >= 2 && (!pakaiSatker || !!isian.satker),
     pangkat:
       !!isian.golonganRuang &&
       TANGGAL.test(isian.tmtGolongan) &&
@@ -164,7 +172,7 @@ export default function FormInventaris() {
   async function kirim(e: FormEvent) {
     e.preventDefault();
     setDicoba(true);
-    const kurang = periksaIsianInventaris(isian);
+    const kurang = periksaIsianInventaris(isian, undefined, pakaiSatker ? kegiatan.satker.map((s) => s.kode) : undefined);
     if (!lengkap.kode) kurang.unshift("kode akses dari grup WA");
     for (const b of daftarBerkas) {
       const g = galatBerkas(berkas[b.jenis], b);
@@ -186,7 +194,7 @@ export default function FormInventaris() {
         const f = berkas[b.jenis];
         if (f) form.set(b.jenis, f);
       }
-      const res = await fetch("/api/public/inventarisasi", { method: "POST", body: form });
+      const res = await fetch(`/api/public/inventarisasi?kegiatan=${encodeURIComponent(kegiatan.id)}`, { method: "POST", body: form });
       const hasil = (await res.json().catch(() => null)) as
         | { ok?: boolean; error?: string; kurang?: string[]; kirimanKe?: number }
         | null;
@@ -343,7 +351,26 @@ export default function FormInventaris() {
               children: teks("nomorWa", "08…", "tel"),
             })}
             {bidang({ label: "Jabatan", lebar: true, salah: kosongTeks("jabatan", 2), children: teks("jabatan", "mis. Analis SDM Aparatur Ahli Pertama") })}
-            {bidang({ label: "Bidang/Bagian", wajib: false, lebar: true, children: teks("bidang", "mis. Bagian Tata Usaha dan Umum") })}
+            {pakaiSatker &&
+              bidang({
+                label: "Satker tempat bertugas",
+                lebar: true,
+                salah: !isian.satker,
+                children: (
+                  <select className="iv-isian" value={isian.satker ?? ""} onChange={(e) => ubah("satker", e.target.value)}>
+                    <option value="">Pilih satker</option>
+                    {kegiatan.satker.map((s) => (
+                      <option key={s.kode} value={s.kode}>{s.nama}</option>
+                    ))}
+                  </select>
+                ),
+              })}
+            {bidang({
+              label: pakaiSatker ? "Seksi/Subbagian" : "Bidang/Bagian",
+              wajib: false,
+              lebar: true,
+              children: teks("bidang", pakaiSatker ? "mis. Subbagian Tata Usaha" : "mis. Bagian Tata Usaha dan Umum"),
+            })}
           </div>
         </fieldset>
 

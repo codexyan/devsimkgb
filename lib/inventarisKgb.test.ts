@@ -8,6 +8,7 @@ import {
   KOLOM_REKAP,
   barisRekap,
   berkasUntuk,
+  folderKiriman,
   namaBerkasInventaris,
   namaFolderPegawai,
   periksaIsianInventaris,
@@ -172,4 +173,22 @@ test("PMK setelah KGB terakhir: SK PMK wajib diunggah, TMT dan tanggal SK PMK wa
   assert.ok(periksaIsianInventaris({ ...pmk, tmtPmk: "2024-01-01" }, "2026-09-28").some((k) => k.startsWith("TMT PMK lebih awal")));
   // Kiriman dari halaman lama yang belum menanyakan PMK diminta menjawab.
   assert.ok(periksaIsianInventaris({ ...pernah, pmkSetelahKgb: "" }, "2026-09-28").some((k) => k.startsWith("jawab apakah ada SK")));
+});
+
+test("kegiatan UPT: satker wajib dipilih dari sasaran, masuk rekap dan letak folder ZIP", () => {
+  const upt: IsianInventaris = { ...pernah, satker: "lapas-banjarmasin" };
+  assert.deepEqual(periksaIsianInventaris(upt, "2026-09-28", ["lapas-banjarmasin", "rutan-barabai"]), []);
+  assert.ok(periksaIsianInventaris({ ...upt, satker: "" }, "2026-09-28", ["lapas-banjarmasin"]).includes("satker tempat Anda bertugas"));
+  assert.ok(periksaIsianInventaris({ ...upt, satker: "kanwil" }, "2026-09-28", ["lapas-banjarmasin"]).includes("satker tempat Anda bertugas"));
+  // Kegiatan tanpa isian satker tidak memeriksanya.
+  assert.deepEqual(periksaIsianInventaris(pernah, "2026-09-28"), []);
+  const baris = barisRekap(upt);
+  assert.equal(baris.length, KOLOM_REKAP.length - 2);
+  assert.equal(baris[baris.length - 1], "Lembaga Pemasyarakatan Kelas IIA Banjarmasin");
+  assert.equal(barisRekap(pernah)[baris.length - 1], "");
+  assert.equal(
+    folderKiriman(upt),
+    "Lembaga Pemasyarakatan Kelas IIA Banjarmasin/01 Pernah KGB/199001012015031001 - Budi Hartono, S.H.",
+  );
+  assert.equal(folderKiriman(pernah), "01 Pernah KGB/199001012015031001 - Budi Hartono, S.H.");
 });

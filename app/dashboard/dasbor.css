@@ -2288,7 +2288,17 @@ html[data-gerak="kurangi"] .dsb-putar {
 .inv-atur .inv-bidang { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--dt2); }
 .inv-atur .inv-bidang .dsb-cari { width: 100%; min-width: 0; }
 .inv-atur .inv-bantu { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--dt2); }
+.inv-atur .inv-lebar { grid-column: 1 / -1; }
+.inv-atur .inv-lebar-2 { grid-column: span 2; }
+.inv-kegiatan { flex-wrap: wrap; }
+.inv-satker summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--dtn); }
+.inv-satker-daftar { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 4px 16px; margin-top: 8px; }
+.inv-satker-daftar .inv-cek { white-space: normal; font-weight: 500; font-size: 12px; }
+.inv-baru > summary { cursor: pointer; list-style: none; }
+.inv-baru > summary::-webkit-details-marker { display: none; }
+.inv-baru > summary::after { content: "+"; margin-left: auto; font-weight: 600; color: var(--dt2); }
+.inv-baru[open] > summary::after { content: "−"; }
 .inv-cek { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13px; font-weight: 600; color: var(--dtn); white-space: nowrap; }
 .inv-berkas { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
 .inv-berkas a { color: var(--st-blue); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
-@media (max-width: 760px) { .inv-atur { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) { .inv-atur { grid-template-columns: minmax(0, 1fr); } .inv-atur .inv-lebar-2 { grid-column: auto; } }
