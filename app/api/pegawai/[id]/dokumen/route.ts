@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/auditLog";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { adaPenandaPdf } from "@/lib/prosesKgb";
 import { BERKAS_USULAN } from "@/lib/usulanPegawai";
+// JEJAK-INVENTARISASI (ADR-027): sumber "Formulir inventarisasi"; hapus impor ini dan bagiannya di bawah bersama modul inventarisasi.
 import { kirimanPegawai } from "@/lib/inventarisServer";
 import { daftarDokumenArsip, simpanDokumenArsip } from "@/lib/dokumenPegawaiServer";
 import {
@@ -100,6 +101,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   // Berkas kiriman yang sudah disalin ke arsip (ADR-024) tidak ditampilkan dua kali; yang tampil salinannya.
   const sudahDiarsip = new Set(arsip.map((d) => d.asal).filter(Boolean));
+  // JEJAK-INVENTARISASI (ADR-027)
   for (const { kegiatan, kiriman } of inventaris) {
     for (const b of kiriman.berkas) {
       if (sudahDiarsip.has(b.kunci)) continue;

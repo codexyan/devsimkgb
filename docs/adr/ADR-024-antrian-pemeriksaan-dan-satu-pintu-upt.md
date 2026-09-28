@@ -1,7 +1,7 @@
 # ADR-024: Antrian pemeriksaan, dokumen berpusat di SIM-KGB, dan satu pintu UPT
 
 Tanggal: 28 September 2026
-Status: berlaku; tahap 1 dari penyederhanaan alur peremajaan data
+Status: berlaku; tahap 1 dari penyederhanaan alur peremajaan data. Diubah ADR-027: Periksa hanya rujukan, dan berkas disalin ke arsip secara manual per berkas, bukan otomatis
 
 ## Konteks
 

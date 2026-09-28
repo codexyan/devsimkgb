@@ -37,8 +37,8 @@ export interface DokumenArsip {
   /** ISO */
   diunggahAt: string;
   /**
-   * Kunci R2 berkas asal bila dokumen ini disalin otomatis dari kiriman formulir (ADR-024); kosong bila diunggah
-   * Tim SDM. Dipakai agar kiriman yang sama tidak tersalin dua kali.
+   * Penanda asal bila dokumen ini disalin dari tempat lain (mis. kunci R2 berkas kiriman formulir); kosong bila
+   * diunggah Tim SDM. Hanya dipakai pemanggil untuk mencegah salinan ganda; modul pegawai tidak menafsirkannya.
    */
   asal?: string;
 }
@@ -66,6 +66,7 @@ export function periksaDokumen(isian: { jenis: unknown; tanggalSK: string; ukura
 }
 
 /** Sumber dokumen pada daftar gabungan di tab pegawai. */
+// JEJAK-INVENTARISASI (ADR-027): sumber "inventaris" dihapus bersama modul inventarisasi.
 export type SumberDokumen = "arsip" | "sk_kgb" | "usulan" | "inventaris";
 
 export const LABEL_SUMBER_DOKUMEN: Record<SumberDokumen, string> = {
@@ -89,18 +90,3 @@ export interface DokumenPegawai {
   /** Hanya dokumen arsip yang dapat dihapus dari tab ini. */
   bisaHapus: boolean;
 }
-
-/**
- * Jenis dokumen arsip untuk tiap berkas kiriman formulir (ADR-024): berkas kiriman yang sudah diperiksa Tim SDM
- * disalin ke arsip dokumen pegawai, sehingga SIM-KGB menjadi rujukan dan ZIP ke Google Drive hanya cadangan.
- */
-export const JENIS_DARI_BERKAS_INVENTARIS: Record<string, JenisDokumen> = {
-  "SK-KGB-Terakhir": "sk_kgb",
-  "SK-KP-Terakhir": "sk_pangkat",
-  "SK-PMK": "sk_pmk",
-  "SK-CPNS": "sk_cpns",
-  "SK-PNS": "sk_pns",
-};
-
-/** Status tindak lanjut kiriman yang membuat berkasnya disalin ke arsip dokumen pegawai. */
-export const STATUS_SALIN_ARSIP = ["sesuai", "diterapkan"] as const;

@@ -7,6 +7,8 @@ import { bandingkanKiriman, peringatanKiriman } from "@/lib/pemutakhiranPegawai"
 
 export const runtime = "nodejs";
 
+// JEJAK-INVENTARISASI (ADR-027): rute ini dihapus bersama modul inventarisasi.
+
 /**
  * Kiriman pemutakhiran data seorang pegawai dari semua kegiatan formulir, beserta perbandingannya dengan Data
  * Pegawai dan peringatan otomatis (ADR-023). Hanya Super Admin dan Tim SDM KGB.

@@ -75,16 +75,29 @@ Inventarisasi KGB Kanwil 2026-10-10.zip
 
 Formulir pegawai Kanwil tetap di `kgb.paskalsel.online/inventarisasi-kgb`, dan kiriman lamanya tidak berubah.
 
-## Memeriksa kiriman (ADR-024)
+## Memeriksa kiriman (ADR-024, ADR-027)
+
+Modul inventarisasi hanya **pengumpul data sementara**. Data Pegawai diremajakan di modul **Data Pegawai**, bukan
+dari kiriman.
 
 1. Buka *Inventarisasi KGB*. Kolom **Perbandingan** menunjukkan berapa isian yang berbeda dengan Data Pegawai,
    dan kolom **Tindak lanjut** menunjukkan status pemeriksaannya. Centang **Perlu dikerjakan** untuk menyaring
    kiriman yang belum diperiksa atau yang datanya berbeda.
-2. Tekan **Periksa** pada baris pegawai. Di panel itu Anda dapat melihat perbandingan dan peringatan, membuka
-   pratinjau berkas SK, menerapkan isian ke Data Pegawai, serta mencatat kenaikan pangkat atau PMK.
-3. Tandai statusnya: *Sesuai*, *Perlu perbaikan* (dengan catatan), atau *Sudah diterapkan*. Begitu ditandai
-   sesuai atau sudah diterapkan, berkas kiriman otomatis masuk **arsip dokumen pegawai**, sehingga SIM-KGB
-   menjadi rujukan dan unduhan ZIP ke Google Drive hanya cadangan.
+2. Tekan **Periksa** pada baris pegawai. Panel itu hanya rujukan: perbandingan dan peringatan, pratinjau berkas
+   SK, dan catatan pegawai.
+3. Tekan **Buka di Data Pegawai** untuk membuka halaman pegawai di tab baru, lalu remajakan datanya di sana
+   (Ubah data per bagian, Catat kenaikan pangkat, PMK).
+4. Berkas SK yang perlu disimpan permanen disalin satu per satu dengan **Simpan ke arsip**. Salinannya menjadi
+   dokumen arsip milik pegawai, sehingga tetap ada setelah modul inventarisasi dihapus. Berkas yang tidak disalin
+   hanya tersimpan di kiriman dan di ZIP Google Drive.
+5. Tandai statusnya sebagai catatan kerja: *Sesuai*, *Perlu perbaikan* (dengan catatan), atau *Sudah diterapkan*.
+   Status tidak mengubah Data Pegawai dan tidak menyalin berkas.
 
 Pemutakhiran data pegawai UPT tidak lagi lewat kegiatan inventarisasi, melainkan lewat **Usulan UPT**, supaya
 UPT tidak mengirim data yang sama di dua tempat.
+
+## Menghapus modul setelah pendataan selesai
+
+Lihat daftar langkahnya di ADR-027. Sebelum menghapus:
+- unduh ZIP terakhir tiap kegiatan;
+- salin ke arsip pegawai berkas yang masih dibutuhkan.

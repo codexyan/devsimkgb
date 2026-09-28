@@ -23,9 +23,7 @@ import {
 } from "@/lib/kegiatanInventaris";
 import type { KirimanInventaris } from "@/lib/inventarisServer";
 import { KerangkaModal, ModalPratinjauBerkas } from "@/app/dashboard/components/kgb";
-import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
-import ModalPmk from "@/app/dashboard/components/ModalPmk";
-import KartuKiriman, { NADA_STATUS, type PegawaiLengkap, type Pemutakhiran } from "./KartuKiriman";
+import KartuKiriman, { NADA_STATUS, type Pemutakhiran } from "./KartuKiriman";
 import { LABEL_TINDAK_LANJUT, type StatusTindakLanjut } from "@/lib/pemutakhiranPegawai";
 import { SATKER } from "@/lib/satker";
 import { keCsv } from "@/lib/cadangan";
@@ -89,10 +87,9 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
   const [daftarKeg, setDaftarKeg] = useState<Kegiatan[]>([]);
   const [aktifId, setAktifId] = useState<string | null>(null);
   const [kiriman, setKiriman] = useState<KirimanAntrian[] | null>(null);
-  // Panel periksa: satu kiriman dibandingkan dan ditindaklanjuti di tempat, tanpa pindah ke Data Pegawai (ADR-024).
-  const [periksa, setPeriksa] = useState<{ k: KirimanAntrian; pegawai: PegawaiLengkap } | null>(null);
-  const [memuatPeriksa, setMemuatPeriksa] = useState<string | null>(null);
-  const [catat, setCatat] = useState<"kp" | "pmk" | null>(null);
+  // Panel Periksa: rujukan satu kiriman (perbandingan, berkas, status tindak lanjut). Data Pegawai diubah di modul
+  // Data Pegawai, bukan dari sini (ADR-027).
+  const [periksa, setPeriksa] = useState<KirimanAntrian | null>(null);
   const [berkasPratinjau, setBerkasPratinjau] = useState<{ judul: string; url: string } | null>(null);
   const [saringKerja, setSaringKerja] = useState(false);
   const [form, setForm] = useState<FormKegiatan>({ nama: "", terbuka: false, kode: "", tutupPada: "", satker: [] });
@@ -201,21 +198,6 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
       setGalat(e instanceof Error ? e.message : "Kegiatan gagal dibuat");
     } finally {
       setMenyimpan(false);
-    }
-  }
-
-  async function bukaPeriksa(k: KirimanAntrian) {
-    if (!k.pegawaiId) return;
-    setMemuatPeriksa(k.isian.nip);
-    setGalat(null);
-    try {
-      const res = await fetch(`/api/pegawai/${k.pegawaiId}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("Data pegawai gagal dimuat.");
-      setPeriksa({ k, pegawai: (await res.json()) as PegawaiLengkap });
-    } catch (e) {
-      setGalat(e instanceof Error ? e.message : "Data pegawai gagal dimuat.");
-    } finally {
-      setMemuatPeriksa(null);
     }
   }
 
@@ -553,11 +535,9 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
                         type="button"
                         className="dsb-tombol"
                         data-jenis="garis"
-                        disabled={!k.pegawaiId || memuatPeriksa === k.isian.nip}
-                        title={k.pegawaiId ? undefined : "Pegawai belum tercatat di Data Pegawai"}
-                        onClick={() => void bukaPeriksa(k)}
+                        onClick={() => setPeriksa(k)}
                       >
-                        {memuatPeriksa === k.isian.nip ? "Memuat…" : "Periksa & ubah"}
+                        Periksa
                       </button>
                       {superAdmin && (
                         <button type="button" className="dsb-ikon-tombol" data-nada="merah" aria-label={`Hapus kiriman ${k.isian.nama}`} onClick={() => void hapus(k)} style={{ marginLeft: 6 }}>
@@ -575,22 +555,21 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
 
       {periksa && (
         <KerangkaModal
-          judul="Periksa dan ubah kiriman"
-          subjudul={`${periksa.k.isian.nama} · ${periksa.k.isian.nip}`}
+          judul="Periksa kiriman"
+          subjudul={`${periksa.isian.nama} · ${periksa.isian.nip}`}
           ukuran="lg"
           onTutup={() => setPeriksa(null)}
         >
           <KartuKiriman
-            p={{ kegiatan: { id: aktif?.id ?? "", nama: aktif?.nama ?? "" }, kiriman: periksa.k, banding: periksa.k.banding, peringatan: periksa.k.peringatan }}
-            pegawai={periksa.pegawai}
+            p={{ kegiatan: { id: aktif?.id ?? "", nama: aktif?.nama ?? "" }, kiriman: periksa, banding: periksa.banding, peringatan: periksa.peringatan }}
+            pegawaiId={periksa.pegawaiId}
             bolehUbah
-            onGalat={setGalat}
+            tautanPegawai={periksa.pegawaiId ? `/dashboard/pegawai/${periksa.pegawaiId}/riwayat` : undefined}
             onBerhasil={(teks) => {
               setPesan(teks);
               setPeriksa(null);
               void muat(aktif?.id);
             }}
-            onCatat={setCatat}
             onLihatBerkas={setBerkasPratinjau}
           />
         </KerangkaModal>
@@ -599,48 +578,12 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
       {berkasPratinjau && (
         <ModalPratinjauBerkas
           judul={berkasPratinjau.judul}
-          subjudul={periksa ? `${periksa.k.isian.nama} · ${periksa.k.isian.nip}` : undefined}
+          subjudul={periksa ? `${periksa.isian.nama} · ${periksa.isian.nip}` : undefined}
           url={berkasPratinjau.url}
           onTutup={() => setBerkasPratinjau(null)}
         />
       )}
 
-      {periksa && catat === "kp" && (
-        <ModalKenaikanPangkat
-          pegawai={periksa.pegawai}
-          awal={{
-            golonganBaru:
-              periksa.k.isian.golonganRuang !== periksa.pegawai.golonganRuang ? periksa.k.isian.golonganRuang : "",
-            tanggalSK: periksa.k.isian.keadaan === "pernah" ? periksa.k.isian.tanggalSkPendukung : "",
-            tmtPangkat: periksa.k.isian.tmtGolongan,
-          }}
-          onTutup={() => setCatat(null)}
-          onBerhasil={(teks) => {
-            setCatat(null);
-            setPeriksa(null);
-            setPesan(teks);
-            void muat(aktif?.id);
-          }}
-        />
-      )}
-      {periksa && catat === "pmk" && (
-        <ModalPmk
-          pegawai={periksa.pegawai}
-          awal={{
-            tanggalSK: periksa.k.isian.tanggalSkPmk,
-            tmtPmk: periksa.k.isian.tmtPmk,
-            mkgTahunSk: periksa.k.isian.mkgTahun,
-            mkgBulanSk: periksa.k.isian.mkgBulan,
-          }}
-          onTutup={() => setCatat(null)}
-          onBerhasil={(teks) => {
-            setCatat(null);
-            setPeriksa(null);
-            setPesan(teks);
-            void muat(aktif?.id);
-          }}
-        />
-      )}
     </div>
   );
 }

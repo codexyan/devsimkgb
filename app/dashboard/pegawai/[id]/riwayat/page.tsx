@@ -194,6 +194,7 @@ export default function RiwayatKGBPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"kgb" | "pangkat" | "hukdis" | "dokumen">("kgb");
   // Dokumen & Pemutakhiran hanya untuk Super Admin dan Tim SDM KGB (ADR-023); ?tab=dokumen membukanya langsung.
+  // JEJAK-INVENTARISASI (ADR-027): setelah modul inventarisasi dihapus, tab ini cukup bernama "Dokumen".
   const bolehDokumen = canProcessKGB(role);
   const bolehUbah = canEditPegawai(role);
   useEffect(() => {

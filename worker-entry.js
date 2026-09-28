@@ -23,6 +23,7 @@ export {
 
 const PATH_CEK_KGB = "/api/public/cek-kgb";
 // Kiriman formulir inventarisasi KGB pegawai Kanwil: kode akses salah (403) dihitung sebagai percobaan gagal.
+// JEJAK-INVENTARISASI (ADR-027): PATH_INVENTARIS dan layaniInventaris dihapus bersama modulnya; Durable Object tetap dipakai cek KGB.
 const PATH_INVENTARIS = "/api/public/inventarisasi";
 // Semua permintaan per IP dibatasi longgar, karena pegawai satu kantor (satu alamat IP) dapat
 // mengecek status bersamaan. Batas ketat hanya untuk NIP yang tidak ditemukan (jawaban 404),

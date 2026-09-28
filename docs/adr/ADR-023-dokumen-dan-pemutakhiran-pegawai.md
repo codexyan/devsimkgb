@@ -1,7 +1,7 @@
 # ADR-023: Dokumen dan pemutakhiran data di halaman pegawai
 
 Tanggal: 28 September 2026
-Status: berlaku
+Status: berlaku, diubah ADR-027 (penerapan isian dari kiriman dihapus; kiriman di halaman pegawai hanya rujukan sementara)
 
 ## Konteks
 

@@ -21,6 +21,7 @@ import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId, hariIniWita, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { canProcessKGB } from "@/lib/auth";
+// JEJAK-INVENTARISASI (ADR-027): penanda kiriman formulir di daftar pegawai; dihapus bersama modul inventarisasi.
 import { LABEL_TINDAK_LANJUT, type StatusTindakLanjut } from "@/lib/pemutakhiranPegawai";
 
 interface RingkasPemutakhiran {
@@ -205,6 +206,7 @@ export default function PegawaiPage() {
   useEffect(() => {
     if (!canProcessKGB(role) || muatUlangRingkasan === 0) return;
     let batal = false;
+    // JEJAK-INVENTARISASI (ADR-027): gagal atau tidak ada rutenya berarti tanpa penanda; daftar pegawai tetap tampil.
     fetch("/api/inventarisasi/ringkasan", { cache: "no-store" })
       .then(async (r) => (r.ok ? ((await r.json()) as Record<string, RingkasPemutakhiran>) : {}))
       .then((d) => {

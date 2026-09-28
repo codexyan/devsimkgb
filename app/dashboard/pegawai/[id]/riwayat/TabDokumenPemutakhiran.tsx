@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
-import ModalPmk from "@/app/dashboard/components/ModalPmk";
 import { ModalPratinjauBerkas } from "@/app/dashboard/components/kgb";
 import {
   BATAS_DOKUMEN_BYTE,
@@ -12,13 +10,18 @@ import {
   type JenisDokumen,
   type SumberDokumen,
 } from "@/lib/dokumenPegawai";
-import KartuKiriman, { type PegawaiLengkap, type Pemutakhiran } from "@/app/dashboard/components/inventarisasi/KartuKiriman";
+// JEJAK-INVENTARISASI (ADR-027): dihapus bersama modul inventarisasi.
+import KartuKiriman, { type Pemutakhiran } from "@/app/dashboard/components/inventarisasi/KartuKiriman";
 import { formatTanggalId } from "@/lib/waktu";
 
-/* Tab "Dokumen & Pemutakhiran" di halaman pegawai (ADR-023): kiriman formulir pemutakhiran data dibandingkan dengan
-   Data Pegawai, status tindak lanjutnya, penerapan isian yang berbeda, dan semua dokumen pegawai (arsip unggahan,
-   SK KGB, berkas usulan UPT, berkas formulir) yang dapat dipratinjau di halaman. Golongan dan masa kerja diterapkan
-   lewat Catat kenaikan pangkat atau PMK, supaya riwayat dan jadwal KGB tetap konsisten. */
+/* Tab "Dokumen & Pemutakhiran" di halaman pegawai (ADR-023, ADR-027).
+
+   - Dokumen pegawai: arsip unggahan, SK KGB, berkas usulan UPT, dan berkas formulir, dapat dipratinjau di halaman.
+     Bagian ini milik modul pegawai dan tetap ada setelah modul inventarisasi dihapus.
+   - Kiriman formulir inventarisasi (JEJAK-INVENTARISASI): rujukan sementara selama pendataan berjalan. Hanya
+     perbandingan, berkas, dan status tindak lanjut; Data Pegawai diubah lewat bagian-bagian halaman ini sendiri
+     (Ubah data, Catat kenaikan pangkat, PMK), bukan dari kiriman. Bila bagian ini gagal dimuat atau modulnya sudah
+     dihapus, dokumen tetap tampil. */
 
 const ukuranTeks = (b: number | null) =>
   b === null ? "" : b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
@@ -30,32 +33,25 @@ export default function TabDokumenPemutakhiran({
   onDataBerubah,
 }: {
   pegawaiId: string;
-  /** Peran yang boleh mengubah Data Pegawai dan mencatat kenaikan pangkat atau PMK. */
+  /** Peran yang boleh mengelola dokumen dan mencatat tindak lanjut kiriman. */
   bolehUbah: boolean;
   onDataBerubah: () => void;
 }) {
-  const [pegawai, setPegawai] = useState<PegawaiLengkap | null>(null);
-  const [daftar, setDaftar] = useState<Pemutakhiran[] | null>(null);
+  // null: sedang dimuat; "gagal": bagian kiriman tidak tersedia, dokumen tetap tampil.
+  const [daftar, setDaftar] = useState<Pemutakhiran[] | null | "gagal">(null);
   const [dokumen, setDokumen] = useState<DokumenPegawai[] | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
   const [pesan, setPesan] = useState<string | null>(null);
-  const [pratinjau, setPratinjau] = useState<DokumenPegawai | null>(null);
-  const [modal, setModal] = useState<{ jenis: "kp" | "pmk"; p: Pemutakhiran } | null>(null);
+  const [pratinjau, setPratinjau] = useState<{ judul: string; subjudul?: string; url: string } | null>(null);
 
   const muat = useCallback(async () => {
-    try {
-      const [rp, rm, rd] = await Promise.all([
-        fetch(`/api/pegawai/${pegawaiId}`, { cache: "no-store" }),
-        fetch(`/api/pegawai/${pegawaiId}/pemutakhiran`, { cache: "no-store" }),
-        fetch(`/api/pegawai/${pegawaiId}/dokumen`, { cache: "no-store" }),
-      ]);
-      if (!rp.ok || !rm.ok || !rd.ok) throw new Error("Dokumen dan pemutakhiran gagal dimuat.");
-      setPegawai((await rp.json()) as PegawaiLengkap);
-      setDaftar((await rm.json()) as Pemutakhiran[]);
-      setDokumen((await rd.json()) as DokumenPegawai[]);
-    } catch (e) {
-      setGalat(e instanceof Error ? e.message : "Dokumen dan pemutakhiran gagal dimuat.");
-    }
+    const [rm, rd] = await Promise.all([
+      fetch(`/api/pegawai/${pegawaiId}/pemutakhiran`, { cache: "no-store" }).catch(() => null),
+      fetch(`/api/pegawai/${pegawaiId}/dokumen`, { cache: "no-store" }).catch(() => null),
+    ]);
+    setDaftar(rm?.ok ? ((await rm.json()) as Pemutakhiran[]) : "gagal");
+    if (rd?.ok) setDokumen((await rd.json()) as DokumenPegawai[]);
+    else setGalat("Dokumen pegawai gagal dimuat.");
   }, [pegawaiId]);
 
   useEffect(() => {
@@ -69,6 +65,13 @@ export default function TabDokumenPemutakhiran({
     onDataBerubah();
     void muat();
   }
+
+  const lihatDokumen = (d: DokumenPegawai) =>
+    setPratinjau({
+      judul: d.judul,
+      subjudul: [d.nomorSK, tanggalTeks(d.tanggal), LABEL_SUMBER_DOKUMEN[d.sumber]].filter(Boolean).join(" · "),
+      url: d.url,
+    });
 
   return (
     <div className="flex flex-col gap-4">
@@ -85,87 +88,42 @@ export default function TabDokumenPemutakhiran({
         </div>
       )}
 
-      <section className="dsb-panel" aria-labelledby="judul-pemutakhiran">
-        <div className="dsb-panel-kepala">
-          <h2 id="judul-pemutakhiran" className="dsb-panel-judul">
-            Pemutakhiran data <small>dari formulir inventarisasi</small>
-          </h2>
-        </div>
-        {!daftar || !pegawai ? (
-          <p className="dsb-kosong">Memuat…</p>
-        ) : daftar.length === 0 ? (
-          <p className="dsb-kosong">
-            Pegawai ini belum mengirim formulir pemutakhiran data. Kiriman dari formulir inventarisasi KGB akan tampil di
-            sini untuk dicocokkan dengan Data Pegawai.
-          </p>
-        ) : (
-          daftar.map((p) => (
-            <KartuKiriman
-              // Disusun ulang setiap kiriman atau tindak lanjutnya berubah, supaya isian status mengikuti yang tersimpan.
-              key={`${p.kegiatan.id}-${p.kiriman.waktu}-${p.kiriman.tindakLanjut?.at ?? ""}`}
-              p={p}
-              pegawai={pegawai}
-              bolehUbah={bolehUbah}
-              onGalat={setGalat}
-              onBerhasil={berhasil}
-              onCatat={(jenis) => setModal({ jenis, p })}
-            />
-          ))
-        )}
-      </section>
+      {/* JEJAK-INVENTARISASI (ADR-027): bagian ini dihapus bersama modul inventarisasi. */}
+      {daftar !== "gagal" && (
+        <section className="dsb-panel" aria-labelledby="judul-pemutakhiran">
+          <div className="dsb-panel-kepala">
+            <h2 id="judul-pemutakhiran" className="dsb-panel-judul">
+              Kiriman formulir inventarisasi <small>rujukan sementara</small>
+            </h2>
+          </div>
+          {!daftar ? (
+            <p className="dsb-kosong">Memuat…</p>
+          ) : daftar.length === 0 ? (
+            <p className="dsb-kosong">Pegawai ini belum mengirim formulir inventarisasi.</p>
+          ) : (
+            daftar.map((p) => (
+              <KartuKiriman
+                // Disusun ulang setiap kiriman atau tindak lanjutnya berubah, supaya isian status mengikuti yang tersimpan.
+                key={`${p.kegiatan.id}-${p.kiriman.waktu}-${p.kiriman.tindakLanjut?.at ?? ""}`}
+                p={p}
+                pegawaiId={pegawaiId}
+                bolehUbah={bolehUbah}
+                onBerhasil={berhasil}
+                onLihatBerkas={(b) => setPratinjau({ ...b, subjudul: `Kiriman ${p.kegiatan.nama}` })}
+              />
+            ))
+          )}
+        </section>
+      )}
 
-      <BagianDokumen
-        pegawaiId={pegawaiId}
-        dokumen={dokumen}
-        onLihat={setPratinjau}
-        onGalat={setGalat}
-        onBerhasil={berhasil}
-      />
+      <BagianDokumen pegawaiId={pegawaiId} dokumen={dokumen} onLihat={lihatDokumen} onGalat={setGalat} onBerhasil={berhasil} />
 
       {pratinjau && (
-        <ModalPratinjauBerkas
-          judul={pratinjau.judul}
-          subjudul={[pratinjau.nomorSK, tanggalTeks(pratinjau.tanggal), LABEL_SUMBER_DOKUMEN[pratinjau.sumber]].filter(Boolean).join(" · ")}
-          url={pratinjau.url}
-          onTutup={() => setPratinjau(null)}
-        />
-      )}
-
-      {modal && pegawai && modal.jenis === "kp" && (
-        <ModalKenaikanPangkat
-          pegawai={pegawai}
-          awal={{
-            golonganBaru: modal.p.kiriman.isian.golonganRuang !== pegawai.golonganRuang ? modal.p.kiriman.isian.golonganRuang : "",
-            tanggalSK: modal.p.kiriman.isian.keadaan === "pernah" ? modal.p.kiriman.isian.tanggalSkPendukung : "",
-            tmtPangkat: modal.p.kiriman.isian.tmtGolongan,
-          }}
-          onTutup={() => setModal(null)}
-          onBerhasil={(teks) => {
-            setModal(null);
-            berhasil(teks);
-          }}
-        />
-      )}
-      {modal && pegawai && modal.jenis === "pmk" && (
-        <ModalPmk
-          pegawai={pegawai}
-          awal={{
-            tanggalSK: modal.p.kiriman.isian.tanggalSkPmk,
-            tmtPmk: modal.p.kiriman.isian.tmtPmk,
-            mkgTahunSk: modal.p.kiriman.isian.mkgTahun,
-            mkgBulanSk: modal.p.kiriman.isian.mkgBulan,
-          }}
-          onTutup={() => setModal(null)}
-          onBerhasil={(teks) => {
-            setModal(null);
-            berhasil(teks);
-          }}
-        />
+        <ModalPratinjauBerkas judul={pratinjau.judul} subjudul={pratinjau.subjudul} url={pratinjau.url} onTutup={() => setPratinjau(null)} />
       )}
     </div>
   );
 }
-
 
 const URUTAN_SUMBER: SumberDokumen[] = ["arsip", "sk_kgb", "inventaris", "usulan"];
 
