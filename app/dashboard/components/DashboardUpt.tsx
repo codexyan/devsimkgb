@@ -18,6 +18,7 @@ import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
+import PengingatUsulan from "@/app/dashboard/components/upt/PengingatUsulan";
 
 /* Dashboard Admin UPT: satu halaman berisi jadwal pengiriman surat usulan, daftar pegawai satker dengan status
    KGB-nya di Kanwil, dan SK yang sudah selesai untuk diunduh. Seluruh datanya dari /api/upt, yang membatasi
@@ -543,6 +544,19 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const usulanById = (id: string | null) => (id ? usulan.find((u) => u.id === id) ?? null : null);
   const pegawaiById = (id: string | null) => (id ? pegawai.find((p) => p.id === id) ?? null : null);
   const perluDiusulkan = pegawai.filter((p) => p.bulanTmt === bulanUsulan);
+  /**
+   * Pegawai jatuh tempo periode ini yang belum masuk surat usulan: tidak ada usulan yang sedang ditinjau atau
+   * sudah diajukan sejak awal bulan ini, dan Kanwil belum memproses KGB-nya. Dasar pengingat periode (ADR-029).
+   */
+  const awalBulanIni = new Date(hariIni.getFullYear(), hariIni.getMonth(), 1).getTime();
+  const belumDiajukan = perluDiusulkan.filter(
+    (p) =>
+      p.usulanBerjalan !== "menunggu" &&
+      !["sedang_diproses", "menunggu_keuangan", "selesai"].includes(p.statusKGB ?? "") &&
+      !usulan.some(
+        (u) => u.pegawaiId === p.id && !dipegangUpt(u.status) && !!u.diajukanAt && new Date(u.diajukanAt).getTime() >= awalBulanIni,
+      ),
+  );
   // SK yang sudah diunggah (menunggu keuangan) pindah ke kolom SK terbit, jadi tidak lagi dihitung di Kanwil.
   const sedangDiproses = pegawai.filter((p) => p.statusKGB === "sedang_diproses");
 
@@ -999,6 +1013,16 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
 
   return (
     <div className="dsb-halaman" data-muat-layar="">
+      {halaman === "dasbor" && data && !memuat && (
+        <PengingatUsulan
+          satker={data.satker.kode}
+          bulanTmt={bulanUsulan}
+          namaBulanTmt={namaBulan(bulanUsulan)}
+          hariIni={hariIni}
+          jumlahJatuhTempo={perluDiusulkan.length}
+          belumDiajukan={belumDiajukan}
+        />
+      )}
       {halaman === "pegawai" ? (
         <header className="dsb-halaman-kepala dsb-muncul">
           <div className="min-w-0">

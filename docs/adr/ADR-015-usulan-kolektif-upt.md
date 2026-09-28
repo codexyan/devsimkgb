@@ -1,7 +1,7 @@
 # ADR-015: Usulan kolektif UPT dalam satu tabel
 
 Tanggal: 27 September 2026
-Status: berlaku
+Status: berlaku; tampilannya diubah ADR-029 (tiga langkah dan daftar-detail, bukan satu tabel)
 
 ## Konteks
 

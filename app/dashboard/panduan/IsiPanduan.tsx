@@ -724,10 +724,12 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                     <a href="#hukdis">hukuman disiplin dari UPT</a>).
                   </li>
                   <li>
-                    <strong>Banyak pegawai sekaligus?</strong> Pakai <strong>Usulan kolektif</strong> di menu UPT: pilih
-                    pegawainya (atau pintasan KGB bulan usulan), ubah yang keliru dan lampirkan berkasnya dalam satu
-                    tabel, simpan semuanya, lalu ajukan dengan satu surat Srikandi dari layar yang sama. Draf pegawai baru
-                    hasil Unggah daftar ikut muncul di tabel itu untuk dilengkapi berkasnya.
+                    <strong>Banyak pegawai sekaligus?</strong> Pakai <strong>Usulan kolektif</strong> di menu UPT, dalam
+                    tiga langkah: pilih pegawainya (dikelompokkan per bulan TMT, dengan saringan jatuh tempo periode
+                    ini), lengkapi data dan berkas tiap pegawai di daftar-detail sampai lingkar kelengkapannya penuh,
+                    lalu ajukan dengan satu surat Srikandi. Draf pegawai baru hasil Unggah daftar ikut otomatis. Saat
+                    masa kirim surat dibuka (tanggal 1 sampai 10 bulan kedua sebelum TMT), dashboard menampilkan
+                    pengingat berisi pegawai yang belum diajukan, dengan tombol yang langsung membuka Usulan kolektif.
                   </li>
                   <li>
                     <strong>Ajukan ke Kanwil.</strong> Di kolom <strong>Perlu dikerjakan</strong>, centang draf yang
