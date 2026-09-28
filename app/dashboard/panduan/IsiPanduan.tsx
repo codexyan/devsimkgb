@@ -1088,7 +1088,8 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       Tim SDM KGB atau Super Admin, menu Usulan UPT atau tombol Tinjau usulan UPT di Antrian kerja KGB
                     </p>
                     <p>
-                      Usulan dikelompokkan per surat. Periksa perbedaan isian dengan data yang tercatat, berkas SK dasar,
+                      Daftar berisi satu nama per pegawai, dikelompokkan per UPT dan dapat disaring per UPT; usulan lain
+                      pegawai yang sama ada di Riwayat usulan pada detailnya. Periksa perbedaan isian dengan data yang tercatat, berkas SK dasar,
                       dan dampaknya pada KGB yang sedang berjalan, lalu pilih Setujui atau Kembalikan. Kembalikan wajib
                       disertai catatan; UPT memperbaikinya lalu mengajukan ulang dengan surat yang sama.
                     </p>

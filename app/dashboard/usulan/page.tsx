@@ -11,7 +11,13 @@ import { cariSatker } from "@/lib/satker";
 import { namaRingkasSatker } from "@/app/dashboard/satker/labelSatker";
 import { formatTanggalId } from "@/lib/waktu";
 
-/* Usulan UPT (ADR-014): daftar usulan dikelompokkan per surat di kiri, detail usulan terpilih di kanan.
+/* Usulan UPT (ADR-014): daftar di kiri, detail usulan terpilih di kanan.
+
+   Daftarnya satu butir per pegawai, dikelompokkan per UPT, dan dapat disaring per UPT. Satu pegawai bisa punya
+   beberapa usulan (mis. pegawai baru lalu perbaikan data, atau usulan ulang setelah dikembalikan); semuanya
+   tampil sebagai riwayat di detail pegawai itu, bukan sebagai nama yang berulang di daftar. Persetujuan sekaligus
+   tetap per surat, dari detail usulan yang menunggu.
+
    Detailnya sama dengan jendela tinjauan di antrian kerja (DetailUsulan): perubahan lama → baru, dampaknya
    pada KGB yang berjalan, laporan hukdis, dan pratinjau berkas di tempat. Laporan mutasi dari UPT punya
    tabnya sendiri dengan susunan yang sama. */
@@ -43,6 +49,12 @@ const ringkas = (unitKerja: string) => {
   return s ? namaRingkasSatker(s) : unitKerja;
 };
 
+/** Satu pegawai di daftar: NIP bila ada, lalu id pegawai, lalu nama. */
+const kunciPegawai = (u: Pick<UsulanKanwil, "nip" | "pegawaiId" | "nama">) =>
+  u.nip?.trim() || u.pegawaiId || `nama:${u.nama.trim().toLowerCase()}`;
+/** Kunci UPT untuk saringan: kode satker baku bila dikenali, selain itu teks unit kerjanya. */
+const kunciUpt = (unitKerja: string) => cariSatker(unitKerja)?.kode ?? unitKerja.trim();
+
 function cocokTab(u: UsulanKanwil, tab: Tab): boolean {
   if (tab === "menunggu") return u.status === "menunggu";
   if (tab === "revisi") return u.status === "revisi";
@@ -60,6 +72,7 @@ export default function UsulanPage() {
   const [memuat, setMemuat] = useState(true);
   const [tab, setTab] = useState<Tab>("menunggu");
   const [cari, setCari] = useState("");
+  const [upt, setUpt] = useState("semua");
   const [terpilih, setTerpilih] = useState<string | null>(null);
   const [dialogKembali, setDialogKembali] = useState<UsulanKanwil | null>(null);
   const [catatanKembali, setCatatanKembali] = useState("");
@@ -176,51 +189,98 @@ export default function UsulanPage() {
     }
   }
 
+  // Angka tab menghitung pegawai, sama dengan daftar yang satu butir per pegawai.
+  const pegawaiDi = (t: Tab) => new Set(daftar.filter((u) => cocokTab(u, t)).map(kunciPegawai)).size;
   const jumlah: Record<Tab, number> = {
-    menunggu: daftar.filter((u) => cocokTab(u, "menunggu")).length,
-    revisi: daftar.filter((u) => cocokTab(u, "revisi")).length,
-    selesai: daftar.filter((u) => cocokTab(u, "selesai")).length,
+    menunggu: pegawaiDi("menunggu"),
+    revisi: pegawaiDi("revisi"),
+    selesai: pegawaiDi("selesai"),
     mutasi: laporan.filter((l) => l.status === "menunggu").length,
   };
 
   const q = cari.trim().toLowerCase();
+
+  /** Pilihan saringan UPT untuk tab yang sedang dibuka, dengan jumlah pegawai di tiap UPT. */
+  const pilihanUpt = useMemo(() => {
+    const peta = new Map<string, { label: string; pegawai: Set<string> }>();
+    const tambah = (unitKerja: string, kunci: string) => {
+      const k = kunciUpt(unitKerja);
+      const isi = peta.get(k) ?? { label: ringkas(unitKerja), pegawai: new Set<string>() };
+      isi.pegawai.add(kunci);
+      peta.set(k, isi);
+    };
+    if (tab === "mutasi") for (const l of laporan) tambah(l.unitKerja, l.nip || l.nama);
+    else for (const u of daftar) if (cocokTab(u, tab)) tambah(u.unitKerja, kunciPegawai(u));
+    return [...peta.entries()]
+      .map(([kode, v]) => ({ kode, label: v.label, jumlah: v.pegawai.size }))
+      .sort((a, b) => a.label.localeCompare(b.label, "id"));
+  }, [daftar, laporan, tab]);
+  // Saringan UPT yang tidak ada di tab ini kembali ke Semua UPT.
+  const uptAktif = upt !== "semua" && pilihanUpt.some((p) => p.kode === upt) ? upt : "semua";
+
   const usulanTampil = useMemo(
     () =>
       daftar
         .filter((u) => cocokTab(u, tab))
+        .filter((u) => uptAktif === "semua" || kunciUpt(u.unitKerja) === uptAktif)
         .filter((u) => !q || `${u.nama} ${u.nip} ${u.unitKerja} ${u.nomorSurat ?? ""}`.toLowerCase().includes(q)),
-    [daftar, tab, q],
+    [daftar, tab, q, uptAktif],
   );
 
-  /** Usulan dikelompokkan per surat; yang menunggu paling lama di atas. */
-  const kelompok = useMemo(() => {
+  /** Semua usulan satu pegawai dari semua status, terbaru lebih dulu: riwayat di detail. */
+  const riwayatPer = useMemo(() => {
     const peta = new Map<string, UsulanKanwil[]>();
-    for (const u of usulanTampil) {
-      const kunci = u.nomorSurat?.trim() || "(tanpa surat)";
-      peta.set(kunci, [...(peta.get(kunci) ?? []), u]);
+    for (const u of daftar) peta.set(kunciPegawai(u), [...(peta.get(kunciPegawai(u)) ?? []), u]);
+    for (const isi of peta.values()) isi.sort((a, b) => (b.diajukanAt ?? "").localeCompare(a.diajukanAt ?? ""));
+    return peta;
+  }, [daftar]);
+
+  /**
+   * Satu butir per pegawai, dikelompokkan per UPT. Di tab Menunggu, pegawai yang menunggu paling lama di atas;
+   * di tab lain, yang terbaru di atas. Usulan utama butir adalah usulan terbaru pegawai itu di tab ini.
+   */
+  const kelompok = useMemo(() => {
+    const perPegawai = new Map<string, UsulanKanwil[]>();
+    for (const u of usulanTampil) perPegawai.set(kunciPegawai(u), [...(perPegawai.get(kunciPegawai(u)) ?? []), u]);
+    const butir = [...perPegawai.entries()].map(([kunci, isi]) => {
+      const urut = [...isi].sort((a, b) => (b.diajukanAt ?? "").localeCompare(a.diajukanAt ?? ""));
+      const diajukan = tab === "menunggu" ? urut[urut.length - 1].diajukanAt ?? "" : urut[0].diajukanAt ?? "";
+      return { kunci, utama: urut[0], isi: urut, diajukan };
+    });
+    butir.sort((a, b) => (tab === "menunggu" ? a.diajukan.localeCompare(b.diajukan) : b.diajukan.localeCompare(a.diajukan)));
+    const perUpt = new Map<string, { kode: string; label: string; butir: typeof butir }>();
+    for (const b of butir) {
+      const kode = kunciUpt(b.utama.unitKerja);
+      const g = perUpt.get(kode) ?? { kode, label: ringkas(b.utama.unitKerja), butir: [] };
+      g.butir.push(b);
+      perUpt.set(kode, g);
     }
-    return [...peta.entries()]
-      .map(([nomorSurat, isi]) => ({
-        nomorSurat,
-        isi,
-        tanggal: isi[0].tanggalSurat,
-        satker: [...new Set(isi.map((u) => ringkas(u.unitKerja)))].join(", "),
-        diajukan: isi.map((u) => u.diajukanAt ?? "").sort()[0] ?? "",
-      }))
-      .sort((a, b) => (tab === "menunggu" ? a.diajukan.localeCompare(b.diajukan) : b.diajukan.localeCompare(a.diajukan)));
+    return [...perUpt.values()].sort((a, b) => a.label.localeCompare(b.label, "id"));
   }, [usulanTampil, tab]);
+  const jumlahPegawai = kelompok.reduce((n, g) => n + g.butir.length, 0);
 
   const laporanTampil = useMemo(
     () =>
       laporan
+        .filter((l) => uptAktif === "semua" || kunciUpt(l.unitKerja) === uptAktif)
         .filter((l) => !q || `${l.nama} ${l.nip} ${l.unitKerja}`.toLowerCase().includes(q))
         .sort((a, b) => Number(b.status === "menunggu") - Number(a.status === "menunggu") || (b.dilaporkanAt ?? "").localeCompare(a.dilaporkanAt ?? "")),
-    [laporan, q],
+    [laporan, q, uptAktif],
   );
 
-  // Yang terpilih jatuh ke butir pertama bila pilihan lama tidak lagi tampil (mis. sesudah disetujui).
-  const usulanAktif = tab === "mutasi" ? null : usulanTampil.find((u) => u.id === terpilih) ?? usulanTampil[0] ?? null;
+  // Usulan terpilih boleh dari status lain (dibuka lewat riwayat), asalkan pegawainya tampil di daftar. Bila
+  // pilihan lama tidak lagi tampil (mis. sesudah disetujui), pilihan jatuh ke butir pertama.
+  const kunciTampil = new Set(kelompok.flatMap((g) => g.butir.map((b) => b.kunci)));
+  const dipilih = terpilih ? daftar.find((u) => u.id === terpilih) : undefined;
+  const usulanAktif =
+    tab === "mutasi" ? null : dipilih && kunciTampil.has(kunciPegawai(dipilih)) ? dipilih : kelompok[0]?.butir[0]?.utama ?? null;
   const laporanAktif = tab === "mutasi" ? laporanTampil.find((l) => l.id === terpilih) ?? laporanTampil[0] ?? null : null;
+  const riwayatAktif = usulanAktif ? riwayatPer.get(kunciPegawai(usulanAktif)) ?? [usulanAktif] : [];
+  /** Usulan lain yang masih menunggu pada surat yang sama: dasar persetujuan sekaligus per surat. */
+  const suratAktif =
+    usulanAktif?.status === "menunggu" && usulanAktif.nomorSurat?.trim()
+      ? daftar.filter((u) => u.status === "menunggu" && u.nomorSurat?.trim() === usulanAktif.nomorSurat?.trim())
+      : [];
 
   if (!boleh) {
     return (
@@ -293,14 +353,27 @@ export default function UsulanPage() {
               </button>
             ))}
           </div>
-          <input
-            type="search"
-            className="dsb-cari usl-cari"
-            aria-label="Cari usulan"
-            placeholder="Cari nama, NIP, satker, atau surat"
-            value={cari}
-            onChange={(e) => setCari(e.target.value)}
-          />
+          <div className="usl-saring">
+            <select
+              className="dsb-cari usl-upt"
+              aria-label="Saring per UPT"
+              value={uptAktif}
+              onChange={(e) => { setUpt(e.target.value); setTerpilih(null); }}
+            >
+              <option value="semua">Semua UPT ({pilihanUpt.length})</option>
+              {pilihanUpt.map((p) => (
+                <option key={p.kode} value={p.kode}>{p.label} · {p.jumlah} pegawai</option>
+              ))}
+            </select>
+            <input
+              type="search"
+              className="dsb-cari usl-cari"
+              aria-label="Cari usulan"
+              placeholder="Cari nama, NIP, atau surat"
+              value={cari}
+              onChange={(e) => setCari(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="usl-tata">
@@ -330,55 +403,62 @@ export default function UsulanPage() {
               )
             ) : kelompok.length === 0 ? (
               <p className="dsb-kosong">
-                {tab === "menunggu" ? "Tidak ada usulan yang menunggu tinjauan." : tab === "revisi" ? "Tidak ada usulan yang sedang diperbaiki UPT." : "Belum ada usulan yang selesai ditinjau."}
+                {q || uptAktif !== "semua" ? "Tidak ada usulan yang cocok dengan saringan." : tab === "menunggu" ? "Tidak ada usulan yang menunggu tinjauan." : tab === "revisi" ? "Tidak ada usulan yang sedang diperbaiki UPT." : "Belum ada usulan yang selesai ditinjau."}
               </p>
             ) : (
-              kelompok.map((g) => (
-                <section key={g.nomorSurat} className="usl-grup" aria-label={`Surat ${g.nomorSurat}`}>
-                  <div className="usl-grup-kepala">
-                    <div className="min-w-0">
-                      <p className="usl-grup-judul">Surat {g.nomorSurat}</p>
-                      <p className="usl-grup-sub">
-                        {g.satker}
-                        {g.tanggal ? ` · ${tgl(g.tanggal)}` : ""} · {g.isi.length} pegawai
-                      </p>
+              <>
+                <p className="usl-daftar-ringkas">
+                  {jumlahPegawai} pegawai{usulanTampil.length > jumlahPegawai ? ` · ${usulanTampil.length} usulan` : ""}
+                  {uptAktif === "semua" && kelompok.length > 1 ? ` · ${kelompok.length} UPT` : ""}
+                </p>
+                {kelompok.map((g) => (
+                  <section key={g.kode} className="usl-grup" aria-label={g.label}>
+                    <div className="usl-grup-kepala">
+                      <div className="min-w-0">
+                        <p className="usl-grup-judul">{g.label}</p>
+                        <p className="usl-grup-sub">{g.butir.length} pegawai</p>
+                      </div>
                     </div>
-                    {tab === "menunggu" && g.isi.length > 1 && (
-                      <button
-                        type="button"
-                        className="dsb-tombol dsb-tombol-kecil"
-                        data-nada="hijau"
-                        disabled={sibuk}
-                        onClick={() => setDialogMassal({ nomorSurat: g.nomorSurat, satker: g.satker, isi: g.isi })}
-                      >
-                        Setujui {g.isi.length}
-                      </button>
-                    )}
-                  </div>
-                  <ul className="usl-grup-isi">
-                    {g.isi.map((u) => {
-                      const cfg = statusCfg(u.status);
-                      return (
-                        <li key={u.id}>
-                          <button type="button" className="usl-butir" aria-pressed={usulanAktif?.id === u.id} onClick={() => setTerpilih(u.id)}>
-                            <span className="usl-butir-nama">{u.nama}</span>
-                            <span className="usl-butir-sub">{u.nip}</span>
-                            <span className="usl-butir-tanda">
-                              {u.jenis === "baru" && <span className="dsb-tag" data-garis="" data-nada="hijau">{LABEL_JENIS_USULAN.baru}</span>}
-                              {u.perubahan.length > 0 && <span className="dsb-tag" data-garis="">{u.perubahan.length} perubahan</span>}
-                              {u.hukdis && <span className="dsb-tag" data-garis="" data-nada="merah">Hukdis</span>}
-                              {u.status === "menunggu" && u.kgb && u.kgb.status !== "menunggu_keuangan" && (
-                                <span className="dsb-tag" data-garis="" data-nada="ungu">KGB tertahan</span>
-                              )}
-                              {tab !== "menunggu" && <span className="dsb-tag" data-garis="" data-nada={cfg.nada}>{cfg.label}</span>}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              ))
+                    <ul className="usl-grup-isi">
+                      {g.butir.map((b) => {
+                        const u = b.utama;
+                        const cfg = statusCfg(u.status);
+                        const semuaUsulan = riwayatPer.get(b.kunci)?.length ?? b.isi.length;
+                        return (
+                          <li key={b.kunci}>
+                            <button
+                              type="button"
+                              className="usl-butir"
+                              aria-pressed={!!usulanAktif && kunciPegawai(usulanAktif) === b.kunci}
+                              onClick={() => setTerpilih(u.id)}
+                            >
+                              <span className="usl-butir-nama">{u.nama}</span>
+                              <span className="usl-butir-sub">
+                                {u.nip}
+                                {u.nomorSurat ? ` · ${u.nomorSurat}` : ""}
+                              </span>
+                              <span className="usl-butir-tanda">
+                                {u.jenis === "baru" && <span className="dsb-tag" data-garis="" data-nada="hijau">{LABEL_JENIS_USULAN.baru}</span>}
+                                {u.perubahan.length > 0 && <span className="dsb-tag" data-garis="">{u.perubahan.length} perubahan</span>}
+                                {u.hukdis && <span className="dsb-tag" data-garis="" data-nada="merah">Hukdis</span>}
+                                {u.status === "menunggu" && u.kgb && u.kgb.status !== "menunggu_keuangan" && (
+                                  <span className="dsb-tag" data-garis="" data-nada="ungu">KGB tertahan</span>
+                                )}
+                                {tab !== "menunggu" && <span className="dsb-tag" data-garis="" data-nada={cfg.nada}>{cfg.label}</span>}
+                                {semuaUsulan > 1 && (
+                                  <span className="dsb-tag" data-garis="" data-nada="biru" title="Riwayat usulan pegawai ini ada di detail">
+                                    {semuaUsulan} usulan
+                                  </span>
+                                )}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                ))}
+              </>
             )}
           </div>
 
@@ -399,6 +479,50 @@ export default function UsulanPage() {
                   </span>
                 </div>
                 <div className="usl-detail-isi">
+                  {riwayatAktif.length > 1 && (
+                    <div className="usl-riwayat">
+                      <p className="usl-bagian-judul">
+                        Riwayat usulan <span>{riwayatAktif.length}</span>
+                      </p>
+                      <div className="usl-riwayat-daftar" role="group" aria-label="Pilih usulan">
+                        {riwayatAktif.map((r) => {
+                          const cfg = statusCfg(r.status);
+                          return (
+                            <button key={r.id} type="button" className="usl-riwayat-butir" aria-pressed={r.id === usulanAktif.id} onClick={() => setTerpilih(r.id)}>
+                              <span className="usl-riwayat-judul">{LABEL_JENIS_USULAN[r.jenis] ?? r.jenis}</span>
+                              <span className="usl-riwayat-sub">
+                                Diajukan {tgl(r.diajukanAt)}
+                                {r.nomorSurat ? ` · ${r.nomorSurat}` : ""}
+                              </span>
+                              <span className="dsb-tag" data-garis="" data-nada={cfg.nada}>{cfg.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {suratAktif.length > 1 && (
+                    <div className="usl-surat">
+                      <p>
+                        Surat <strong>{usulanAktif.nomorSurat}</strong> memuat {suratAktif.length} usulan yang menunggu tinjauan.
+                      </p>
+                      <button
+                        type="button"
+                        className="dsb-tombol dsb-tombol-kecil"
+                        data-nada="hijau"
+                        disabled={sibuk}
+                        onClick={() =>
+                          setDialogMassal({
+                            nomorSurat: usulanAktif.nomorSurat ?? "",
+                            satker: [...new Set(suratAktif.map((u) => ringkas(u.unitKerja)))].join(", "),
+                            isi: suratAktif,
+                          })
+                        }
+                      >
+                        Setujui {suratAktif.length} usulan pada surat ini
+                      </button>
+                    </div>
+                  )}
                   <DetailUsulan key={usulanAktif.id} usulan={usulanAktif} pratinjauDiTempat />
                 </div>
                 {usulanAktif.status === "menunggu" && (

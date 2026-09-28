@@ -35,6 +35,10 @@ satu, dan panel petunjuk permanen memakan sepertiga layar.
 4. **Modul Usulan UPT dirancang ulang.**
    - Tab: Menunggu tinjauan, Dikembalikan, Selesai, dan Laporan mutasi, masing-masing dengan jumlahnya.
    - Daftar di kiri dikelompokkan per surat, dengan tombol Setujui seluruh surat.
+     *Diubah 28 September 2026:* daftar menjadi satu butir per pegawai (NIP), dikelompokkan dan dapat disaring
+     per UPT. Usulan lain pegawai yang sama tampil sebagai Riwayat usulan di detail, sehingga nama tidak lagi
+     berulang. Angka tab menghitung pegawai. Setujui seluruh surat pindah ke detail usulan yang menunggu, dan
+     tampil bila suratnya memuat lebih dari satu usulan yang menunggu.
    - Panel detail di kanan dengan pratinjau berkas di tempat. Tombol Kembalikan dan Setujui menempel di bawah.
    - Panel petunjuk permanen dihapus.
 
