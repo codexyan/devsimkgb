@@ -7,6 +7,7 @@
 
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
+import { kekuranganDasarBaru, perluDasarBaru } from "./dasarBaruUsulan";
 import { bulanKeKgbBerikutnya, getGajiPokok, getPangkat, isGolonganDikenal, tambahBulan } from "./tabelGaji";
 
 export type StatusUsulan = "draf" | "menunggu" | "revisi" | "disetujui" | "ditolak";
@@ -375,13 +376,16 @@ export function kekuranganUsulan(
     kurang.push(`masa kerja golongan yang cocok dengan tabel PP 5/2024 untuk golongan ${golongan}`);
   }
 
-  const perluBerkas =
-    jenis === "baru" || (!!pegawai && bandingkanUsulan(pegawai, usulan).some((p) => KOLOM_DASAR_GAJI.includes(p.kunci)));
+  const perubahan = pegawai ? bandingkanUsulan(pegawai, usulan) : [];
+  const perluBerkas = jenis === "baru" || perubahan.some((p) => KOLOM_DASAR_GAJI.includes(p.kunci));
   if (perluBerkas) {
     for (const b of berkasUntukKeadaan(pernahKgb(nilai("mkgTahun"), nilai("mkgBulan")))) {
       if (b.wajib && !usulan[b.kunci]) kurang.push(b.label);
     }
   }
+  // Golongan dan masa kerja golongan hanya berubah karena kenaikan pangkat, PMK, atau salah ketik; usulan
+  // perbaikan wajib menyebut sebabnya beserta SK-nya (ADR-030). Pegawai baru belum punya pembanding.
+  kurang.push(...kekuranganDasarBaru(usulan, jenis !== "baru" && perluDasarBaru(perubahan)));
   return kurang;
 }
 

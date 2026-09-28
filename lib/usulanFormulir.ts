@@ -6,6 +6,7 @@ import { BIDANG_USULAN, hitungUsulan, type KunciBidangUsulan } from "./usulanPeg
 import { bacaTanggalInput } from "./prosesKgb";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { isoTanggalLokal, tanggalKalender, type NilaiTanggal } from "./waktu";
+import { isJenisDasarBaru } from "./dasarBaruUsulan";
 
 /**
  * Kolom yang dihitung sistem dan karena itu tidak dibaca dari formulir. Gaji pokok dan jatuh tempo KGB
@@ -24,6 +25,41 @@ export const BIDANG_DIISI = BIDANG_USULAN.filter((b) => !KOLOM_HITUNGAN.includes
  */
 export function bacaIsianUsulan(form: FormData): { isian: Partial<UsulanPegawaiRow> } | { galat: string } {
   return bacaIsian((kunci) => (form.get(kunci) as string | null)?.trim() || "");
+}
+
+/** Keenam kolom SK baru selalu ditulis sekaligus, supaya baris usulan tidak pernah setengah terisi. */
+export type DasarBaruUsulan = Pick<
+  UsulanPegawaiRow,
+  "dasarBaruJenis" | "dasarBaruJenisKp" | "dasarBaruNomorSk" | "dasarBaruTanggalSk" | "dasarBaruTmt" | "dasarBaruPenetap"
+>;
+
+const KOSONG_DASAR_BARU: DasarBaruUsulan = {
+  dasarBaruJenis: null,
+  dasarBaruJenisKp: null,
+  dasarBaruNomorSk: null,
+  dasarBaruTanggalSk: null,
+  dasarBaruTmt: null,
+  dasarBaruPenetap: null,
+};
+
+/**
+ * Isian SK baru yang menetapkan gaji pokok (ADR-030); kolomnya di luar BIDANG_USULAN karena bukan kolom data
+ * pegawai, melainkan keterangan sebab perubahannya. Pilihan yang tidak dikenal diperlakukan sebagai kosong,
+ * dan pemeriksaan kelengkapannya di lib/dasarBaruUsulan.ts.
+ */
+export function bacaDasarBaru(teks: (kunci: string) => string): DasarBaruUsulan {
+  const jenis = teks("dasarBaruJenis");
+  if (!isJenisDasarBaru(jenis)) return { ...KOSONG_DASAR_BARU };
+  // Koreksi salah ketik tidak membawa SK, jadi kolom SK-nya sengaja dikosongkan.
+  if (jenis === "koreksi") return { ...KOSONG_DASAR_BARU, dasarBaruJenis: jenis };
+  return {
+    dasarBaruJenis: jenis,
+    dasarBaruJenisKp: jenis === "kp" ? teks("dasarBaruJenisKp") || null : null,
+    dasarBaruNomorSk: teks("dasarBaruNomorSk") || null,
+    dasarBaruTanggalSk: tanggalKalender(teks("dasarBaruTanggalSk")),
+    dasarBaruTmt: tanggalKalender(teks("dasarBaruTmt")),
+    dasarBaruPenetap: teks("dasarBaruPenetap") || null,
+  };
 }
 
 /**

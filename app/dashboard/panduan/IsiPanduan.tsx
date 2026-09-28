@@ -719,6 +719,21 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                     bila SK-nya memang berganti.
                   </li>
                   <li>
+                    <strong>Golongan atau masa kerja berubah? Sebutkan SK-nya.</strong> Keduanya hanya berubah karena
+                    kenaikan pangkat (termasuk penyesuaian ijazah), peninjauan masa kerja, atau salah ketik. Formulir
+                    usulan meminta Anda memilih salah satunya; untuk SK baru, isi nomor, tanggal, TMT, dan pejabat
+                    penetapnya. Kanwil lalu mencatatnya sebagai riwayat, menghitung ulang gaji pokoknya, dan{" "}
+                    <strong>SK itulah yang menjadi dasar SK KGB berikutnya</strong>. Masa kerja golongan yang Anda
+                    ketik menjadi keterangan: untuk kenaikan pangkat sistem menghitungnya sendiri (naik dari golongan
+                    II ke III memotong 5 tahun), dan untuk PMK angka itu dibaca sebagai masa kerja yang tertulis di SK.
+                  </li>
+                  <li>
+                    <strong>Dasar KGB berikutnya terlihat di Data Pegawai.</strong> Setelah SK KGB direkam di Gaji Web,
+                    SK itulah dasar KGB reguler berikutnya. Kolom <em>Dasar KGB berikutnya</em> menunjukkan SK mana
+                    yang berlaku sekarang, dan berpindah sendiri begitu ada SK kenaikan pangkat, penyesuaian ijazah,
+                    atau PMK yang lebih baru disetujui Kanwil.
+                  </li>
+                  <li>
                     Hukuman disiplin tidak dilaporkan di formulir usulan data. Laporkan lewat menu{" "}
                     <strong>Hukuman Disiplin</strong> beserta pindaian SK-nya (lihat{" "}
                     <a href="#hukdis">hukuman disiplin dari UPT</a>).

@@ -1,7 +1,7 @@
 # ADR-021: Peninjauan masa kerja (PMK) dicatat di Data Pegawai dan dapat menggeser jadwal KGB
 
 Tanggal: 28 September 2026
-Status: berlaku; tahap 2 dari ADR-020
+Status: berlaku; tahap 2 dari ADR-020. Dapat juga dicatat dari usulan UPT sejak ADR-030
 
 ## Konteks
 

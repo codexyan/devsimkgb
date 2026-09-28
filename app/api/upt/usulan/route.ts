@@ -8,7 +8,7 @@ import { notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
 import { pegawaiSatker } from "@/lib/aksesUpt";
 import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgb, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan } from "@/lib/bawaanUsulan";
-import { bacaIsianUsulan, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
+import { bacaDasarBaru, bacaIsianUsulan, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
@@ -75,6 +75,17 @@ export async function GET() {
               nomorSkTerakhir: u.nomorSkTerakhir ?? "",
               tanggalSkTerakhir: tanggalIsian(u.tanggalSkTerakhir),
               catatanUpt: u.catatanUpt ?? "",
+            }
+          : null,
+        // SK yang menetapkan gaji pokok baru, bila usulan ini menyentuh golongan atau masa kerja (ADR-030).
+        dasarBaru: DIPEGANG_UPT.includes(u.status)
+          ? {
+              jenis: u.dasarBaruJenis ?? "",
+              jenisKp: u.dasarBaruJenisKp ?? "",
+              nomorSk: u.dasarBaruNomorSk ?? "",
+              tanggalSk: tanggalIsian(u.dasarBaruTanggalSk),
+              tmt: tanggalIsian(u.dasarBaruTmt),
+              penetap: u.dasarBaruPenetap ?? "",
             }
           : null,
         hukdis: DIPEGANG_UPT.includes(u.status)
@@ -191,6 +202,8 @@ export async function POST(req: Request) {
   }
 
   const isian = isiHitungan(dibaca.isian, dasar);
+  // Sebab perubahan golongan atau masa kerja golongan beserta SK-nya (ADR-030).
+  const dasarBaru = bacaDasarBaru(teks);
   const hukdisAda = teks("hukdisAda") === "true";
 
   // Berkas yang sudah disetujui Kanwil untuk pegawai ini ikut terbawa bila tidak diunggah ulang (ADR-017).
@@ -203,6 +216,7 @@ export async function POST(req: Request) {
     const kurang = kekuranganUsulan(
       {
         ...denganBerkasBawaan(isian, bawaan ?? { nomorSkTerakhir: null, tanggalSkTerakhir: null, berkas: {} }),
+        ...dasarBaru,
         // Berkas yang diunggah bersama permintaan ini dihitung ada; objeknya baru disimpan setelah semua lolos.
         ...Object.fromEntries(
           BERKAS_USULAN.filter((b) => { const f = form.get(b.medan); return f instanceof File && f.size > 0; }).map((b) => [b.kunci, b.medan]),
@@ -271,6 +285,7 @@ export async function POST(req: Request) {
     ditinjauOleh: null,
     ditinjauAt: null,
     alasanTolak: null,
+    ...dasarBaru,
     ...isian,
   };
 

@@ -185,9 +185,22 @@ test("berkas wajib ditagih saat diajukan: pegawai baru selalu, perbaikan hanya b
   assert.deepEqual(kekuranganUsulan({ ...baru, pathSkCpns: "usulan/x.pdf" }, "baru"), []);
   assert.deepEqual(kekuranganUsulan({ ...baru, mkgTahun: 2 }, "baru"), ["SK KGB terakhir", "SK kenaikan pangkat terakhir"]);
 
-  // Perbaikan nama saja tidak menuntut berkas; perbaikan masa kerja golongan menuntutnya.
+  // Perbaikan nama saja tidak menuntut berkas; perbaikan masa kerja golongan menuntutnya, beserta
+  // sebab perubahannya, sebab masa kerja hanya berubah karena kenaikan pangkat, PMK, atau salah ketik (ADR-030).
   assert.deepEqual(kekuranganUsulan({ nama: "Siti N." }, "perubahan", pegawai), []);
-  assert.deepEqual(kekuranganUsulan({ mkgTahun: 2 }, "perubahan", pegawai), ["SK KGB terakhir", "SK kenaikan pangkat terakhir"]);
+  assert.deepEqual(kekuranganUsulan({ mkgTahun: 2 }, "perubahan", pegawai), [
+    "SK KGB terakhir",
+    "SK kenaikan pangkat terakhir",
+    "sebab perubahan golongan atau masa kerja golongan",
+  ]);
+  assert.deepEqual(
+    kekuranganUsulan(
+      { mkgTahun: 2, pathSkTerakhir: "usulan/a.pdf", pathSkPangkat: "usulan/b.pdf", dasarBaruJenis: "koreksi" },
+      "perubahan",
+      pegawai,
+    ),
+    [],
+  );
 });
 
 test("nama asli berkas usulan tersimpan di kunci R2 dan dapat dibaca kembali", async () => {

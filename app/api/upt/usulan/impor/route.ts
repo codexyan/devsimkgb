@@ -87,6 +87,14 @@ export async function POST(req: Request) {
       tmtKgbTerakhir: null, tmtKgbBerikutnya: null,
       nomorSkTerakhir: null,
       tanggalSkTerakhir: null,
+      // Pegawai baru belum punya data tercatat, jadi tidak ada golongan atau masa kerja yang berubah
+      // karena SK (ADR-030); kolomnya diisi saat UPT melengkapi draf ini.
+      dasarBaruJenis: null,
+      dasarBaruJenisKp: null,
+      dasarBaruNomorSk: null,
+      dasarBaruTanggalSk: null,
+      dasarBaruTmt: null,
+      dasarBaruPenetap: null,
       hukdisAda: false,
       hukdisJenis: null,
       hukdisNomorSk: null,

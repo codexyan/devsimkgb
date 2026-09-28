@@ -4,6 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BATAS_BERKAS_USULAN_BYTE, PESAN_BERKAS_TERLALU_BESAR, berkasUntukKeadaan, hitungUsulan, pernahKgb } from "@/lib/usulanPegawai";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
+import {
+  KETERANGAN_DASAR_BARU,
+  LABEL_DASAR_BARU,
+  kekuranganDasarBaru,
+  perluDasarBaru,
+  type JenisDasarBaru,
+} from "@/lib/dasarBaruUsulan";
+import { JENIS_KP } from "@/lib/kenaikanPangkat";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { kunciBulanTmt } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan } from "@/app/dashboard/satker/labelSatker";
@@ -51,6 +59,7 @@ interface DrafUpt {
   nilai: Record<string, string> | null;
   surat: { nomorSkTerakhir: string; tanggalSkTerakhir: string; catatanUpt: string } | null;
   hukdis: { ada: boolean; jenis: string; nomorSk: string; tmtMulai: string; tmtBerakhir: string; keterangan: string } | null;
+  dasarBaru: { jenis: string; jenisKp: string; nomorSk: string; tanggalSk: string; tmt: string; penetap: string } | null;
   berkas: { medan: string; label: string; nama?: string | null }[];
   kekurangan: string[];
 }
@@ -73,9 +82,13 @@ interface Baris {
   /** Berkas yang sudah disetujui Kanwil; disalin server ke draf bila kolomnya masih kosong. */
   bawaan: BerkasTersimpan[];
   catatanUpt: string;
+  /** SK yang menetapkan gaji pokok baru, bila golongan atau masa kerja golongan berubah (ADR-030). */
+  dasar: { jenis: string; jenisKp: string; nomorSk: string; tanggalSk: string; tmt: string; penetap: string };
   keadaan: Keadaan;
   pesan: string | null;
 }
+
+const DASAR_KOSONG = { jenis: "", jenisKp: "reguler", nomorSk: "", tanggalSk: "", tmt: "", penetap: "" };
 
 /** Isian yang disunting di tabel; sisanya ikut dari data tercatat apa adanya. */
 const KOLOM_TABEL = ["golonganRuang", "mkgTahun", "mkgBulan", "tmtKgbTerakhir", "nomorSkTerakhir", "tanggalSkTerakhir"] as const;
@@ -104,19 +117,41 @@ function barisDari(p: PegawaiUpt | null, d: DrafUpt | null): Baris {
     tersimpan: d?.berkas ?? [],
     bawaan: p?.bawaan?.berkas ?? [],
     catatanUpt: d?.surat?.catatanUpt ?? "",
+    dasar: d?.dasarBaru ? { ...d.dasarBaru, jenisKp: d.dasarBaru.jenisKp || "reguler" } : { ...DASAR_KOSONG },
     keadaan: "siap",
     pesan: null,
   };
 }
 
 const berubah = (b: Baris) =>
-  KOLOM_TABEL.some((k) => (b.isian[k] ?? "") !== (b.awal[k] ?? "")) || Object.values(b.berkas).some(Boolean);
+  KOLOM_TABEL.some((k) => (b.isian[k] ?? "") !== (b.awal[k] ?? "")) ||
+  Object.values(b.berkas).some(Boolean) ||
+  !!b.dasar.jenis;
 
 /* ── Kelengkapan satu baris: dihitung di peramban untuk lingkar kemajuan dan daftar kekurangan. Server tetap
    menjadi penentu akhir (kekurangan draf dari /api/upt/usulan) saat diajukan. ─────────────────────────────── */
 function kelengkapan(b: Baris): { selesai: number; total: number; kurang: string[] } {
   const kurang: string[] = [];
+  // Golongan dan masa kerja golongan hanya berubah karena kenaikan pangkat, PMK, atau salah ketik (ADR-030).
+  const perluSebab =
+    b.jenis !== "baru" &&
+    perluDasarBaru(
+      (["golonganRuang", "mkgTahun", "mkgBulan"] as const)
+        .filter((k) => (b.isian[k] ?? "") !== (b.awal[k] ?? ""))
+        .map((kunci) => ({ kunci })),
+    );
+  const kurangDasar = kekuranganDasarBaru(
+    {
+      dasarBaruJenis: b.dasar.jenis,
+      dasarBaruJenisKp: b.dasar.jenisKp,
+      dasarBaruNomorSk: b.dasar.nomorSk,
+      dasarBaruTanggalSk: b.dasar.tanggalSk,
+      dasarBaruTmt: b.dasar.tmt,
+    },
+    perluSebab,
+  );
   const cek: [boolean, string][] = [
+    ...(perluSebab || b.dasar.jenis ? ([[kurangDasar.length === 0, "SK yang mengubah gaji pokok"]] as [boolean, string][]) : []),
     [!!b.isian.golonganRuang, "golongan"],
     [!b.pernah || /^\d+$/.test(b.isian.mkgTahun ?? ""), "masa kerja"],
     [!!b.isian.tmtKgbTerakhir, b.pernah ? "TMT KGB terakhir" : "TMT CPNS"],
@@ -292,6 +327,13 @@ export default function UsulanKolektif() {
     form.set("nomorSkTerakhir", b.isian.nomorSkTerakhir ?? "");
     form.set("tanggalSkTerakhir", b.isian.tanggalSkTerakhir ?? "");
     form.set("catatanUpt", b.catatanUpt);
+    // Sebab perubahan golongan atau masa kerja golongan beserta SK-nya (ADR-030).
+    form.set("dasarBaruJenis", b.dasar.jenis);
+    form.set("dasarBaruJenisKp", b.dasar.jenisKp);
+    form.set("dasarBaruNomorSk", b.dasar.nomorSk);
+    form.set("dasarBaruTanggalSk", b.dasar.tanggalSk);
+    form.set("dasarBaruTmt", b.dasar.tmt);
+    form.set("dasarBaruPenetap", b.dasar.penetap);
     // Isian hukdis sengaja tidak dikirim: laporan lama pada draf dibiarkan utuh oleh server (ADR-016).
     for (const [medan, file] of Object.entries(b.berkas)) if (file) form.set(medan, file);
     return form;
@@ -596,6 +638,7 @@ export default function UsulanKolektif() {
                 }
                 onIsi={(kolom, nilai) => isi(barisAktif.kunci, kolom, nilai)}
                 onCatatan={(teks) => ubahBaris(barisAktif.kunci, (x) => ({ ...x, catatanUpt: teks }))}
+                onDasar={(kolom, nilai) => ubahBaris(barisAktif.kunci, (x) => ({ ...x, dasar: { ...x.dasar, [kolom]: nilai } }))}
                 onBerkas={(medan, f) => pilihBerkas(barisAktif.kunci, medan, f)}
                 onSebelum={indeksAktif > 0 ? () => setAktif(baris[indeksAktif - 1].kunci) : undefined}
                 onBerikut={indeksAktif < baris.length - 1 ? () => setAktif(baris[indeksAktif + 1].kunci) : undefined}
@@ -793,6 +836,7 @@ function DetailBaris({
   onKeadaan,
   onIsi,
   onCatatan,
+  onDasar,
   onBerkas,
   onSebelum,
   onBerikut,
@@ -803,11 +847,19 @@ function DetailBaris({
   onKeadaan: (pernah: boolean) => void;
   onIsi: (kolom: string, nilai: string) => void;
   onCatatan: (teks: string) => void;
+  onDasar: (kolom: keyof Baris["dasar"], nilai: string) => void;
   onBerkas: (medan: string, f: File | null) => void;
   onSebelum?: () => void;
   onBerikut?: () => void;
 }) {
   const k = kelengkapan(b);
+  const perluSebab =
+    b.jenis !== "baru" &&
+    perluDasarBaru(
+      (["golonganRuang", "mkgTahun", "mkgBulan"] as const)
+        .filter((kolom) => (b.isian[kolom] ?? "") !== (b.awal[kolom] ?? ""))
+        .map((kunci) => ({ kunci })),
+    );
   const hitung = hitungUsulan({
     golonganRuang: b.isian.golonganRuang,
     mkgTahun: b.isian.mkgTahun ?? "0",
@@ -898,6 +950,69 @@ function DetailBaris({
           {hitung.peringatan.length > 0 && <p>{hitung.peringatan[0]}</p>}
         </div>
       </div>
+
+      {/* Sebab perubahan golongan atau masa kerja golongan; Kanwil memakainya membentuk riwayat (ADR-030). */}
+      {(perluSebab || !!b.dasar.jenis) && (
+        <div className="kol-bagian">
+          <p className="kol-subjudul">
+            Sebab golongan atau masa kerja berubah <span>SK inilah yang menjadi dasar SK KGB berikutnya</span>
+          </p>
+          <div className="kol-sebab">
+            {(["kp", "pmk", "koreksi"] as JenisDasarBaru[]).map((j) => (
+              <label key={j} className="kol-sebab-pilihan" data-pilih={b.dasar.jenis === j ? "" : undefined}>
+                <input type="radio" name={`sebab-${b.kunci}`} className="sr-only" checked={b.dasar.jenis === j} onChange={() => onDasar("jenis", j)} />
+                <span className="kol-sebab-titik" aria-hidden="true" />
+                <span className="min-w-0">
+                  <strong>{LABEL_DASAR_BARU[j]}</strong>
+                  <span>{KETERANGAN_DASAR_BARU[j]}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {(b.dasar.jenis === "kp" || b.dasar.jenis === "pmk") && (
+            <div className="kol-isian-kisi">
+              {b.dasar.jenis === "kp" && (
+                <label className="kol-label">
+                  <span className="kol-wajib">Jenis kenaikan pangkat</span>
+                  <select className="kol-isi" value={b.dasar.jenisKp} onChange={(e) => onDasar("jenisKp", e.target.value)}>
+                    {Object.entries(JENIS_KP).map(([k, l]) => (
+                      <option key={k} value={k}>{l}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <label className="kol-label">
+                <span className="kol-wajib">Nomor {b.dasar.jenis === "kp" ? "SK kenaikan pangkat" : "SK PMK"}</span>
+                <input className="kol-isi" value={b.dasar.nomorSk} onChange={(e) => onDasar("nomorSk", e.target.value)} placeholder="Sesuai SK" />
+              </label>
+              <label className="kol-label">
+                <span className="kol-wajib">Tanggal SK</span>
+                <input className="kol-isi" type="date" value={b.dasar.tanggalSk} onChange={(e) => onDasar("tanggalSk", e.target.value)} />
+              </label>
+              <label className="kol-label">
+                <span className="kol-wajib">{b.dasar.jenis === "kp" ? "TMT pangkat" : "TMT PMK"}</span>
+                <input className="kol-isi" type="date" value={b.dasar.tmt} onChange={(e) => onDasar("tmt", e.target.value)} />
+              </label>
+              <label className="kol-label">
+                <span>Ditetapkan oleh</span>
+                <input className="kol-isi" value={b.dasar.penetap} onChange={(e) => onDasar("penetap", e.target.value)} placeholder="Pejabat penanda tangan SK" />
+              </label>
+            </div>
+          )}
+          {b.dasar.jenis === "kp" && (
+            <p className="kol-catatan-kecil">
+              Golongan di atas diisi golongan baru menurut SK. Masa kerja golongan dihitung ulang Kanwil dari SK itu:
+              naik dari golongan II ke III memotong masa kerja 5 tahun.
+            </p>
+          )}
+          {b.dasar.jenis === "pmk" && (
+            <p className="kol-catatan-kecil">
+              Masa kerja golongan di atas diisi sesuai yang tertulis pada SK PMK. Jadwal KGB berikutnya dapat maju,
+              dan Kanwil menghitungnya ulang saat menyetujui.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="kol-bagian">
         <p className="kol-subjudul">Berkas pendukung</p>

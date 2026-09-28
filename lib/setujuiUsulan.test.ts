@@ -63,6 +63,8 @@ async function siapkan(statusKgb: "sedang_diproses" | "menunggu_keuangan", denga
     tmtKgbBerikutnya: tgl(2027, 6), nomorSkTerakhir: null, tanggalSkTerakhir: null, hukdisAda: false,
     hukdisJenis: null, hukdisNomorSk: null, hukdisTmtMulai: null, hukdisTmtBerakhir: null, hukdisKeterangan: null,
     catatanUpt: null, diajukanOleh: "UPT", diajukanAt: new Date(), ditinjauOleh: null, ditinjauAt: null, alasanTolak: null,
+    dasarBaruJenis: null, dasarBaruJenisKp: null, dasarBaruNomorSk: null, dasarBaruTanggalSk: null,
+    dasarBaruTmt: null, dasarBaruPenetap: null,
   };
   await db.usulanPegawai.create(usulan);
   return { db, usulan };
@@ -104,4 +106,60 @@ test("setelah SK bertanda tangan diunggah, usulan yang mengubah dasar gaji ditol
     assert.equal((await db.pegawai.findUnique({ id: "p1" }))?.mkgTahun, 0, "data pegawai tidak berubah");
     assert.equal((await db.usulanPegawai.findUnique({ id: "u1" }))?.status, "menunggu");
   });
+});
+
+test("usulan yang menyertakan SK penyesuaian ijazah membentuk riwayat kenaikan pangkat, dan masa kerjanya dipotong", async () => {
+  await denganDataLokal(async () => {
+    const { db, usulan } = await siapkan("sedang_diproses", false);
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+    // UPT mengusulkan golongan III/a karena penyesuaian ijazah, beserta SK-nya (ADR-030).
+    const dariUpt = {
+      ...usulan,
+      golonganRuang: "III/a",
+      mkgTahun: 6,
+      mkgBulan: 0,
+      dasarBaruJenis: "kp",
+      dasarBaruJenisKp: "penyesuaian_ijazah",
+      dasarBaruNomorSk: "W.19-KP.03.01-9",
+      dasarBaruTanggalSk: tgl(2026, 5, 2),
+      dasarBaruTmt: tgl(2026, 4, 1),
+      dasarBaruPenetap: "Kepala Kantor Wilayah",
+    };
+    await db.usulanPegawai.update({ id: "u1" }, dariUpt);
+
+    const lama = await db.pegawai.findUnique({ id: "p1" });
+    const hasil = await setujuiUsulan(dariUpt as never, lama, "Peninjau", new Date(), "u1");
+    assert.equal(hasil.ok, true);
+    assert.match((hasil as { dasarBaru: string }).dasarBaru, /Penyesuaian Ijazah/);
+
+    // Riwayat kenaikan pangkat terbentuk, sehingga SK ini dapat menjadi Atas dasar SK KGB berikutnya (ADR-020).
+    const riwayat = await db.riwayatPangkat.findMany({ where: { pegawaiId: "p1" } });
+    assert.equal(riwayat.length, 1);
+    assert.equal(riwayat[0].nomorSK, "W.19-KP.03.01-9");
+    assert.equal(riwayat[0].penetapSK, "Kepala Kantor Wilayah");
+
+    // Golongan II ke III memotong masa kerja golongan 5 tahun; angka yang diketik UPT tidak dipakai apa adanya.
+    const baru = await db.pegawai.findUnique({ id: "p1" });
+    assert.equal(baru?.golonganRuang, "III/a");
+    assert.equal(Number(baru?.mkgTahun), 0);
+    assert.equal(Number(riwayat[0].mkgTahunBaru), 0);
+  });
+});
+
+test("usulan yang mengubah golongan tanpa menyebut SK-nya ditolak saat diajukan", async () => {
+  const { kekuranganUsulan } = await import("./usulanPegawai");
+  const pegawai = { golonganRuang: "II/a", mkgTahun: 0, mkgBulan: 0, tmtKgbTerakhir: tgl(2025, 6) };
+  // Masa kerja lebih dari nol berarti pegawai sudah pernah KGB, jadi berkas wajibnya SK KGB dan SK pangkat.
+  const dasar = { golonganRuang: "III/a", mkgTahun: 2, mkgBulan: 0, tmtKgbTerakhir: tgl(2025, 6), pathSkTerakhir: "a", pathSkPangkat: "b" };
+  const kurang = kekuranganUsulan(dasar as never, "perubahan", pegawai as never);
+  assert.ok(kurang.some((k) => k.includes("sebab perubahan golongan")), kurang.join("; "));
+  // Dengan sebabnya disebut, usulan yang sama sudah lengkap.
+  assert.deepEqual(
+    kekuranganUsulan(
+      { ...dasar, dasarBaruJenis: "koreksi" } as never,
+      "perubahan",
+      pegawai as never,
+    ),
+    [],
+  );
 });

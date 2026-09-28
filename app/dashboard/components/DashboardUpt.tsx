@@ -18,7 +18,14 @@ import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
+import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
 import PengingatUsulan from "@/app/dashboard/components/upt/PengingatUsulan";
+
+/** Satu baris "Dasar KGB berikutnya": SK yang gaji pokoknya dipakai SK KGB berikutnya (ADR-030). */
+function teksDasarKgb(dasar: DasarKgbBerikutnya | null | undefined): string | null {
+  if (!dasar) return null;
+  return [dasar.label, dasar.nomorSK, dasar.tanggalSK ? fmtTgl(dasar.tanggalSK) : null].filter(Boolean).join(" · ");
+}
 
 /* Dashboard Admin UPT: satu halaman berisi jadwal pengiriman surat usulan, daftar pegawai satker dengan status
    KGB-nya di Kanwil, dan SK yang sudah selesai untuk diunduh. Seluruh datanya dari /api/upt, yang membatasi
@@ -46,6 +53,8 @@ interface PegawaiUpt {
   perluDiperiksa: boolean;
   /** "draf", "menunggu", atau "revisi" bila ada usulan berjalan. */
   usulanBerjalan?: string | null;
+  /** SK yang menjadi dasar KGB berikutnya (ADR-030); null bila belum ada SK yang tercatat. */
+  dasarKgb?: DasarKgbBerikutnya | null;
   dataSekarang: Record<string, string>;
   /** SK dasar dan berkas yang sudah disetujui Kanwil; terbawa ke usulan perbaikan berikutnya. */
   bawaan?: PegawaiUntukUsulan["bawaan"];
@@ -654,6 +663,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                     <th scope="col">Pegawai</th>
                     <th scope="col">KGB berikutnya</th>
                     <th scope="col">Gaji pokok</th>
+                    <th scope="col">Dasar KGB berikutnya</th>
                     <th scope="col">Status di Kanwil</th>
                   </tr>
                 </thead>
@@ -684,6 +694,23 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                           )}
                         </td>
                         <td className="whitespace-nowrap" style={{ fontVariantNumeric: "tabular-nums" }}>{fmtRp(p.gajiPokok)}</td>
+                        {/* SK yang gaji pokoknya dipakai SK KGB berikutnya; berpindah sendiri bila ada SK pangkat/PI atau PMK yang lebih baru (ADR-030). */}
+                        <td style={{ maxWidth: "230px" }}>
+                          {p.dasarKgb ? (
+                            <>
+                              <p className="dsb-kecil truncate" style={{ margin: 0, color: "var(--dtn)" }} title={p.dasarKgb.label}>
+                                {p.dasarKgb.label}
+                              </p>
+                              <p className="dsb-kecil truncate" style={{ margin: 0 }} title={p.dasarKgb.nomorSK ?? undefined}>
+                                {[p.dasarKgb.nomorSK ?? "tanpa nomor", p.dasarKgb.tanggalSK ? fmtTgl(p.dasarKgb.tanggalSK) : null]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            </>
+                          ) : (
+                            <span className="dsb-kecil">Belum ada SK tercatat</span>
+                          )}
+                        </td>
                         <td>
                           <span className="dsb-status" data-nada={k.nada === "merah" ? "merah" : undefined}>
                             <span className="dsb-titik" data-nada={k.nada} aria-hidden="true" />
@@ -973,6 +1000,12 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             nama={sk.nama}
             sub={`TMT ${fmtTgl(sk.tmtKgbBaru)} · ${fmtRp(sk.gajiPokokBaru)}`}
             tanda={{ teks: `Direkam di Gaji Web ${fmtTgl(sk.gajiWebAt)}`, nada: "hijau" }}
+            // SK yang sudah direkam menjadi dasar KGB berikutnya, kecuali nanti ada SK pangkat/PI atau PMK.
+            catatan={
+              teksDasarKgb(pegawaiById(sk.pegawaiId)?.dasarKgb)
+                ? `Dasar KGB berikutnya: ${teksDasarKgb(pegawaiById(sk.pegawaiId)?.dasarKgb)}`
+                : null
+            }
             aksi={
               sk.berkasAda ? (
                 <a href={`/api/upt/sk/${sk.id}`} target="_blank" rel="noopener noreferrer" className="dsb-tautan">

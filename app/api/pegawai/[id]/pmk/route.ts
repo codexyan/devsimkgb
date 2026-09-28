@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
-import { newId } from "@/lib/sheets/id";
 import { logAudit } from "@/lib/auditLog";
 import { canEditPegawai } from "@/lib/auth";
 import { NON_KEUANGAN } from "@/lib/authGuard";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
-import { dampakKenaikanPangkatPadaKgb, skKpLebihBaru } from "@/lib/kenaikanPangkat";
-import { hitungPmk } from "@/lib/pmk";
-import { rencanaSiklusBerikutnya } from "@/lib/jadwalKgb";
+import { catatPmk } from "@/lib/catatDasarGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
-import { formatTanggalId, tanggalKalender } from "@/lib/waktu";
-import type { RiwayatKGBRow, RiwayatPmkRow } from "@/lib/sheets/tables";
+import { tanggalKalender } from "@/lib/waktu";
+import type { RiwayatPmkRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
 
@@ -68,7 +65,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   );
 }
 
-// POST, catat PMK dan sesuaikan data gaji serta jadwal KGB pegawai.
+// POST, catat PMK dan sesuaikan data gaji serta jadwal KGB pegawai (lib/catatDasarGaji.ts).
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   await muatBatasInputSdm();
   const session = await auth();
@@ -88,166 +85,43 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const teks = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-  const nomorSK = teks(body.nomorSK);
   const tanggalSK = keTanggal(body.tanggalSK);
   const tmtPmk = keTanggal(body.tmtPmk);
-  const mkgTahunSk = keBilangan(body.mkgTahunSk);
   const bulan = keBilangan(body.mkgBulanSk);
-  const mkgBulanSk = Number.isNaN(bulan) ? 0 : bulan;
-  const tmtKgbPilihan = keTanggal(body.tmtKgbBerikutnya);
-  const penetapSK = teks(body.penetapSK) || null;
-  const keterangan = teks(body.keterangan) || null;
-
-  if (!nomorSK) return NextResponse.json({ error: "Nomor SK PMK wajib diisi" }, { status: 400 });
   if (!tanggalSK || !tmtPmk) return NextResponse.json({ error: "Tanggal SK dan TMT PMK wajib diisi" }, { status: 400 });
-  if (Number.isNaN(mkgTahunSk))
-    return NextResponse.json({ error: "Masa kerja golongan pada SK PMK wajib diisi" }, { status: 400 });
 
   const { id } = await params;
   const pegawai = await db.pegawai.findUnique({ id });
   if (!pegawai) return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
-  const hitung = hitungPmk({
-    golonganRuang: pegawai.golonganRuang,
-    mkgTahun: pegawai.mkgTahun ?? 0,
-    mkgBulan: pegawai.mkgBulan ?? 0,
-    tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
-    tmtPmk,
-    mkgTahunSk,
-    mkgBulanSk,
-  });
-  if (!hitung.ok) return NextResponse.json({ error: hitung.pesan }, { status: 400 });
-  const hasil = hitung.hasil;
-
-  // TMT KGB berikutnya: usulan hitungan, atau koreksi Tim SDM sesuai SK PMK. KGB tidak boleh sebelum PMK berlaku.
-  const tmtKgbBerikutnya = tmtKgbPilihan ?? hasil.tmtKgbBerikutnyaUsulan;
-  if (tmtKgbBerikutnya <= tmtPmk)
-    return NextResponse.json(
-      { error: `TMT KGB berikutnya harus sesudah TMT PMK (${formatTanggalId(tmtPmk)})` },
-      { status: 400 },
-    );
-
-  const kgbPegawai = (await db.riwayatKGB.findMany({ where: { pegawaiId: id } })) as RiwayatKGBRow[];
-  const dampak = dampakKenaikanPangkatPadaKgb(kgbPegawai);
-
-  // 1) Riwayat PMK disimpan lebih dulu, sehingga jejaknya tetap ada walau langkah berikutnya gagal.
-  const riwayat: RiwayatPmkRow = {
-    id: newId(),
-    pegawaiId: id,
-    nomorSK,
+  const hasil = await catatPmk({
+    pegawai,
+    nomorSK: teks(body.nomorSK),
     tanggalSK,
     tmtPmk,
-    golonganRuang: pegawai.golonganRuang,
-    tambahBulan: hasil.tambahBulan,
-    mkgTahunSebelum: hasil.mkgSebelumPadaTmt.tahun,
-    mkgBulanSebelum: hasil.mkgSebelumPadaTmt.bulan,
-    mkgTahunSesudah: hasil.mkgSesudahPadaTmt.tahun,
-    mkgBulanSesudah: hasil.mkgSesudahPadaTmt.bulan,
-    mkgTahunDasarLama: pegawai.mkgTahun ?? 0,
-    mkgBulanDasarLama: pegawai.mkgBulan ?? 0,
-    mkgTahunDasarBaru: hasil.mkgTahunDasar,
-    mkgBulanDasarBaru: hasil.mkgBulanDasar,
-    gajiPokokLama: pegawai.gajiPokok ?? 0,
-    gajiPokokBaru: hasil.gajiPokokBaru,
-    tmtKgbBerikutnyaLama: tanggalKalender(pegawai.tmtKgbBerikutnya),
-    tmtKgbBerikutnyaBaru: tmtKgbBerikutnya,
-    penetapSK,
-    keterangan,
-    createdAt: new Date(),
-    createdBy: pengguna.id,
-  };
-  await db.riwayatPmk.create(riwayat);
-
-  // 2) Data gaji dan jadwal KGB pegawai mengikuti SK PMK.
-  await db.pegawai.update(
-    { id },
-    {
-      mkgTahun: hasil.mkgTahunDasar,
-      mkgBulan: hasil.mkgBulanDasar,
-      gajiPokok: hasil.gajiPokokBaru,
-      tmtKgbBerikutnya,
-      updatedAt: new Date(),
-    },
-  );
-
-  // 3) Placeholder KGB berikutnya disusun ulang pada jadwal yang baru. SK PMK yang ber-TMT sesudah KGB terakhir
-  // yang selesai menjadi Atas dasar SK KGB berikutnya (ADR-020), jadi penetapnya menggantikan penetap lama.
-  const pmkTerbaru = skKpLebihBaru(tmtPmk, kgbPegawai);
-  const placeholder = [...dampak.diselaraskan].sort(
-    (a, b) => (tanggalKalender(a.tmtKgbBaru)?.getTime() ?? 0) - (tanggalKalender(b.tmtKgbBaru)?.getTime() ?? 0),
-  );
-  const diselaraskan: string[] = [];
-  let tmtBerikut: Date | null = tmtKgbBerikutnya;
-  for (const k of placeholder) {
-    if (!tmtBerikut) break;
-    try {
-      const rencana = rencanaSiklusBerikutnya({
-        golonganRuang: pegawai.golonganRuang,
-        mkgTahun: hasil.mkgTahunDasar,
-        mkgBulan: hasil.mkgBulanDasar,
-        gajiPokok: hasil.gajiPokokBaru,
-        tmtKgbBerikutnya: tmtBerikut,
-        tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
-        penetapSkDasar: pmkTerbaru ? penetapSK : k.penetapSkDasar,
-      });
-      await db.riwayatKGB.update(
-        { id: k.id },
-        {
-          tanggalSK: rencana.tanggalSK,
-          tmtSK: rencana.tmtSK,
-          golonganLama: rencana.golonganLama,
-          gajiPokokLama: rencana.gajiPokokLama,
-          mkgTahunLama: rencana.mkgTahunLama,
-          mkgBulanLama: rencana.mkgBulanLama,
-          golonganBaru: rencana.golonganBaru,
-          gajiPokokBaru: rencana.gajiPokokBaru,
-          mkgTahunBaru: rencana.mkgTahunBaru,
-          mkgBulanBaru: rencana.mkgBulanBaru,
-          tmtKgbBaru: rencana.tmtKgbBaru,
-          tmtKgbBerikutnya: rencana.tmtKgbBerikutnya,
-          flagRapelan: rencana.flagRapelan,
-          ...(pmkTerbaru ? { penetapSkDasar: penetapSK } : {}),
-        },
-      );
-      diselaraskan.push(k.id);
-      tmtBerikut = rencana.tmtKgbBerikutnya;
-    } catch {
-      // Golongan atau TMT yang tidak terbaca dibiarkan; Tim SDM memperbaikinya lewat Proses KGB.
-      tmtBerikut = null;
-    }
-  }
-
-  const jadwalBergeser =
-    isoTanggalKalender(pegawai.tmtKgbBerikutnya) !== isoTanggalKalender(tmtKgbBerikutnya)
-      ? `, KGB berikutnya ${formatTanggalId(pegawai.tmtKgbBerikutnya)} → ${formatTanggalId(tmtKgbBerikutnya)}`
-      : "";
-  logAudit({
+    mkgTahunSk: keBilangan(body.mkgTahunSk),
+    mkgBulanSk: Number.isNaN(bulan) ? 0 : bulan,
+    tmtKgbBerikutnya: keTanggal(body.tmtKgbBerikutnya),
+    penetapSK: teks(body.penetapSK),
+    keterangan: teks(body.keterangan),
     userId: pengguna.id,
-    aksi: "peninjauan_masa_kerja",
-    targetNama: pegawai.nama,
-    detail:
-      `PMK ${pegawai.nama} (${pegawai.nip}), tambah ${Math.floor(hasil.tambahBulan / 12)} thn ${hasil.tambahBulan % 12} bln, ` +
-      `MKG pada TMT PMK ${hasil.mkgSesudahPadaTmt.tahun} thn ${hasil.mkgSesudahPadaTmt.bulan} bln, ` +
-      `Gaji Rp ${(pegawai.gajiPokok ?? 0).toLocaleString("id-ID")} → Rp ${hasil.gajiPokokBaru.toLocaleString("id-ID")}` +
-      `${jadwalBergeser}, SK ${nomorSK}`,
   });
+  if (!hasil.ok) return NextResponse.json({ error: hasil.pesan }, { status: hasil.status });
+
+  logAudit({ userId: pengguna.id, aksi: "peninjauan_masa_kerja", targetNama: pegawai.nama, detail: hasil.ringkas });
 
   return NextResponse.json(
     {
       ok: true,
       hasil: {
         tambahBulan: hasil.tambahBulan,
-        gajiPokokLama: pegawai.gajiPokok ?? 0,
+        gajiPokokLama: hasil.gajiPokokLama,
         gajiPokokBaru: hasil.gajiPokokBaru,
-        tmtKgbBerikutnyaLama: isoTanggalKalender(pegawai.tmtKgbBerikutnya),
-        tmtKgbBerikutnya: isoTanggalKalender(tmtKgbBerikutnya),
+        tmtKgbBerikutnyaLama: hasil.tmtKgbBerikutnyaLama,
+        tmtKgbBerikutnya: hasil.tmtKgbBerikutnya,
       },
-      kgbDiselaraskan: diselaraskan.length,
-      kgbPerluDitinjau: dampak.perluDitinjau.map((k) => ({
-        id: k.id,
-        status: k.status,
-        tmtKgbBaru: isoTanggalKalender(k.tmtKgbBaru),
-      })),
+      kgbDiselaraskan: hasil.kgbDiselaraskan,
+      kgbPerluDitinjau: hasil.kgbPerluDitinjau,
     },
     { status: 201 },
   );

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { canProcessKGB } from "@/lib/auth";
 import { BERKAS_USULAN, bandingkanUsulan, nilaiUsulan, ringkasHukdisUsulan, namaAsliBerkas } from "@/lib/usulanPegawai";
+import { ringkasDasarBaru } from "@/lib/dasarBaruUsulan";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
 import type { RiwayatKGBRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
@@ -71,6 +72,8 @@ export async function GET(req: Request) {
         perubahan: u.status === "menunggu" && p ? bandingkanUsulan(p, u) : [],
         nilaiDiusulkan: u.status === "menunggu" && p ? [] : nilaiUsulan(u),
         hukdis: ringkasHukdisUsulan(u),
+        // SK kenaikan pangkat atau PMK yang disebut UPT sebagai sebab perubahan dasar gaji (ADR-030).
+        dasarBaru: ringkasDasarBaru(u),
         hukdisKeterangan: u.hukdisKeterangan,
         nomorSkTerakhir: u.nomorSkTerakhir,
         tanggalSkTerakhir: u.tanggalSkTerakhir ? new Date(u.tanggalSkTerakhir).toISOString() : null,

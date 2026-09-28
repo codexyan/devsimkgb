@@ -168,6 +168,15 @@ export interface UsulanPegawaiRow {
   mkgTahun: number | null; mkgBulan: number | null; gajiPokok: number | null;
   tmtKgbTerakhir: Date | null; tmtKgbBerikutnya: Date | null;
   nomorSkTerakhir: string | null; tanggalSkTerakhir: Date | null;
+  /**
+   * SK baru yang menetapkan gaji pokok (ADR-030): "kp" untuk kenaikan pangkat termasuk penyesuaian ijazah,
+   * "pmk" untuk peninjauan masa kerja, "koreksi" untuk pembetulan salah ketik tanpa SK baru. Kosong pada
+   * usulan yang tidak menyentuh golongan maupun masa kerja golongan.
+   */
+  dasarBaruJenis: string | null; dasarBaruJenisKp: string | null;
+  dasarBaruNomorSk: string | null; dasarBaruTanggalSk: Date | null;
+  /** TMT pangkat untuk "kp", TMT PMK untuk "pmk". */
+  dasarBaruTmt: Date | null; dasarBaruPenetap: string | null;
   hukdisAda: boolean; hukdisJenis: string | null; hukdisNomorSk: string | null;
   hukdisTmtMulai: Date | null; hukdisTmtBerakhir: Date | null; hukdisKeterangan: string | null;
   catatanUpt: string | null;
@@ -232,6 +241,8 @@ export const defs = {
       s("ditinjauOleh"), d("ditinjauAt"), s("alasanTolak"),
       // Ditambahkan kemudian; penulisan baris posisional, jadi kolom baru selalu di ujung kanan.
       s("pathSkCpns"),
+      s("dasarBaruJenis"), s("dasarBaruJenisKp"), s("dasarBaruNomorSk"),
+      d("dasarBaruTanggalSk"), d("dasarBaruTmt"), s("dasarBaruPenetap"),
     ],
   },
   RiwayatKGB: {

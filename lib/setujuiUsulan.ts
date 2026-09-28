@@ -15,6 +15,18 @@ import { getGajiPokok, getPangkat } from "./tabelGaji";
 import { SATKER } from "./satker";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { rencanakanPenyesuaianKgb } from "./sesuaikanKgbUsulan";
+import { catatKenaikanPangkat, catatPmk } from "./catatDasarGaji";
+import { hitungKenaikanPangkat } from "./kenaikanPangkat";
+import { hitungPmk } from "./pmk";
+import { isJenisDasarBaru, ringkasDasarBaru } from "./dasarBaruUsulan";
+import { tanggalKalender } from "./waktu";
+
+/**
+ * Kolom dasar gaji yang tidak ditulis langsung dari usulan bila usulannya menyertakan SK kenaikan pangkat
+ * atau PMK (ADR-030): nilainya ditentukan hitungan SK itu di lib/catatDasarGaji.ts, bukan angka yang diketik
+ * UPT, supaya hasilnya sama persis dengan Catat KP/PMK di halaman pegawai.
+ */
+const KOLOM_DITENTUKAN_SK = ["golonganRuang", "pangkat", "mkgTahun", "mkgBulan", "gajiPokok", "tmtGolongan", "tmtKgbBerikutnya"] as const;
 
 export interface HasilSetujui {
   ok: true;
@@ -26,6 +38,8 @@ export interface HasilSetujui {
   hukdis: string | null;
   /** Penyesuaian KGB berjalan akibat usulan ini (lib/sesuaikanKgbUsulan.ts); null bila tidak ada. */
   penyesuaianKgb: string | null;
+  /** Riwayat kenaikan pangkat atau PMK yang terbentuk dari SK pada usulan ini (ADR-030); null bila tidak ada. */
+  dasarBaru: string | null;
 }
 
 export interface GagalSetujui {
@@ -54,6 +68,7 @@ export async function setujuiUsulan(
   const nilaiBaru = perubahanPegawai(usulan);
   let terapkanPenyesuaian: ((userId: string) => Promise<string | null>) | null = null;
   let perubahan = pegawaiLama ? bandingkanUsulan(pegawaiLama, usulan) : [];
+  let dasarBaru: string | null = null;
   let pegawaiIdHasil = usulan.pegawaiId;
 
   if (usulan.jenis === "baru") {
@@ -125,21 +140,74 @@ export async function setujuiUsulan(
           pesan: `NIP ${nilaiBaru.nip} sudah tercatat atas nama ${bentrok.nama}. Kembalikan usulan ini agar UPT memeriksa NIP-nya.`,
         };
     }
+    // SK kenaikan pangkat atau PMK pada usulan ini menentukan sendiri golongan, masa kerja, dan gaji pokok
+    // (ADR-030). Hitungannya dijalankan lebih dulu tanpa menulis apa pun, supaya penyesuaian KGB berjalan
+    // dinilai terhadap keadaan pegawai yang benar-benar akan terjadi.
+    const jenisSk = usulan.dasarBaruJenis?.trim() ?? "";
+    const tanggalSkBaru = tanggalKalender(usulan.dasarBaruTanggalSk);
+    const tmtSkBaru = tanggalKalender(usulan.dasarBaruTmt);
+    const catatSk = isJenisDasarBaru(jenisSk) && jenisSk !== "koreksi" && !!tanggalSkBaru && !!tmtSkBaru;
+    const golonganDiusulkan = String(nilaiBaru.golonganRuang ?? pegawaiLama.golonganRuang);
+    const mkgTahunSk = Number(nilaiBaru.mkgTahun ?? pegawaiLama.mkgTahun ?? 0);
+    const mkgBulanSk = Number(nilaiBaru.mkgBulan ?? pegawaiLama.mkgBulan ?? 0);
+    let perkiraan: PegawaiRow = { ...pegawaiLama, ...(nilaiBaru as Partial<PegawaiRow>) };
+
+    if (catatSk && jenisSk === "kp") {
+      const h = hitungKenaikanPangkat({
+        golonganLama: pegawaiLama.golonganRuang,
+        mkgTahunLama: pegawaiLama.mkgTahun ?? 0,
+        mkgBulanLama: pegawaiLama.mkgBulan ?? 0,
+        golonganBaru: golonganDiusulkan,
+      });
+      if (!h.ok) return { ok: false, pesan: h.pesan };
+      perkiraan = {
+        ...perkiraan,
+        golonganRuang: h.hasil.golonganBaru,
+        pangkat: h.hasil.pangkatBaru,
+        mkgTahun: h.hasil.mkgTahunBaru,
+        mkgBulan: h.hasil.mkgBulanBaru,
+        gajiPokok: h.hasil.gajiPokokBaru,
+        tmtGolongan: tmtSkBaru,
+        // Kenaikan pangkat tidak menggeser jadwal KGB (Buku Saku KP 2026).
+        tmtKgbBerikutnya: pegawaiLama.tmtKgbBerikutnya,
+      };
+    } else if (catatSk && tmtSkBaru) {
+      const h = hitungPmk({
+        golonganRuang: pegawaiLama.golonganRuang,
+        mkgTahun: pegawaiLama.mkgTahun ?? 0,
+        mkgBulan: pegawaiLama.mkgBulan ?? 0,
+        tmtKgbTerakhir: pegawaiLama.tmtKgbTerakhir,
+        tmtPmk: tmtSkBaru,
+        mkgTahunSk,
+        mkgBulanSk,
+      });
+      if (!h.ok) return { ok: false, pesan: h.pesan };
+      perkiraan = {
+        ...perkiraan,
+        golonganRuang: pegawaiLama.golonganRuang,
+        mkgTahun: h.hasil.mkgTahunDasar,
+        mkgBulan: h.hasil.mkgBulanDasar,
+        gajiPokok: h.hasil.gajiPokokBaru,
+        tmtKgbBerikutnya: h.hasil.tmtKgbBerikutnyaUsulan,
+      };
+    }
+
     // KGB yang sedang berjalan disesuaikan selama SK-nya belum diunggah; sesudahnya perubahan dasar gaji
     // ditolak. Penolakan diperiksa sebelum apa pun ditulis (ADR-011).
-    const penyesuaian = await rencanakanPenyesuaianKgb(
-      pegawaiLama,
-      { ...pegawaiLama, ...(nilaiBaru as Partial<PegawaiRow>) },
-      perubahan.length > 0,
-    );
+    const penyesuaian = await rencanakanPenyesuaianKgb(pegawaiLama, perkiraan, perubahan.length > 0);
     if (!penyesuaian.ok) return { ok: false, pesan: penyesuaian.pesan };
     terapkanPenyesuaian = penyesuaian.terapkan;
 
-    const tmtSiklus = (nilaiBaru.tmtKgbBerikutnya as Date | null) ?? pegawaiLama.tmtKgbBerikutnya ?? null;
+    // Kolom yang ditentukan SK tidak ditulis dari usulan; catatKenaikanPangkat atau catatPmk yang mengisinya
+    // dengan hitungan yang sama persis dengan Catat KP/PMK di halaman pegawai.
+    const nilaiDitulis: Record<string, unknown> = { ...nilaiBaru };
+    if (catatSk) for (const kolom of KOLOM_DITENTUKAN_SK) delete nilaiDitulis[kolom];
+
+    const tmtSiklus = (perkiraan.tmtKgbBerikutnya as Date | null) ?? pegawaiLama.tmtKgbBerikutnya ?? null;
     await db.pegawai.update(
       { id: pegawaiLama.id },
       {
-        ...nilaiBaru,
+        ...nilaiDitulis,
         // SK dasar ikut diperbarui hanya bila UPT mengisinya pada usulan ini (ADR-010).
         ...(usulan.nomorSkTerakhir?.trim() ? { nomorSkDasar: usulan.nomorSkTerakhir.trim() } : {}),
         ...(usulan.tanggalSkTerakhir ? { tanggalSkDasar: usulan.tanggalSkTerakhir } : {}),
@@ -149,6 +217,38 @@ export async function setujuiUsulan(
         updatedAt: sekarang,
       },
     );
+
+    if (catatSk && tanggalSkBaru && tmtSkBaru) {
+      const keterangan = `Dari usulan UPT${usulan.nomorSurat ? ` surat ${usulan.nomorSurat}` : ""}`;
+      const hasilSk =
+        jenisSk === "kp"
+          ? await catatKenaikanPangkat({
+              pegawai: pegawaiLama,
+              jenisKp: usulan.dasarBaruJenisKp?.trim() ?? "",
+              golonganBaru: golonganDiusulkan,
+              nomorSK: usulan.dasarBaruNomorSk ?? "",
+              tanggalSK: tanggalSkBaru,
+              tmtPangkat: tmtSkBaru,
+              penetapSK: usulan.dasarBaruPenetap,
+              keterangan,
+              userId,
+            })
+          : await catatPmk({
+              pegawai: pegawaiLama,
+              nomorSK: usulan.dasarBaruNomorSk ?? "",
+              tanggalSK: tanggalSkBaru,
+              tmtPmk: tmtSkBaru,
+              mkgTahunSk,
+              mkgBulanSk,
+              penetapSK: usulan.dasarBaruPenetap,
+              keterangan,
+              userId,
+            });
+      // Hitungannya sudah dijalankan di atas tanpa galat, jadi kegagalan di sini hanya soal penyimpanan.
+      // Dilaporkan apa adanya supaya Tim SDM mencatat SK-nya sendiri lewat Catat KP/PMK, bukan dibiarkan senyap.
+      if (!hasilSk.ok) return { ok: false, pesan: hasilSk.pesan };
+      dasarBaru = hasilSk.ringkas;
+    }
   }
 
   const penyesuaianKgb = terapkanPenyesuaian ? await terapkanPenyesuaian(userId) : null;
@@ -168,6 +268,7 @@ export async function setujuiUsulan(
     perluCatatHukdis: !!usulan.hukdisAda,
     hukdis: ringkasHukdisUsulan(usulan),
     penyesuaianKgb,
+    dasarBaru: dasarBaru ?? ringkasDasarBaru(usulan),
     ringkasPerubahan:
       usulan.jenis === "baru"
         ? "pegawai baru ditambahkan ke data induk"

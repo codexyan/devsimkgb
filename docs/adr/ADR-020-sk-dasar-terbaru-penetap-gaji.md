@@ -1,7 +1,7 @@
 # ADR-020: Atas dasar SK KGB adalah SK terbaru yang menetapkan gaji pokok
 
 Tanggal: 28 September 2026
-Status: berlaku; mengubah butir "SK kenaikan pangkat tidak dipakai sebagai SK dasar" pada ADR-010
+Status: berlaku; mengubah butir "SK kenaikan pangkat tidak dipakai sebagai SK dasar" pada ADR-010. Jalur UPT ditambahkan ADR-030
 
 ## Konteks
 

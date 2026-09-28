@@ -5,7 +5,7 @@ import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { BELUM_SELESAI, BERKAS_USULAN, DIPEGANG_UPT, pernahKgb } from "@/lib/usulanPegawai";
 import { bawaanPegawai, berkasPerluDisalin } from "@/lib/bawaanUsulan";
-import { bacaIsianUsulan, isiHitungan } from "@/lib/usulanFormulir";
+import { bacaDasarBaru, bacaIsianUsulan, isiHitungan } from "@/lib/usulanFormulir";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, hapusBerkasUsulan, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { TIPE_NOTIFIKASI } from "@/lib/generateNotifikasi";
@@ -112,6 +112,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const perubahan: Partial<UsulanPegawaiRow> = {
     ...isian,
+    // Sebab perubahan golongan atau masa kerja golongan beserta SK-nya (ADR-030); formulir yang tidak
+    // memuatnya, mis. perbaikan berkas saja, tidak menyentuh kolom ini.
+    ...(form.has("dasarBaruJenis") ? bacaDasarBaru(teks) : {}),
     nomorSkTerakhir: teks("nomorSkTerakhir") || null,
     tanggalSkTerakhir,
     // Laporan hukdis kini lewat modulnya sendiri (ADR-016). Formulir usulan tidak lagi mengirimnya, dan

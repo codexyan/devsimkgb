@@ -26,6 +26,8 @@ export interface UsulanKanwil {
   hukdis: string | null;
   hukdisKeterangan: string | null;
   nomorSkTerakhir: string | null;
+  /** SK yang menetapkan gaji pokok baru pada usulan ini (ADR-030); null bila tidak ada. */
+  dasarBaru?: string | null;
   tanggalSkTerakhir: string | null;
   catatanUpt: string | null;
   diajukanOleh: string | null;
@@ -113,6 +115,19 @@ export default function DetailUsulan({ usulan: u, pratinjauDiTempat = false }: {
         </section>
       ) : (
         <Catatan>Tidak ada kolom data yang diusulkan berubah; usulan ini berisi laporan atau lampiran saja.</Catatan>
+      )}
+
+      {/* SK kenaikan pangkat atau PMK yang disebut UPT; persetujuan membentuk riwayatnya (ADR-030). */}
+      {u.dasarBaru && (
+        <div className="usl-sk-baru">
+          <strong>SK yang mengubah gaji pokok</strong>
+          <span>{u.dasarBaru}</span>
+          <span>
+            {u.dasarBaru.startsWith("Koreksi")
+              ? "Tidak ada SK baru; dasar SK KGB berikutnya tidak berubah, dan pembetulannya tercatat di Log Aktivitas."
+              : "Persetujuan mencatatnya sebagai riwayat, menghitung ulang gaji pokoknya, dan menjadikan SK ini dasar SK KGB berikutnya."}
+          </span>
+        </div>
       )}
 
       {u.hukdis && (

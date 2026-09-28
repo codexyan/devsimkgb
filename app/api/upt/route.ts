@@ -14,8 +14,9 @@ import { SATKER } from "@/lib/satker";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { berhakKgb } from "@/lib/mutasiPegawai";
 import { muatKppnSatker } from "@/lib/muatKppnSatker";
+import { dasarKgbBerikutnya, type SkPenetapGaji } from "@/lib/dasarKgbBerikutnya";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
-import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
+import type { RiwayatPangkatRow, RiwayatPmkRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
 
 /** Kolom hukdis yang dipakai di sini; sisanya sengaja tidak dibaca agar tidak ikut terkirim. */
 type HukdisBaris = { pegawaiId: string; berdampakKGB: boolean | null; tmtBerakhir: Date | null };
@@ -47,17 +48,33 @@ export async function GET() {
   const satker = SATKER.find((s) => s.kode === kode)!;
 
   const hariIni = hariIniWita();
-  const [semuaPegawai, semuaKgb, semuaSurat, semuaHukdis, usulanBerjalan, usulanDisetujui] = await Promise.all([
-    db.pegawai.findMany(),
-    db.riwayatKGB.findMany(),
-    db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
-    db.riwayatHukdis.findMany() as Promise<HukdisBaris[]>,
-    // Usulan yang sedang berjalan: menyiapkan atau mengirim usulan sudah menjadi pernyataan UPT
-    // tentang pegawai itu, sehingga konfirmasi terpisah tidak diminta lagi.
-    db.usulanPegawai.findMany({ where: { satker: kode, status: { in: BELUM_SELESAI } } }),
-    // Sumber SK dasar dan berkas yang terbawa ke usulan perbaikan berikutnya (lib/bawaanUsulan.ts).
-    db.usulanPegawai.findMany({ where: { status: "disetujui" } }) as Promise<UsulanPegawaiRow[]>,
-  ]);
+  const [semuaPegawai, semuaKgb, semuaSurat, semuaHukdis, usulanBerjalan, usulanDisetujui, semuaPangkat, semuaPmk] =
+    await Promise.all([
+      db.pegawai.findMany(),
+      db.riwayatKGB.findMany(),
+      db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
+      db.riwayatHukdis.findMany() as Promise<HukdisBaris[]>,
+      // Usulan yang sedang berjalan: menyiapkan atau mengirim usulan sudah menjadi pernyataan UPT
+      // tentang pegawai itu, sehingga konfirmasi terpisah tidak diminta lagi.
+      db.usulanPegawai.findMany({ where: { satker: kode, status: { in: BELUM_SELESAI } } }),
+      // Sumber SK dasar dan berkas yang terbawa ke usulan perbaikan berikutnya (lib/bawaanUsulan.ts).
+      db.usulanPegawai.findMany({ where: { status: "disetujui" } }) as Promise<UsulanPegawaiRow[]>,
+      // SK yang menetapkan gaji pokok sesudah KGB terakhir, untuk dasar KGB berikutnya (ADR-030).
+      db.riwayatPangkat.findMany() as Promise<RiwayatPangkatRow[]>,
+      db.riwayatPmk.findMany() as Promise<RiwayatPmkRow[]>,
+    ]);
+  const pangkatPerPegawai = new Map<string, SkPenetapGaji[]>();
+  for (const r of semuaPangkat)
+    pangkatPerPegawai.set(r.pegawaiId, [
+      ...(pangkatPerPegawai.get(r.pegawaiId) ?? []),
+      { nomorSK: r.nomorSK, tanggalSK: r.tanggalSK, tmt: r.tmtPangkat, jenisKp: r.jenisKp },
+    ]);
+  const pmkPerPegawai = new Map<string, SkPenetapGaji[]>();
+  for (const r of semuaPmk)
+    pmkPerPegawai.set(r.pegawaiId, [
+      ...(pmkPerPegawai.get(r.pegawaiId) ?? []),
+      { nomorSK: r.nomorSK, tanggalSK: r.tanggalSK, tmt: r.tmtPmk },
+    ]);
   const jenisUsulanPegawai = new Map<string, string>();
   for (const u of usulanBerjalan as { pegawaiId: string | null; status: string }[]) {
     if (u.pegawaiId) jenisUsulanPegawai.set(u.pegawaiId, u.status);
@@ -122,6 +139,13 @@ export async function GET() {
         konfirmasiAt: p.konfirmasiUptAt ? new Date(p.konfirmasiUptAt).toISOString() : null,
         konfirmasiOleh: p.konfirmasiUptOleh ?? null,
         usulanBerjalan: jenisUsulanPegawai.get(p.id) ?? null,
+        // SK yang menjadi "Atas dasar" SK KGB berikutnya (ADR-030): SK KGB terakhir yang sudah direkam di
+        // Gaji Web, atau SK kenaikan pangkat/PMK yang terbit sesudahnya.
+        dasarKgb: dasarKgbBerikutnya({
+          kgb: (kgbPerPegawai.get(p.id) ?? []).map((k) => ({ ...k, surat: suratByKgb.get(k.id) ?? null })),
+          pangkat: pangkatPerPegawai.get(p.id),
+          pmk: pmkPerPegawai.get(p.id),
+        }),
         // Pengingat pemeriksaan hanya selama perbaikan masih berguna: KGB belum diinput Kanwil dan
         // batas inputnya belum lewat. Sesudahnya, tanpa usulan, datanya dianggap benar (lib/tugasUpt.ts).
         perluDiperiksa:
