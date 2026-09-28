@@ -44,8 +44,7 @@ Lalu:
 
 1. Cari `JEJAK-INVENTARISASI` dan hapus tiap bagian yang ditandai:
    - `app/dashboard/pegawai/page.tsx`: penanda status di daftar;
-   - `app/dashboard/pegawai/[id]/riwayat/TabDokumenPemutakhiran.tsx`: bagian kiriman; tab cukup bernama *Dokumen*
-     di `riwayat/page.tsx`;
+   - `app/dashboard/pegawai/[id]/riwayat/TabDokumenPemutakhiran.tsx`: bagian kiriman (tabnya sudah bernama *Dokumen*, ADR-028);
    - `app/api/pegawai/[id]/dokumen/route.ts`: sumber inventaris;
    - `lib/dokumenPegawai.ts`: sumber `inventaris` dan labelnya;
    - `app/api/pegawai/[id]/pemutakhiran/`: seluruh rute;

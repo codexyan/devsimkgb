@@ -6,10 +6,13 @@ import { BidangPenetap, Catatan, DaftarData, KerangkaModal, PesanGalat } from "@
 import { JENIS_KP, URUTAN_GOLONGAN, hitungKenaikanPangkat, peringkatGolongan, type JenisKp } from "@/lib/kenaikanPangkat";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { formatTanggalId, isoTanggalLokal } from "@/lib/waktu";
+import PanelDokumenRujukan, { unggahKeArsip, type LampiranSk } from "@/app/dashboard/components/pegawai/PanelDokumenRujukan";
 
 /* Catat SK kenaikan pangkat satu pegawai. Hitungannya memakai lib/kenaikanPangkat.ts, sama dengan yang dipakai
    API, sehingga pratinjau di layar sama dengan yang tersimpan: MKG dipotong bila pindah jenjang golongan, lalu
-   gaji pokok dibaca ulang dari tabel PP 5/2024. TMT KGB tidak diubah oleh kenaikan pangkat. */
+   gaji pokok dibaca ulang dari tabel PP 5/2024. TMT KGB tidak diubah oleh kenaikan pangkat.
+   Kolom kanan (ADR-028): SK kenaikan pangkat yang sudah ada di arsip, dan PDF SK baru yang diunggah ke arsip setelah
+   pencatatannya tersimpan. */
 
 export interface PegawaiPangkat {
   id: string;
@@ -56,6 +59,9 @@ export default function ModalKenaikanPangkat({
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState("");
   const [ditinjau, setDitinjau] = useState<KgbDitinjau[] | null>(null);
+  const [lampiran, setLampiran] = useState<LampiranSk | null>(null);
+  // Pesan unggahan SK dibawa ke pesan akhir, termasuk bila jendela peninjauan KGB tampil lebih dulu.
+  const [tambahan, setTambahan] = useState("");
 
   // Hanya golongan di atas golongan sekarang yang masuk akal sebagai kenaikan pangkat.
   const pilihanGolongan = useMemo(
@@ -92,6 +98,12 @@ export default function ModalKenaikanPangkat({
         kgbPerluDitinjau?: KgbDitinjau[];
       };
       if (!res.ok) { setGalat(d.error ?? "Kenaikan pangkat gagal disimpan"); return; }
+      const unggahan = await unggahKeArsip(pegawai.id, lampiran, {
+        nomorSK,
+        tanggalSK,
+        keterangan: `Kenaikan pangkat ${pegawai.golonganRuang} → ${golonganBaru}, TMT ${formatTanggalId(tmtPangkat)}`,
+      });
+      setTambahan(unggahan);
 
       const perlu = d.kgbPerluDitinjau ?? [];
       if (perlu.length > 0) {
@@ -101,7 +113,8 @@ export default function ModalKenaikanPangkat({
       }
       onBerhasil(
         `Kenaikan pangkat ${pegawai.nama} tersimpan: ${pegawai.golonganRuang} → ${golonganBaru}.` +
-          (d.kgbDiselaraskan ? " Jadwal KGB berikutnya ikut diselaraskan." : ""),
+          (d.kgbDiselaraskan ? " Jadwal KGB berikutnya ikut diselaraskan." : "") +
+          unggahan,
       );
     } catch {
       setGalat("Gagal menghubungi server");
@@ -117,11 +130,11 @@ export default function ModalKenaikanPangkat({
         subjudul={`${pegawai.nama} · ${pegawai.golonganRuang} → ${golonganBaru}`}
         nada="amber"
         ukuran="sm"
-        onTutup={() => onBerhasil(`Kenaikan pangkat ${pegawai.nama} tersimpan.`)}
+        onTutup={() => onBerhasil(`Kenaikan pangkat ${pegawai.nama} tersimpan.${tambahan}`)}
         kaki={
           <>
             <Link href="/dashboard/kgb" className="kgbm-tombol kgbm-kedua">Buka Proses KGB</Link>
-            <button type="button" className="kgbm-tombol kgbm-utama" onClick={() => onBerhasil(`Kenaikan pangkat ${pegawai.nama} tersimpan.`)}>
+            <button type="button" className="kgbm-tombol kgbm-utama" onClick={() => onBerhasil(`Kenaikan pangkat ${pegawai.nama} tersimpan.${tambahan}`)}>
               Mengerti
             </button>
           </>
@@ -148,7 +161,7 @@ export default function ModalKenaikanPangkat({
     <KerangkaModal
       judul="Catat kenaikan pangkat"
       subjudul={`${pegawai.nama} · ${pegawai.nip} · ${pegawai.golonganRuang}`}
-      ukuran="md"
+      ukuran="lg"
       sibuk={sibuk}
       onTutup={onTutup}
       onKirim={() => void simpan()}
@@ -161,78 +174,83 @@ export default function ModalKenaikanPangkat({
         </>
       }
     >
-      <div className="kgbm-grid2">
-        <div>
-          <label htmlFor="kp-jenis" className="kgbm-label">Jenis kenaikan pangkat</label>
-          <select id="kp-jenis" className="kgbm-input" value={jenisKp} onChange={(e) => setJenisKp(e.target.value as JenisKp)}>
-            {Object.entries(JENIS_KP).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="kp-golongan" className="kgbm-label">Golongan baru<span className="kgbm-wajib" aria-hidden="true" /></label>
-          <select id="kp-golongan" className="kgbm-input" value={golonganBaru} onChange={(e) => setGolonganBaru(e.target.value)} data-autofocus>
-            <option value="">Pilih golongan…</option>
-            {pilihanGolongan.map((g) => <option key={g} value={g}>{g} · {GOLONGAN_PANGKAT[g]}</option>)}
-          </select>
-        </div>
-      </div>
+      <div className="pgw-kerja">
+        <div className="pgw-kerja-form">
+          <div className="kgbm-grid2">
+            <div>
+              <label htmlFor="kp-jenis" className="kgbm-label">Jenis kenaikan pangkat</label>
+              <select id="kp-jenis" className="kgbm-input" value={jenisKp} onChange={(e) => setJenisKp(e.target.value as JenisKp)}>
+                {Object.entries(JENIS_KP).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="kp-golongan" className="kgbm-label">Golongan baru<span className="kgbm-wajib" aria-hidden="true" /></label>
+              <select id="kp-golongan" className="kgbm-input" value={golonganBaru} onChange={(e) => setGolonganBaru(e.target.value)} data-autofocus>
+                <option value="">Pilih golongan…</option>
+                {pilihanGolongan.map((g) => <option key={g} value={g}>{g} · {GOLONGAN_PANGKAT[g]}</option>)}
+              </select>
+            </div>
+          </div>
 
-      <div>
-        <label htmlFor="kp-nomor" className="kgbm-label">Nomor SK kenaikan pangkat<span className="kgbm-wajib" aria-hidden="true" /></label>
-        <input id="kp-nomor" className="kgbm-input" value={nomorSK} onChange={(e) => setNomorSK(e.target.value)} placeholder="mis. W.17-KP.03.01-125" />
-      </div>
+          <div>
+            <label htmlFor="kp-nomor" className="kgbm-label">Nomor SK kenaikan pangkat<span className="kgbm-wajib" aria-hidden="true" /></label>
+            <input id="kp-nomor" className="kgbm-input" value={nomorSK} onChange={(e) => setNomorSK(e.target.value)} placeholder="mis. W.17-KP.03.01-125" />
+          </div>
 
-      <div className="kgbm-grid2">
-        <div>
-          <label htmlFor="kp-tanggal" className="kgbm-label">Tanggal SK<span className="kgbm-wajib" aria-hidden="true" /></label>
-          <input id="kp-tanggal" type="date" className="kgbm-input" value={tanggalSK} onChange={(e) => setTanggalSK(e.target.value)} />
-        </div>
-        <div>
-          <label htmlFor="kp-tmt" className="kgbm-label">TMT pangkat<span className="kgbm-wajib" aria-hidden="true" /></label>
-          <input id="kp-tmt" type="date" className="kgbm-input" value={tmtPangkat} onChange={(e) => setTmtPangkat(e.target.value)} />
-        </div>
-      </div>
+          <div className="kgbm-grid2">
+            <div>
+              <label htmlFor="kp-tanggal" className="kgbm-label">Tanggal SK<span className="kgbm-wajib" aria-hidden="true" /></label>
+              <input id="kp-tanggal" type="date" className="kgbm-input" value={tanggalSK} onChange={(e) => setTanggalSK(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="kp-tmt" className="kgbm-label">TMT pangkat<span className="kgbm-wajib" aria-hidden="true" /></label>
+              <input id="kp-tmt" type="date" className="kgbm-input" value={tmtPangkat} onChange={(e) => setTmtPangkat(e.target.value)} />
+            </div>
+          </div>
 
-      <BidangPenetap
-        label="Ditetapkan oleh"
-        nilai={penetapSK}
-        onUbah={setPenetapSK}
-        petunjuk="Pejabat yang menandatangani SK kenaikan pangkat. SK KGB berikutnya berdasar SK ini dan mencetak pejabatnya pada baris Oleh."
-        nonaktif={sibuk}
-      />
-      {pratinjau && (
-        <>
-          <DaftarData
-            judul="Setelah kenaikan pangkat"
-            baris={[
-              { label: "Pangkat", nilai: `${pegawai.golonganRuang} → ${pratinjau.golonganBaru} (${pratinjau.pangkatBaru})` },
-              {
-                label: "Masa kerja golongan",
-                nilai: `${pegawai.mkgTahun} thn ${pegawai.mkgBulan} bln → ${pratinjau.mkgTahunBaru} thn ${pratinjau.mkgBulanBaru} bln`,
-              },
-              { label: "Gaji pokok", nilai: `${fmtRp(pegawai.gajiPokok)} → ${fmtRp(pratinjau.gajiPokokBaru)}` },
-            ]}
+          <BidangPenetap
+            label="Ditetapkan oleh"
+            nilai={penetapSK}
+            onUbah={setPenetapSK}
+            petunjuk="Pejabat yang menandatangani SK kenaikan pangkat. SK KGB berikutnya berdasar SK ini dan mencetak pejabatnya pada baris Oleh."
+            nonaktif={sibuk}
           />
-          {pratinjau.potonganMkgTahun > 0 && (
-            <Catatan nada="amber">
-              Pindah jenjang golongan, jadi masa kerja golongan dipotong <strong>{pratinjau.potonganMkgTahun} tahun</strong> sesuai
-              Buku Saku Kenaikan Pangkat. Gaji pokok di atas sudah dibaca ulang dari tabel PP 5/2024.
-            </Catatan>
+          {pratinjau && (
+            <>
+              <DaftarData
+                judul="Setelah kenaikan pangkat"
+                baris={[
+                  { label: "Pangkat", nilai: `${pegawai.golonganRuang} → ${pratinjau.golonganBaru} (${pratinjau.pangkatBaru})` },
+                  {
+                    label: "Masa kerja golongan",
+                    nilai: `${pegawai.mkgTahun} thn ${pegawai.mkgBulan} bln → ${pratinjau.mkgTahunBaru} thn ${pratinjau.mkgBulanBaru} bln`,
+                  },
+                  { label: "Gaji pokok", nilai: `${fmtRp(pegawai.gajiPokok)} → ${fmtRp(pratinjau.gajiPokokBaru)}` },
+                ]}
+              />
+              {pratinjau.potonganMkgTahun > 0 && (
+                <Catatan nada="amber">
+                  Pindah jenjang golongan, jadi masa kerja golongan dipotong <strong>{pratinjau.potonganMkgTahun} tahun</strong> sesuai
+                  Buku Saku Kenaikan Pangkat. Gaji pokok di atas sudah dibaca ulang dari tabel PP 5/2024.
+                </Catatan>
+              )}
+            </>
           )}
-        </>
-      )}
 
-      <div>
-        <label htmlFor="kp-keterangan" className="kgbm-label">Keterangan <span style={{ color: "var(--dt5)" }}>(opsional)</span></label>
-        <textarea id="kp-keterangan" rows={2} className="kgbm-input" value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="mis. hasil ujian dinas atau nomor PAK" />
+          <div>
+            <label htmlFor="kp-keterangan" className="kgbm-label">Keterangan <span style={{ color: "var(--dt5)" }}>(opsional)</span></label>
+            <textarea id="kp-keterangan" rows={2} className="kgbm-input" value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="mis. hasil ujian dinas atau nomor PAK" />
+          </div>
+
+          <Catatan>
+            TMT KGB tidak diubah oleh kenaikan pangkat: siklus KGB tetap berjalan dari TMT KGB terakhir. Yang berubah
+            hanya golongan, masa kerja golongan, dan gaji pokok sebagai dasar KGB berikutnya.
+          </Catatan>
+
+          <PesanGalat pesan={galat || null} />
+        </div>
+        <PanelDokumenRujukan pegawaiId={pegawai.id} tindakan="kp" lampiran={lampiran} onLampiran={setLampiran} nonaktif={sibuk} />
       </div>
-
-      <Catatan>
-        TMT KGB tidak diubah oleh kenaikan pangkat: siklus KGB tetap berjalan dari TMT KGB terakhir. Yang berubah
-        hanya golongan, masa kerja golongan, dan gaji pokok sebagai dasar KGB berikutnya.
-      </Catatan>
-
-      <PesanGalat pesan={galat || null} />
     </KerangkaModal>
   );
 }

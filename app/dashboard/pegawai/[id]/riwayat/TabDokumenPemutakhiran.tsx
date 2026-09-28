@@ -14,7 +14,8 @@ import {
 import KartuKiriman, { type Pemutakhiran } from "@/app/dashboard/components/inventarisasi/KartuKiriman";
 import { formatTanggalId } from "@/lib/waktu";
 
-/* Tab "Dokumen & Pemutakhiran" di halaman pegawai (ADR-023, ADR-027).
+/* Tab "Dokumen" di halaman pegawai (ADR-023, ADR-027, ADR-028). Arsip dokumen pegawai tampil lebih dulu; kiriman
+   formulir inventarisasi, yang hanya sementara, di bawahnya.
 
    - Dokumen pegawai: arsip unggahan, SK KGB, berkas usulan UPT, dan berkas formulir, dapat dipratinjau di halaman.
      Bagian ini milik modul pegawai dan tetap ada setelah modul inventarisasi dihapus.
@@ -88,6 +89,8 @@ export default function TabDokumenPemutakhiran({
         </div>
       )}
 
+      <BagianDokumen pegawaiId={pegawaiId} dokumen={dokumen} onLihat={lihatDokumen} onGalat={setGalat} onBerhasil={berhasil} />
+
       {/* JEJAK-INVENTARISASI (ADR-027): bagian ini dihapus bersama modul inventarisasi. */}
       {daftar !== "gagal" && (
         <section className="dsb-panel" aria-labelledby="judul-pemutakhiran">
@@ -115,8 +118,6 @@ export default function TabDokumenPemutakhiran({
           )}
         </section>
       )}
-
-      <BagianDokumen pegawaiId={pegawaiId} dokumen={dokumen} onLihat={lihatDokumen} onGalat={setGalat} onBerhasil={berhasil} />
 
       {pratinjau && (
         <ModalPratinjauBerkas judul={pratinjau.judul} subjudul={pratinjau.subjudul} url={pratinjau.url} onTutup={() => setPratinjau(null)} />

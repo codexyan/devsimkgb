@@ -6,13 +6,17 @@ import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiS
 import { SATKER } from "@/lib/satker";
 import { GOLONGAN_PANGKAT, getMKGOptions } from "@/lib/tabelGaji";
 import { formatTanggalId, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
+import PanelDokumenRujukan, { unggahKeArsip, type LampiranSk } from "@/app/dashboard/components/pegawai/PanelDokumenRujukan";
 
 /* Ubah data pegawai per bagian (ADR-025): Identitas, Kepegawaian, dan Dasar KGB disimpan terpisah, sehingga
    mengubah satu bagian tidak menimpa bagian lain (PATCH menerima perubahan sebagian).
 
    Golongan, masa kerja golongan, dan TMT KGB tidak diubah di sini, melainkan lewat Catat kenaikan pangkat atau
    Catat PMK, supaya riwayat dan jadwal KGB tetap konsisten. Salah ketik tetap dapat diperbaiki lewat Koreksi
-   data, yang sengaja dipisahkan dan tercatat di log aktivitas. */
+   data, yang sengaja dipisahkan dan tercatat di log aktivitas.
+
+   Modalnya dua kolom (ADR-028): isian di kiri, dokumen rujukan dari arsip pegawai di kanan. Bagian Kepegawaian dan
+   Dasar KGB dapat melampirkan SK (jabatan, KGB, atau CPNS) yang diunggah ke arsip setelah perubahan tersimpan. */
 
 export type BagianUbah = "identitas" | "kepegawaian" | "dasar";
 
@@ -61,7 +65,11 @@ export interface PegawaiUbah {
   tmtKgbBerikutnya?: string | null;
   nomorSkDasar?: string | null;
   tanggalSkDasar?: string | null;
-  penetapSkDasar?: string | null;
+  penetapSkDasar?: string | null;  /** Keadaan kepegawaian untuk tab Data pegawai; tidak diubah lewat modal ini. */
+  satkerTugas?: string | null;
+  berhentiTmt?: string | null;
+  berhentiAlasan?: string | null;
+  aktif?: boolean;
 }
 
 const teks = (v: string | null | undefined) => v ?? "";
@@ -102,6 +110,7 @@ export default function ModalUbahPegawai({
     tmtKgbBerikutnya: tgl(pegawai.tmtKgbBerikutnya),
   }));
   const [koreksi, setKoreksi] = useState(false);
+  const [lampiran, setLampiran] = useState<LampiranSk | null>(null);
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState("");
 
@@ -130,7 +139,12 @@ export default function ModalUbahPegawai({
       });
       const d = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(d.error ?? "Data pegawai gagal disimpan.");
-      onBerhasil(`${LABEL_BAGIAN[bagian]} ${pegawai.nama} tersimpan.`);
+      const tambahan = await unggahKeArsip(pegawai.id, lampiran, {
+        nomorSK: bagian === "dasar" ? form.nomorSkDasar : "",
+        tanggalSK: bagian === "dasar" ? form.tanggalSkDasar : "",
+        keterangan: `Dilampirkan saat mengubah ${LABEL_BAGIAN_KECIL[bagian]}`,
+      });
+      onBerhasil(`${LABEL_BAGIAN[bagian]} ${pegawai.nama} tersimpan.${tambahan}`);
     } catch (e) {
       setGalat(e instanceof Error ? e.message : "Data pegawai gagal disimpan.");
     } finally {
@@ -161,7 +175,7 @@ export default function ModalUbahPegawai({
     <KerangkaModal
       judul={`Ubah ${LABEL_BAGIAN_KECIL[bagian]}`}
       subjudul={`${pegawai.nama} · ${pegawai.nip}`}
-      ukuran="md"
+      ukuran="lg"
       sibuk={sibuk}
       onTutup={onTutup}
       onKirim={() => void simpan()}
@@ -174,127 +188,137 @@ export default function ModalUbahPegawai({
         </>
       }
     >
-      <div className="inv-atur pgw-ubah">
-        {bagian === "identitas" && (
-          <>
-            <label className="inv-bidang inv-lebar">
-              <span>Nama lengkap dengan gelar</span>
-              <input className="dsb-cari" value={form.nama} onChange={(e) => ubah("nama")(e.target.value)} disabled={sibuk} data-autofocus />
-            </label>
-            <label className="inv-bidang inv-lebar">
-              <span>NIP</span>
-              <input className="dsb-cari" inputMode="numeric" value={form.nip} onChange={(e) => ubah("nip")(e.target.value.replace(/D/g, "").slice(0, 18))} disabled={sibuk} />
-              {form.nip !== pegawai.nip && (
-                <small className="inv-bantu" style={{ color: "var(--st-amber)" }}>
-                  NIP diubah dari {pegawai.nip}. Pastikan sesuai SK CPNS; SK yang sudah terbit tetap memuat NIP lama.
-                </small>
-              )}
-            </label>
-            {bidang("Tempat lahir", "tempatLahir")}
-            {bidang("Tanggal lahir", "tanggalLahir", "date")}
-            {pilihan("Jenis kelamin", "jenisKelamin", JENIS_KELAMIN)}
-            {pilihan("Pendidikan terakhir", "pendidikanTerakhir", PENDIDIKAN_TERAKHIR)}
-          </>
-        )}
+      <div className="pgw-kerja">
+        <div className="pgw-kerja-form">
+          <div className="inv-atur pgw-ubah">
+            {bagian === "identitas" && (
+              <>
+                <label className="inv-bidang inv-lebar">
+                  <span>Nama lengkap dengan gelar</span>
+                  <input className="dsb-cari" value={form.nama} onChange={(e) => ubah("nama")(e.target.value)} disabled={sibuk} data-autofocus />
+                </label>
+                <label className="inv-bidang inv-lebar">
+                  <span>NIP</span>
+                  <input className="dsb-cari" inputMode="numeric" value={form.nip} onChange={(e) => ubah("nip")(e.target.value.replace(/\D/g, "").slice(0, 18))} disabled={sibuk} />
+                  {form.nip !== pegawai.nip && (
+                    <small className="inv-bantu" style={{ color: "var(--st-amber)" }}>
+                      NIP diubah dari {pegawai.nip}. Pastikan sesuai SK CPNS; SK yang sudah terbit tetap memuat NIP lama.
+                    </small>
+                  )}
+                </label>
+                {bidang("Tempat lahir", "tempatLahir")}
+                {bidang("Tanggal lahir", "tanggalLahir", "date")}
+                {pilihan("Jenis kelamin", "jenisKelamin", JENIS_KELAMIN)}
+                {pilihan("Pendidikan terakhir", "pendidikanTerakhir", PENDIDIKAN_TERAKHIR)}
+              </>
+            )}
 
-        {bagian === "kepegawaian" && (
-          <>
-            <label className="inv-bidang inv-lebar">
-              <span>Jabatan</span>
-              <input className="dsb-cari" value={form.jabatan} onChange={(e) => ubah("jabatan")(e.target.value)} disabled={sibuk} data-autofocus />
-            </label>
-            {pilihan("Jenis jabatan", "jenisJabatan", JENIS_JABATAN)}
-            {pilihan("Eselon", "eselon", ESELON, "Non Eselon")}
-            <label className="inv-bidang inv-lebar">
-              <span>Unit kerja</span>
-              <select className="dsb-cari" value={form.unitKerja} onChange={(e) => ubah("unitKerja")(e.target.value)} disabled={sibuk}>
-                {denganNilaiSaatIni(SATKER.map((s) => s.nama), form.unitKerja).map((v) => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </select>
-              <small className="inv-bantu">Pindah satker sebaiknya dicatat lewat Mutasi, agar riwayatnya tersimpan.</small>
-            </label>
-          </>
-        )}
+            {bagian === "kepegawaian" && (
+              <>
+                <label className="inv-bidang inv-lebar">
+                  <span>Jabatan</span>
+                  <input className="dsb-cari" value={form.jabatan} onChange={(e) => ubah("jabatan")(e.target.value)} disabled={sibuk} data-autofocus />
+                </label>
+                {pilihan("Jenis jabatan", "jenisJabatan", JENIS_JABATAN)}
+                {pilihan("Eselon", "eselon", ESELON, "Non Eselon")}
+                <label className="inv-bidang inv-lebar">
+                  <span>Unit kerja</span>
+                  <select className="dsb-cari" value={form.unitKerja} onChange={(e) => ubah("unitKerja")(e.target.value)} disabled={sibuk}>
+                    {denganNilaiSaatIni(SATKER.map((s) => s.nama), form.unitKerja).map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                  <small className="inv-bantu">Pindah satker sebaiknya dicatat lewat Mutasi, agar riwayatnya tersimpan.</small>
+                </label>
+              </>
+            )}
 
-        {bagian === "dasar" && (
-          <>
-            <label className="inv-bidang inv-lebar">
-              <span>Nomor SK dasar</span>
-              <input className="dsb-cari" value={form.nomorSkDasar} onChange={(e) => ubah("nomorSkDasar")(e.target.value)} disabled={sibuk} data-autofocus />
-              <small className="inv-bantu">SK CPNS bagi pegawai yang belum pernah KGB; sesudahnya SK KGB terakhir.</small>
-            </label>
-            {bidang("Tanggal SK dasar", "tanggalSkDasar", "date")}
-            <label className="inv-bidang inv-lebar">
-              <span>Ditetapkan oleh</span>
-              <input className="dsb-cari" value={form.penetapSkDasar} onChange={(e) => ubah("penetapSkDasar")(e.target.value)} disabled={sibuk} />
-            </label>
+            {bagian === "dasar" && (
+              <>
+                <label className="inv-bidang inv-lebar">
+                  <span>Nomor SK dasar</span>
+                  <input className="dsb-cari" value={form.nomorSkDasar} onChange={(e) => ubah("nomorSkDasar")(e.target.value)} disabled={sibuk} data-autofocus />
+                  <small className="inv-bantu">SK CPNS bagi pegawai yang belum pernah KGB; sesudahnya SK KGB terakhir.</small>
+                </label>
+                {bidang("Tanggal SK dasar", "tanggalSkDasar", "date")}
+                <label className="inv-bidang inv-lebar">
+                  <span>Ditetapkan oleh</span>
+                  <input className="dsb-cari" value={form.penetapSkDasar} onChange={(e) => ubah("penetapSkDasar")(e.target.value)} disabled={sibuk} />
+                </label>
 
-            <div className="inv-lebar pgw-gaji">
-              <h3>Golongan dan masa kerja</h3>
-              <dl className="pmh-lain">
-                <div>
-                  <dt>Golongan</dt>
-                  <dd>{pegawai.golonganRuang} · {GOLONGAN_PANGKAT[pegawai.golonganRuang] ?? pegawai.pangkat ?? "-"}</dd>
+                <div className="inv-lebar pgw-gaji">
+                  <h3>Golongan dan masa kerja</h3>
+                  <dl className="pgw-ringkas-dl">
+                    <div>
+                      <dt>Golongan</dt>
+                      <dd>{pegawai.golonganRuang} · {GOLONGAN_PANGKAT[pegawai.golonganRuang] ?? pegawai.pangkat ?? "-"}</dd>
+                    </div>
+                    <div>
+                      <dt>Masa kerja golongan</dt>
+                      <dd>{pegawai.mkgTahun} thn {pegawai.mkgBulan} bln</dd>
+                    </div>
+                    <div>
+                      <dt>TMT KGB terakhir</dt>
+                      <dd>{pegawai.tmtKgbTerakhir ? formatTanggalId(pegawai.tmtKgbTerakhir) : "-"}</dd>
+                    </div>
+                    <div>
+                      <dt>TMT KGB berikutnya</dt>
+                      <dd>{pegawai.tmtKgbBerikutnya ? formatTanggalId(pegawai.tmtKgbBerikutnya) : "-"}</dd>
+                    </div>
+                  </dl>
+                  {!koreksi ? (
+                    <Catatan>
+                      Golongan, masa kerja golongan, dan TMT KGB berubah lewat <strong>Catat kenaikan pangkat</strong> atau{" "}
+                      <strong>Catat PMK</strong>, supaya riwayat dan jadwal KGB tetap konsisten.{" "}
+                      <button type="button" className="pgw-tautan" onClick={() => setKoreksi(true)}>
+                        Koreksi data yang salah ketik
+                      </button>
+                    </Catatan>
+                  ) : (
+                    <>
+                      <Catatan nada="amber">
+                        Koreksi ini mengubah dasar gaji tanpa mencatat riwayat kenaikan pangkat atau PMK, jadi pakai hanya
+                        untuk membetulkan data yang salah ketik. Perubahannya tercatat di Log Aktivitas.
+                      </Catatan>
+                      <div className="inv-atur pgw-koreksi">
+                        <label className="inv-bidang">
+                          <span>Golongan ruang</span>
+                          <select className="dsb-cari" value={form.golonganRuang} onChange={(e) => { ubah("golonganRuang")(e.target.value); ubah("mkg")("0_0"); }} disabled={sibuk}>
+                            {Object.entries(GOLONGAN_PANGKAT).map(([g, p]) => (
+                              <option key={g} value={g}>{g} · {p}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="inv-bidang">
+                          <span>Masa kerja golongan</span>
+                          <select className="dsb-cari" value={form.mkg} onChange={(e) => ubah("mkg")(e.target.value)} disabled={sibuk}>
+                            {getMKGOptions(form.golonganRuang).map((m) => (
+                              <option key={`${m.tahun}_${m.bulan}`} value={`${m.tahun}_${m.bulan}`}>
+                                {m.tahun} thn {m.bulan} bln · Rp {m.gaji.toLocaleString("id-ID")}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        {bidang("TMT golongan", "tmtGolongan", "date")}
+                        {bidang("TMT KGB terakhir", "tmtKgbTerakhir", "date")}
+                        {bidang("TMT KGB berikutnya", "tmtKgbBerikutnya", "date")}
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div>
-                  <dt>Masa kerja golongan</dt>
-                  <dd>{pegawai.mkgTahun} thn {pegawai.mkgBulan} bln</dd>
-                </div>
-                <div>
-                  <dt>TMT KGB terakhir</dt>
-                  <dd>{pegawai.tmtKgbTerakhir ? formatTanggalId(pegawai.tmtKgbTerakhir) : "-"}</dd>
-                </div>
-                <div>
-                  <dt>TMT KGB berikutnya</dt>
-                  <dd>{pegawai.tmtKgbBerikutnya ? formatTanggalId(pegawai.tmtKgbBerikutnya) : "-"}</dd>
-                </div>
-              </dl>
-              {!koreksi ? (
-                <Catatan>
-                  Golongan, masa kerja golongan, dan TMT KGB berubah lewat <strong>Catat kenaikan pangkat</strong> atau{" "}
-                  <strong>Catat PMK</strong>, supaya riwayat dan jadwal KGB tetap konsisten.{" "}
-                  <button type="button" className="pgw-tautan" onClick={() => setKoreksi(true)}>
-                    Koreksi data yang salah ketik
-                  </button>
-                </Catatan>
-              ) : (
-                <>
-                  <Catatan nada="amber">
-                    Koreksi ini mengubah dasar gaji tanpa mencatat riwayat kenaikan pangkat atau PMK, jadi pakai hanya
-                    untuk membetulkan data yang salah ketik. Perubahannya tercatat di Log Aktivitas.
-                  </Catatan>
-                  <div className="inv-atur pgw-koreksi">
-                    <label className="inv-bidang">
-                      <span>Golongan ruang</span>
-                      <select className="dsb-cari" value={form.golonganRuang} onChange={(e) => { ubah("golonganRuang")(e.target.value); ubah("mkg")("0_0"); }} disabled={sibuk}>
-                        {Object.entries(GOLONGAN_PANGKAT).map(([g, p]) => (
-                          <option key={g} value={g}>{g} · {p}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="inv-bidang">
-                      <span>Masa kerja golongan</span>
-                      <select className="dsb-cari" value={form.mkg} onChange={(e) => ubah("mkg")(e.target.value)} disabled={sibuk}>
-                        {getMKGOptions(form.golonganRuang).map((m) => (
-                          <option key={`${m.tahun}_${m.bulan}`} value={`${m.tahun}_${m.bulan}`}>
-                            {m.tahun} thn {m.bulan} bln · Rp {m.gaji.toLocaleString("id-ID")}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {bidang("TMT golongan", "tmtGolongan", "date")}
-                    {bidang("TMT KGB terakhir", "tmtKgbTerakhir", "date")}
-                    {bidang("TMT KGB berikutnya", "tmtKgbBerikutnya", "date")}
-                  </div>
-                </>
-              )}
-            </div>
-          </>
-        )}
+              </>
+            )}
+          </div>
+          <PesanGalat pesan={galat || null} />
+        </div>
+        <PanelDokumenRujukan
+          pegawaiId={pegawai.id}
+          tindakan={bagian}
+          lampiran={lampiran}
+          onLampiran={bagian === "identitas" ? undefined : setLampiran}
+          nonaktif={sibuk}
+        />
       </div>
-
-      <PesanGalat pesan={galat || null} />
     </KerangkaModal>
   );
 }

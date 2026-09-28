@@ -11,6 +11,7 @@ import { BERKAS_USULAN } from "@/lib/usulanPegawai";
 import { kirimanPegawai } from "@/lib/inventarisServer";
 import { daftarDokumenArsip, simpanDokumenArsip } from "@/lib/dokumenPegawaiServer";
 import {
+  JENIS_BERKAS_USULAN,
   JENIS_DOKUMEN,
   idAman,
   periksaDokumen,
@@ -60,6 +61,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       ukuran: d.ukuran,
       url: `/api/pegawai/${encodeURIComponent(id)}/dokumen/${encodeURIComponent(d.id)}`,
       bisaHapus: true,
+      jenis: d.jenis,
     });
   }
 
@@ -77,6 +79,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       ukuran: null,
       url: `/api/blob/download?url=${encodeURIComponent(s.pathFile)}`,
       bisaHapus: false,
+      jenis: "sk_kgb",
     });
   }
 
@@ -95,6 +98,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         ukuran: null,
         url: `/api/usulan/${encodeURIComponent(u.id)}/berkas?berkas=${b.medan}`,
         bisaHapus: false,
+        jenis: JENIS_BERKAS_USULAN[b.medan],
       });
     }
   }
@@ -102,6 +106,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // Berkas kiriman yang sudah disalin ke arsip (ADR-024) tidak ditampilkan dua kali; yang tampil salinannya.
   const sudahDiarsip = new Set(arsip.map((d) => d.asal).filter(Boolean));
   // JEJAK-INVENTARISASI (ADR-027)
+  const JENIS_BERKAS_INVENTARIS: Record<string, JenisDokumen> = {
+    "SK-KGB-Terakhir": "sk_kgb",
+    "SK-KP-Terakhir": "sk_pangkat",
+    "SK-PMK": "sk_pmk",
+    "SK-CPNS": "sk_cpns",
+    "SK-PNS": "sk_pns",
+  };
   for (const { kegiatan, kiriman } of inventaris) {
     for (const b of kiriman.berkas) {
       if (sudahDiarsip.has(b.kunci)) continue;
@@ -116,6 +127,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         ukuran: b.ukuran,
         url: `/api/inventarisasi/berkas?kunci=${encodeURIComponent(b.kunci)}`,
         bisaHapus: false,
+        jenis: JENIS_BERKAS_INVENTARIS[b.jenis],
       });
     }
   }

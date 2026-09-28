@@ -1,5 +1,6 @@
-// Arsip dokumen pegawai (ADR-023): PDF yang diunggah Super Admin atau Tim SDM KGB dari tab "Dokumen & Pemutakhiran",
-// misalnya SK CPNS, SK PNS, SK pangkat, SK KGB lama, atau SK PMK. Modul ini murni; penyimpanannya di
+// Arsip dokumen pegawai (ADR-023, ADR-028): PDF yang diunggah Super Admin atau Tim SDM KGB dari tab Dokumen atau
+// dilampirkan saat mencatat (kenaikan pangkat, PMK, mutasi, ubah data), misalnya SK CPNS, SK PNS, SK pangkat, SK KGB
+// lama, SK PMK, atau SK mutasi. Modul ini murni; penyimpanannya di
 // lib/dokumenPegawaiServer.ts (R2, tanpa tabel basis data):
 //
 //   dokumen/<id pegawai>/_daftar.json     daftar dokumen beserta jenis, nomor, dan tanggal SK-nya
@@ -14,6 +15,8 @@ export const JENIS_DOKUMEN = {
   sk_kgb: "SK KGB",
   sk_pmk: "SK peninjauan masa kerja",
   sk_jabatan: "SK jabatan",
+  sk_mutasi: "SK mutasi",
+  sk_pemberhentian: "SK pemberhentian",
   ijazah: "Ijazah",
   lainnya: "Dokumen lain",
 } as const;
@@ -89,4 +92,32 @@ export interface DokumenPegawai {
   url: string;
   /** Hanya dokumen arsip yang dapat dihapus dari tab ini. */
   bisaHapus: boolean;
+  /** Jenis dokumen bila diketahui, untuk memilih dokumen rujukan tiap tindakan; kosong untuk surat pengantar. */
+  jenis?: JenisDokumen;
 }
+
+/** Tindakan di halaman pegawai yang menampilkan dokumen rujukan (ADR-028). */
+export type TindakanDokumen = "identitas" | "kepegawaian" | "dasar" | "kp" | "pmk" | "mutasi" | "pemberhentian";
+
+/**
+ * Dokumen rujukan dan jenis unggahan tiap tindakan: `rujukan` ditampilkan di panel kanan modal untuk dipratinjau,
+ * `unggah` adalah jenis SK yang boleh dilampirkan saat mencatat (kosong berarti tanpa unggahan). Jenis pertama
+ * pada `unggah` menjadi bawaan.
+ */
+export const DOKUMEN_TINDAKAN: Record<TindakanDokumen, { rujukan: readonly JenisDokumen[]; unggah: readonly JenisDokumen[] }> = {
+  identitas: { rujukan: ["sk_cpns", "sk_pns", "ijazah"], unggah: [] },
+  kepegawaian: { rujukan: ["sk_jabatan", "sk_mutasi"], unggah: ["sk_jabatan"] },
+  dasar: { rujukan: ["sk_kgb", "sk_cpns", "sk_pangkat", "sk_pmk"], unggah: ["sk_kgb", "sk_cpns"] },
+  kp: { rujukan: ["sk_pangkat"], unggah: ["sk_pangkat"] },
+  pmk: { rujukan: ["sk_pmk", "sk_pangkat"], unggah: ["sk_pmk"] },
+  mutasi: { rujukan: ["sk_mutasi", "sk_jabatan"], unggah: ["sk_mutasi"] },
+  pemberhentian: { rujukan: ["sk_pemberhentian", "sk_mutasi"], unggah: ["sk_pemberhentian"] },
+};
+
+/** Jenis dokumen berkas usulan UPT menurut medannya (lib/usulanPegawai.ts BERKAS_USULAN). */
+export const JENIS_BERKAS_USULAN: Record<string, JenisDokumen> = {
+  skTerakhir: "sk_kgb",
+  skPangkat: "sk_pangkat",
+  skCpns: "sk_cpns",
+  syaratCpns: "lainnya",
+};

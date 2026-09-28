@@ -5,10 +5,13 @@ import Link from "next/link";
 import { BidangPenetap, Catatan, DaftarData, KerangkaModal, PesanGalat } from "@/app/dashboard/components/kgb";
 import { hitungPmk } from "@/lib/pmk";
 import { formatTanggalId, isoTanggalLokal } from "@/lib/waktu";
+import PanelDokumenRujukan, { unggahKeArsip, type LampiranSk } from "@/app/dashboard/components/pegawai/PanelDokumenRujukan";
 
 /* Catat SK peninjauan masa kerja (PMK) satu pegawai (ADR-021). Hitungannya memakai lib/pmk.ts, sama dengan yang
    dipakai API, sehingga pratinjau di layar sama dengan yang tersimpan: MKG bertambah, gaji pokok dibaca ulang dari
-   tabel PP 5/2024, dan TMT KGB berikutnya diusulkan dari MKG yang baru. Usulan itu boleh dikoreksi sesuai SK. */
+   tabel PP 5/2024, dan TMT KGB berikutnya diusulkan dari MKG yang baru. Usulan itu boleh dikoreksi sesuai SK.
+   Kolom kanan (ADR-028): SK PMK dan SK pangkat di arsip, dan PDF SK PMK baru yang diunggah ke arsip setelah
+   pencatatannya tersimpan. */
 
 export interface PegawaiPmk {
   id: string;
@@ -60,6 +63,8 @@ export default function ModalPmk({
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState("");
   const [ditinjau, setDitinjau] = useState<KgbDitinjau[] | null>(null);
+  const [lampiran, setLampiran] = useState<LampiranSk | null>(null);
+  const [tambahan, setTambahan] = useState("");
 
   const hitung = useMemo(() => {
     if (!tmtPmk || mkgTahunSk === "") return null;
@@ -106,6 +111,12 @@ export default function ModalPmk({
         kgbPerluDitinjau?: KgbDitinjau[];
       };
       if (!res.ok) { setGalat(d.error ?? "PMK gagal disimpan"); return; }
+      const unggahan = await unggahKeArsip(pegawai.id, lampiran, {
+        nomorSK,
+        tanggalSK,
+        keterangan: `PMK TMT ${formatTanggalId(tmtPmk)}, masa kerja golongan ${mkgTahunSk} thn ${mkgBulanSk || "0"} bln`,
+      });
+      setTambahan(unggahan);
 
       const perlu = d.kgbPerluDitinjau ?? [];
       if (perlu.length > 0) {
@@ -117,7 +128,7 @@ export default function ModalPmk({
         d.hasil && d.hasil.tmtKgbBerikutnyaLama !== d.hasil.tmtKgbBerikutnya
           ? ` KGB berikutnya kini ${formatTanggalId(d.hasil.tmtKgbBerikutnya)}.`
           : "";
-      onBerhasil(`PMK ${pegawai.nama} tersimpan.${geser}${d.kgbDiselaraskan ? " Jadwal KGB berikutnya ikut disusun ulang." : ""}`);
+      onBerhasil(`PMK ${pegawai.nama} tersimpan.${geser}${d.kgbDiselaraskan ? " Jadwal KGB berikutnya ikut disusun ulang." : ""}${unggahan}`);
     } catch {
       setGalat("Gagal menghubungi server");
     } finally {
@@ -132,11 +143,11 @@ export default function ModalPmk({
         subjudul={`${pegawai.nama} · ${pegawai.nip}`}
         nada="amber"
         ukuran="sm"
-        onTutup={() => onBerhasil(`PMK ${pegawai.nama} tersimpan.`)}
+        onTutup={() => onBerhasil(`PMK ${pegawai.nama} tersimpan.${tambahan}`)}
         kaki={
           <>
             <Link href="/dashboard/kgb" className="kgbm-tombol kgbm-kedua">Buka Proses KGB</Link>
-            <button type="button" className="kgbm-tombol kgbm-utama" onClick={() => onBerhasil(`PMK ${pegawai.nama} tersimpan.`)}>
+            <button type="button" className="kgbm-tombol kgbm-utama" onClick={() => onBerhasil(`PMK ${pegawai.nama} tersimpan.${tambahan}`)}>
               Mengerti
             </button>
           </>
@@ -163,7 +174,7 @@ export default function ModalPmk({
     <KerangkaModal
       judul="Catat peninjauan masa kerja (PMK)"
       subjudul={`${pegawai.nama} · ${pegawai.nip} · ${pegawai.golonganRuang}`}
-      ukuran="md"
+      ukuran="lg"
       sibuk={sibuk}
       onTutup={onTutup}
       onKirim={() => void simpan()}
@@ -176,104 +187,109 @@ export default function ModalPmk({
         </>
       }
     >
-      <div>
-        <label htmlFor="pmk-nomor" className="kgbm-label">Nomor SK PMK<span className="kgbm-wajib" aria-hidden="true" /></label>
-        <input id="pmk-nomor" className="kgbm-input" value={nomorSK} onChange={(e) => setNomorSK(e.target.value)} data-autofocus />
-      </div>
-
-      <div className="kgbm-grid2">
-        <div>
-          <label htmlFor="pmk-tanggal" className="kgbm-label">Tanggal SK<span className="kgbm-wajib" aria-hidden="true" /></label>
-          <input id="pmk-tanggal" type="date" className="kgbm-input" value={tanggalSK} onChange={(e) => setTanggalSK(e.target.value)} />
-        </div>
-        <div>
-          <label htmlFor="pmk-tmt" className="kgbm-label">TMT PMK<span className="kgbm-wajib" aria-hidden="true" /></label>
-          <input id="pmk-tmt" type="date" className="kgbm-input" value={tmtPmk} onChange={(e) => setTmtPmk(e.target.value)} />
-        </div>
-      </div>
-
-      <div>
-        <span className="kgbm-label" id="pmk-mkg">
-          Masa kerja golongan pada SK PMK<span className="kgbm-wajib" aria-hidden="true" />
-        </span>
-        <div className="kgbm-grid2" role="group" aria-labelledby="pmk-mkg">
-          <input
-            className="kgbm-input"
-            inputMode="numeric"
-            aria-label="Tahun"
-            placeholder="Tahun"
-            value={mkgTahunSk}
-            onChange={(e) => setMkgTahunSk(e.target.value.replace(/\D/g, "").slice(0, 2))}
-          />
-          <input
-            className="kgbm-input"
-            inputMode="numeric"
-            aria-label="Bulan"
-            placeholder="Bulan"
-            value={mkgBulanSk}
-            onChange={(e) => setMkgBulanSk(e.target.value.replace(/\D/g, "").slice(0, 2))}
-          />
-        </div>
-        <p className="kgbm-petunjuk">Masa kerja golongan pada TMT PMK, seperti tertulis di SK, sesudah ditambah masa kerja yang diperhitungkan.</p>
-      </div>
-
-      <BidangPenetap
-        label="Ditetapkan oleh"
-        nilai={penetapSK}
-        onUbah={setPenetapSK}
-        petunjuk="Pejabat yang menandatangani SK PMK. SK KGB berikutnya berdasar SK ini dan mencetak pejabatnya pada baris Oleh."
-        nonaktif={sibuk}
-      />
-
-      {hitung && !hitung.ok && <Catatan nada="merah">{hitung.pesan}</Catatan>}
-      {pratinjau && (
-        <>
-          <DaftarData
-            judul="Setelah PMK"
-            baris={[
-              {
-                label: "Masa kerja pada TMT PMK",
-                nilai: `${fmtMkg(pratinjau.mkgSebelumPadaTmt)} → ${fmtMkg(pratinjau.mkgSesudahPadaTmt)} (tambah ${fmtMkg({
-                  tahun: Math.floor(pratinjau.tambahBulan / 12),
-                  bulan: pratinjau.tambahBulan % 12,
-                })})`,
-              },
-              { label: "Gaji pokok", nilai: `${fmtRp(pegawai.gajiPokok)} → ${fmtRp(pratinjau.gajiPokokBaru)}` },
-              {
-                label: "KGB berikutnya",
-                nilai: `${pegawai.tmtKgbBerikutnya ? formatTanggalId(pegawai.tmtKgbBerikutnya) : "-"} → ${formatTanggalId(tmtKgbDipakai)}`,
-              },
-            ]}
-          />
+      <div className="pgw-kerja">
+        <div className="pgw-kerja-form">
           <div>
-            <label htmlFor="pmk-kgb" className="kgbm-label">TMT KGB berikutnya</label>
-            <input
-              id="pmk-kgb"
-              type="date"
-              className="kgbm-input"
-              value={tmtKgbDipakai}
-              onChange={(e) => setTmtKgbKoreksi(e.target.value === tmtKgbUsulan ? "" : e.target.value)}
-            />
-            <p className="kgbm-petunjuk">
-              {tmtKgbKoreksi
-                ? `Dikoreksi dari usulan ${formatTanggalId(tmtKgbUsulan)}.`
-                : "Usulan: saat masa kerja yang baru mencapai langkah berikutnya di tabel gaji. Koreksi bila SK PMK menyebut tanggal lain."}
-            </p>
+            <label htmlFor="pmk-nomor" className="kgbm-label">Nomor SK PMK<span className="kgbm-wajib" aria-hidden="true" /></label>
+            <input id="pmk-nomor" className="kgbm-input" value={nomorSK} onChange={(e) => setNomorSK(e.target.value)} data-autofocus />
           </div>
-        </>
-      )}
 
-      <div>
-        <label htmlFor="pmk-keterangan" className="kgbm-label">Keterangan <span style={{ color: "var(--dt5)" }}>(opsional)</span></label>
-        <textarea id="pmk-keterangan" rows={2} className="kgbm-input" value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="mis. masa kerja honorer yang diperhitungkan" />
+          <div className="kgbm-grid2">
+            <div>
+              <label htmlFor="pmk-tanggal" className="kgbm-label">Tanggal SK<span className="kgbm-wajib" aria-hidden="true" /></label>
+              <input id="pmk-tanggal" type="date" className="kgbm-input" value={tanggalSK} onChange={(e) => setTanggalSK(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="pmk-tmt" className="kgbm-label">TMT PMK<span className="kgbm-wajib" aria-hidden="true" /></label>
+              <input id="pmk-tmt" type="date" className="kgbm-input" value={tmtPmk} onChange={(e) => setTmtPmk(e.target.value)} />
+            </div>
+          </div>
+
+          <div>
+            <span className="kgbm-label" id="pmk-mkg">
+              Masa kerja golongan pada SK PMK<span className="kgbm-wajib" aria-hidden="true" />
+            </span>
+            <div className="kgbm-grid2" role="group" aria-labelledby="pmk-mkg">
+              <input
+                className="kgbm-input"
+                inputMode="numeric"
+                aria-label="Tahun"
+                placeholder="Tahun"
+                value={mkgTahunSk}
+                onChange={(e) => setMkgTahunSk(e.target.value.replace(/\D/g, "").slice(0, 2))}
+              />
+              <input
+                className="kgbm-input"
+                inputMode="numeric"
+                aria-label="Bulan"
+                placeholder="Bulan"
+                value={mkgBulanSk}
+                onChange={(e) => setMkgBulanSk(e.target.value.replace(/\D/g, "").slice(0, 2))}
+              />
+            </div>
+            <p className="kgbm-petunjuk">Masa kerja golongan pada TMT PMK, seperti tertulis di SK, sesudah ditambah masa kerja yang diperhitungkan.</p>
+          </div>
+
+          <BidangPenetap
+            label="Ditetapkan oleh"
+            nilai={penetapSK}
+            onUbah={setPenetapSK}
+            petunjuk="Pejabat yang menandatangani SK PMK. SK KGB berikutnya berdasar SK ini dan mencetak pejabatnya pada baris Oleh."
+            nonaktif={sibuk}
+          />
+
+          {hitung && !hitung.ok && <Catatan nada="merah">{hitung.pesan}</Catatan>}
+          {pratinjau && (
+            <>
+              <DaftarData
+                judul="Setelah PMK"
+                baris={[
+                  {
+                    label: "Masa kerja pada TMT PMK",
+                    nilai: `${fmtMkg(pratinjau.mkgSebelumPadaTmt)} → ${fmtMkg(pratinjau.mkgSesudahPadaTmt)} (tambah ${fmtMkg({
+                      tahun: Math.floor(pratinjau.tambahBulan / 12),
+                      bulan: pratinjau.tambahBulan % 12,
+                    })})`,
+                  },
+                  { label: "Gaji pokok", nilai: `${fmtRp(pegawai.gajiPokok)} → ${fmtRp(pratinjau.gajiPokokBaru)}` },
+                  {
+                    label: "KGB berikutnya",
+                    nilai: `${pegawai.tmtKgbBerikutnya ? formatTanggalId(pegawai.tmtKgbBerikutnya) : "-"} → ${formatTanggalId(tmtKgbDipakai)}`,
+                  },
+                ]}
+              />
+              <div>
+                <label htmlFor="pmk-kgb" className="kgbm-label">TMT KGB berikutnya</label>
+                <input
+                  id="pmk-kgb"
+                  type="date"
+                  className="kgbm-input"
+                  value={tmtKgbDipakai}
+                  onChange={(e) => setTmtKgbKoreksi(e.target.value === tmtKgbUsulan ? "" : e.target.value)}
+                />
+                <p className="kgbm-petunjuk">
+                  {tmtKgbKoreksi
+                    ? `Dikoreksi dari usulan ${formatTanggalId(tmtKgbUsulan)}.`
+                    : "Usulan: saat masa kerja yang baru mencapai langkah berikutnya di tabel gaji. Koreksi bila SK PMK menyebut tanggal lain."}
+                </p>
+              </div>
+            </>
+          )}
+
+          <div>
+            <label htmlFor="pmk-keterangan" className="kgbm-label">Keterangan <span style={{ color: "var(--dt5)" }}>(opsional)</span></label>
+            <textarea id="pmk-keterangan" rows={2} className="kgbm-input" value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="mis. masa kerja honorer yang diperhitungkan" />
+          </div>
+
+          <Catatan>
+            Berbeda dengan kenaikan pangkat, PMK dapat menggeser jadwal KGB: masa kerja yang bertambah bisa mencapai langkah
+            tabel gaji berikutnya lebih cepat. Golongan pegawai tidak berubah.
+          </Catatan>
+
+          <PesanGalat pesan={galat || null} />
+        </div>
+        <PanelDokumenRujukan pegawaiId={pegawai.id} tindakan="pmk" lampiran={lampiran} onLampiran={setLampiran} nonaktif={sibuk} />
       </div>
-
-      <Catatan>
-        Berbeda dengan kenaikan pangkat, PMK dapat menggeser jadwal KGB: masa kerja yang bertambah bisa mencapai langkah
-        tabel gaji berikutnya lebih cepat. Golongan pegawai tidak berubah.
-      </Catatan>
-
-      <PesanGalat pesan={galat || null} />
     </KerangkaModal>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { canEditPegawai, canManageHukdis, canProcessKGB } from "@/lib/auth";
 import TabDokumenPemutakhiran from "./TabDokumenPemutakhiran";
+import TabDataPegawai, { type TindakanPegawai } from "./TabDataPegawai";
 import ModalUbahPegawai, { LABEL_BAGIAN, LABEL_BAGIAN_KECIL, type BagianUbah, type PegawaiUbah } from "@/app/dashboard/components/pegawai/ModalUbahPegawai";
 import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
 import ModalPmk from "@/app/dashboard/components/ModalPmk";
@@ -189,12 +190,20 @@ export default function RiwayatKGBPage() {
   const [pmkList, setPmkList] = useState<RiwayatPmk[]>([]);
   // Data pegawai lengkap untuk modal tindakan (ubah per bagian, KP, PMK, mutasi); ADR-025.
   const [lengkap, setLengkap] = useState<PegawaiUbah | null>(null);
-  const [tindakan, setTindakan] = useState<BagianUbah | "kp" | "pmk" | "mutasi" | null>(null);
+  const [tindakan, setTindakanMentah] = useState<TindakanPegawai | null>(null);
+  // Menu Tindakan (<details>) ditutup begitu satu tindakan dipilih, supaya tidak tertinggal terbuka di belakang modal.
+  const menuTindakanRef = useRef<HTMLDetailsElement>(null);
+  const setTindakan = (t: TindakanPegawai | null) => {
+    if (menuTindakanRef.current) menuTindakanRef.current.open = false;
+    setTindakanMentah(t);
+  };
+  // Naik setiap data pegawai dimuat ulang, supaya tab Data pegawai memuat ulang dokumen dan riwayat mutasinya.
+  const [versiData, setVersiData] = useState(0);
   const [pesanTindakan, setPesanTindakan] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"kgb" | "pangkat" | "hukdis" | "dokumen">("kgb");
-  // Dokumen & Pemutakhiran hanya untuk Super Admin dan Tim SDM KGB (ADR-023); ?tab=dokumen membukanya langsung.
-  // JEJAK-INVENTARISASI (ADR-027): setelah modul inventarisasi dihapus, tab ini cukup bernama "Dokumen".
+  // Tab Data pegawai (ADR-028) menjadi tab pertama dan bawaan: data induk lengkap per bagian beserta dokumennya.
+  const [activeTab, setActiveTab] = useState<"data" | "kgb" | "pangkat" | "hukdis" | "dokumen">("data");
+  // Tab Dokumen hanya untuk Super Admin dan Tim SDM KGB (ADR-023, ADR-028); ?tab=dokumen membukanya langsung.
   const bolehDokumen = canProcessKGB(role);
   const bolehUbah = canEditPegawai(role);
   useEffect(() => {
@@ -283,7 +292,10 @@ export default function RiwayatKGBPage() {
       .catch(() => []);
     fetch(`/api/pegawai/${id}`, { cache: "no-store" })
       .then(async (r) => (r.ok ? ((await r.json()) as PegawaiUbah) : null))
-      .then(setLengkap)
+      .then((p) => {
+        setLengkap(p);
+        setVersiData((v) => v + 1);
+      })
       .catch(() => {});
     const pmkPromise = fetch(`/api/pegawai/${id}/pmk`)
       .then(async (r) => (r.ok ? ((await r.json()) as unknown) : []))
@@ -559,7 +571,7 @@ export default function RiwayatKGBPage() {
         </div>
         <div className="flex flex-wrap gap-2 shrink-0 items-start">
           {bolehUbah && lengkap && (
-            <details className="pgw-menu">
+            <details className="pgw-menu" ref={menuTindakanRef}>
               <summary className="text-xs px-4 py-2 rounded-xl font-semibold">Tindakan</summary>
               <div className="pgw-menu-isi">
                 {(Object.keys(LABEL_BAGIAN) as BagianUbah[]).map((b) => (
@@ -606,12 +618,12 @@ export default function RiwayatKGBPage() {
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 mb-5">
-        {(["kgb", "pangkat", ...(canHukdis ? ["hukdis"] : []), ...(bolehDokumen ? ["dokumen"] : [])] as const).map((tab) => (
+        {(["data", "kgb", "pangkat", ...(canHukdis ? ["hukdis"] : []), ...(bolehDokumen ? ["dokumen"] : [])] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             aria-pressed={activeTab === tab}
-            onClick={() => setActiveTab(tab as "kgb" | "pangkat" | "hukdis" | "dokumen")}
+            onClick={() => setActiveTab(tab as "data" | "kgb" | "pangkat" | "hukdis" | "dokumen")}
             className="text-xs px-4 py-2 rounded-xl font-semibold transition"
             style={{
               background: activeTab === tab ? "var(--navy-solid)" : "var(--sub)",
@@ -620,16 +632,32 @@ export default function RiwayatKGBPage() {
               borderColor: activeTab === tab ? "var(--dtn)" : "var(--ln1)",
             }}
           >
-            {tab === "kgb"
+            {tab === "data"
+              ? "Data pegawai"
+              : tab === "kgb"
               ? `Riwayat KGB (${riwayat.length})`
               : tab === "pangkat"
                 ? `Pangkat & PMK (${pangkatList.length + pmkList.length})`
                 : tab === "dokumen"
-                  ? "Dokumen & Pemutakhiran"
+                  ? "Dokumen"
                   : `Riwayat Hukdis (${hukdisList.length})`}
           </button>
         ))}
       </div>
+
+      {activeTab === "data" &&
+        (lengkap ? (
+          <TabDataPegawai
+            pegawai={lengkap}
+            bolehUbah={bolehUbah}
+            bolehDokumen={bolehDokumen}
+            versi={versiData}
+            onTindakan={setTindakan}
+            onSemuaDokumen={() => setActiveTab("dokumen")}
+          />
+        ) : (
+          <div className="dsb-kerangka" style={{ height: 280 }} role="status" aria-label="Memuat data pegawai" />
+        ))}
 
       {activeTab === "dokumen" && bolehDokumen && (
         <TabDokumenPemutakhiran pegawaiId={id} bolehUbah={bolehUbah} onDataBerubah={() => fetchData()} />

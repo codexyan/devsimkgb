@@ -637,10 +637,12 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
 
                 <h3 className="pub-h3">Di SIM-KGB</h3>
                 <p>
-                  Kenaikan pangkat dicatat dari halaman Data Pegawai lewat tombol Kenaikan Pangkat pada pegawai yang
-                  bersangkutan. Sistem menghitung masa kerja golongan baru beserta gaji pokoknya, menyimpan riwayat
-                  pangkat, lalu menyelaraskan rencana KGB berikutnya. Bila ada KGB yang sedang berjalan, sistem
-                  menandainya untuk ditinjau Tim SDM.
+                  Kenaikan pangkat dicatat dari halaman pegawai: buka pegawainya di Data Pegawai, lalu pada tab Data
+                  pegawai tekan Catat kenaikan pangkat di kartu Dasar KGB (atau lewat menu Tindakan). Di sisi kanan
+                  jendela tampil SK kenaikan pangkat yang sudah ada di arsip pegawai; SK baru dapat dilampirkan dan
+                  otomatis masuk arsip setelah disimpan. Sistem menghitung masa kerja golongan baru beserta gaji
+                  pokoknya, menyimpan riwayat pangkat, lalu menyelaraskan rencana KGB berikutnya. Bila ada KGB yang
+                  sedang berjalan, sistem menandainya untuk ditinjau Tim SDM.
                 </p>
                 <LanjutBagian dari="kenaikan-pangkat" />
               </section>
