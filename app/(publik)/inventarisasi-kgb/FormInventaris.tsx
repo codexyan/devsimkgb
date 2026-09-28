@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type FormE
 import { GOLONGAN_PANGKAT, getGajiPokok } from "@/lib/tabelGaji";
 import {
   BATAS_BERKAS_INVENTARIS_BYTE,
-  BERKAS_KEADAAN,
+  berkasUntuk,
   FOLDER_KEADAAN,
   LABEL_KEADAAN,
   namaBerkasInventaris,
@@ -36,6 +36,9 @@ const KOSONG: IsianInventaris = {
   golonganRuang: "",
   tmtGolongan: "",
   naikSetelahKgb: "",
+  pmkSetelahKgb: "",
+  tmtPmk: "",
+  tanggalSkPmk: "",
   mkgTahun: "",
   mkgBulan: "",
   tmtDasar: "",
@@ -45,6 +48,14 @@ const KOSONG: IsianInventaris = {
   nomorWa: "",
   catatan: "",
 };
+
+/* Satu pertanyaan untuk dua isian: kenaikan pangkat/PI dan PMK setelah KGB terakhir. */
+const PILIHAN_PERUBAHAN = [
+  { nilai: "tidak", naik: "tidak", pmk: "tidak", judul: "Tidak ada", teks: "Golongan dan masa kerja golongan saya sama dengan SK KGB terakhir." },
+  { nilai: "kp", naik: "ya", pmk: "tidak", judul: "Kenaikan pangkat atau PI", teks: "SK pangkat, termasuk penyesuaian ijazah, ber-TMT sesudah KGB terakhir." },
+  { nilai: "pmk", naik: "tidak", pmk: "ya", judul: "Peninjauan masa kerja (PMK)", teks: "SK PMK yang menambah masa kerja golongan terbit sesudah KGB terakhir." },
+  { nilai: "keduanya", naik: "ya", pmk: "ya", judul: "Keduanya", teks: "Ada SK pangkat atau PI dan SK PMK sesudah KGB terakhir." },
+] as const;
 
 const TANGGAL = /^\d{4}-\d{2}-\d{2}$/;
 const rupiah = (n: number) => "Rp" + new Intl.NumberFormat("id-ID").format(n);
@@ -74,9 +85,11 @@ export default function FormInventaris() {
 
   const ubah = <K extends keyof IsianInventaris>(k: K, v: IsianInventaris[K]) => setIsian((s) => ({ ...s, [k]: v }));
   const pernah = isian.keadaan === "pernah";
-  // Naik pangkat setelah KGB terakhir: golongan dan MKG berasal dari SK kenaikan pangkat, bukan SK KGB (lib/inventarisKgb.ts).
+  // SK kenaikan pangkat/PI atau PMK setelah KGB terakhir: golongan dan MKG diambil dari SK terbaru (lib/inventarisKgb.ts).
   const naik = pernah && isian.naikSetelahKgb === "ya";
-  const daftarBerkas = BERKAS_KEADAAN[isian.keadaan];
+  const pmk = pernah && isian.pmkSetelahKgb === "ya";
+  const perubahan = PILIHAN_PERUBAHAN.find((p) => p.naik === isian.naikSetelahKgb && p.pmk === isian.pmkSetelahKgb)?.nilai ?? null;
+  const daftarBerkas = berkasUntuk(isian);
   const nipSah = /^\d{18}$/.test(isian.nip);
   const lahirNip = tanggalLahirDariNip(isian.nip);
 
@@ -111,7 +124,11 @@ export default function FormInventaris() {
       TANGGAL.test(isian.tmtDasar) &&
       !!isian.nomorSkDasar.trim() &&
       TANGGAL.test(isian.tanggalSkDasar) &&
-      (!pernah || (!!isian.naikSetelahKgb && /^\d{1,2}$/.test(isian.mkgTahun) && TANGGAL.test(isian.tanggalSkPendukung))),
+      (!pernah ||
+        (!!perubahan &&
+          /^\d{1,2}$/.test(isian.mkgTahun) &&
+          TANGGAL.test(isian.tanggalSkPendukung) &&
+          (!pmk || (TANGGAL.test(isian.tmtPmk) && TANGGAL.test(isian.tanggalSkPmk))))),
     berkas: daftarBerkas.every((b) => !galatBerkas(berkas[b.jenis], b)),
     setuju,
   };
@@ -333,21 +350,24 @@ export default function FormInventaris() {
         <fieldset className="iv-kelompok" disabled={mengirim}>
           <legend><span className="iv-nomor">4</span>{pernah ? "Pangkat dan KGB terakhir" : "Pangkat dan pengangkatan"}</legend>
           {pernah && (
-            <div className="iv-bidang iv-tanya" data-salah={dicoba && !isian.naikSetelahKgb ? "" : undefined}>
+            <div className="iv-bidang iv-tanya" data-salah={dicoba && !perubahan ? "" : undefined}>
               <span className="iv-label" data-wajib="" id={`${id}-naik`}>
-                Apakah Anda naik pangkat setelah KGB terakhir, termasuk penyesuaian ijazah (PI)?
+                Setelah KGB terakhir, adakah SK yang mengubah golongan atau masa kerja golongan Anda?
               </span>
               <div className="iv-pilihan" role="radiogroup" aria-labelledby={`${id}-naik`}>
-                {(["ya", "tidak"] as const).map((v) => (
-                  <button key={v} type="button" role="radio" aria-checked={isian.naikSetelahKgb === v} className="iv-opsi" onClick={() => ubah("naikSetelahKgb", v)}>
+                {PILIHAN_PERUBAHAN.map((p) => (
+                  <button
+                    key={p.nilai}
+                    type="button"
+                    role="radio"
+                    aria-checked={perubahan === p.nilai}
+                    className="iv-opsi"
+                    onClick={() => setIsian((s) => ({ ...s, naikSetelahKgb: p.naik, pmkSetelahKgb: p.pmk }))}
+                  >
                     <span className="iv-opsi-titik" aria-hidden="true" />
                     <span className="iv-opsi-teks">
-                      <strong>{v === "ya" ? "Ya" : "Tidak"}</strong>
-                      <span>
-                        {v === "ya"
-                          ? "TMT SK pangkat atau PI saya sesudah TMT KGB terakhir. Golongan dan masa kerja golongan diisi dari SK itu."
-                          : "Golongan saya sama dengan yang tertulis di SK KGB terakhir."}
-                      </span>
+                      <strong>{p.judul}</strong>
+                      <span>{p.teks}</span>
                     </span>
                   </button>
                 ))}
@@ -373,11 +393,15 @@ export default function FormInventaris() {
               <>
                 {bidang({ label: "TMT KGB terakhir", salah: salahTanggal("tmtDasar"), children: tanggal("tmtDasar") })}
                 {bidang({
-                  label: naik ? "Masa kerja golongan pada SK kenaikan pangkat terakhir" : "Masa kerja golongan pada SK KGB terakhir",
+                  label:
+                    naik || pmk
+                      ? "Masa kerja golongan pada SK terbaru"
+                      : "Masa kerja golongan pada SK KGB terakhir",
                   salah: !/^\d{1,2}$/.test(isian.mkgTahun),
-                  bantuan: naik
-                    ? "Salin dari SK pangkat atau PI. Naik dari golongan II ke III memotong masa kerja 5 tahun, dan potongan itu sudah tertulis di SK."
-                    : undefined,
+                  bantuan:
+                    naik || pmk
+                      ? `Salin dari SK yang paling baru${naik && pmk ? " di antara SK pangkat/PI dan SK PMK" : naik ? ", yaitu SK pangkat atau PI" : ", yaitu SK PMK"}.${naik ? " Naik dari golongan II ke III memotong masa kerja 5 tahun, dan potongan itu sudah tertulis di SK." : ""}`
+                      : undefined,
                   children: (
                     <span className="iv-mkg">
                       <span className="iv-satuan">
@@ -399,6 +423,12 @@ export default function FormInventaris() {
                   bantuan: naik ? "Tanggal SK pangkat atau PI yang terbit setelah KGB terakhir." : "Belum pernah naik pangkat? Isi tanggal SK CPNS.",
                   children: tanggal("tanggalSkPendukung"),
                 })}
+                {pmk && (
+                  <>
+                    {bidang({ label: "TMT PMK", salah: salahTanggal("tmtPmk"), bantuan: "Tanggal mulai berlaku pada SK PMK.", children: tanggal("tmtPmk") })}
+                    {bidang({ label: "Tanggal SK PMK", salah: salahTanggal("tanggalSkPmk"), children: tanggal("tanggalSkPmk") })}
+                  </>
+                )}
               </>
             ) : (
               <>

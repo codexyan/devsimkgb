@@ -72,7 +72,7 @@ export const kunciBerkas = (nip: string, nama: string) => `${AWALAN}${nip}/${nam
 
 /** Kunci berkas inventaris yang sah: inventaris/<NIP>/<NIP>_<Jenis>[_yyyy-mm-dd].pdf. */
 export function kunciBerkasSah(kunci: string): boolean {
-  return /^inventaris\/(\d{18})\/\1_(SK-KGB-Terakhir|SK-KP-Terakhir|SK-CPNS|SK-PNS)(_\d{4}-\d{2}-\d{2})?\.pdf$/.test(kunci);
+  return /^inventaris\/(\d{18})\/\1_(SK-KGB-Terakhir|SK-KP-Terakhir|SK-PMK|SK-CPNS|SK-PNS)(_\d{4}-\d{2}-\d{2})?\.pdf$/.test(kunci);
 }
 
 export async function bacaKiriman(nip: string): Promise<KirimanInventaris | null> {

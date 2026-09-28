@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { adaPenandaPdf } from "@/lib/prosesKgb";
 import {
   BATAS_BERKAS_INVENTARIS_BYTE,
-  BERKAS_KEADAAN,
+  BERKAS_MAKS_PER_KIRIMAN,
+  berkasUntuk,
   keadaanFormulir,
   namaBerkasInventaris,
   periksaIsianInventaris,
@@ -16,7 +17,7 @@ export const runtime = "nodejs";
 
 const BIDANG: (keyof IsianInventaris)[] = [
   "nip", "nama", "tempatLahir", "tanggalLahir", "jabatan", "bidang", "golonganRuang", "tmtGolongan",
-  "naikSetelahKgb", "mkgTahun", "mkgBulan", "tmtDasar", "nomorSkDasar", "tanggalSkDasar", "tanggalSkPendukung", "nomorWa", "catatan",
+  "naikSetelahKgb", "pmkSetelahKgb", "tmtPmk", "tanggalSkPmk", "mkgTahun", "mkgBulan", "tmtDasar", "nomorSkDasar", "tanggalSkDasar", "tanggalSkPendukung", "nomorWa", "catatan",
 ];
 
 /**
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
     );
 
   const panjang = Number(req.headers.get("content-length"));
-  if (Number.isFinite(panjang) && panjang > 2 * BATAS_BERKAS_INVENTARIS_BYTE + 64 * 1024)
+  if (Number.isFinite(panjang) && panjang > BERKAS_MAKS_PER_KIRIMAN * BATAS_BERKAS_INVENTARIS_BYTE + 64 * 1024)
     return NextResponse.json({ error: "Ukuran kiriman terlalu besar. Tiap berkas paling besar 1 MB." }, { status: 413 });
 
   let form: FormData;
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
 
   const kurang = periksaIsianInventaris(isian);
   const berkas: { jenis: JenisBerkasInventaris; nama: string; isi: ArrayBuffer }[] = [];
-  for (const aturan of BERKAS_KEADAAN[keadaan]) {
+  for (const aturan of berkasUntuk(isian)) {
     const f = form.get(aturan.jenis);
     if (!(f instanceof File) || f.size === 0) {
       if (aturan.wajib) kurang.push(`berkas ${aturan.label}`);

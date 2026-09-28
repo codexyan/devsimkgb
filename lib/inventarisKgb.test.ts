@@ -7,6 +7,7 @@ import { test } from "node:test";
 import {
   KOLOM_REKAP,
   barisRekap,
+  berkasUntuk,
   namaBerkasInventaris,
   namaFolderPegawai,
   periksaIsianInventaris,
@@ -31,6 +32,9 @@ const pernah: IsianInventaris = {
   golonganRuang: "III/b",
   tmtGolongan: "2023-04-01",
   naikSetelahKgb: "tidak",
+  pmkSetelahKgb: "tidak",
+  tmtPmk: "",
+  tanggalSkPmk: "",
   mkgTahun: "8",
   mkgBulan: "0",
   tmtDasar: "2024-10-01",
@@ -69,8 +73,8 @@ test("belum pernah KGB tidak menuntut masa kerja dan SK kenaikan pangkat", () =>
   const baris = barisRekap(belum);
   assert.equal(baris[0], "Belum pernah KGB");
   assert.equal(baris[10], "");
-  assert.equal(baris[11], "0");
-  assert.equal(baris[12], "0");
+  assert.equal(baris[14], "0");
+  assert.equal(baris[15], "0");
 });
 
 test("kenaikan pangkat setelah KGB terakhir: pertanyaannya wajib dan TMT golongan harus cocok dengan jawabannya", () => {
@@ -87,7 +91,7 @@ test("kenaikan pangkat setelah KGB terakhir: pertanyaannya wajib dan TMT golonga
   };
   assert.deepEqual(periksaIsianInventaris(pi), []);
   assert.equal(barisRekap(pi)[10], "Ya");
-  assert.ok(periksaIsianInventaris({ ...pi, naikSetelahKgb: "" }).some((k) => k.startsWith("jawab apakah Anda naik pangkat")));
+  assert.ok(periksaIsianInventaris({ ...pi, naikSetelahKgb: "" }).some((k) => k.startsWith("jawab apakah ada SK kenaikan pangkat/PI atau SK PMK")));
   assert.ok(periksaIsianInventaris({ ...pi, naikSetelahKgb: "tidak" }).some((k) => k.startsWith("TMT golongan sesudah TMT KGB")));
   assert.ok(periksaIsianInventaris({ ...pi, tmtGolongan: "2024-04-01" }).some((k) => k.startsWith("TMT golongan lebih awal")));
 });
@@ -132,7 +136,7 @@ test("baris rekap sejajar dengan kolomnya dan dirapikan", () => {
   assert.equal(baris[2], "Budi Hartono, S.H.");
   assert.equal(baris[8], "Penata Muda Tingkat I");
   assert.equal(baris[10], "Tidak");
-  assert.equal(baris[17], "081234567890");
+  assert.equal(baris[20], "081234567890");
 });
 
 test("formulir tertutup sendiri saat batas pengisian WITA lewat, dan terbuka lagi dengan batas baru", () => {
@@ -152,4 +156,20 @@ test("teks batas memakai hari dan jam WITA, atau teks lama", () => {
   assert.equal(teksBatas({ tutupPada: "2026-10-10T23:59" }), "Sabtu, 10 Oktober 2026 pukul 23.59 WITA");
   assert.equal(teksBatas({ tutupPada: "", batas: "Jumat, 9 Oktober" }), "Jumat, 9 Oktober");
   assert.equal(teksBatas({}), "");
+});
+
+test("PMK setelah KGB terakhir: SK PMK wajib diunggah, TMT dan tanggal SK PMK wajib diisi", () => {
+  const pmk: IsianInventaris = { ...pernah, pmkSetelahKgb: "ya", tmtPmk: "2025-07-01", tanggalSkPmk: "2025-06-20", mkgTahun: "10" };
+  assert.deepEqual(periksaIsianInventaris(pmk, "2026-09-28"), []);
+  assert.deepEqual(berkasUntuk(pmk).map((b) => b.jenis), ["SK-KGB-Terakhir", "SK-KP-Terakhir", "SK-PMK"]);
+  assert.deepEqual(berkasUntuk(pernah).map((b) => b.jenis), ["SK-KGB-Terakhir", "SK-KP-Terakhir"]);
+  assert.equal(tanggalUntukBerkas(pmk, "SK-PMK"), "2025-06-20");
+  const baris = barisRekap(pmk);
+  assert.deepEqual([baris[11], baris[12], baris[13]], ["Ya", "2025-07-01", "2025-06-20"]);
+  const kurang = periksaIsianInventaris({ ...pmk, tmtPmk: "", tanggalSkPmk: "" }, "2026-09-28");
+  assert.ok(kurang.includes("TMT PMK") && kurang.includes("tanggal SK PMK"));
+  // PMK sebelum KGB terakhir sudah tercakup dalam SK KGB itu.
+  assert.ok(periksaIsianInventaris({ ...pmk, tmtPmk: "2024-01-01" }, "2026-09-28").some((k) => k.startsWith("TMT PMK lebih awal")));
+  // Kiriman dari halaman lama yang belum menanyakan PMK diminta menjawab.
+  assert.ok(periksaIsianInventaris({ ...pernah, pmkSetelahKgb: "" }, "2026-09-28").some((k) => k.startsWith("jawab apakah ada SK")));
 });

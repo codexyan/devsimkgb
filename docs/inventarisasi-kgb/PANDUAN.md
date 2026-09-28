@@ -11,11 +11,13 @@ sebagai ZIP yang foldernya siap diseret ke Google Drive.
 2. Pengumuman di grup WA memuat tautan `kgb.paskalsel.online/inventarisasi-kgb` dan kode aksesnya.
 3. Pegawai memilih keadaan KGB-nya:
    - **Sudah pernah KGB:** mengisi data dan SK KGB terakhir, lalu mengunggah SK KGB terakhir dan SK kenaikan
-     pangkat terakhir. Pegawai juga menjawab apakah ia naik pangkat, termasuk penyesuaian ijazah (PI), setelah
-     KGB terakhir. Bila **Ya**, golongan dan masa kerja golongan (MKG) diisi dari SK kenaikan pangkat itu, bukan
-     dari SK KGB lama. Kenaikan dari golongan II ke III/a memotong MKG 5 tahun, dan potongan itu sudah tertulis di
-     SK. TMT KGB terakhir dan nomor SK KGB tetap dari SK KGB, karena kenaikan pangkat tidak mengubah jadwal KGB.
-     Rekap mencatat jawabannya di kolom *Naik pangkat setelah KGB terakhir*.
+     pangkat terakhir. Pegawai juga menjawab apakah setelah KGB terakhir ada SK yang mengubah golongan atau MKG:
+     *Tidak ada*, *Kenaikan pangkat atau PI*, *Peninjauan masa kerja (PMK)*, atau *Keduanya*. Bila ada,
+     golongan dan masa kerja golongan (MKG) diisi dari SK yang paling baru, bukan dari SK KGB lama. Kenaikan dari
+     golongan II ke III/a memotong MKG 5 tahun, dan potongan itu sudah tertulis di SK. Pegawai dengan PMK juga
+     mengisi TMT dan tanggal SK PMK dan mengunggah SK PMK. TMT dan nomor SK KGB terakhir tetap dari SK KGB.
+     Rekap mencatat jawabannya di kolom *Naik pangkat setelah KGB terakhir*, *PMK setelah KGB terakhir*,
+     *TMT PMK*, dan *Tanggal SK PMK*; berkasnya bernama `NIP_SK-PMK_Tanggal.pdf`.
    - **Belum pernah KGB:** mengisi data dan SK CPNS, lalu mengunggah SK CPNS, dan SK PNS bila sudah terbit.
 4. **Tim SDM KGB atau Super Admin** membuka *Inventarisasi KGB*, meninjau daftar kiriman (berkasnya bisa
    dipratinjau), lalu menekan **Unduh semua (ZIP)**.
