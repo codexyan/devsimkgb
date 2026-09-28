@@ -98,8 +98,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
+  // Berkas kiriman yang sudah disalin ke arsip (ADR-024) tidak ditampilkan dua kali; yang tampil salinannya.
+  const sudahDiarsip = new Set(arsip.map((d) => d.asal).filter(Boolean));
   for (const { kegiatan, kiriman } of inventaris) {
     for (const b of kiriman.berkas) {
+      if (sudahDiarsip.has(b.kunci)) continue;
       const tanggal = /_(\d{4}-\d{2}-\d{2})\.pdf$/.exec(b.nama)?.[1] ?? "";
       hasil.push({
         id: `inventaris-${kegiatan.id}-${b.jenis}`,

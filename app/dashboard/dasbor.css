@@ -2326,3 +2326,4 @@ html[data-gerak="kurangi"] .dsb-putar {
 .pmh-peringatan { margin: 0; padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: var(--dt2); background: var(--tint-amber-bg); border: 0.5px solid var(--tint-amber-ln); }
 .pmh-status { grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto; }
 .pmh-status .pmh-catatan .dsb-cari { width: 100%; }
+.pmh-berkas { display: flex; flex-wrap: wrap; gap: 8px; }

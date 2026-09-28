@@ -17,10 +17,16 @@ import {
   namaSatker,
   satkerPilihan,
   tautanKegiatan,
+  templateTersedia,
   type Kegiatan,
   type TemplateKegiatan,
 } from "@/lib/kegiatanInventaris";
 import type { KirimanInventaris } from "@/lib/inventarisServer";
+import { KerangkaModal, ModalPratinjauBerkas } from "@/app/dashboard/components/kgb";
+import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
+import ModalPmk from "@/app/dashboard/components/ModalPmk";
+import KartuKiriman, { NADA_STATUS, type PegawaiLengkap, type Pemutakhiran } from "./KartuKiriman";
+import { LABEL_TINDAK_LANJUT, type StatusTindakLanjut } from "@/lib/pemutakhiranPegawai";
 import { SATKER } from "@/lib/satker";
 import { keCsv } from "@/lib/cadangan";
 import { formatTanggalId } from "@/lib/waktu";
@@ -68,10 +74,27 @@ const formDari = (k: Kegiatan): FormKegiatan => ({
   satker: k.satker,
 });
 
+/** Kiriman beserta perbandingannya dengan Data Pegawai (GET /api/inventarisasi). */
+type KirimanAntrian = KirimanInventaris & Pick<Pemutakhiran, "banding" | "peringatan"> & { pegawaiId: string | null };
+
+/** Ringkasan sel Perbandingan: jumlah isian berbeda, atau keterangan bila pegawainya belum tercatat. */
+function selBanding(k: KirimanAntrian): { teks: string; nada?: string } {
+  if (!k.pegawaiId) return { teks: "Belum terdaftar di SIM-KGB", nada: "kuning" };
+  const beda = k.banding.filter((b) => b.beda).length;
+  if (beda === 0) return { teks: k.peringatan.length > 0 ? "Sama, ada peringatan" : "Sama dengan SIM-KGB" };
+  return { teks: `${beda} isian berbeda`, nada: "kuning" };
+}
+
 export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boolean }) {
   const [daftarKeg, setDaftarKeg] = useState<Kegiatan[]>([]);
   const [aktifId, setAktifId] = useState<string | null>(null);
-  const [kiriman, setKiriman] = useState<KirimanInventaris[] | null>(null);
+  const [kiriman, setKiriman] = useState<KirimanAntrian[] | null>(null);
+  // Panel periksa: satu kiriman dibandingkan dan ditindaklanjuti di tempat, tanpa pindah ke Data Pegawai (ADR-024).
+  const [periksa, setPeriksa] = useState<{ k: KirimanAntrian; pegawai: PegawaiLengkap } | null>(null);
+  const [memuatPeriksa, setMemuatPeriksa] = useState<string | null>(null);
+  const [catat, setCatat] = useState<"kp" | "pmk" | null>(null);
+  const [berkasPratinjau, setBerkasPratinjau] = useState<{ judul: string; url: string } | null>(null);
+  const [saringKerja, setSaringKerja] = useState(false);
   const [form, setForm] = useState<FormKegiatan>({ nama: "", terbuka: false, kode: "", tutupPada: "", satker: [] });
   const [baru, setBaru] = useState<{ nama: string; template: TemplateKegiatan }>({ nama: "", template: "kgb-upt" });
   const [galat, setGalat] = useState<string | null>(null);
@@ -90,7 +113,7 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
       const d = (await res.json().catch(() => ({}))) as {
         kegiatan?: Kegiatan[];
         aktif?: string;
-        kiriman?: KirimanInventaris[];
+        kiriman?: KirimanAntrian[];
         error?: string;
       };
       if (!res.ok || !d.kiriman || !d.kegiatan || !d.aktif) throw new Error(d.error ?? "Data inventarisasi gagal dimuat");
@@ -124,9 +147,10 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
     return (kiriman ?? []).filter(
       (k) =>
         (saring === "semua" || k.isian.keadaan === saring) &&
+        (!saringKerja || (k.tindakLanjut?.status ?? "belum_diperiksa") === "belum_diperiksa" || k.banding.some((b) => b.beda)) &&
         (!q || `${k.isian.nama} ${k.isian.nip} ${k.isian.bidang} ${namaSatker(k.isian.satker)}`.toLowerCase().includes(q)),
     );
-  }, [kiriman, cari, saring]);
+  }, [kiriman, cari, saring, saringKerja]);
 
   const jumlah = (k: KeadaanKgb) => (kiriman ?? []).filter((x) => x.isian.keadaan === k).length;
 
@@ -180,14 +204,29 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
     }
   }
 
-  async function hapus(k: KirimanInventaris) {
+  async function bukaPeriksa(k: KirimanAntrian) {
+    if (!k.pegawaiId) return;
+    setMemuatPeriksa(k.isian.nip);
+    setGalat(null);
+    try {
+      const res = await fetch(`/api/pegawai/${k.pegawaiId}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Data pegawai gagal dimuat.");
+      setPeriksa({ k, pegawai: (await res.json()) as PegawaiLengkap });
+    } catch (e) {
+      setGalat(e instanceof Error ? e.message : "Data pegawai gagal dimuat.");
+    } finally {
+      setMemuatPeriksa(null);
+    }
+  }
+
+  async function hapus(k: KirimanAntrian) {
     if (!aktif || !window.confirm(`Hapus kiriman ${k.isian.nama} (${k.isian.nip}) beserta berkasnya?`)) return;
     const res = await fetch(`/api/inventarisasi/${k.isian.nip}?kegiatan=${encodeURIComponent(aktif.id)}`, { method: "DELETE" });
     if (res.ok) void muat(aktif.id);
     else setGalat("Kiriman gagal dihapus");
   }
 
-  async function unduhZip(daftar: KirimanInventaris[]) {
+  async function unduhZip(daftar: KirimanAntrian[]) {
     if (!aktif) return;
     setGalat(null);
     const total = daftar.reduce((n, k) => n + k.berkas.length, 0);
@@ -385,7 +424,7 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
             <label className="inv-bidang">
               <span>Template</span>
               <select className="dsb-cari" value={baru.template} onChange={(e) => setBaru((b) => ({ ...b, template: e.target.value as TemplateKegiatan }))}>
-                {(Object.keys(TEMPLATE_KEGIATAN) as TemplateKegiatan[]).map((t) => (
+                {templateTersedia().map((t) => (
                   <option key={t} value={t}>{TEMPLATE_KEGIATAN[t].label}</option>
                 ))}
               </select>
@@ -399,7 +438,9 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
             </button>
             <p className="inv-bantu">
               {TEMPLATE_KEGIATAN[baru.template].keterangan} Kegiatan baru mendapat tautannya sendiri dan masih ditutup
-              sampai Anda mengatur kode akses dan membukanya.
+              sampai Anda mengatur kode akses dan membukanya.{" "}
+              Pemutakhiran data pegawai UPT tidak lewat sini, melainkan lewat Usulan UPT, supaya UPT tidak mengirim data
+              yang sama di dua tempat.
             </p>
           </div>
         </details>
@@ -419,6 +460,10 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
               </button>
             ))}
           </div>
+          <label className="inv-cek">
+            <input type="checkbox" className="dsb-cek" checked={saringKerja} onChange={(e) => setSaringKerja(e.target.checked)} />
+            Perlu dikerjakan
+          </label>
           <input
             type="search"
             className="dsb-cari"
@@ -441,11 +486,11 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
                   <th scope="col">Pegawai</th>
                   {pakaiSatker && <th scope="col">Satker</th>}
                   <th scope="col">Keadaan</th>
-                  <th scope="col">Golongan</th>
-                  <th scope="col">TMT KGB terakhir / CPNS</th>
+                  <th scope="col">Perbandingan</th>
+                  <th scope="col">Tindak lanjut</th>
                   <th scope="col">Berkas</th>
                   <th scope="col">Dikirim</th>
-                  {superAdmin && <th scope="col" className="kanan">Tindakan</th>}
+                  <th scope="col" className="kanan">Tindakan</th>
                 </tr>
               </thead>
               <tbody>
@@ -459,8 +504,34 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
                     <td>
                       <span className="dsb-tag" data-nada={k.isian.keadaan === "pernah" ? "biru" : "hijau"}>{LABEL_KEADAAN[k.isian.keadaan]}</span>
                     </td>
-                    <td className="whitespace-nowrap">{k.isian.golonganRuang}{k.isian.keadaan === "pernah" ? ` · MKG ${k.isian.mkgTahun}/${k.isian.mkgBulan || "0"}` : ""}</td>
-                    <td className="whitespace-nowrap">{k.isian.tmtDasar ? formatTanggalId(k.isian.tmtDasar) : "-"}</td>
+                    <td>
+                      {(() => {
+                        const sel = selBanding(k);
+                        return (
+                          <>
+                            <span className="dsb-tag" data-nada={sel.nada}>{sel.teks}</span>
+                            {k.peringatan.length > 0 && (
+                              <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-amber)" }}>
+                                {k.peringatan.length} peringatan
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </td>
+                    <td>
+                      {(() => {
+                        const st: StatusTindakLanjut = k.tindakLanjut?.status ?? "belum_diperiksa";
+                        return (
+                          <>
+                            <span className="dsb-tag" data-nada={NADA_STATUS[st]}>{LABEL_TINDAK_LANJUT[st]}</span>
+                            {k.tindakLanjut?.oleh && (
+                              <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>{k.tindakLanjut.oleh}</p>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </td>
                     <td>
                       <div className="inv-berkas">
                         {k.berkas.map((b) => (
@@ -474,13 +545,23 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
                       {waktuWita(k.waktu)}
                       {k.kirimanKe > 1 && <> · ke-{k.kirimanKe}</>}
                     </td>
-                    {superAdmin && (
-                      <td className="kanan">
-                        <button type="button" className="dsb-ikon-tombol" data-nada="merah" aria-label={`Hapus kiriman ${k.isian.nama}`} onClick={() => void hapus(k)}>
+                    <td className="kanan whitespace-nowrap">
+                      <button
+                        type="button"
+                        className="dsb-tombol"
+                        data-jenis="garis"
+                        disabled={!k.pegawaiId || memuatPeriksa === k.isian.nip}
+                        title={k.pegawaiId ? undefined : "Pegawai belum tercatat di Data Pegawai"}
+                        onClick={() => void bukaPeriksa(k)}
+                      >
+                        {memuatPeriksa === k.isian.nip ? "Memuat…" : "Periksa"}
+                      </button>
+                      {superAdmin && (
+                        <button type="button" className="dsb-ikon-tombol" data-nada="merah" aria-label={`Hapus kiriman ${k.isian.nama}`} onClick={() => void hapus(k)} style={{ marginLeft: 6 }}>
                           ×
                         </button>
-                      </td>
-                    )}
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -488,6 +569,80 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
           </div>
         )}
       </section>
+
+      {periksa && (
+        <KerangkaModal
+          judul="Periksa kiriman"
+          subjudul={`${periksa.k.isian.nama} · ${periksa.k.isian.nip}`}
+          ukuran="lg"
+          onTutup={() => setPeriksa(null)}
+          kaki={
+            <button type="button" className="dsb-tombol" onClick={() => setPeriksa(null)}>
+              Tutup
+            </button>
+          }
+        >
+          <KartuKiriman
+            p={{ kegiatan: { id: aktif?.id ?? "", nama: aktif?.nama ?? "" }, kiriman: periksa.k, banding: periksa.k.banding, peringatan: periksa.k.peringatan }}
+            pegawai={periksa.pegawai}
+            bolehUbah
+            onGalat={setGalat}
+            onBerhasil={(teks) => {
+              setPesan(teks);
+              setPeriksa(null);
+              void muat(aktif?.id);
+            }}
+            onCatat={setCatat}
+            onLihatBerkas={setBerkasPratinjau}
+          />
+        </KerangkaModal>
+      )}
+
+      {berkasPratinjau && (
+        <ModalPratinjauBerkas
+          judul={berkasPratinjau.judul}
+          subjudul={periksa ? `${periksa.k.isian.nama} · ${periksa.k.isian.nip}` : undefined}
+          url={berkasPratinjau.url}
+          onTutup={() => setBerkasPratinjau(null)}
+        />
+      )}
+
+      {periksa && catat === "kp" && (
+        <ModalKenaikanPangkat
+          pegawai={periksa.pegawai}
+          awal={{
+            golonganBaru:
+              periksa.k.isian.golonganRuang !== periksa.pegawai.golonganRuang ? periksa.k.isian.golonganRuang : "",
+            tanggalSK: periksa.k.isian.keadaan === "pernah" ? periksa.k.isian.tanggalSkPendukung : "",
+            tmtPangkat: periksa.k.isian.tmtGolongan,
+          }}
+          onTutup={() => setCatat(null)}
+          onBerhasil={(teks) => {
+            setCatat(null);
+            setPeriksa(null);
+            setPesan(teks);
+            void muat(aktif?.id);
+          }}
+        />
+      )}
+      {periksa && catat === "pmk" && (
+        <ModalPmk
+          pegawai={periksa.pegawai}
+          awal={{
+            tanggalSK: periksa.k.isian.tanggalSkPmk,
+            tmtPmk: periksa.k.isian.tmtPmk,
+            mkgTahunSk: periksa.k.isian.mkgTahun,
+            mkgBulanSk: periksa.k.isian.mkgBulan,
+          }}
+          onTutup={() => setCatat(null)}
+          onBerhasil={(teks) => {
+            setCatat(null);
+            setPeriksa(null);
+            setPesan(teks);
+            void muat(aktif?.id);
+          }}
+        />
+      )}
     </div>
   );
 }

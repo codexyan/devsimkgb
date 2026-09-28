@@ -16,6 +16,11 @@ export interface AturanTemplate {
   keterangan: string;
   /** true bila pengisi memilih satkernya; kiriman dikelompokkan per satker. */
   pakaiSatker: boolean;
+  /**
+   * Template yang tidak lagi ditawarkan untuk kegiatan baru (ADR-024). Kegiatan yang sudah dibuat dengannya tetap
+   * terbaca dan dapat ditutup, supaya kiriman yang sudah masuk tidak hilang.
+   */
+  usang?: { alasan: string };
 }
 
 export const TEMPLATE_KEGIATAN: Record<TemplateKegiatan, AturanTemplate> = {
@@ -28,11 +33,20 @@ export const TEMPLATE_KEGIATAN: Record<TemplateKegiatan, AturanTemplate> = {
     label: "Inventarisasi KGB pegawai UPT",
     keterangan: "Isian yang sama dengan inventarisasi Kanwil, ditambah satker; kiriman dikelompokkan per satker.",
     pakaiSatker: true,
+    usang: {
+      alasan:
+        "Pemutakhiran data pegawai UPT kini lewat Usulan UPT, supaya UPT tidak mengirim data yang sama di dua tempat (ADR-024).",
+    },
   },
 };
 
 export function isTemplateKegiatan(nilai: unknown): nilai is TemplateKegiatan {
   return typeof nilai === "string" && Object.prototype.hasOwnProperty.call(TEMPLATE_KEGIATAN, nilai);
+}
+
+/** Template yang masih boleh dipakai untuk kegiatan baru. */
+export function templateTersedia(): TemplateKegiatan[] {
+  return (Object.keys(TEMPLATE_KEGIATAN) as TemplateKegiatan[]).filter((t) => !TEMPLATE_KEGIATAN[t].usang);
 }
 
 export interface Kegiatan {
@@ -145,11 +159,15 @@ export function namaSatker(kode: string | undefined): string {
 }
 
 /** Kekurangan pengaturan kegiatan sebelum disimpan; kosong berarti siap. `sekarang` untuk memeriksa waktu tutup. */
-export function periksaKegiatan(k: Kegiatan, sekarang: Date = new Date()): string[] {
+export function periksaKegiatan(k: Kegiatan, sekarang: Date = new Date(), baru = false): string[] {
   const kurang: string[] = [];
   if (!idKegiatanSah(k.id)) kurang.push("Id kegiatan 3 sampai 40 huruf kecil, angka, atau tanda hubung.");
   if (k.nama.trim().length < 3) kurang.push("Nama kegiatan minimal 3 huruf.");
   if (!isTemplateKegiatan(k.template)) kurang.push("Template kegiatan tidak dikenal.");
+  else if (baru) {
+    const usang = TEMPLATE_KEGIATAN[k.template].usang;
+    if (usang) kurang.push(usang.alasan);
+  }
   const upt = new Set(SATKER.filter((s) => s.jenis !== "kanwil").map((s) => s.kode));
   if (k.satker.some((s) => !upt.has(s))) kurang.push("Satker sasaran tidak dikenal.");
   if (k.terbuka && !/^[A-Z0-9-]{4,30}$/.test(k.kode)) kurang.push("Kode akses 4 sampai 30 huruf atau angka, tanpa spasi.");

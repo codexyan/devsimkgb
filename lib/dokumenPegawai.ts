@@ -36,6 +36,11 @@ export interface DokumenArsip {
   diunggahOleh: string;
   /** ISO */
   diunggahAt: string;
+  /**
+   * Kunci R2 berkas asal bila dokumen ini disalin otomatis dari kiriman formulir (ADR-024); kosong bila diunggah
+   * Tim SDM. Dipakai agar kiriman yang sama tidak tersalin dua kali.
+   */
+  asal?: string;
 }
 
 /** Batas ukuran satu dokumen arsip. */
@@ -84,3 +89,18 @@ export interface DokumenPegawai {
   /** Hanya dokumen arsip yang dapat dihapus dari tab ini. */
   bisaHapus: boolean;
 }
+
+/**
+ * Jenis dokumen arsip untuk tiap berkas kiriman formulir (ADR-024): berkas kiriman yang sudah diperiksa Tim SDM
+ * disalin ke arsip dokumen pegawai, sehingga SIM-KGB menjadi rujukan dan ZIP ke Google Drive hanya cadangan.
+ */
+export const JENIS_DARI_BERKAS_INVENTARIS: Record<string, JenisDokumen> = {
+  "SK-KGB-Terakhir": "sk_kgb",
+  "SK-KP-Terakhir": "sk_pangkat",
+  "SK-PMK": "sk_pmk",
+  "SK-CPNS": "sk_cpns",
+  "SK-PNS": "sk_pns",
+};
+
+/** Status tindak lanjut kiriman yang membuat berkasnya disalin ke arsip dokumen pegawai. */
+export const STATUS_SALIN_ARSIP = ["sesuai", "diterapkan"] as const;

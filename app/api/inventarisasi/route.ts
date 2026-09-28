@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { db } from "@/lib/db";
+import { bandingkanKiriman, peringatanKiriman } from "@/lib/pemutakhiranPegawai";
 import { canProcessKGB, isSuperAdmin } from "@/lib/auth";
 import { penggunaLogin, PESAN_SESI_BERAKHIR } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
@@ -28,9 +30,23 @@ export async function GET(req: Request) {
   const diminta = new URL(req.url).searchParams.get("kegiatan") ?? ID_KEGIATAN_KANWIL;
   const aktif = kegiatan.find((k) => k.id === diminta) ?? kegiatan[0];
   const kiriman = await daftarKiriman(aktif.id);
+  // Antrian pemeriksaan (ADR-024): tiap kiriman dibandingkan dengan Data Pegawai di sini, supaya daftarnya langsung
+  // menunjukkan mana yang perlu dikerjakan dan Tim SDM tidak perlu membuka satu per satu.
+  const pegawai = await db.pegawai.findMany();
+  const byNip = new Map(pegawai.map((p) => [p.nip, p]));
+  const diperiksa = kiriman.map((k) => {
+    const p = byNip.get(k.isian.nip);
+    if (!p) return { ...k, pegawaiId: null, banding: [], peringatan: [] };
+    return {
+      ...k,
+      pegawaiId: p.id,
+      banding: bandingkanKiriman(p, k.isian),
+      peringatan: peringatanKiriman(p, k.isian),
+    };
+  });
   const superAdmin = isSuperAdmin(role);
   return NextResponse.json(
-    { kegiatan: superAdmin ? kegiatan : kegiatan.map((k) => ({ ...k, kode: "" })), aktif: aktif.id, kiriman },
+    { kegiatan: superAdmin ? kegiatan : kegiatan.map((k) => ({ ...k, kode: "" })), aktif: aktif.id, kiriman: diperiksa },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -98,7 +114,7 @@ export async function POST(req: Request) {
   const semua = await daftarKegiatan();
   const id = idDariNama(typeof body.nama === "string" ? body.nama : "", new Set(semua.map((k) => k.id)));
   const kegiatan = { ...kegiatanDariBadan(body, null, id), diubahOleh: cek.pengguna.nama, diubahAt: new Date().toISOString() };
-  const kurang = periksaKegiatan(kegiatan);
+  const kurang = periksaKegiatan(kegiatan, new Date(), true);
   if (kurang.length > 0) return NextResponse.json({ error: kurang.join(" ") }, { status: 400 });
 
   await simpanKegiatan(kegiatan);

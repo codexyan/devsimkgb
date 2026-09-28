@@ -13,6 +13,7 @@ import {
   periksaKegiatan,
   satkerPilihan,
   tautanKegiatan,
+  templateTersedia,
   type Kegiatan,
 } from "./kegiatanInventaris";
 
@@ -73,4 +74,22 @@ test("pemeriksaan pengaturan kegiatan", () => {
   assert.ok(periksaKegiatan({ ...k, satker: ["kanwil"] }, sekarang).some((p) => p.startsWith("Satker sasaran")));
   // Kegiatan yang ditutup boleh tanpa kode.
   assert.deepEqual(periksaKegiatan({ ...k, terbuka: false, kode: "" }, sekarang), []);
+});
+
+test("template UPT tidak lagi ditawarkan untuk kegiatan baru, tetapi kegiatan lamanya tetap sah (ADR-024)", () => {
+  assert.deepEqual(templateTersedia(), ["kgb-kanwil"]);
+  const upt: Kegiatan = {
+    id: "kgb-upt-2026",
+    nama: "Inventarisasi KGB UPT 2026",
+    template: "kgb-upt",
+    satker: [],
+    terbuka: true,
+    kode: "UPT2026",
+    tutupPada: "2026-10-31T23:59",
+  };
+  const sekarang = new Date("2026-10-01T08:00:00+08:00");
+  // Kegiatan yang sudah ada tetap dapat disimpan (mis. untuk ditutup); hanya kegiatan baru yang ditolak.
+  assert.deepEqual(periksaKegiatan(upt, sekarang), []);
+  assert.ok(periksaKegiatan(upt, sekarang, true).some((p) => p.includes("Usulan UPT")));
+  assert.deepEqual(periksaKegiatan({ ...upt, template: "kgb-kanwil" }, sekarang, true), []);
 });

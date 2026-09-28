@@ -74,3 +74,17 @@ Inventarisasi KGB Kanwil 2026-10-10.zip
    kolom *Satker*.
 
 Formulir pegawai Kanwil tetap di `kgb.paskalsel.online/inventarisasi-kgb`, dan kiriman lamanya tidak berubah.
+
+## Memeriksa kiriman (ADR-024)
+
+1. Buka *Inventarisasi KGB*. Kolom **Perbandingan** menunjukkan berapa isian yang berbeda dengan Data Pegawai,
+   dan kolom **Tindak lanjut** menunjukkan status pemeriksaannya. Centang **Perlu dikerjakan** untuk menyaring
+   kiriman yang belum diperiksa atau yang datanya berbeda.
+2. Tekan **Periksa** pada baris pegawai. Di panel itu Anda dapat melihat perbandingan dan peringatan, membuka
+   pratinjau berkas SK, menerapkan isian ke Data Pegawai, serta mencatat kenaikan pangkat atau PMK.
+3. Tandai statusnya: *Sesuai*, *Perlu perbaikan* (dengan catatan), atau *Sudah diterapkan*. Begitu ditandai
+   sesuai atau sudah diterapkan, berkas kiriman otomatis masuk **arsip dokumen pegawai**, sehingga SIM-KGB
+   menjadi rujukan dan unduhan ZIP ke Google Drive hanya cadangan.
+
+Pemutakhiran data pegawai UPT tidak lagi lewat kegiatan inventarisasi, melainkan lewat **Usulan UPT**, supaya
+UPT tidak mengirim data yang sama di dua tempat.
