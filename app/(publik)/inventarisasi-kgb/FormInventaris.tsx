@@ -10,6 +10,7 @@ import {
   namaBerkasInventaris,
   namaFolderPegawai,
   periksaIsianInventaris,
+  tanggalLahirDariNip,
   tanggalUntukBerkas,
   type AturanBerkas,
   type IsianInventaris,
@@ -77,6 +78,7 @@ export default function FormInventaris() {
   const naik = pernah && isian.naikSetelahKgb === "ya";
   const daftarBerkas = BERKAS_KEADAAN[isian.keadaan];
   const nipSah = /^\d{18}$/.test(isian.nip);
+  const lahirNip = tanggalLahirDariNip(isian.nip);
 
   // URL pratinjau untuk tiap berkas terpilih; dicabut saat berkasnya berganti agar memori dilepas.
   const urlBerkas = useMemo(() => {
@@ -102,7 +104,7 @@ export default function FormInventaris() {
   const lengkap = {
     kode: kode.trim().length >= 4,
     identitas:
-      nipSah && isian.nama.trim().length >= 3 && isian.tempatLahir.trim().length >= 3 && TANGGAL.test(isian.tanggalLahir) && isian.jabatan.trim().length >= 2,
+      nipSah && isian.nama.trim().length >= 3 && isian.tempatLahir.trim().length >= 3 && TANGGAL.test(isian.tanggalLahir) && (!lahirNip || isian.tanggalLahir === lahirNip) && isian.jabatan.trim().length >= 2,
     pangkat:
       !!isian.golonganRuang &&
       TANGGAL.test(isian.tmtGolongan) &&
@@ -286,8 +288,30 @@ export default function FormInventaris() {
         <fieldset className="iv-kelompok" disabled={mengirim}>
           <legend><span className="iv-nomor">3</span>Identitas</legend>
           <div className="iv-kisi">
-            {bidang({ label: "NIP", salah: !nipSah, bantuan: dicoba && !nipSah ? "NIP terdiri atas 18 angka." : undefined, children: teks("nip", "18 angka", "numeric") })}
-            {bidang({ label: "Tanggal lahir", salah: salahTanggal("tanggalLahir"), children: tanggal("tanggalLahir") })}
+            {bidang({
+              label: "NIP",
+              salah: !nipSah,
+              bantuan: dicoba && !nipSah ? "NIP terdiri atas 18 angka." : undefined,
+              children: (
+                <input
+                  className="iv-isian"
+                  inputMode="numeric"
+                  placeholder="18 angka"
+                  value={isian.nip}
+                  onChange={(e) => {
+                    const nip = e.target.value.replace(/\D/g, "");
+                    // 8 angka pertama NIP adalah tanggal lahir; diisikan bila pegawai belum mengisinya sendiri.
+                    setIsian((s) => ({ ...s, nip, tanggalLahir: s.tanggalLahir || tanggalLahirDariNip(nip) }));
+                  }}
+                />
+              ),
+            })}
+            {bidang({
+              label: "Tanggal lahir",
+              salah: salahTanggal("tanggalLahir") || (!!lahirNip && isian.tanggalLahir !== lahirNip),
+              bantuan: lahirNip && isian.tanggalLahir && isian.tanggalLahir !== lahirNip ? "Tidak sama dengan tanggal lahir pada NIP." : undefined,
+              children: tanggal("tanggalLahir"),
+            })}
             {bidang({ label: "Nama lengkap dengan gelar", lebar: true, salah: kosongTeks("nama", 3), children: teks("nama", "Sesuai SK terakhir") })}
             {bidang({
               label: "Tempat lahir",

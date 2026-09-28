@@ -10,7 +10,9 @@ import {
   namaBerkasInventaris,
   namaFolderPegawai,
   periksaIsianInventaris,
+  tanggalLahirDariNip,
   tanggalUntukBerkas,
+  tmtCpnsDariNip,
   type IsianInventaris,
 } from "./inventarisKgb";
 
@@ -84,6 +86,34 @@ test("kenaikan pangkat setelah KGB terakhir: pertanyaannya wajib dan TMT golonga
   assert.ok(periksaIsianInventaris({ ...pi, naikSetelahKgb: "" }).some((k) => k.startsWith("jawab apakah Anda naik pangkat")));
   assert.ok(periksaIsianInventaris({ ...pi, naikSetelahKgb: "tidak" }).some((k) => k.startsWith("TMT golongan sesudah TMT KGB")));
   assert.ok(periksaIsianInventaris({ ...pi, tmtGolongan: "2024-04-01" }).some((k) => k.startsWith("TMT golongan lebih awal")));
+});
+
+test("tanggal lahir harus sama dengan NIP dan usianya wajar", () => {
+  assert.equal(tanggalLahirDariNip("196911091994032001"), "1969-11-09");
+  assert.equal(tanggalLahirDariNip("19691339199403200"), "");
+  assert.equal(tmtCpnsDariNip("200001032025061009"), "2025-06-01");
+  // Kiriman nyata: tanggal lahir terisi tanggal hari pengisian.
+  const hariIni = periksaIsianInventaris({ ...pernah, tanggalLahir: "2026-09-28" }, "2026-09-28");
+  assert.ok(hariIni.some((k) => k.startsWith("tanggal lahir tidak sama dengan NIP (NIP Anda menunjukkan 01-01-1990)")));
+  // NIP dengan tanggal lahir tak sah tidak dicocokkan, tetapi usianya tetap diperiksa.
+  const nipAneh = { ...pernah, nip: "199013012015031001", tanggalLahir: "2020-01-01" };
+  assert.ok(periksaIsianInventaris(nipAneh, "2026-09-28").includes("tanggal lahir tidak wajar; periksa tahunnya"));
+  assert.deepEqual(periksaIsianInventaris(pernah, "2026-09-28"), []);
+});
+
+test("Sudah pernah KGB ditolak bila TMT KGB terakhir tidak sesudah TMT CPNS pada NIP", () => {
+  // Kiriman nyata: CPNS TMT Juni 2025 memilih "Sudah pernah KGB" dengan TMT KGB = TMT CPNS.
+  const cpns: IsianInventaris = {
+    ...pernah,
+    nip: "200001032025061009",
+    tanggalLahir: "2000-01-03",
+    golonganRuang: "III/a",
+    tmtGolongan: "2025-06-01",
+    tmtDasar: "2025-06-01",
+    mkgTahun: "1",
+  };
+  assert.ok(periksaIsianInventaris(cpns, "2026-09-28").some((k) => k.startsWith("TMT KGB terakhir tidak sesudah TMT CPNS")));
+  assert.ok(periksaIsianInventaris({ ...cpns, keadaan: "belum" }, "2026-09-28").every((k) => !k.startsWith("TMT KGB terakhir")));
 });
 
 test("kiriman lama tanpa jawaban kenaikan pangkat tetap terbaca di rekap", () => {

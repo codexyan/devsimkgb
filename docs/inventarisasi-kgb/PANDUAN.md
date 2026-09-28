@@ -49,6 +49,9 @@ Inventarisasi KGB Kanwil 2026-10-10.zip
   menandainya "ke-2", "ke-3", dan seterusnya.
 - **Pembatasan:** tanpa kode akses yang benar, kiriman ditolak. Kode salah dihitung sebagai percobaan gagal,
   dan alamat yang terlalu sering salah ditahan sementara.
+- **Pemeriksaan dengan NIP:** tanggal lahir harus sama dengan 8 angka pertama NIP (formulir mengisikannya
+  otomatis). Untuk *Sudah pernah KGB*, TMT KGB terakhir harus sesudah bulan TMT CPNS pada NIP (angka ke-9 sampai
+  14); CPNS yang belum pernah menerima SK KGB diarahkan memilih *Belum pernah KGB*.
 - **Berkas:** harus PDF, paling besar 1 MB per berkas.
 - **Penyimpanan:** kiriman berada di penyimpanan berkas SIM-KGB (R2, awalan `inventaris/`), dan hanya dapat
   dibuka Super Admin dan Tim SDM KGB. Super Admin dapat menghapus kiriman yang keliru atau kiriman uji.

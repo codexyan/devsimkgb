@@ -116,13 +116,42 @@ export function tanggalUntukBerkas(isian: IsianInventaris, jenis: JenisBerkasInv
 
 const TANGGAL = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Kekurangan isian sebelum dikirim; kosong berarti siap. Berkas diperiksa terpisah di formulir. */
-export function periksaIsianInventaris(isian: IsianInventaris): string[] {
+/** Tanggal lahir yang tertulis di NIP (8 angka pertama), yyyy-mm-dd, atau "" bila bukan tanggal yang sah. */
+export function tanggalLahirDariNip(nip: string): string {
+  if (!/^\d{18}$/.test(nip)) return "";
+  const iso = `${nip.slice(0, 4)}-${nip.slice(4, 6)}-${nip.slice(6, 8)}`;
+  const d = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso ? iso : "";
+}
+
+/** Awal bulan TMT CPNS yang tertulis di NIP (angka ke-9 sampai 14), yyyy-mm-01, atau "" bila tidak sah. */
+export function tmtCpnsDariNip(nip: string): string {
+  if (!/^\d{18}$/.test(nip)) return "";
+  const bulan = Number(nip.slice(12, 14));
+  return bulan >= 1 && bulan <= 12 ? `${nip.slice(8, 12)}-${nip.slice(12, 14)}-01` : "";
+}
+
+/** Usia pegawai yang wajar pada tanggal lahir yang diisi (CPNS paling muda 18 tahun, pensiun paling lambat 65). */
+const USIA_MIN = 18;
+const USIA_MAKS = 65;
+
+/**
+ * Kekurangan isian sebelum dikirim; kosong berarti siap. Berkas diperiksa terpisah di formulir. `hariIni`
+ * (yyyy-mm-dd) hanya dipakai untuk memeriksa usia.
+ */
+export function periksaIsianInventaris(isian: IsianInventaris, hariIni = new Date().toISOString().slice(0, 10)): string[] {
   const kurang: string[] = [];
   if (!/^\d{18}$/.test(isian.nip)) kurang.push("NIP harus 18 angka");
   if (RAPIKAN(isian.nama).length < 3) kurang.push("nama lengkap");
   if (RAPIKAN(isian.tempatLahir).length < 3) kurang.push("tempat lahir");
+  const lahirNip = tanggalLahirDariNip(isian.nip);
   if (!TANGGAL.test(isian.tanggalLahir)) kurang.push("tanggal lahir");
+  else if (lahirNip && isian.tanggalLahir !== lahirNip)
+    kurang.push(`tanggal lahir tidak sama dengan NIP (NIP Anda menunjukkan ${lahirNip.split("-").reverse().join("-")})`);
+  else {
+    const usia = Number(hariIni.slice(0, 4)) - Number(isian.tanggalLahir.slice(0, 4)) - (hariIni.slice(5) < isian.tanggalLahir.slice(5) ? 1 : 0);
+    if (usia < USIA_MIN || usia > USIA_MAKS) kurang.push("tanggal lahir tidak wajar; periksa tahunnya");
+  }
   if (RAPIKAN(isian.jabatan).length < 2) kurang.push("jabatan");
   if (!Object.prototype.hasOwnProperty.call(GOLONGAN_PANGKAT, isian.golonganRuang)) kurang.push("golongan ruang");
   if (!TANGGAL.test(isian.tmtGolongan)) kurang.push("TMT golongan");
@@ -135,6 +164,11 @@ export function periksaIsianInventaris(isian: IsianInventaris): string[] {
     if (!/^\d{1,2}$/.test(isian.mkgTahun) || th > 40) kurang.push("masa kerja golongan (tahun)");
     if (!/^\d{0,2}$/.test(isian.mkgBulan) || bl > 11) kurang.push("masa kerja golongan (bulan) 0 sampai 11");
     if (!TANGGAL.test(isian.tanggalSkPendukung)) kurang.push("tanggal SK kenaikan pangkat terakhir");
+    // KGB pertama paling cepat satu tahun sesudah TMT CPNS, jadi TMT KGB terakhir tidak mungkin pada atau
+    // sebelum TMT CPNS. Pola ini muncul bila CPNS yang belum pernah KGB memilih "Sudah pernah KGB".
+    const tmtCpns = tmtCpnsDariNip(isian.nip);
+    if (tmtCpns && TANGGAL.test(isian.tmtDasar) && isian.tmtDasar <= tmtCpns)
+      kurang.push("TMT KGB terakhir tidak sesudah TMT CPNS pada NIP: bila belum pernah menerima SK KGB, pilih Belum pernah KGB");
     if (isian.naikSetelahKgb !== "ya" && isian.naikSetelahKgb !== "tidak") {
       kurang.push("jawab apakah Anda naik pangkat setelah KGB terakhir (muat ulang halaman bila pertanyaannya tidak tampil)");
     } else if (TANGGAL.test(isian.tmtGolongan) && TANGGAL.test(isian.tmtDasar)) {
