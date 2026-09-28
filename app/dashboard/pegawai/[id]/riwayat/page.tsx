@@ -616,8 +616,8 @@ export default function RiwayatKGBPage() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 mb-5">
+      {/* Tabs: satu baris; di ponsel bergulir mendatar (pgw-tab di dasbor.css) */}
+      <div className="pgw-tab" role="group" aria-label="Bagian halaman pegawai">
         {(["data", "kgb", "pangkat", ...(canHukdis ? ["hukdis"] : []), ...(bolehDokumen ? ["dokumen"] : [])] as const).map((tab) => (
           <button
             key={tab}

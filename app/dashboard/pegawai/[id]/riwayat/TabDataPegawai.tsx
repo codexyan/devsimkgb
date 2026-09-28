@@ -26,9 +26,9 @@ interface RiwayatMutasi {
 const tgl = (v: string | null | undefined) => (v ? formatTanggalId(v) : "–");
 const rupiah = (n: number) => "Rp" + new Intl.NumberFormat("id-ID").format(n);
 
-function Baris({ label, children }: { label: string; children: ReactNode }) {
+function Baris({ label, lebar = false, children }: { label: string; lebar?: boolean; children: ReactNode }) {
   return (
-    <div>
+    <div className={lebar ? "pgw-kartu-lebar" : undefined}>
       <dt>{label}</dt>
       <dd>{children || "–"}</dd>
     </div>
@@ -152,9 +152,9 @@ export default function TabDataPegawai({
           tombol: [{ label: "Ubah", t: "identitas" }],
           children: (
             <>
-              <Baris label="Nama lengkap">{pegawai.nama}</Baris>
+              <Baris label="Nama lengkap" lebar>{pegawai.nama}</Baris>
               <Baris label="NIP">{pegawai.nip}</Baris>
-              <Baris label="Tempat, tanggal lahir">
+              <Baris label="Tempat, tanggal lahir" lebar>
                 {[pegawai.tempatLahir, pegawai.tanggalLahir ? formatTanggalId(pegawai.tanggalLahir) : ""].filter(Boolean).join(", ")}
               </Baris>
               <Baris label="Jenis kelamin">{pegawai.jenisKelamin}</Baris>
@@ -169,11 +169,11 @@ export default function TabDataPegawai({
           tombol: [{ label: "Ubah", t: "kepegawaian" }],
           children: (
             <>
-              <Baris label="Jabatan">{pegawai.jabatan}</Baris>
+              <Baris label="Jabatan" lebar>{pegawai.jabatan}</Baris>
               <Baris label="Jenis jabatan">{pegawai.jenisJabatan}</Baris>
               <Baris label="Eselon">{pegawai.eselon || "Non Eselon"}</Baris>
-              <Baris label="Unit kerja">{pegawai.unitKerja}</Baris>
-              {pegawai.satkerTugas && <Baris label="Bertugas (BKO) di">{pegawai.satkerTugas}</Baris>}
+              <Baris label="Unit kerja" lebar>{pegawai.unitKerja}</Baris>
+              {pegawai.satkerTugas && <Baris label="Bertugas (BKO) di" lebar>{pegawai.satkerTugas}</Baris>}
             </>
           ),
         })}
@@ -197,10 +197,10 @@ export default function TabDataPegawai({
               <Baris label="Gaji pokok">{rupiah(pegawai.gajiPokok)}</Baris>
               <Baris label="TMT KGB terakhir">{tgl(pegawai.tmtKgbTerakhir)}</Baris>
               <Baris label="TMT KGB berikutnya">{tgl(pegawai.tmtKgbBerikutnya)}</Baris>
-              <Baris label="SK dasar">
+              <Baris label="SK dasar" lebar>
                 {[pegawai.nomorSkDasar, pegawai.tanggalSkDasar ? formatTanggalId(pegawai.tanggalSkDasar) : ""].filter(Boolean).join(" · ")}
               </Baris>
-              <Baris label="Ditetapkan oleh">{pegawai.penetapSkDasar}</Baris>
+              <Baris label="Ditetapkan oleh" lebar>{pegawai.penetapSkDasar}</Baris>
             </>
           ),
         })}
@@ -214,7 +214,7 @@ export default function TabDataPegawai({
               <Baris label="Status">
                 <span className="dsb-tag" data-nada={berhenti || pegawai.aktif === false ? "merah" : "hijau"}>{status}</span>
               </Baris>
-              <Baris label="Satker">{pegawai.unitKerja}</Baris>
+              <Baris label="Satker" lebar>{pegawai.unitKerja}</Baris>
               <div className="pgw-kartu-lebar">
                 <dt>Riwayat mutasi dan pemberhentian</dt>
                 <dd>
