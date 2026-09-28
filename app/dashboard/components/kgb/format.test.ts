@@ -5,6 +5,7 @@ import {
   berkasPdfSah,
   dasarAwalDariRiwayat,
   dasarAwalInputKgb,
+  dasarDariKenaikanPangkat,
   isianDasarKosong,
   formatMkg,
   formatRupiah,
@@ -234,4 +235,20 @@ test("hitungKgbPegawai: data yang tidak dapat dihitung menjadi galat", () => {
   assert.equal(golongan.ok, false);
   const tanpaTmt = hitungKgbPegawai({ golonganRuang: "III/a", mkgTahun: 4, mkgBulan: 0, tmtKgbBerikutnya: null, tmtKgbTerakhir: null });
   assert.equal(tanpaTmt.ok, false);
+});
+
+test("dasarDariKenaikanPangkat: SK PI sesudah KGB terakhir menjadi Atas dasar (ADR-020)", () => {
+  const kgbTerakhir = { nomorSK: "W.19-KP.04.03-1", tanggalSK: "2024-11-20", tmtSK: "2024-12-01", penetapSkDasar: "Kakanwil" };
+  const pi = { jenisLabel: "Penyesuaian ijazah", nomorSK: "W.19-KP.03.01-7", tanggalSK: "2026-01-29", tmtPangkat: "2026-02-01", penetapSK: null };
+  const lama = { nomorSK: "W.19-KP.03.01-2", tanggalSK: "2022-03-20", tmtPangkat: "2022-04-01", penetapSK: "Kakanwil lama" };
+  const hasil = dasarDariKenaikanPangkat(kgbTerakhir, [lama, pi]);
+  assert.deepEqual(
+    hasil && { nomorSK: hasil.nomorSK, tanggalSK: hasil.tanggalSK, tmtSK: hasil.tmtSK, penetapSkDasar: hasil.penetapSkDasar },
+    { nomorSK: "W.19-KP.03.01-7", tanggalSK: "2026-01-29", tmtSK: "2026-02-01", penetapSkDasar: null },
+  );
+  // KP sebelum KGB terakhir sudah tercakup dalam SK KGB itu.
+  assert.equal(dasarDariKenaikanPangkat(kgbTerakhir, [lama]), null);
+  assert.equal(dasarDariKenaikanPangkat(kgbTerakhir, []), null);
+  // Tanpa SK dasar yang diketahui, KP terbaru dipakai.
+  assert.equal(dasarDariKenaikanPangkat(null, [lama, pi])?.nomorSK, "W.19-KP.03.01-7");
 });

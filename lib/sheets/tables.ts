@@ -58,6 +58,8 @@ export interface RiwayatPangkatRow {
   mkgTahunLama: number; mkgBulanLama: number; mkgTahunBaru: number; mkgBulanBaru: number;
   gajiPokokLama: number; gajiPokokBaru: number; keterangan: string | null;
   createdAt: Date | null; createdBy: string | null;
+  /** Pejabat penetap SK KP: baris "Oleh" bila SK ini menjadi Atas dasar SK KGB berikutnya (ADR-020). */
+  penetapSK?: string | null;
 }
 
 /**
@@ -292,7 +294,7 @@ export const defs = {
       s("id"), s("pegawaiId"), s("jenisKp"), s("nomorSK"), d("tanggalSK"), d("tmtPangkat"),
       s("golonganLama"), s("golonganBaru"), i("mkgTahunLama"), i("mkgBulanLama"),
       i("mkgTahunBaru"), i("mkgBulanBaru"), i("gajiPokokLama"), i("gajiPokokBaru"),
-      s("keterangan"), d("createdAt"), s("createdBy"),
+      s("keterangan"), d("createdAt"), s("createdBy"), s("penetapSK"),
     ],
   },
   RiwayatHukdis: {

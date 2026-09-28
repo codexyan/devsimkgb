@@ -6,7 +6,7 @@ import { logAudit } from "@/lib/auditLog";
 import { canEditPegawai } from "@/lib/auth";
 import { NON_KEUANGAN } from "@/lib/authGuard";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
-import { JENIS_KP, dampakKenaikanPangkatPadaKgb, hitungKenaikanPangkat, isJenisKp } from "@/lib/kenaikanPangkat";
+import { JENIS_KP, dampakKenaikanPangkatPadaKgb, hitungKenaikanPangkat, isJenisKp, skKpLebihBaru } from "@/lib/kenaikanPangkat";
 import { rencanaSiklusBerikutnya } from "@/lib/jadwalKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
@@ -59,6 +59,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       gajiPokokLama: r.gajiPokokLama,
       gajiPokokBaru: r.gajiPokokBaru,
       keterangan: r.keterangan,
+      penetapSK: r.penetapSK ?? null,
     })),
   );
 }
@@ -92,6 +93,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const tanggalSK = keTanggal(body.tanggalSK);
   const tmtPangkat = keTanggal(body.tmtPangkat);
   const keterangan = teks(body.keterangan) || null;
+  const penetapSK = teks(body.penetapSK) || null;
 
   if (!isJenisKp(jenisKp))
     return NextResponse.json({ error: "Jenis kenaikan pangkat tidak dikenal" }, { status: 400 });
@@ -137,6 +139,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     keterangan,
     createdAt: new Date(),
     createdBy: pengguna.id,
+    penetapSK,
   };
   await db.riwayatPangkat.create(riwayat);
 
@@ -155,6 +158,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   );
 
   // 3) Placeholder KGB berikutnya dihitung ulang dari keadaan pegawai yang baru; jadwalnya tidak berubah.
+  // SK KP yang ber-TMT sesudah KGB terakhir yang selesai menjadi Atas dasar SK KGB berikutnya (ADR-020), jadi
+  // penetapnya menggantikan penetap SK KGB lama pada placeholder. Penetap yang belum diketahui dibiarkan kosong
+  // agar Tim SDM mengisinya saat Input KGB, bukan tercetak penetap SK KGB lama.
+  const kpTerbaru = skKpLebihBaru(tmtPangkat, kgbPegawai);
   const diselaraskan: string[] = [];
   for (const k of dampak.diselaraskan) {
     const tmtKgbBaru = tanggalKalender(k.tmtKgbBaru);
@@ -167,7 +174,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         gajiPokok: hasil.gajiPokokBaru,
         tmtKgbBerikutnya: tmtKgbBaru,
         tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
-        penetapSkDasar: k.penetapSkDasar,
+        penetapSkDasar: kpTerbaru ? penetapSK : k.penetapSkDasar,
       });
       await db.riwayatKGB.update(
         { id: k.id },
@@ -181,6 +188,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           mkgTahunBaru: rencana.mkgTahunBaru,
           mkgBulanBaru: rencana.mkgBulanBaru,
           tmtKgbBerikutnya: rencana.tmtKgbBerikutnya,
+          ...(kpTerbaru ? { penetapSkDasar: penetapSK } : {}),
         },
       );
       diselaraskan.push(k.id);

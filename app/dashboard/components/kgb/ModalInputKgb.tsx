@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ambilPegawaiKgb, ambilRiwayatKgb, ambilSkDasarUsulan, inputKgb, type DataDasarSk, type SkDasarUsulan } from "@/lib/kgbAksi";
+import {
+  ambilPegawaiKgb,
+  ambilRiwayatKgb,
+  ambilRiwayatPangkat,
+  ambilSkDasarUsulan,
+  inputKgb,
+  type DataDasarSk,
+  type SkDasarUsulan,
+} from "@/lib/kgbAksi";
 import { pernahKgb } from "@/lib/usulanPegawai";
 import { formatTanggalId } from "@/lib/waktu";
 import KerangkaModal from "./KerangkaModal";
@@ -17,6 +25,7 @@ import {
 } from "./BidangForm";
 import {
   dasarAwalDariRiwayat,
+  dasarDariKenaikanPangkat,
   formatMkg,
   formatRupiah,
   isianDasarKosong,
@@ -66,6 +75,31 @@ export default function ModalInputKgb({
   // sebelum SK-nya disalin ke data pegawai.
   const [skUsulan, setSkUsulan] = useState<SkDasarUsulan | null>(null);
   const [dariDataPegawai, setDariDataPegawai] = useState(false);
+  // SK kenaikan pangkat/PI yang lebih baru dari SK dasar di atas, dan karena itu menjadi Atas dasar (ADR-020).
+  const [dasarKp, setDasarKp] = useState<ReturnType<typeof dasarDariKenaikanPangkat>>(null);
+
+  // Berjalan setelah SK dasar dari riwayat KGB, data pegawai, atau usulan UPT diketahui. Isian hanya diganti
+  // selama belum disunting: masih kosong atau masih sama dengan SK dasar yang ditemukan.
+  const dasarDiketahui = dasarRiwayat === null ? null : (dasarRiwayat ?? dasarAwal ?? undefined);
+  useEffect(() => {
+    if (dasarDiketahui === null) return;
+    let batal = false;
+    ambilRiwayatPangkat(ringkas.id).then((hasilKp) => {
+      if (batal || !hasilKp.ok) return;
+      const kp = dasarDariKenaikanPangkat(dasarDiketahui, hasilKp.data);
+      if (!kp) return;
+      setDasarKp(kp);
+      const semula = isianDasarSk(dasarDiketahui);
+      setForm((f) =>
+        isianDasarKosong(f) || JSON.stringify(f) === JSON.stringify(semula) ? isianDasarSk(kp) : f,
+      );
+    });
+    return () => {
+      batal = true;
+    };
+    // dasarDiketahui berganti sekali, saat pencarian SK dasar selesai.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dasarDiketahui === null, ringkas.id]);
 
   useEffect(() => {
     if (!cariDiRiwayat) return;
@@ -118,9 +152,11 @@ export default function ModalInputKgb({
   // KGB pertama berdasar SK CPNS; sesudahnya berdasar SK KGB terakhir. Masa kerja golongan 0 berarti
   // pegawai belum pernah KGB, aturan yang sama dengan formulir UPT (lib/usulanPegawai.ts).
   const kgbPertama = !!pegawai && !pernahKgb(pegawai.mkgTahun, pegawai.mkgBulan);
-  const sk = kgbPertama
-    ? { nama: "SK CPNS", nomor: "Nomor SK CPNS", tanggal: "Tanggal SK CPNS", tmt: "TMT CPNS" }
-    : { nama: "SK KGB terakhir", nomor: "Nomor SK KGB Terakhir", tanggal: "Tanggal SK KGB Terakhir", tmt: "TMT SK KGB Terakhir" };
+  const sk = dasarKp
+    ? { nama: "SK kenaikan pangkat", nomor: "Nomor SK Kenaikan Pangkat", tanggal: "Tanggal SK Kenaikan Pangkat", tmt: "TMT Pangkat" }
+    : kgbPertama
+      ? { nama: "SK CPNS", nomor: "Nomor SK CPNS", tanggal: "Tanggal SK CPNS", tmt: "TMT CPNS" }
+      : { nama: "SK KGB terakhir", nomor: "Nomor SK KGB Terakhir", tanggal: "Tanggal SK KGB Terakhir", tmt: "TMT SK KGB Terakhir" };
 
   const ubah = (kolom: keyof DataDasarSk) => (nilai: string) => setForm((f) => ({ ...f, [kolom]: nilai }));
 
@@ -233,18 +269,29 @@ export default function ModalInputKgb({
         </Catatan>
       )}
       <BagianForm
-        judul={`Atas Dasar ${kgbPertama ? "SK CPNS" : "SK KGB Terakhir"}`}
+        judul={`Atas Dasar ${dasarKp ? "SK Kenaikan Pangkat" : kgbPertama ? "SK CPNS" : "SK KGB Terakhir"}`}
         keterangan={
-          kgbPertama
-            ? "Pegawai ini belum pernah KGB, jadi KGB pertamanya berdasar SK pengangkatan CPNS; tercetak pada bagian Atas dasar di SK KGB."
-            : "SK KGB yang terakhir diterima pegawai, dasar KGB ini; tercetak pada bagian Atas dasar di SK KGB."
+          dasarKp
+            ? "SK terbaru yang menetapkan gaji pokok pegawai, dasar KGB ini; tercetak pada bagian Atas dasar di SK KGB."
+            : kgbPertama
+              ? "Pegawai ini belum pernah KGB, jadi KGB pertamanya berdasar SK pengangkatan CPNS; tercetak pada bagian Atas dasar di SK KGB."
+              : "SK KGB yang terakhir diterima pegawai, dasar KGB ini; tercetak pada bagian Atas dasar di SK KGB."
         }
       >
         {riwayatDimuat && <Memuat teks="Mencari SK dasar di riwayat KGB dan usulan UPT..." />}
-        {!riwayatDimuat && dariDataPegawai && (
+        {dasarKp && (
+          <Catatan nada={dasarKp.penetapSkDasar ? undefined : "amber"}>
+            Diisi dari SK kenaikan pangkat{dasarKp.kp.jenisLabel ? ` (${dasarKp.kp.jenisLabel.replace(/^Pilihan: /, "")})` : ""}
+            {dasarKp.kp.nomorSK ? ` nomor ${dasarKp.kp.nomorSK}` : ""}
+            {dasarKp.kp.tmtPangkat ? `, TMT ${formatTanggalId(dasarKp.kp.tmtPangkat)}` : ""}, karena SK itu lebih baru dari{" "}
+            {kgbPertama ? "SK CPNS" : "SK KGB terakhir"} dan menetapkan gaji pokok sekarang.
+            {dasarKp.penetapSkDasar ? " Periksa kembali sebelum menyimpan." : " Pejabat penetapnya belum tercatat; isi baris Oleh."}
+          </Catatan>
+        )}
+        {!riwayatDimuat && !dasarKp && dariDataPegawai && (
           <Catatan>Diisi dari SK dasar pada data pegawai. Periksa kembali sebelum menyimpan.</Catatan>
         )}
-        {!riwayatDimuat && skUsulan && (
+        {!riwayatDimuat && !dasarKp && skUsulan && (
           <Catatan nada={skUsulan.status === "disetujui" ? undefined : "amber"}>
             {skUsulan.status === "disetujui" ? (
               "Diisi dari usulan UPT yang sudah disetujui."
@@ -278,7 +325,7 @@ export default function ModalInputKgb({
             )}
           </Catatan>
         )}
-        {!riwayatDimuat && !dasarTercatat && (
+        {!riwayatDimuat && !dasarTercatat && !dasarKp && (
           <Catatan nada="amber">
             Data {sk.nama} belum tercatat di SIM-KGB. Isi sesuai dokumen {sk.nama} pegawai.
             {onArsipKgb && (
@@ -316,7 +363,7 @@ export default function ModalInputKgb({
             wajib
             nilai={form.tmtSK}
             onUbah={ubah("tmtSK")}
-            petunjuk={kgbPertama ? "Tanggal mulai berlaku pengangkatan CPNS." : "Tanggal mulai berlaku SK KGB terakhir."}
+            petunjuk={dasarKp ? "Tanggal mulai berlaku pangkat pada SK kenaikan pangkat." : kgbPertama ? "Tanggal mulai berlaku pengangkatan CPNS." : "Tanggal mulai berlaku SK KGB terakhir."}
             nonaktif={sibuk}
           />
         </div>

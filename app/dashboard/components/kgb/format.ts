@@ -174,3 +174,36 @@ export function hitungKgbPegawai(
     return { ok: false, error: e instanceof Error ? e.message : "Jadwal KGB pegawai tidak dapat dihitung" };
   }
 }
+
+/** Riwayat kenaikan pangkat pegawai (GET /api/pegawai/[id]/pangkat), sebatas yang dipakai sebagai SK dasar. */
+export interface KenaikanPangkatDasar {
+  jenisLabel?: string | null;
+  nomorSK: string | null;
+  tanggalSK: string | null;
+  tmtPangkat: string | null;
+  penetapSK?: string | null;
+}
+
+/**
+ * Atas dasar SK KGB adalah SK terbaru yang menetapkan gaji pokok (ADR-020). Bila SK kenaikan pangkat, termasuk
+ * penyesuaian ijazah, ber-TMT pada atau sesudah TMT SK dasar yang ditemukan (SK KGB terakhir atau SK CPNS),
+ * SK kenaikan pangkat itulah dasarnya. null bila tidak ada kenaikan pangkat yang lebih baru.
+ */
+export function dasarDariKenaikanPangkat(
+  dasar: DasarSkAwal | null | undefined,
+  riwayat: ReadonlyArray<KenaikanPangkatDasar>,
+): (DasarSkAwal & { kp: KenaikanPangkatDasar }) | null {
+  let kp: KenaikanPangkatDasar | null = null;
+  let tmtKp: Date | null = null;
+  for (const r of riwayat) {
+    const t = tanggalKalender(r.tmtPangkat);
+    if (t && (!tmtKp || t > tmtKp)) {
+      kp = r;
+      tmtKp = t;
+    }
+  }
+  if (!kp || !tmtKp) return null;
+  const tmtDasar = tanggalKalender(dasar?.tmtSK);
+  if (tmtDasar && tmtKp < tmtDasar) return null;
+  return { nomorSK: kp.nomorSK, tanggalSK: kp.tanggalSK, tmtSK: kp.tmtPangkat, penetapSkDasar: kp.penetapSK ?? null, kp };
+}

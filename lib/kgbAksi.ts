@@ -124,6 +124,27 @@ export async function ambilRiwayatKgb(pegawaiId: string): Promise<HasilAksi<Riwa
   return { ok: true, data: Array.isArray(hasil.data) ? hasil.data.filter((k) => !!k?.id) : [] };
 }
 
+/** Riwayat kenaikan pangkat pegawai, terbaru dulu (GET /api/pegawai/[id]/pangkat). */
+export interface RiwayatPangkatItem {
+  id: string;
+  jenisLabel: string;
+  nomorSK: string | null;
+  tanggalSK: string | null;
+  tmtPangkat: string | null;
+  golonganBaru: string;
+  penetapSK: string | null;
+}
+
+export async function ambilRiwayatPangkat(pegawaiId: string): Promise<HasilAksi<RiwayatPangkatItem[]>> {
+  const hasil = await kirimJson<RiwayatPangkatItem[]>(
+    `/api/pegawai/${encodeURIComponent(pegawaiId)}/pangkat`,
+    { cache: "no-store" },
+    "Riwayat kenaikan pangkat gagal dimuat.",
+  );
+  if (!hasil.ok) return hasil;
+  return { ok: true, data: Array.isArray(hasil.data) ? hasil.data : [] };
+}
+
 /** SK dasar dari usulan UPT yang disetujui (GET /api/pegawai/[id]/sk-dasar); null bila tidak ada. */
 export interface SkDasarUsulan {
   usulanId: string;

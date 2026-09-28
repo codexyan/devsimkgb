@@ -8,7 +8,7 @@ export { default as ModalBuatSk, type RingkasanSk } from "./ModalBuatSk";
 export { default as ModalUnggahSk } from "./ModalUnggahSk";
 export { default as ModalRiwayatKgb } from "./ModalRiwayatKgb";
 export { default as ModalPratinjauBerkas } from "./ModalPratinjauBerkas";
-export { Catatan, DaftarData, Lencana, LencanaRapelan, LencanaStatus, PesanGalat } from "./BidangForm";
+export { BidangPenetap, Catatan, DaftarData, Lencana, LencanaRapelan, LencanaStatus, PesanGalat } from "./BidangForm";
 export { IkonDokumen, IkonPeringatan } from "./ikon";
 export { dasarAwalInputKgb, formatMkg, formatRupiah, nomorSkTerisi } from "./format";
 export type { DasarSkAwal, DataDasarKartuKgb, RingkasPegawai } from "./format";

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dampakKenaikanPangkatPadaKgb, hitungKenaikanPangkat, isJenisKp, peringkatGolongan } from "@/lib/kenaikanPangkat";
+import { dampakKenaikanPangkatPadaKgb, hitungKenaikanPangkat, isJenisKp, peringkatGolongan, skKpLebihBaru } from "@/lib/kenaikanPangkat";
 import { getGajiPokok } from "@/lib/tabelGaji";
 
 test("pindah jenjang golongan memotong MKG sesuai Buku Saku KP", () => {
@@ -62,4 +62,17 @@ test("KGB berjalan dipisahkan: placeholder diselaraskan, yang sudah dikerjakan d
   ]);
   assert.deepEqual(d.diselaraskan.map((k) => k.id), ["a"]);
   assert.deepEqual(d.perluDitinjau.map((k) => k.id), ["b", "c"]);
+});
+
+test("SK KP menjadi Atas dasar bila ber-TMT pada atau sesudah KGB terakhir yang selesai", () => {
+  const kgb = [
+    { status: "selesai", tmtKgbBaru: "2024-12-01" },
+    { status: "belum_diproses", tmtKgbBaru: "2026-12-01" },
+  ];
+  // Penyesuaian ijazah TMT 1 Feb 2026 sesudah KGB 1 Des 2024.
+  assert.equal(skKpLebihBaru("2026-02-01", kgb), true);
+  assert.equal(skKpLebihBaru("2024-12-01", kgb), true);
+  assert.equal(skKpLebihBaru("2023-04-01", kgb), false);
+  assert.equal(skKpLebihBaru("2023-04-01", []), true);
+  assert.equal(skKpLebihBaru(null, kgb), false);
 });

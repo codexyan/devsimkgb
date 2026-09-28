@@ -15,6 +15,7 @@ import {
   hitungMKGKenaikanPangkat,
   isGolonganDikenal,
 } from "@/lib/tabelGaji";
+import { tanggalKalender, type NilaiTanggal } from "@/lib/waktu";
 
 /** Jenis KP menurut PP 99/2000 jo. PP 12/2002, sesuai Buku Saku KP 2026. */
 export const JENIS_KP = {
@@ -105,4 +106,24 @@ export function dampakKenaikanPangkatPadaKgb<T extends { status: string; isArsip
     diselaraskan: aktif.filter((k) => k.status === "belum_diproses"),
     perluDitinjau: aktif.filter((k) => STATUS_PERLU_DITINJAU.includes(k.status)),
   };
+}
+
+/**
+ * true bila SK kenaikan pangkat ber-TMT pada atau sesudah TMT KGB terakhir yang selesai, sehingga SK itulah SK
+ * terbaru yang menetapkan gaji pokok dan menjadi Atas dasar SK KGB berikutnya (ADR-020). Juga true bila belum
+ * ada KGB yang selesai. TMT yang sama dimenangkan SK kenaikan pangkat, karena gaji pokoknya sudah memuat KGB itu.
+ */
+export function skKpLebihBaru(
+  tmtPangkat: NilaiTanggal,
+  kgb: ReadonlyArray<{ status: string; tmtKgbBaru: NilaiTanggal }>,
+): boolean {
+  const tmtKp = tanggalKalender(tmtPangkat);
+  if (!tmtKp) return false;
+  let tmtKgb: Date | null = null;
+  for (const k of kgb) {
+    if (k.status !== "selesai") continue;
+    const t = tanggalKalender(k.tmtKgbBaru);
+    if (t && (!tmtKgb || t > tmtKgb)) tmtKgb = t;
+  }
+  return !tmtKgb || tmtKp >= tmtKgb;
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Catatan, DaftarData, KerangkaModal, PesanGalat } from "@/app/dashboard/components/kgb";
+import { BidangPenetap, Catatan, DaftarData, KerangkaModal, PesanGalat } from "@/app/dashboard/components/kgb";
 import { JENIS_KP, URUTAN_GOLONGAN, hitungKenaikanPangkat, peringkatGolongan, type JenisKp } from "@/lib/kenaikanPangkat";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { formatTanggalId, isoTanggalLokal } from "@/lib/waktu";
@@ -49,6 +49,7 @@ export default function ModalKenaikanPangkat({
   const [tanggalSK, setTanggalSK] = useState(isoTanggalLokal());
   const [tmtPangkat, setTmtPangkat] = useState("");
   const [keterangan, setKeterangan] = useState("");
+  const [penetapSK, setPenetapSK] = useState("");
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState("");
   const [ditinjau, setDitinjau] = useState<KgbDitinjau[] | null>(null);
@@ -80,7 +81,7 @@ export default function ModalKenaikanPangkat({
       const res = await fetch(`/api/pegawai/${pegawai.id}/pangkat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jenisKp, golonganBaru, nomorSK, tanggalSK, tmtPangkat, keterangan }),
+        body: JSON.stringify({ jenisKp, golonganBaru, nomorSK, tanggalSK, tmtPangkat, keterangan, penetapSK }),
       });
       const d = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -189,6 +190,13 @@ export default function ModalKenaikanPangkat({
         </div>
       </div>
 
+      <BidangPenetap
+        label="Ditetapkan oleh"
+        nilai={penetapSK}
+        onUbah={setPenetapSK}
+        petunjuk="Pejabat yang menandatangani SK kenaikan pangkat. SK KGB berikutnya berdasar SK ini dan mencetak pejabatnya pada baris Oleh."
+        nonaktif={sibuk}
+      />
       {pratinjau && (
         <>
           <DaftarData

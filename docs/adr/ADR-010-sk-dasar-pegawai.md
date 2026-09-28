@@ -1,7 +1,7 @@
 # ADR-010: SK dasar KGB pertama disimpan pada data pegawai
 
 Tanggal: 26 September 2026
-Status: berlaku
+Status: berlaku; butir "SK kenaikan pangkat tidak dipakai sebagai SK dasar" diubah oleh ADR-020
 
 ## Konteks
 
