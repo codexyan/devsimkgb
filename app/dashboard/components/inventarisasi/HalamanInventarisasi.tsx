@@ -452,7 +452,8 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
             Kiriman <small>{tampil.length} pegawai</small>
           </h2>
         </div>
-        <div className="dsb-alat" style={{ padding: "8px 16px" }}>
+        {/* Saringan menempel di atas saat daftar kiriman yang panjang digulir. */}
+        <div className="dsb-alat inv-alat">
           <div className="dsb-segmen" role="group" aria-label="Saring keadaan KGB">
             {(["semua", "pernah", "belum"] as const).map((v) => (
               <button key={v} type="button" aria-pressed={saring === v} onClick={() => setSaring(v)}>
@@ -479,8 +480,10 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
         ) : tampil.length === 0 ? (
           <p className="dsb-kosong">{kiriman.length === 0 ? "Belum ada kiriman." : "Tidak ada yang cocok."}</p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="dsb-tabel">
+          // Di layar lebar: tabel yang bergulir mendatar di dalam panelnya dengan kolom Pegawai tetap di kiri.
+          // Di ponsel: tiap baris menjadi kartu bertumpuk (inv-tabel di dasbor.css), tanpa gulir mendatar.
+          <div className="inv-tabel-gulir">
+            <table className="dsb-tabel inv-tabel">
               <thead>
                 <tr>
                   <th scope="col">Pegawai</th>
@@ -500,11 +503,11 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
                       <p className="dsb-nama" style={{ margin: 0 }}>{k.isian.nama}</p>
                       <p className="dsb-kecil" style={{ margin: 0 }}>{k.isian.nip}{k.isian.bidang ? ` · ${k.isian.bidang}` : ""}</p>
                     </td>
-                    {pakaiSatker && <td className="dsb-kecil" style={{ minWidth: 200 }}>{namaSatker(k.isian.satker) || "-"}</td>}
-                    <td>
+                    {pakaiSatker && <td className="dsb-kecil" data-label="Satker" style={{ minWidth: 200 }}>{namaSatker(k.isian.satker) || "-"}</td>}
+                    <td data-label="Keadaan">
                       <span className="dsb-tag" data-nada={k.isian.keadaan === "pernah" ? "biru" : "hijau"}>{LABEL_KEADAAN[k.isian.keadaan]}</span>
                     </td>
-                    <td>
+                    <td data-label="Perbandingan">
                       {(() => {
                         const sel = selBanding(k);
                         return (
@@ -519,7 +522,7 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
                         );
                       })()}
                     </td>
-                    <td>
+                    <td data-label="Tindak lanjut">
                       {(() => {
                         const st: StatusTindakLanjut = k.tindakLanjut?.status ?? "belum_diperiksa";
                         return (
@@ -532,7 +535,7 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
                         );
                       })()}
                     </td>
-                    <td>
+                    <td data-label="Berkas">
                       <div className="inv-berkas">
                         {k.berkas.map((b) => (
                           <a key={b.kunci} href={`/api/inventarisasi/berkas?kunci=${encodeURIComponent(b.kunci)}`} target="_blank" rel="noreferrer" title={b.nama}>
@@ -541,11 +544,11 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
                         ))}
                       </div>
                     </td>
-                    <td className="whitespace-nowrap dsb-kecil">
+                    <td className="whitespace-nowrap dsb-kecil" data-label="Dikirim">
                       {waktuWita(k.waktu)}
                       {k.kirimanKe > 1 && <> · ke-{k.kirimanKe}</>}
                     </td>
-                    <td className="kanan whitespace-nowrap">
+                    <td className="kanan whitespace-nowrap inv-tindakan">
                       <button
                         type="button"
                         className="dsb-tombol"
@@ -554,7 +557,7 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
                         title={k.pegawaiId ? undefined : "Pegawai belum tercatat di Data Pegawai"}
                         onClick={() => void bukaPeriksa(k)}
                       >
-                        {memuatPeriksa === k.isian.nip ? "Memuat…" : "Periksa"}
+                        {memuatPeriksa === k.isian.nip ? "Memuat…" : "Periksa & ubah"}
                       </button>
                       {superAdmin && (
                         <button type="button" className="dsb-ikon-tombol" data-nada="merah" aria-label={`Hapus kiriman ${k.isian.nama}`} onClick={() => void hapus(k)} style={{ marginLeft: 6 }}>
@@ -572,15 +575,10 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
 
       {periksa && (
         <KerangkaModal
-          judul="Periksa kiriman"
+          judul="Periksa dan ubah kiriman"
           subjudul={`${periksa.k.isian.nama} · ${periksa.k.isian.nip}`}
           ukuran="lg"
           onTutup={() => setPeriksa(null)}
-          kaki={
-            <button type="button" className="dsb-tombol" onClick={() => setPeriksa(null)}>
-              Tutup
-            </button>
-          }
         >
           <KartuKiriman
             p={{ kegiatan: { id: aktif?.id ?? "", nama: aktif?.nama ?? "" }, kiriman: periksa.k, banding: periksa.k.banding, peringatan: periksa.k.peringatan }}

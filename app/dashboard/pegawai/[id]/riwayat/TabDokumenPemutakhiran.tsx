@@ -169,6 +169,17 @@ export default function TabDokumenPemutakhiran({
 
 const URUTAN_SUMBER: SumberDokumen[] = ["arsip", "sk_kgb", "inventaris", "usulan"];
 
+/** Label sumber yang ringkas untuk saringan. */
+const SUMBER_RINGKAS: Record<SumberDokumen, string> = {
+  arsip: "Arsip",
+  sk_kgb: "SK KGB",
+  inventaris: "Formulir",
+  usulan: "Usulan UPT",
+};
+
+/* Dokumen pegawai: kartu per berkas yang dapat disaring menurut sumbernya dan dipratinjau di halaman. Panel unggah
+   disembunyikan di balik tombol Unggah dokumen supaya daftar berkasnya yang tampil lebih dulu; bila belum ada
+   dokumen sama sekali, panel itu langsung terbuka. Daftar tidak diberi gulir sendiri: halaman yang bergulir. */
 function BagianDokumen({
   pegawaiId,
   dokumen,
@@ -189,13 +200,37 @@ function BagianDokumen({
   const [berkas, setBerkas] = useState<File | null>(null);
   const [sibuk, setSibuk] = useState(false);
   const [kunciInput, setKunciInput] = useState(0);
+  const [bukaUnggah, setBukaUnggah] = useState<boolean | null>(null);
+  const [saring, setSaring] = useState<"semua" | SumberDokumen>("semua");
+  const [seret, setSeret] = useState(false);
 
-  async function unggah() {
-    if (!berkas) return;
-    if (berkas.size > BATAS_DOKUMEN_BYTE) {
+  // Terbuka sendiri bila belum ada dokumen, sampai pengguna menutup atau membukanya.
+  const unggahTerbuka = bukaUnggah ?? (dokumen !== null && dokumen.length === 0);
+
+  function kosongkan() {
+    setNomorSK("");
+    setTanggalSK("");
+    setKeterangan("");
+    setBerkas(null);
+    setKunciInput((k) => k + 1);
+  }
+
+  function pilihBerkas(f: File | null | undefined) {
+    if (!f) return;
+    if (f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf")) {
+      onGalat("Dokumen harus berupa PDF.");
+      return;
+    }
+    if (f.size > BATAS_DOKUMEN_BYTE) {
       onGalat("Ukuran dokumen paling besar 5 MB.");
       return;
     }
+    onGalat(null);
+    setBerkas(f);
+  }
+
+  async function unggah() {
+    if (!berkas) return;
     setSibuk(true);
     onGalat(null);
     try {
@@ -208,11 +243,8 @@ function BagianDokumen({
       const res = await fetch(`/api/pegawai/${pegawaiId}/dokumen`, { method: "POST", body: form });
       const d = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(d.error ?? "Dokumen gagal diunggah.");
-      setNomorSK("");
-      setTanggalSK("");
-      setKeterangan("");
-      setBerkas(null);
-      setKunciInput((k) => k + 1);
+      kosongkan();
+      setBukaUnggah(false);
       onBerhasil(`${JENIS_DOKUMEN[jenis]} diunggah ke arsip dokumen pegawai.`);
     } catch (e) {
       onGalat(e instanceof Error ? e.message : "Dokumen gagal diunggah.");
@@ -231,97 +263,151 @@ function BagianDokumen({
   const urut = [...(dokumen ?? [])].sort(
     (a, b) => URUTAN_SUMBER.indexOf(a.sumber) - URUTAN_SUMBER.indexOf(b.sumber) || (b.tanggal || "").localeCompare(a.tanggal || ""),
   );
+  const ada = URUTAN_SUMBER.filter((s) => urut.some((d) => d.sumber === s));
+  const tampil = urut.filter((d) => saring === "semua" || d.sumber === saring);
 
   return (
     <section className="dsb-panel" aria-labelledby="judul-dokumen">
-      <div className="dsb-panel-kepala">
+      <div className="dsb-panel-kepala dok-kepala">
         <h2 id="judul-dokumen" className="dsb-panel-judul">
           Dokumen pegawai <small>{dokumen ? `${dokumen.length} berkas` : ""}</small>
         </h2>
-      </div>
-
-      <div className="inv-atur pmh-unggah">
-        <label className="inv-bidang">
-          <span>Jenis dokumen</span>
-          <select className="dsb-cari" value={jenis} onChange={(e) => setJenis(e.target.value as JenisDokumen)}>
-            {(Object.keys(JENIS_DOKUMEN) as JenisDokumen[]).map((j) => (
-              <option key={j} value={j}>{JENIS_DOKUMEN[j]}</option>
-            ))}
-          </select>
-        </label>
-        <label className="inv-bidang">
-          <span>Nomor SK</span>
-          <input className="dsb-cari" value={nomorSK} onChange={(e) => setNomorSK(e.target.value)} placeholder="Sesuai dokumen" />
-        </label>
-        <label className="inv-bidang">
-          <span>Tanggal SK</span>
-          <input type="date" className="dsb-cari" value={tanggalSK} onChange={(e) => setTanggalSK(e.target.value)} />
-        </label>
-        <span />
-        <label className="inv-bidang inv-lebar-2">
-          <span>Berkas PDF (paling besar 5 MB)</span>
-          <input
-            key={kunciInput}
-            type="file"
-            accept="application/pdf,.pdf"
-            className="dsb-cari"
-            onChange={(e) => setBerkas(e.target.files?.[0] ?? null)}
-          />
-        </label>
-        <label className="inv-bidang">
-          <span>Keterangan</span>
-          <input className="dsb-cari" value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="opsional" />
-        </label>
-        <button type="button" className="dsb-tombol" disabled={sibuk || !berkas} onClick={() => void unggah()}>
-          {sibuk ? "Mengunggah…" : "Unggah"}
+        <button
+          type="button"
+          className="dsb-tombol"
+          data-jenis={unggahTerbuka ? "garis" : undefined}
+          aria-expanded={unggahTerbuka}
+          aria-controls="dok-unggah"
+          onClick={() => setBukaUnggah(!unggahTerbuka)}
+        >
+          {unggahTerbuka ? "Tutup unggah" : "+ Unggah dokumen"}
         </button>
       </div>
 
+      {unggahTerbuka && (
+        <div id="dok-unggah" className="dok-unggah">
+          <label
+            className="dok-lepas"
+            data-seret={seret ? "" : undefined}
+            data-isi={berkas ? "" : undefined}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setSeret(true);
+            }}
+            onDragLeave={() => setSeret(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setSeret(false);
+              pilihBerkas(e.dataTransfer.files?.[0]);
+            }}
+          >
+            <input key={kunciInput} type="file" accept="application/pdf,.pdf" className="sr-only" onChange={(e) => pilihBerkas(e.target.files?.[0])} />
+            <span className="dok-ikon" aria-hidden="true">PDF</span>
+            {berkas ? (
+              <span className="dok-lepas-teks">
+                <strong>{berkas.name}</strong>
+                <span>{ukuranTeks(berkas.size)} · klik untuk mengganti</span>
+              </span>
+            ) : (
+              <span className="dok-lepas-teks">
+                <strong>Pilih berkas PDF</strong>
+                <span>atau tarik ke sini · paling besar 5 MB</span>
+              </span>
+            )}
+          </label>
+          <div className="dok-unggah-isian">
+            <label className="pmh-bidang">
+              <span>Jenis dokumen</span>
+              <select className="dsb-cari" value={jenis} onChange={(e) => setJenis(e.target.value as JenisDokumen)}>
+                {(Object.keys(JENIS_DOKUMEN) as JenisDokumen[]).map((j) => (
+                  <option key={j} value={j}>{JENIS_DOKUMEN[j]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="pmh-bidang">
+              <span>Nomor SK</span>
+              <input className="dsb-cari" value={nomorSK} onChange={(e) => setNomorSK(e.target.value)} placeholder="Sesuai dokumen" />
+            </label>
+            <label className="pmh-bidang">
+              <span>Tanggal SK</span>
+              <input type="date" className="dsb-cari" value={tanggalSK} onChange={(e) => setTanggalSK(e.target.value)} />
+            </label>
+            <label className="pmh-bidang">
+              <span>Keterangan</span>
+              <input className="dsb-cari" value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="opsional" />
+            </label>
+          </div>
+          <div className="dok-unggah-tombol">
+            <button
+              type="button"
+              className="dsb-tombol"
+              data-jenis="garis"
+              disabled={sibuk}
+              onClick={() => {
+                kosongkan();
+                setBukaUnggah(false);
+              }}
+            >
+              Batal
+            </button>
+            <button type="button" className="dsb-tombol" disabled={sibuk || !berkas} onClick={() => void unggah()}>
+              {sibuk ? "Mengunggah…" : "Unggah ke arsip"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {ada.length > 1 && (
+        <div className="dok-saring">
+          <div className="dsb-segmen" role="group" aria-label="Saring sumber dokumen">
+            <button type="button" aria-pressed={saring === "semua"} onClick={() => setSaring("semua")}>
+              Semua <small>{urut.length}</small>
+            </button>
+            {ada.map((s) => (
+              <button key={s} type="button" aria-pressed={saring === s} onClick={() => setSaring(s)}>
+                {SUMBER_RINGKAS[s]} <small>{urut.filter((d) => d.sumber === s).length}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!dokumen ? (
         <p className="dsb-kosong">Memuat…</p>
-      ) : urut.length === 0 ? (
-        <p className="dsb-kosong">Belum ada dokumen. Unggah SK pegawai di atas, atau dokumen akan tampil dari SK KGB, usulan UPT, dan formulir.</p>
+      ) : tampil.length === 0 ? (
+        <p className="dsb-kosong">
+          Belum ada dokumen. Unggah SK pegawai, atau dokumen akan tampil sendiri dari SK KGB, usulan UPT, dan formulir
+          inventarisasi.
+        </p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table className="dsb-tabel">
-            <thead>
-              <tr>
-                <th scope="col">Dokumen</th>
-                <th scope="col">Nomor dan tanggal</th>
-                <th scope="col">Sumber</th>
-                <th scope="col" className="kanan">Tindakan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {urut.map((d) => (
-                <tr key={d.id}>
-                  <td>
-                    <p className="dsb-nama" style={{ margin: 0 }}>{d.judul}</p>
-                    {d.keterangan && <p className="dsb-kecil" style={{ margin: 0 }}>{d.keterangan}</p>}
-                  </td>
-                  <td className="dsb-kecil">
-                    {d.nomorSK || "-"}
-                    {d.tanggal && <span style={{ display: "block" }}>{tanggalTeks(d.tanggal)}</span>}
-                  </td>
-                  <td className="dsb-kecil">
-                    {LABEL_SUMBER_DOKUMEN[d.sumber]}
-                    {d.ukuran !== null && <span style={{ display: "block" }}>{ukuranTeks(d.ukuran)}</span>}
-                  </td>
-                  <td className="kanan whitespace-nowrap">
-                    <button type="button" className="dsb-tombol" data-jenis="garis" onClick={() => onLihat(d)}>
-                      Lihat
+        <ul className="dok-kisi">
+          {tampil.map((d) => (
+            <li key={d.id} className="dok-kartu" data-sumber={d.sumber}>
+              <button type="button" className="dok-buka" onClick={() => onLihat(d)} aria-label={`Lihat ${d.judul}`}>
+                <span className="dok-ikon" aria-hidden="true">PDF</span>
+                <span className="dok-teks">
+                  <strong>{d.judul}</strong>
+                  <span className="dok-nomor">{d.nomorSK || "Tanpa nomor SK"}</span>
+                  <span className="dok-meta">
+                    {[d.tanggal ? tanggalTeks(d.tanggal) : "", ukuranTeks(d.ukuran)].filter(Boolean).join(" · ") || "–"}
+                  </span>
+                </span>
+              </button>
+              {d.keterangan && <p className="dok-ket">{d.keterangan}</p>}
+              <div className="dok-kaki">
+                <span className="dok-sumber" data-sumber={d.sumber}>{LABEL_SUMBER_DOKUMEN[d.sumber]}</span>
+                <span className="dok-aksi">
+                  <button type="button" className="dok-tombol" onClick={() => onLihat(d)}>Lihat</button>
+                  {d.bisaHapus && (
+                    <button type="button" className="dok-tombol" data-nada="merah" onClick={() => void hapus(d)} aria-label={`Hapus ${d.judul}`}>
+                      Hapus
                     </button>
-                    {d.bisaHapus && (
-                      <button type="button" className="dsb-ikon-tombol" data-nada="merah" aria-label={`Hapus ${d.judul}`} onClick={() => void hapus(d)} style={{ marginLeft: 6 }}>
-                        ×
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  )}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );
