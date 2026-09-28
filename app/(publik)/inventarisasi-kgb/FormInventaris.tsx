@@ -5,12 +5,8 @@ import { GOLONGAN_PANGKAT, getGajiPokok } from "@/lib/tabelGaji";
 import {
   BATAS_BERKAS_INVENTARIS_BYTE,
   BERKAS_KEADAAN,
-  FOLDER_KEADAAN,
-  KOLOM_REKAP,
   LABEL_KEADAAN,
-  barisRekap,
   namaBerkasInventaris,
-  namaFolderPegawai,
   periksaIsianInventaris,
   tanggalUntukBerkas,
   type IsianInventaris,
@@ -18,9 +14,8 @@ import {
   type KeadaanKgb,
 } from "@/lib/inventarisKgb";
 
-/* Formulir inventarisasi data KGB pegawai Kanwil. Berkas dibaca di peramban menjadi base64 lalu dikirim
-   bersama isian ke Google Apps Script (docs/inventarisasi-kgb/Code.gs), yang memeriksa ulang kode akses,
-   NIP, nama berkas, dan ukuran sebelum menyimpannya di Drive. */
+/* Formulir inventarisasi data KGB pegawai Kanwil. Dikirim ke POST /api/public/inventarisasi, yang memeriksa
+   ulang kode akses, isian, dan berkas PDF sebelum menyimpannya di SIM-KGB (lib/inventarisServer.ts). */
 
 const KOSONG: IsianInventaris = {
   keadaan: "pernah",
@@ -44,18 +39,9 @@ const KOSONG: IsianInventaris = {
 
 const rupiah = (n: number) => "Rp" + new Intl.NumberFormat("id-ID").format(n);
 
-function bacaBase64(berkas: File): Promise<string> {
-  return new Promise((selesai, gagal) => {
-    const r = new FileReader();
-    r.onload = () => selesai(String(r.result).replace(/^data:[^,]*,/, ""));
-    r.onerror = () => gagal(r.error);
-    r.readAsDataURL(berkas);
-  });
-}
-
 type Keadaan = { tahap: "isi" } | { tahap: "kirim" } | { tahap: "selesai"; kirimanKe: number; nama: string };
 
-export default function FormInventaris({ url }: { url: string }) {
+export default function FormInventaris() {
   const id = useId();
   const [kode, setKode] = useState("");
   const [isian, setIsian] = useState<IsianInventaris>(KOSONG);
@@ -108,38 +94,23 @@ export default function FormInventaris({ url }: { url: string }) {
 
     setKeadaan({ tahap: "kirim" });
     try {
-      const lampiran = [];
+      const form = new FormData();
+      form.set("kode", kode.trim());
+      for (const [k, v] of Object.entries(isian)) form.set(k, String(v));
       for (const b of daftarBerkas) {
         const f = berkas[b.jenis];
-        if (!f) continue;
-        const base64 = await bacaBase64(f);
-        if (!base64.startsWith("JVBERi")) throw new Error(`${b.label} bukan berkas PDF yang sah.`);
-        lampiran.push({
-          jenis: b.jenis,
-          nama: namaBerkasInventaris(isian.nip, b.jenis, tanggalUntukBerkas(isian, b.jenis)),
-          base64,
-        });
+        if (f) form.set(b.jenis, f);
       }
-      const muatan = {
-        kode: kode.trim(),
-        keadaan: isian.keadaan,
-        nip: isian.nip,
-        namaFolder: namaFolderPegawai(isian.nip, isian.nama),
-        folderKeadaan: FOLDER_KEADAAN[isian.keadaan],
-        kolom: KOLOM_REKAP,
-        baris: barisRekap(isian),
-        berkas: lampiran,
-      };
-      // text/plain agar tidak memicu preflight CORS; Apps Script membaca isinya sebagai teks JSON.
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(muatan),
-        redirect: "follow",
-      });
-      const hasil = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; kirimanKe?: number } | null;
+      const res = await fetch("/api/public/inventarisasi", { method: "POST", body: form });
+      const hasil = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; kurang?: string[]; kirimanKe?: number }
+        | null;
       if (!hasil?.ok) {
-        setGalat([hasil?.error ?? "Kiriman gagal. Periksa koneksi, lalu coba lagi."]);
+        setGalat(
+          hasil?.kurang?.length
+            ? hasil.kurang
+            : [res.status === 429 ? hasil?.error ?? "Terlalu banyak percobaan. Coba lagi nanti." : hasil?.error ?? "Kiriman gagal. Periksa koneksi, lalu coba lagi."],
+        );
         setKeadaan({ tahap: "isi" });
         return;
       }
@@ -341,7 +312,7 @@ export default function FormInventaris({ url }: { url: string }) {
 
       <div className="iv-kirim">
         <p className="iv-bantu">
-          Data dan berkas disimpan di Google Drive Tim SDM Kanwil dan hanya dipakai untuk memperbarui data KGB Anda.
+          Data dan berkas disimpan di SIM-KGB dan hanya dipakai Tim SDM Kanwil untuk memperbarui data KGB Anda.
         </p>
         <button type="submit" className="iv-tombol" disabled={mengirim}>
           {mengirim ? "Mengirim…" : "Kirim data"}

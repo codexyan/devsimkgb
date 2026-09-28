@@ -33,12 +33,5 @@
   "ratelimits": [
     { "name": "CEK_KGB_RATE_LIMITER", "namespace_id": "4101", "simple": { "limit": 30, "period": 60 } }
   ],
-  // Formulir inventarisasi data KGB pegawai Kanwil (/inventarisasi-kgb, docs/inventarisasi-kgb/PANDUAN.md).
-  // INVENTARIS_KGB_URL: alamat web app Google Apps Script (https://script.google.com/macros/s/.../exec);
-  // kosong berarti formulir tertutup. INVENTARIS_KGB_BATAS: teks batas pengisian yang tampil di halaman.
-  "vars": {
-    "INVENTARIS_KGB_URL": "",
-    "INVENTARIS_KGB_BATAS": ""
-  },
   "observability": { "enabled": true }
 }

@@ -1,0 +1,82 @@
+import { NextResponse } from "next/server";
+import { adaPenandaPdf } from "@/lib/prosesKgb";
+import {
+  BATAS_BERKAS_INVENTARIS_BYTE,
+  BERKAS_KEADAAN,
+  namaBerkasInventaris,
+  periksaIsianInventaris,
+  tanggalUntukBerkas,
+  type IsianInventaris,
+  type JenisBerkasInventaris,
+} from "@/lib/inventarisKgb";
+import { bacaKonfigurasi, simpanKiriman } from "@/lib/inventarisServer";
+
+export const runtime = "nodejs";
+
+const BIDANG: (keyof IsianInventaris)[] = [
+  "nip", "nama", "tempatLahir", "tanggalLahir", "jabatan", "bidang", "golonganRuang", "tmtGolongan",
+  "mkgTahun", "mkgBulan", "tmtDasar", "nomorSkDasar", "tanggalSkDasar", "tanggalSkPendukung", "nomorWa", "catatan",
+];
+
+/**
+ * Kiriman formulir inventarisasi data KGB pegawai Kanwil (/inventarisasi-kgb). Tanpa login: yang menjaga adalah
+ * kode akses yang diumumkan di grup WA (diatur Super Admin), pembatas percobaan per alamat IP di worker-entry.js
+ * (kode salah dihitung gagal, jawaban 403), serta pemeriksaan isian dan berkas PDF di sini.
+ */
+export async function POST(req: Request) {
+  const konfigurasi = await bacaKonfigurasi();
+  if (!konfigurasi.terbuka || !konfigurasi.kode)
+    return NextResponse.json({ error: "Formulir sedang ditutup. Tunggu pengumuman dari Tim SDM Kanwil." }, { status: 403 });
+
+  const panjang = Number(req.headers.get("content-length"));
+  if (Number.isFinite(panjang) && panjang > 2 * BATAS_BERKAS_INVENTARIS_BYTE + 64 * 1024)
+    return NextResponse.json({ error: "Ukuran kiriman terlalu besar. Tiap berkas paling besar 1 MB." }, { status: 413 });
+
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Data formulir tidak valid." }, { status: 400 });
+  }
+  const teks = (k: string) => String(form.get(k) ?? "").trim();
+
+  if (teks("kode").toUpperCase() !== konfigurasi.kode.trim().toUpperCase())
+    return NextResponse.json({ error: "Kode akses salah. Lihat pengumuman di grup WA pegawai Kanwil." }, { status: 403 });
+
+  const keadaan = teks("keadaan") === "belum" ? "belum" : "pernah";
+  const isian = { keadaan } as IsianInventaris;
+  for (const k of BIDANG) (isian as unknown as Record<string, string>)[k] = teks(k);
+
+  const kurang = periksaIsianInventaris(isian);
+  const berkas: { jenis: JenisBerkasInventaris; nama: string; isi: ArrayBuffer }[] = [];
+  for (const aturan of BERKAS_KEADAAN[keadaan]) {
+    const f = form.get(aturan.jenis);
+    if (!(f instanceof File) || f.size === 0) {
+      if (aturan.wajib) kurang.push(`berkas ${aturan.label}`);
+      continue;
+    }
+    if (f.size > BATAS_BERKAS_INVENTARIS_BYTE) {
+      kurang.push(`${aturan.label} lebih dari 1 MB`);
+      continue;
+    }
+    const isi = await f.arrayBuffer();
+    if (!adaPenandaPdf(new Uint8Array(isi.slice(0, 1024)))) {
+      kurang.push(`${aturan.label} bukan berkas PDF`);
+      continue;
+    }
+    berkas.push({
+      jenis: aturan.jenis,
+      nama: namaBerkasInventaris(isian.nip, aturan.jenis, tanggalUntukBerkas(isian, aturan.jenis)),
+      isi,
+    });
+  }
+  if (kurang.length > 0) return NextResponse.json({ error: "Periksa kembali isian.", kurang }, { status: 400 });
+
+  try {
+    const kiriman = await simpanKiriman(isian, berkas);
+    return NextResponse.json({ ok: true, kirimanKe: kiriman.kirimanKe }, { status: 201 });
+  } catch (err) {
+    console.error("[inventarisasi] gagal menyimpan:", err);
+    return NextResponse.json({ error: "Kiriman gagal disimpan. Coba lagi beberapa saat lagi." }, { status: 500 });
+  }
+}

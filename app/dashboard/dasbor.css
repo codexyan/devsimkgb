@@ -2282,3 +2282,12 @@ html[data-gerak="kurangi"] .dsb-putar {
 .cdg-jendela h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--midnight-ink); }
 .cdg-jendela p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--slate); }
 .cdg-aksi { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+
+/* ── Inventarisasi KGB Kanwil ─────────────────────────────────────────── */
+.inv-atur { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 12px 16px; padding: 14px 16px; }
+.inv-atur .inv-bidang { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--dt2); }
+.inv-atur .inv-bidang .dsb-cari { width: 100%; min-width: 0; }
+.inv-cek { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13px; font-weight: 600; color: var(--dtn); white-space: nowrap; }
+.inv-berkas { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
+.inv-berkas a { color: var(--st-blue); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+@media (max-width: 760px) { .inv-atur { grid-template-columns: minmax(0, 1fr); } }
