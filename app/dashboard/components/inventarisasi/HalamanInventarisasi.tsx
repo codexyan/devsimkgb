@@ -7,7 +7,9 @@ import {
   KOLOM_REKAP,
   LABEL_KEADAAN,
   barisRekap,
+  keadaanFormulir,
   namaFolderPegawai,
+  teksBatas,
   type KeadaanKgb,
 } from "@/lib/inventarisKgb";
 import type { KirimanInventaris, KonfigurasiInventaris } from "@/lib/inventarisServer";
@@ -40,7 +42,7 @@ function barisCsv(k: KirimanInventaris): Record<string, string> {
 export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boolean }) {
   const [kiriman, setKiriman] = useState<KirimanInventaris[] | null>(null);
   const [konfig, setKonfig] = useState<KonfigurasiInventaris | null>(null);
-  const [form, setForm] = useState({ terbuka: false, kode: "", batas: "" });
+  const [form, setForm] = useState({ terbuka: false, kode: "", tutupPada: "" });
   const [galat, setGalat] = useState<string | null>(null);
   const [pesan, setPesan] = useState<string | null>(null);
   const [menyimpan, setMenyimpan] = useState(false);
@@ -55,7 +57,7 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
       if (!res.ok || !d.kiriman || !d.konfigurasi) throw new Error(d.error ?? "Data inventarisasi gagal dimuat");
       setKiriman(d.kiriman);
       setKonfig(d.konfigurasi);
-      setForm({ terbuka: d.konfigurasi.terbuka, kode: d.konfigurasi.kode, batas: d.konfigurasi.batas });
+      setForm({ terbuka: d.konfigurasi.terbuka, kode: d.konfigurasi.kode, tutupPada: d.konfigurasi.tutupPada ?? "" });
     } catch (e) {
       setGalat(e instanceof Error ? e.message : "Data inventarisasi gagal dimuat");
     }
@@ -89,7 +91,12 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
       });
       const d = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(d.error ?? "Pengaturan gagal disimpan");
-      setPesan(form.terbuka ? "Formulir dibuka dengan kode akses yang baru." : "Formulir ditutup.");
+      const batas = teksBatas(form);
+      setPesan(
+        form.terbuka
+          ? `Formulir dibuka${batas ? ` sampai ${batas}, lalu tertutup otomatis` : " tanpa batas waktu"}.`
+          : "Formulir ditutup.",
+      );
       void muat();
     } catch (e) {
       setGalat(e instanceof Error ? e.message : "Pengaturan gagal disimpan");
@@ -148,6 +155,9 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
     }
   }
 
+  const keadaan = konfig ? keadaanFormulir(konfig) : null;
+  const batasKini = konfig ? teksBatas(konfig) : "";
+
   const tautanPublik = typeof window !== "undefined" ? `${window.location.origin}/inventarisasi-kgb` : "/inventarisasi-kgb";
 
   return (
@@ -187,10 +197,16 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
       <div className="dsb-angka-kisi dsb-muncul">
         <div className="dsb-angka">
           <span className="dsb-angka-label">Formulir</span>
-          <span className="dsb-angka-nilai" style={{ fontSize: 22 }}>{konfig ? (konfig.terbuka ? "Dibuka" : "Ditutup") : "–"}</span>
+          <span className="dsb-angka-nilai" style={{ fontSize: 22 }}>
+            {keadaan ? (keadaan === "dibuka" ? "Dibuka" : keadaan === "lewat_batas" ? "Lewat batas" : "Ditutup") : "–"}
+          </span>
           <span className="dsb-angka-meta">
-            <span className="dsb-titik" data-nada={konfig?.terbuka ? "hijau" : "kuning"} aria-hidden="true" />
-            {konfig?.batas ? `Batas ${konfig.batas}` : "Tanpa batas waktu tertulis"}
+            <span className="dsb-titik" data-nada={keadaan === "dibuka" ? "hijau" : keadaan === "lewat_batas" ? "merah" : "kuning"} aria-hidden="true" />
+            {keadaan === "dibuka"
+              ? batasKini ? `Sampai ${batasKini}` : "Tanpa batas waktu"
+              : keadaan === "lewat_batas"
+                ? `Tertutup otomatis ${batasKini}`
+                : "Tidak menerima kiriman"}
           </span>
         </div>
         <div className="dsb-angka">
@@ -225,12 +241,16 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
               <input className="dsb-cari" value={form.kode} onChange={(e) => setForm((f) => ({ ...f, kode: e.target.value.toUpperCase().replace(/\s/g, "") }))} placeholder="mis. KANWIL2026" />
             </label>
             <label className="inv-bidang">
-              <span>Batas pengisian (tampil di formulir)</span>
-              <input className="dsb-cari" value={form.batas} onChange={(e) => setForm((f) => ({ ...f, batas: e.target.value }))} placeholder="mis. Jumat, 10 Oktober 2026" />
+              <span>Ditutup otomatis pada (WITA)</span>
+              <input type="datetime-local" className="dsb-cari" value={form.tutupPada} onChange={(e) => setForm((f) => ({ ...f, tutupPada: e.target.value }))} />
             </label>
             <button type="button" className="dsb-tombol" onClick={() => void simpanKonfig()} disabled={menyimpan}>
               {menyimpan ? "Menyimpan…" : "Simpan"}
             </button>
+            <p className="inv-bantu">
+              Kosongkan waktu tutup bila tanpa batas. Setelah waktunya lewat, formulir tertutup sendiri; untuk membukanya
+              lagi, pilih waktu tutup yang baru lalu Simpan.
+            </p>
           </div>
         </section>
       )}

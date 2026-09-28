@@ -9,6 +9,7 @@
 // membersihkan dan menjalankannya.
 
 import { GOLONGAN_PANGKAT } from "./tabelGaji";
+import { formatTanggalId } from "./waktu";
 
 export type KeadaanKgb = "pernah" | "belum";
 
@@ -237,4 +238,42 @@ export function barisRekap(isian: IsianInventaris): string[] {
     isian.nomorWa.replace(/[\s-]/g, ""),
     RAPIKAN(isian.catatan),
   ];
+}
+
+/** Batas pengisian dari pengaturan: "yyyy-mm-ddTHH:mm" waktu WITA, sama dengan nilai input datetime-local. */
+const POLA_TUTUP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+/** Saat formulir tertutup otomatis, atau null bila tanpa batas (atau nilainya tidak sah). */
+export function waktuTutup(tutupPada: string | undefined): Date | null {
+  if (!tutupPada || !POLA_TUTUP.test(tutupPada)) return null;
+  const d = new Date(`${tutupPada}:00+08:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function tutupPadaSah(tutupPada: string): boolean {
+  return tutupPada === "" || waktuTutup(tutupPada) !== null;
+}
+
+export type KeadaanFormulir = "dibuka" | "ditutup" | "lewat_batas";
+
+/**
+ * Keadaan formulir publik saat ini. Formulir yang dibuka Super Admin tertutup sendiri begitu batas pengisian lewat
+ * ("lewat_batas"); untuk membukanya lagi, Super Admin menyimpan batas yang baru.
+ */
+export function keadaanFormulir(
+  k: { terbuka: boolean; kode: string; tutupPada?: string },
+  sekarang: Date = new Date(),
+): KeadaanFormulir {
+  if (!k.terbuka || !k.kode) return "ditutup";
+  const tutup = waktuTutup(k.tutupPada);
+  return tutup && sekarang.getTime() >= tutup.getTime() ? "lewat_batas" : "dibuka";
+}
+
+/** Batas pengisian untuk ditampilkan, mis. "Sabtu, 10 Oktober 2026 pukul 23.59 WITA"; teks lama bila belum ada tanggal. */
+export function teksBatas(k: { tutupPada?: string; batas?: string }): string {
+  const tutup = waktuTutup(k.tutupPada);
+  if (!tutup) return k.batas?.trim() ?? "";
+  const tanggal = formatTanggalId(tutup, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const jam = formatTanggalId(tutup, { hour: "2-digit", minute: "2-digit", hour12: false }).replace(":", ".");
+  return `${tanggal} pukul ${jam} WITA`;
 }

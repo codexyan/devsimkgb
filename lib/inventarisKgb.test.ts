@@ -11,7 +11,11 @@ import {
   namaFolderPegawai,
   periksaIsianInventaris,
   tanggalLahirDariNip,
+  keadaanFormulir,
   tanggalUntukBerkas,
+  teksBatas,
+  tutupPadaSah,
+  waktuTutup,
   tmtCpnsDariNip,
   type IsianInventaris,
 } from "./inventarisKgb";
@@ -129,4 +133,23 @@ test("baris rekap sejajar dengan kolomnya dan dirapikan", () => {
   assert.equal(baris[8], "Penata Muda Tingkat I");
   assert.equal(baris[10], "Tidak");
   assert.equal(baris[17], "081234567890");
+});
+
+test("formulir tertutup sendiri saat batas pengisian WITA lewat, dan terbuka lagi dengan batas baru", () => {
+  const k = { terbuka: true, kode: "KANWIL2026", tutupPada: "2026-10-10T23:59" };
+  assert.equal(waktuTutup(k.tutupPada)?.toISOString(), "2026-10-10T15:59:00.000Z");
+  assert.equal(keadaanFormulir(k, new Date("2026-10-10T23:58:00+08:00")), "dibuka");
+  assert.equal(keadaanFormulir(k, new Date("2026-10-10T23:59:00+08:00")), "lewat_batas");
+  assert.equal(keadaanFormulir({ ...k, tutupPada: "2026-10-17T23:59" }, new Date("2026-10-11T08:00:00+08:00")), "dibuka");
+  assert.equal(keadaanFormulir({ ...k, tutupPada: "" }, new Date("2030-01-01")), "dibuka");
+  assert.equal(keadaanFormulir({ ...k, terbuka: false }, new Date("2026-10-01")), "ditutup");
+  assert.equal(keadaanFormulir({ ...k, kode: "" }, new Date("2026-10-01")), "ditutup");
+  assert.ok(tutupPadaSah("") && tutupPadaSah("2026-10-10T23:59"));
+  assert.ok(!tutupPadaSah("10 Oktober 2026") && !tutupPadaSah("2026-13-40T99:99"));
+});
+
+test("teks batas memakai hari dan jam WITA, atau teks lama", () => {
+  assert.equal(teksBatas({ tutupPada: "2026-10-10T23:59" }), "Sabtu, 10 Oktober 2026 pukul 23.59 WITA");
+  assert.equal(teksBatas({ tutupPada: "", batas: "Jumat, 9 Oktober" }), "Jumat, 9 Oktober");
+  assert.equal(teksBatas({}), "");
 });

@@ -18,7 +18,12 @@ export interface KonfigurasiInventaris {
   terbuka: boolean;
   /** Kode akses yang diumumkan di grup WA; dibandingkan tanpa peka huruf besar-kecil. */
   kode: string;
-  /** Teks batas pengisian yang tampil di halaman publik, mis. "Jumat, 10 Oktober 2026". */
+  /**
+   * Batas pengisian "yyyy-mm-ddTHH:mm" WITA; kosong berarti tanpa batas. Lewat dari itu formulir tertutup sendiri
+   * (keadaanFormulir di lib/inventarisKgb.ts) sampai Super Admin menyimpan batas yang baru.
+   */
+  tutupPada?: string;
+  /** Teks batas bebas dari pengaturan lama, sebelum ada tutupPada; hanya ditampilkan, tidak menutup formulir. */
   batas: string;
   diubahOleh?: string;
   diubahAt?: string;

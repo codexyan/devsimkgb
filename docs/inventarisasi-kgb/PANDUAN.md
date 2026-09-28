@@ -7,7 +7,7 @@ sebagai ZIP yang foldernya siap diseret ke Google Drive.
 ## Alur
 
 1. **Super Admin** membuka *Data → Inventarisasi KGB* di dashboard, mencentang **Formulir dibuka**, lalu mengisi
-   **Kode akses** (mis. `KANWIL2026`) dan **Batas pengisian**, dan menekan Simpan.
+   **Kode akses** (mis. `KANWIL2026`) dan **Ditutup otomatis pada** (tanggal dan jam WITA), lalu menekan Simpan.
 2. Pengumuman di grup WA memuat tautan `kgb.paskalsel.online/inventarisasi-kgb` dan kode aksesnya.
 3. Pegawai memilih keadaan KGB-nya:
    - **Sudah pernah KGB:** mengisi data dan SK KGB terakhir, lalu mengunggah SK KGB terakhir dan SK kenaikan
@@ -55,4 +55,7 @@ Inventarisasi KGB Kanwil 2026-10-10.zip
 - **Berkas:** harus PDF, paling besar 1 MB per berkas.
 - **Penyimpanan:** kiriman berada di penyimpanan berkas SIM-KGB (R2, awalan `inventaris/`), dan hanya dapat
   dibuka Super Admin dan Tim SDM KGB. Super Admin dapat menghapus kiriman yang keliru atau kiriman uji.
-- **Menutup formulir:** hapus centang *Formulir dibuka*. Halaman publik lalu menampilkan "Formulir belum dibuka".
+- **Menutup formulir:** begitu waktu *Ditutup otomatis pada* lewat, formulir tertutup sendiri: halaman publik
+  menampilkan "Formulir sudah ditutup" dan kiriman yang terlambat ditolak. Untuk membukanya lagi, Super Admin
+  memilih waktu tutup yang baru lalu menekan Simpan; waktu yang sudah lewat ditolak. Kosongkan waktu tutup bila
+  formulir dibuka tanpa batas. Untuk menutup lebih awal, hapus centang *Formulir dibuka*.

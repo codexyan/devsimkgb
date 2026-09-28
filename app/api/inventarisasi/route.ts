@@ -4,6 +4,7 @@ import { canProcessKGB, isSuperAdmin } from "@/lib/auth";
 import { penggunaLogin, PESAN_SESI_BERAKHIR } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 import { bacaKonfigurasi, daftarKiriman, simpanKonfigurasi } from "@/lib/inventarisServer";
+import { tutupPadaSah, waktuTutup } from "@/lib/inventarisKgb";
 
 export const runtime = "nodejs";
 
@@ -29,18 +30,27 @@ export async function PUT(req: Request) {
   const pengguna = await penggunaLogin(session);
   if (!pengguna) return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
 
-  const body = (await req.json().catch(() => ({}))) as { terbuka?: unknown; kode?: unknown; batas?: unknown };
+  const body = (await req.json().catch(() => ({}))) as { terbuka?: unknown; kode?: unknown; tutupPada?: unknown };
   const kode = typeof body.kode === "string" ? body.kode.trim().toUpperCase() : "";
-  const batas = typeof body.batas === "string" ? body.batas.trim().slice(0, 80) : "";
+  const tutupPada = typeof body.tutupPada === "string" ? body.tutupPada.trim() : "";
   const terbuka = body.terbuka === true;
   if (terbuka && !/^[A-Z0-9-]{4,30}$/.test(kode))
     return NextResponse.json({ error: "Kode akses 4 sampai 30 huruf atau angka, tanpa spasi." }, { status: 400 });
+  if (!tutupPadaSah(tutupPada))
+    return NextResponse.json({ error: "Batas pengisian tidak valid. Pilih tanggal dan jam." }, { status: 400 });
+  const tutup = waktuTutup(tutupPada);
+  if (terbuka && tutup && tutup.getTime() <= Date.now())
+    return NextResponse.json(
+      { error: "Batas pengisian sudah lewat. Untuk membuka formulir lagi, pilih tanggal dan jam yang akan datang." },
+      { status: 400 },
+    );
 
-  await simpanKonfigurasi({ terbuka, kode, batas, diubahOleh: pengguna.nama, diubahAt: new Date().toISOString() });
+  // Teks batas lama tidak dipakai lagi setelah pengaturan disimpan dengan batas tanggal.
+  await simpanKonfigurasi({ terbuka, kode, tutupPada, batas: "", diubahOleh: pengguna.nama, diubahAt: new Date().toISOString() });
   logAudit({
     userId: pengguna.id,
     aksi: "atur_inventarisasi_kgb",
-    detail: `Formulir inventarisasi KGB ${terbuka ? "dibuka" : "ditutup"}${batas ? `, batas ${batas}` : ""}`,
+    detail: `Formulir inventarisasi KGB ${terbuka ? "dibuka" : "ditutup"}${tutupPada ? `, ditutup otomatis ${tutupPada.replace("T", " ")} WITA` : ""}`,
     targetNama: "Inventarisasi KGB",
   });
   return NextResponse.json({ ok: true });

@@ -3,6 +3,7 @@ import Kata from "../Kata";
 import LatarNavy from "@/app/_bersama/LatarNavy";
 import FormInventaris from "./FormInventaris";
 import { bacaKonfigurasi } from "@/lib/inventarisServer";
+import { keadaanFormulir, teksBatas } from "@/lib/inventarisKgb";
 import "./inventaris.css";
 
 export const metadata: Metadata = {
@@ -17,7 +18,9 @@ export const dynamic = "force-dynamic";
    (lib/inventarisServer.ts) dan diunduh Tim SDM sebagai ZIP berstruktur folder dari menu Inventarisasi di
    dashboard. Halaman ini tidak ada di menu publik; tautannya dibagikan lewat grup WA pegawai Kanwil. */
 export default async function HalamanInventarisasi() {
-  const { terbuka, kode, batas } = await bacaKonfigurasi();
+  const konfigurasi = await bacaKonfigurasi();
+  const keadaan = keadaanFormulir(konfigurasi);
+  const batas = teksBatas(konfigurasi);
   return (
     <>
       <section className="pub-navy pub-hero iv-hero" aria-labelledby="iv-judul">
@@ -33,15 +36,22 @@ export default async function HalamanInventarisasi() {
                 Data ini dipakai Tim SDM untuk memperbarui data kenaikan gaji berkala Anda di SIM-KGB. Siapkan SK
                 terakhir dalam bentuk PDF sebelum mengisi.
               </p>
-              {batas && <p className="iv-batas">Batas pengisian: {batas}</p>}
+              {batas && keadaan === "dibuka" && <p className="iv-batas">Batas pengisian: {batas}</p>}
             </div>
           </header>
         </div>
       </section>
 
       <div className="pub-container iv">
-        {terbuka && kode ? (
+        {keadaan === "dibuka" ? (
           <FormInventaris />
+        ) : keadaan === "lewat_batas" ? (
+          <div className="iv-tutup" role="status">
+            <h2>Formulir sudah ditutup</h2>
+            <p>
+              Batas pengisian {batas} sudah lewat. Bila data Anda belum terkirim, hubungi Tim SDM Kanwil.
+            </p>
+          </div>
         ) : (
           <div className="iv-tutup" role="status">
             <h2>Formulir belum dibuka</h2>

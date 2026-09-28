@@ -3,6 +3,7 @@ import { adaPenandaPdf } from "@/lib/prosesKgb";
 import {
   BATAS_BERKAS_INVENTARIS_BYTE,
   BERKAS_KEADAAN,
+  keadaanFormulir,
   namaBerkasInventaris,
   periksaIsianInventaris,
   tanggalUntukBerkas,
@@ -25,8 +26,15 @@ const BIDANG: (keyof IsianInventaris)[] = [
  */
 export async function POST(req: Request) {
   const konfigurasi = await bacaKonfigurasi();
-  if (!konfigurasi.terbuka || !konfigurasi.kode)
+  const keadaanForm = keadaanFormulir(konfigurasi);
+  if (keadaanForm === "ditutup")
     return NextResponse.json({ error: "Formulir sedang ditutup. Tunggu pengumuman dari Tim SDM Kanwil." }, { status: 403 });
+  // 410, bukan 403: pegawai yang terlambat mengirim tidak dihitung sebagai percobaan kode salah di worker-entry.js.
+  if (keadaanForm === "lewat_batas")
+    return NextResponse.json(
+      { error: "Batas pengisian sudah lewat, jadi formulir sudah ditutup. Hubungi Tim SDM Kanwil bila data Anda belum terkirim." },
+      { status: 410 },
+    );
 
   const panjang = Number(req.headers.get("content-length"));
   if (Number.isFinite(panjang) && panjang > 2 * BATAS_BERKAS_INVENTARIS_BYTE + 64 * 1024)
