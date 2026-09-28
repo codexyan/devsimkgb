@@ -32,8 +32,8 @@ export default async function HalamanKegiatan({ id }: { id: string }) {
             </h1>
             <div className="iv-pengantar masuk" style={{ "--d": 180 } as React.CSSProperties}>
               <p className="pub-lead">
-                Data ini dipakai Tim SDM untuk memperbarui data kenaikan gaji berkala Anda di SIM-KGB. Siapkan SK
-                terakhir dalam bentuk PDF sebelum mengisi.
+                Data ini menjadi rujukan Tim SDM saat memperbarui data kenaikan gaji berkala Anda di SIM-KGB. Siapkan
+                SK terakhir dalam bentuk PDF sebelum mengisi.
               </p>
               {batas && keadaan === "dibuka" && <p className="iv-batas">Batas pengisian: {batas}</p>}
             </div>

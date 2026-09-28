@@ -144,10 +144,14 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                     <p>
                       Tata Usaha mencatat surat pada Lembar Disposisi, dan disposisi Kepala Kanwil diteruskan kepada Ketua
                       Tim SDM. Tim SDM KGB atau Super Admin meninjau usulan data di menu Usulan UPT: Setujui menerapkannya
-                      ke data pegawai, Kembalikan mengirimnya kembali ke UPT dengan catatan. Selama usulan belum ditinjau,
+                      ke data pegawai, Kembalikan mengirimnya kembali ke UPT dengan catatan. Bila usulan menyebut SK
+                      kenaikan pangkat, penyesuaian ijazah, atau PMK, persetujuannya sekaligus mencatat riwayat SK itu
+                      dan menghitung ulang masa kerja golongan serta gaji pokoknya. Selama usulan belum ditinjau,
                       proses KGB pegawainya tertahan.
                     </p>
-                    <p className="pg-hasil">Hasil: data pegawai sesuai SK yang dilampirkan UPT.</p>
+                    <p className="pg-hasil">
+                      Hasil: data pegawai sesuai SK yang dilampirkan UPT, dan SK itu menjadi dasar KGB berikutnya.
+                    </p>
                   </div>
                   </li>
                   <li>
@@ -582,7 +586,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
               {/* 5. Kenaikan pangkat dan dampaknya pada KGB */}
               <section className="pub-prose pg-bagian" data-bagian="kenaikan-pangkat" data-peran={peranUntuk("kenaikan-pangkat")}>
                 <h2 id="kenaikan-pangkat" className="pub-h2">
-                  Kenaikan pangkat dan dampaknya pada KGB
+                  Kenaikan pangkat, PMK, dan dampaknya pada KGB
                 </h2>
                 <p>
                   Kenaikan pangkat mengubah golongan ruang, dan karena itu mengubah kolom tabel gaji yang dipakai. Yang
@@ -621,12 +625,13 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                 <h3 className="pub-h3">Yang berubah dan yang tetap</h3>
                 <ul>
                   <li>
-                    <strong>Berubah:</strong> golongan ruang, masa kerja golongan, dan gaji pokok yang menjadi dasar KGB
-                    berikutnya.
+                    <strong>Berubah:</strong> golongan ruang, masa kerja golongan, dan gaji pokok. Berubah pula SK yang
+                    menjadi dasarnya: SK kenaikan pangkat itu menggantikan SK KGB terakhir pada bagian Atas Dasar SK
+                    KGB berikutnya, sebab SK itulah yang terakhir menetapkan gaji pokok.
                   </li>
                   <li>
                     <strong>Tetap:</strong> jadwal KGB. Selang dua tahun dihitung dari KGB terakhir, bukan diulang dari
-                    tanggal kenaikan pangkat.
+                    tanggal kenaikan pangkat. Yang dapat menggesernya hanya PMK, lihat di bawah.
                   </li>
                   <li>
                     <strong>Perlu ditinjau:</strong> KGB yang sedang diproses ketika kenaikan pangkat dicatat. Golongan
@@ -635,14 +640,34 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   </li>
                 </ul>
 
+                <h3 className="pub-h3">Peninjauan masa kerja (PMK)</h3>
+                <p>
+                  PMK adalah SK yang menambah masa kerja golongan yang diakui, misalnya dengan memperhitungkan masa
+                  kerja sebelum CPNS, dan karena itu menetapkan gaji pokok baru. Bedanya dengan kenaikan pangkat:
+                  golongan ruangnya tidak berubah, tetapi <strong>jadwal KGB dapat maju</strong>. Masa kerja golongan
+                  bertambah sebesar tambahan pada SK PMK, sehingga langkah berikutnya di tabel gaji tercapai lebih
+                  cepat; TMT KGB berikutnya dihitung ulang dari TMT PMK.
+                </p>
+                <p>
+                  SK PMK juga menggantikan SK KGB terakhir sebagai dasar SK KGB berikutnya. SK PMK yang TMT-nya lebih
+                  awal dari TMT KGB terakhir ditolak, sebab KGB itu telanjur dihitung tanpa PMK: koreksi KGB tersebut
+                  lebih dulu, atau catat KGB yang terbit sesudah PMK lewat Arsip KGB.
+                </p>
+
                 <h3 className="pub-h3">Di SIM-KGB</h3>
                 <p>
-                  Kenaikan pangkat dicatat dari halaman pegawai: buka pegawainya di Data Pegawai, lalu pada tab Data
-                  pegawai tekan Catat kenaikan pangkat di kartu Dasar KGB (atau lewat menu Tindakan). Di sisi kanan
-                  jendela tampil SK kenaikan pangkat yang sudah ada di arsip pegawai; SK baru dapat dilampirkan dan
-                  otomatis masuk arsip setelah disimpan. Sistem menghitung masa kerja golongan baru beserta gaji
-                  pokoknya, menyimpan riwayat pangkat, lalu menyelaraskan rencana KGB berikutnya. Bila ada KGB yang
-                  sedang berjalan, sistem menandainya untuk ditinjau Tim SDM.
+                  Keduanya dicatat dari halaman pegawai: buka pegawainya di Data Pegawai, lalu pada tab Data pegawai
+                  tekan <strong>Catat kenaikan pangkat</strong> atau <strong>Catat PMK</strong>{" "}
+                  di kartu Dasar KGB (lewat menu Tindakan namanya Catat peninjauan masa kerja). Di sisi kanan jendela, panel Dokumen
+                  rujukan menampilkan SK sejenis yang sudah ada di arsip pegawai; SK baru dapat dilampirkan dan
+                  otomatis masuk arsip setelah pencatatannya tersimpan. Sistem menghitung masa kerja golongan baru
+                  beserta gaji pokoknya, menyimpan riwayatnya di tab Pangkat &amp; PMK, lalu menyelaraskan rencana KGB
+                  berikutnya. Bila ada KGB yang sedang berjalan, sistem menandainya untuk ditinjau Tim SDM.
+                </p>
+                <p>
+                  Untuk pegawai UPT, SK itu umumnya masuk lewat <a href="#untuk-upt">usulan UPT</a>, bukan diketik Tim
+                  SDM: usulan yang mengubah golongan atau masa kerja golongan wajib menyebut SK sebabnya, dan
+                  persetujuan Kanwil mencatat riwayatnya lewat jalur yang sama dengan kedua tombol di atas.
                 </p>
                 <LanjutBagian dari="kenaikan-pangkat" />
               </section>
@@ -667,7 +692,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   </p>
                 </div>
 
-                <h3 className="pub-h3">Menginventarisir data pegawai lewat SIM-KGB</h3>
+                <h3 className="pub-h3">Meremajakan data pegawai lewat usulan</h3>
                 <p>
                   Dokumen aslinya ada di UPT, sedangkan yang mengetik datanya selama ini Kanwil. Pengetikan ganda itu
                   sumber salah masa kerja golongan. Karena itu UPT mendata sendiri pegawainya, dan mengusulkannya dalam
@@ -685,9 +710,11 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   <li>
                     <strong>Golongan dan masa kerja golongan disalin dari SK, bukan dihitung sendiri.</strong> Pilih
                     dulu keadaan pegawainya. <em>Belum pernah KGB</em> cukup meminta TMT CPNS, dan masa kerjanya 0 tahun
-                    0 bulan. <em>Sudah pernah KGB</em> meminta TMT dan masa kerja golongan pada SK KGB terakhir; pegawai
-                    yang baru naik pangkat tetap memakai TMT dari siklus KGB sebelumnya, sebab kenaikan pangkat tidak
-                    mengulang hitungan KGB.
+                    0 bulan. <em>Sudah pernah KGB</em> meminta TMT dan masa kerja golongan pada SK KGB terakhir; TMT-nya
+                    tetap dari siklus KGB sebelumnya walau pegawainya baru naik pangkat, sebab kenaikan pangkat tidak
+                    mengulang hitungan KGB. Bila sesudah SK KGB itu terbit SK kenaikan pangkat, penyesuaian ijazah, atau
+                    PMK, isikan golongan dan masa kerja golongan dari SK yang paling baru, lalu sebutkan SK-nya seperti
+                    pada butir 7.
                   </li>
                   <li>
                     <strong>Pangkat, gaji pokok, dan TMT KGB berikutnya dihitung sistem</strong> dari tabel PP 5/2024,
@@ -1113,6 +1140,16 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       disertai catatan; UPT memperbaikinya lalu mengajukan ulang dengan surat yang sama.
                     </p>
                     <p>
+                      Usulan yang mengubah golongan ruang atau masa kerja golongan wajib menyebut sebabnya, dan panel
+                      tinjauan menampilkan SK yang disebut UPT beserta akibat persetujuannya. Bila sebabnya SK kenaikan
+                      pangkat, penyesuaian ijazah, atau PMK, Setujui membentuk riwayat pangkat atau PMK-nya, sehingga SK
+                      itu menjadi Atas dasar SK KGB berikutnya — sama seperti Catat kenaikan pangkat dan Catat PMK di
+                      halaman pegawai. Masa kerja golongan dan gaji pokoknya dihitung sistem, bukan diambil apa adanya
+                      dari angka yang diketik UPT: naik dari golongan II ke III tetap memotong masa kerja 5 tahun, dan
+                      PMK tetap menghitung pergeseran jadwal KGB-nya. Bila sebabnya koreksi salah ketik, nilainya
+                      dipakai apa adanya dan dasar KGB berikutnya tidak berpindah.
+                    </p>
+                    <p>
                       Usulan pegawai baru yang disetujui langsung menambahkan pegawai beserta jadwal KGB-nya, dan SK yang
                       diketik UPT (misalnya SK CPNS) menjadi SK dasar Input KGB pertama. Bila KGB pegawai sedang berjalan
                       dan SK-nya belum diunggah, perhitungannya disesuaikan otomatis saat usulan disetujui. Selama usulan
@@ -1173,12 +1210,20 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                       baru, TMT KGB berikutnya, dan batas input SDM.
                     </p>
                     <p>
-                      Bagian Atas Dasar SK Terakhir terisi sendiri: dari SK KGB terakhir di riwayat, atau dari SK dasar
-                      yang tercatat pada data pegawai, misalnya SK CPNS yang diketik UPT pada usulannya. Cocokkan dengan
-                      SK yang dilampirkan. Nomor SK Terakhir, Tanggal SK Terakhir, dan TMT SK Terakhir wajib diisi; Oleh wajib dilengkapi paling lambat saat Buat SK. Isian Oleh
-                      adalah pejabat yang menetapkan SK terakhir itu, bukan yang menandatangani SK KGB yang sedang
-                      dibuat. Untuk KGB pertama, SK terakhirnya adalah SK CPNS; untuk KGB berikutnya, SK KGB sebelumnya.
-                      Pilih Simpan Input KGB. Status berubah menjadi <Status status="sedang_diproses" />.
+                      Bagian <strong>Atas Dasar</strong> berisi SK terbaru yang menetapkan gaji pokok pegawai, dan
+                      judul serta nama isiannya menyesuaikan SK itu: Atas Dasar SK KGB Terakhir, SK Kenaikan Pangkat,
+                      SK PMK, atau SK CPNS bagi pegawai yang belum pernah KGB. Aturannya: SK KGB terakhir dipakai,
+                      kecuali ada SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang TMT-nya sesudah SK KGB itu.
+                      Isiannya terisi sendiri dari riwayat KGB, riwayat pangkat dan PMK, atau SK dasar yang tercatat
+                      pada data pegawai, misalnya SK CPNS yang diketik UPT pada usulannya. Cocokkan dengan SK yang
+                      dilampirkan. Nomor, Tanggal, dan TMT-nya wajib diisi; Oleh wajib dilengkapi paling lambat saat
+                      Buat SK. Isian Oleh adalah pejabat yang menetapkan SK dasar itu, bukan yang menandatangani SK KGB
+                      yang sedang dibuat. Pilih Simpan Input KGB. Status berubah menjadi{" "}
+                      <Status status="sedang_diproses" />.
+                    </p>
+                    <p>
+                      Baris <em>Masa kerja golongan pada tanggal tersebut</em> yang tercetak di SK KGB mengikuti SK
+                      dasar itu: masa kerja golongan pegawai pada TMT SK dasar, bukan pada TMT KGB yang sedang dibuat.
                     </p>
                     <p>SIM-KGB menolak Input KGB bila:</p>
                     <ul>
@@ -1305,7 +1350,12 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   <li>
                     <strong>Detail dan riwayat.</strong> Di menu Proses KGB, tombol Detail membuka Detail KGB berisi data
                     pegawai, perhitungan, SK KGB Baru, tautan Lihat SK Tertandatangani, dan tombol aksi sesuai status.
-                    Riwayat KGB menampilkan seluruh KGB pegawai. Di halaman riwayat pegawai, tombol Proses KGB membuka
+                    Halaman pegawai sendiri punya lima tab: <strong>Data pegawai</strong> (kartu Identitas, Kepegawaian,
+                    Dasar KGB, serta Status &amp; mutasi, masing-masing dengan tombol ubah dan catatnya),{" "}
+                    <strong>Riwayat KGB</strong>, <strong>Pangkat &amp; PMK</strong>, <strong>Dokumen</strong>, dan{" "}
+                    <strong>Riwayat Hukdis</strong>. Tab Dokumen adalah arsip dokumen pegawai, tempat SK yang dilampirkan
+                    lewat panel Dokumen rujukan atau disalin dari kiriman inventarisasi tersimpan permanen; tab ini hanya
+                    tampil bagi Super Admin dan Tim SDM KGB. Riwayat KGB menampilkan seluruh KGB pegawai. Di halaman riwayat pegawai, tombol Proses KGB membuka
                     tombol aksi yang sama dan tautan Buka di Halaman Proses KGB. Baris bertanda Dari Data Pegawai dibentuk
                     dari TMT KGB berikutnya di Data Pegawai, untuk pegawai aktif yang tidak memiliki entri KGB berstatus
                     Belum Diproses, Sedang Diproses, atau Menunggu Keuangan.
@@ -1864,9 +1914,11 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                     <summary>Pegawai pindah satker atau berhenti sebelum SK terbit</summary>
                     <p>
                       Admin UPT satker asal memilih Laporkan mutasi pada baris pegawai: mutasi definitif, BKO, selesai
-                      BKO, atau pemberhentian, beserta TMT dan nomor SK-nya. Tim SDM Kanwil menetapkannya sebelum Buat SK.
-                      Mutasi definitif memperbarui Unit Kerja, sehingga SK ditujukan ke KPPN mitra satker baru; BKO tidak
-                      mengubah Unit Kerja maupun KPPN.
+                      BKO, atau pemberhentian, beserta TMT dan nomor SK-nya. Tim SDM Kanwil menetapkannya sebelum Buat SK,
+                      lewat kartu Status &amp; mutasi pada tab Data pegawai; SK mutasi atau SK pemberhentiannya dapat
+                      dilampirkan di panel Dokumen rujukan dan langsung masuk arsip pegawai. Mutasi definitif memperbarui
+                      Unit Kerja, sehingga SK ditujukan ke KPPN mitra satker baru; BKO tidak mengubah Unit Kerja maupun
+                      KPPN.
                     </p>
                   </details>
                   <details name="faq-panduan">

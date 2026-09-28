@@ -22,17 +22,18 @@ export const metadata: Metadata = {
 // Jadwal pengusulan dihitung dari tanggal hari ini (WITA), jadi halaman dirender per permintaan.
 export const dynamic = "force-dynamic";
 
-/* Enam langkah satu usulan KGB, sama dengan alur singkat di panduan dashboard (app/dashboard/panduan). */
+/* Ringkasan enam langkah satu usulan KGB untuk pembaca umum. Panduan dashboard (app/dashboard/panduan)
+   merinci langkah yang sama menjadi tujuh, sebab pengiriman dan unggah SK dipisah untuk petugasnya. */
 const LANGKAH: { judul: string; pelaksana: string; isi: string; status?: StatusKgb }[] = [
   {
     judul: "UPT menyiapkan dan mengajukan usulan",
     pelaksana: "Admin UPT dan Kepala UPT",
-    isi: "Data pegawai yang KGB-nya jatuh tempo diperiksa di SIM-KGB, perbaikan dan berkas SK dasarnya disiapkan, lalu diajukan ke Kanwil bersama surat usulan Srikandi yang ditandatangani Kepala UPT.",
+    isi: "Data pegawai yang KGB-nya jatuh tempo diperiksa di SIM-KGB, lalu perbaikan dan berkas SK dasarnya disiapkan. Perubahan golongan atau masa kerja golongan harus menyebut SK yang menjadi sebabnya. Usulan diajukan ke Kanwil bersama surat usulan Srikandi yang ditandatangani Kepala UPT.",
   },
   {
     judul: "Kanwil meninjau usulan",
     pelaksana: "Tim SDM Kanwil",
-    isi: "Surat dicatat dan didisposisikan. Usulan perbaikan data disetujui atau dikembalikan untuk diperbaiki; selama belum ditinjau, proses KGB pegawainya tertahan.",
+    isi: "Surat dicatat dan didisposisikan. Usulan disetujui atau dikembalikan untuk diperbaiki; bila usulan menyebut SK kenaikan pangkat, penyesuaian ijazah, atau peninjauan masa kerja, persetujuannya sekaligus menghitung ulang masa kerja golongan dan gaji pokok. Selama belum ditinjau, proses KGB pegawainya tertahan.",
   },
   {
     judul: "Input KGB dan buat SK",
@@ -319,15 +320,17 @@ export default async function HalamanBeranda() {
             <li data-muncul="" style={{ "--i": 4 } as React.CSSProperties}>
               <h3>Setelah naik pangkat</h3>
               <p>
-                Golongan baru memotong masa kerja golongan, sehingga dasar gaji KGB berikutnya berubah, tetapi jadwal dua
-                tahunannya tetap. <a href="#info-pangkat">Aturan potongannya</a>.
+                Golongan baru memotong masa kerja golongan, dan SK kenaikan pangkat itu menjadi dasar KGB berikutnya.
+                Jadwal dua tahunannya tetap, kecuali ada SK peninjauan masa kerja.{" "}
+                <a href="#info-pangkat">Aturan potongannya</a>.
               </p>
             </li>
             <li data-muncul="" style={{ "--i": 5 } as React.CSSProperties}>
               <h3>Akun untuk UPT</h3>
               <p>
                 Setiap UPT memegang akun Admin UPT untuk menyiapkan usulan, melaporkan mutasi dan hukuman disiplin,
-                mengunduh SK begitu diunggah Kanwil, dan menandai SK yang sudah direkam di Gaji Web satker.
+                melihat SK yang menjadi dasar KGB berikutnya tiap pegawainya, mengunduh SK begitu diunggah Kanwil, dan
+                menandai SK yang sudah direkam di Gaji Web satker.
               </p>
             </li>
           </ul>
@@ -441,20 +444,31 @@ export default async function HalamanBeranda() {
                   Yang dirapel hanya bulan yang terlanjur dibayar dengan gaji pokok lama. Periksa gaji pokok pada SK
                   pengangkatan PNS: bila sudah memakai gaji pokok hasil KGB, sejak TMT PNS tidak ada lagi kekurangan.
                 </li>
-                <li>KGB berikutnya tetap 2 tahun setelah KGB pertama.</li>
+                <li>
+                  KGB berikutnya 2 tahun setelah KGB pertama, kecuali ada SK peninjauan masa kerja yang memajukannya.
+                </li>
               </ul>
             </article>
 
             <article className="ip-kartu" id="info-pangkat" data-muncul="" style={{ "--i": 2 } as React.CSSProperties}>
-              <h3>Setelah naik pangkat</h3>
+              <h3>Setelah naik pangkat atau peninjauan masa kerja</h3>
               <ul>
                 <li>
                   Naik dari golongan I ke II/a memotong masa kerja golongan 6 tahun; dari golongan II ke III/a
                   memotong 5 tahun. Kenaikan di dalam golongan yang sama, misalnya III/a ke III/b, tidak memotong.
+                  Penyesuaian ijazah mengikuti aturan potongan yang sama.
                 </li>
-                <li>Golongan dan gaji pokok yang menjadi dasar KGB berikutnya ikut berubah.</li>
+                <li>
+                  Golongan dan gaji pokoknya berubah, dan SK kenaikan pangkat atau penyesuaian ijazah itu menggantikan
+                  SK KGB terakhir sebagai SK yang tertulis pada bagian Atas Dasar di SK KGB berikutnya.
+                </li>
                 <li>
                   Jadwal KGB tetap: 2 tahun dihitung dari KGB terakhir, tidak diulang dari tanggal kenaikan pangkat.
+                </li>
+                <li>
+                  Peninjauan masa kerja (PMK) menambah masa kerja golongan yang diakui. SK PMK juga menjadi dasar SK
+                  KGB berikutnya, dan karena masa kerjanya bertambah, TMT KGB berikutnya dapat maju lebih cepat dari
+                  dua tahun.
                 </li>
               </ul>
             </article>
@@ -507,13 +521,22 @@ export default async function HalamanBeranda() {
                 </p>
               </details>
               <details name="faq-publik" style={{ "--i": 3 } as React.CSSProperties}>
+                <summary>SK mana yang menjadi dasar gaji pokok saya?</summary>
+                <p>
+                  SK terbaru yang menetapkan gaji pokok Anda. Biasanya SK KGB terakhir, atau SK CPNS bila Anda belum
+                  pernah menerima KGB. Namun bila sesudah itu terbit SK kenaikan pangkat, penyesuaian ijazah, atau
+                  peninjauan masa kerja, SK itulah yang menjadi dasarnya dan tertulis pada bagian Atas Dasar di SK KGB
+                  berikutnya. Karena itu pastikan SK tersebut sudah dilaporkan ke admin kepegawaian satker Anda.
+                </p>
+              </details>
+              <details name="faq-publik" style={{ "--i": 4 } as React.CSSProperties}>
                 <summary>Saya pindah satker atau berhenti sebelum SK terbit</summary>
                 <p>
                   Admin kepegawaian satker asal melaporkannya lewat SIM-KGB, lalu Kanwil mencatatnya. Satker tempat Anda
                   bertugas menentukan KPPN mitra yang menjadi tujuan SK.
                 </p>
               </details>
-              <details name="faq-publik" style={{ "--i": 4 } as React.CSSProperties}>
+              <details name="faq-publik" style={{ "--i": 5 } as React.CSSProperties}>
                 <summary>Apakah saya perlu akun SIM-KGB?</summary>
                 <p>
                   Tidak. Status KGB dapat dicek dengan NIP dan tempat lahir di halaman ini. Akun SIM-KGB hanya untuk Tim SDM dan keuangan

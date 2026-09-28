@@ -6,7 +6,7 @@ export const DAFTAR_ISI = [
   { id: "kewenangan", judul: "Siapa yang menetapkan KGB" },
   { id: "jadwal", judul: "Kapan KGB diberikan dan diusulkan" },
   { id: "cpns-pns", judul: "KGB pertama setelah CPNS jadi PNS" },
-  { id: "kenaikan-pangkat", judul: "Kenaikan pangkat dan KGB" },
+  { id: "kenaikan-pangkat", judul: "Kenaikan pangkat, PMK, dan KGB" },
   { id: "untuk-upt", judul: "Untuk Admin UPT" },
   { id: "di-kanwil", judul: "Di Kanwil: agenda dan disposisi" },
   { id: "di-sim-kgb", judul: "Di SIM-KGB: langkah Tim SDM" },

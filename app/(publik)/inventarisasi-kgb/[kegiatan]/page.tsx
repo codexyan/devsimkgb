@@ -3,7 +3,7 @@ import HalamanKegiatan from "../HalamanKegiatan";
 
 export const metadata: Metadata = {
   title: "Inventarisasi Data KGB",
-  description: "Formulir pemutakhiran data kenaikan gaji berkala pegawai pemasyarakatan Kalimantan Selatan.",
+  description: "Formulir pendataan kenaikan gaji berkala pegawai pemasyarakatan Kalimantan Selatan.",
 };
 
 // Buka-tutup formulir dan batas waktunya diatur Super Admin di dashboard, jadi dibaca saat permintaan.

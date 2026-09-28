@@ -62,16 +62,24 @@ Inventarisasi KGB Kanwil 2026-10-10.zip
   memilih waktu tutup yang baru lalu menekan Simpan; waktu yang sudah lewat ditolak. Kosongkan waktu tutup bila
   formulir dibuka tanpa batas. Untuk menutup lebih awal, hapus centang *Formulir dibuka*.
 
-## Kegiatan lain, mis. pegawai UPT (ADR-022)
+## Kegiatan lain (ADR-022, ADR-024)
 
-1. **Super Admin** membuka *Inventarisasi KGB*, lalu *Kegiatan baru*: pilih template (mis. *Inventarisasi KGB
-   pegawai UPT*), isi nama kegiatan, dan tekan *Buat kegiatan*. Kegiatan baru masih ditutup.
-2. Pada *Pengaturan formulir* kegiatan itu, isi kode akses dan waktu tutup, pilih **Satker sasaran** (tanpa
-   centang berarti semua UPT), centang *Formulir dibuka*, lalu Simpan.
-3. Bagikan tautan kegiatan, `kgb.paskalsel.online/inventarisasi-kgb/<id kegiatan>`, beserta kode aksesnya.
-   Pegawai UPT memilih satkernya di formulir.
-4. ZIP kegiatan UPT dikelompokkan per satker: `<Satker>/01 Pernah KGB/<NIP - Nama>/...`, dan rekapnya memuat
-   kolom *Satker*.
+**Kegiatan baru** dibuat oleh **Super Admin** lewat *Inventarisasi KGB → Kegiatan baru*: pilih template, isi nama
+kegiatan, lalu tekan *Buat kegiatan*. Kegiatan baru masih ditutup sampai kode akses dan waktu tutupnya diisi di
+*Pengaturan formulir* dan *Formulir dibuka* dicentang. Tautannya `kgb.paskalsel.online/inventarisasi-kgb/<id
+kegiatan>`, dibagikan beserta kode aksesnya.
+
+Template yang tersedia untuk kegiatan baru tinggal **Inventarisasi KGB pegawai Kanwil**. Template *Inventarisasi
+KGB pegawai UPT* sudah ditarik, sebab pemutakhiran data pegawai UPT kini lewat **Usulan UPT** supaya UPT tidak
+mengirim data yang sama di dua tempat.
+
+**Kegiatan UPT yang telanjur dibuat** tetap berjalan seperti biasa, supaya kiriman yang sudah masuk tidak hilang:
+
+- tautannya tetap terbuka selama *Formulir dibuka* dicentang dan waktu tutupnya belum lewat;
+- *Pengaturan formulir* tetap dapat diubah, termasuk **Satker sasaran** (tanpa centang berarti semua UPT);
+  pegawai UPT memilih satkernya sendiri di formulir;
+- ZIP-nya dikelompokkan per satker, `<Satker>/01 Pernah KGB/<NIP - Nama>/...`, dan rekapnya memuat kolom *Satker*;
+- untuk menutupnya, hapus centang *Formulir dibuka*.
 
 Formulir pegawai Kanwil tetap di `kgb.paskalsel.online/inventarisasi-kgb`, dan kiriman lamanya tidak berubah.
 
@@ -85,11 +93,15 @@ dari kiriman.
    kiriman yang belum diperiksa atau yang datanya berbeda.
 2. Tekan **Periksa** pada baris pegawai. Panel itu hanya rujukan: perbandingan dan peringatan, pratinjau berkas
    SK, dan catatan pegawai.
-3. Tekan **Buka di Data Pegawai** untuk membuka halaman pegawai di tab baru, lalu remajakan datanya di sana
-   (Ubah data per bagian, Catat kenaikan pangkat, PMK).
-4. Berkas SK yang perlu disimpan permanen disalin satu per satu dengan **Simpan ke arsip**. Salinannya menjadi
+3. Berkas SK yang perlu disimpan permanen disalin satu per satu dengan **Simpan ke arsip**. Salinannya menjadi
    dokumen arsip milik pegawai, sehingga tetap ada setelah modul inventarisasi dihapus. Berkas yang tidak disalin
-   hanya tersimpan di kiriman dan di ZIP Google Drive.
+   hanya tersimpan di kiriman dan di ZIP Google Drive. Salin lebih dulu, sebelum langkah berikutnya: panel
+   **Dokumen rujukan** pada modal tindakan hanya menampilkan dokumen yang sudah ada di arsip.
+4. Tekan **Buka di Data Pegawai** untuk membuka halaman pegawai di tab baru. Halaman itu terbuka pada tab **Data
+   pegawai**, berisi kartu Identitas, Kepegawaian, Dasar KGB, serta Status & mutasi; tombol ubah dan catat ada di
+   kartunya masing-masing (Ubah identitas, Ubah data kepegawaian, Catat kenaikan pangkat, Catat PMK). Tiap modal
+   tindakan punya panel **Dokumen rujukan** di sisi kanan untuk memeriksa SK arsip sambil mengisi, sekaligus
+   melampirkan SK baru ke arsip.
 5. Tandai statusnya sebagai catatan kerja: *Sesuai*, *Perlu perbaikan* (dengan catatan), atau *Sudah diterapkan*.
    Status tidak mengubah Data Pegawai dan tidak menyalin berkas.
 

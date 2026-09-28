@@ -220,7 +220,7 @@ export default function FormInventaris({ kegiatan }: { kegiatan: KegiatanFormuli
         <p>
           {tahap.kirimanKe > 1
             ? `Ini kiriman ke-${tahap.kirimanKe}; kiriman sebelumnya sudah digantikan.`
-            : "Tim SDM Kanwil akan memperbarui data KGB Anda di SIM-KGB."}{" "}
+            : "Tim SDM Kanwil akan memeriksanya, lalu memperbarui data KGB Anda di SIM-KGB."}{" "}
           Bila ada yang keliru, isi ulang formulir ini; kiriman terakhir yang dipakai.
         </p>
         <div className="iv-selesai-aksi">
@@ -554,7 +554,7 @@ export default function FormInventaris({ kegiatan }: { kegiatan: KegiatanFormuli
         <button type="submit" form={`${id}-form`} className="iv-tombol iv-tombol-kirim" disabled={mengirim}>
           {mengirim ? "Mengirim…" : "Kirim data"}
         </button>
-        <p className="iv-bantu">Data dan berkas disimpan di SIM-KGB dan hanya dipakai Tim SDM Kanwil untuk memperbarui data KGB Anda.</p>
+        <p className="iv-bantu">Data dan berkas disimpan di SIM-KGB dan hanya dipakai Tim SDM Kanwil sebagai rujukan untuk memperbarui data KGB Anda.</p>
       </aside>
 
       <dialog ref={dialogRef} className="iv-dialog" onClose={() => setPratinjau(null)} aria-label={pratinjau ? `Pratinjau ${pratinjau.judul}` : "Pratinjau berkas"}>
