@@ -11,6 +11,7 @@ import {
   bacaTanggalInput,
   hukdisMenahanKgb,
   izinUnggahSk,
+  mkgPadaSkDasar,
   PESAN_BELUM_DIINPUT,
   pesanKgbMasihAktif,
   placeholderBerlebih,
@@ -190,4 +191,14 @@ test("recordKgbKembarBerlebih: record yang tertulis paling dulu dipertahankan, b
   assert.deepEqual(recordKgbKembarBerlebih([recordA, recordB]), ["b"]);
   assert.deepEqual(recordKgbKembarBerlebih([{ id: "x" }, { id: "y" }, { id: "z" }]), ["y", "z"]);
   assert.deepEqual(recordKgbKembarBerlebih([]), []);
+});
+
+test("mkgPadaSkDasar: SK PI atau PMK di tengah siklus mencetak MKG pada TMT SK itu", () => {
+  // II/c MKG 9 pada KGB 1 Des 2024; PI ke III/a TMT 1 Feb 2026 (MKG dipotong 5 tahun); KGB 1 Des 2026.
+  const kgb = { tmtKgbBaru: "2026-12-01", mkgTahunLama: 4, mkgBulanLama: 0, mkgTahunBaru: 6, mkgBulanBaru: 0 };
+  assert.deepEqual(mkgPadaSkDasar({ ...kgb, tmtSK: "2026-02-01" }), { tahun: 5, bulan: 2 });
+  // SK dasar SK KGB terakhir (awal siklus) dan KGB yang pernah ditunda tetap mencetak MKG lama.
+  assert.deepEqual(mkgPadaSkDasar({ ...kgb, tmtSK: "2024-12-01" }), { tahun: 4, bulan: 0 });
+  assert.deepEqual(mkgPadaSkDasar({ ...kgb, tmtSK: "2023-12-01", mkgTahunBaru: 7 }), { tahun: 4, bulan: 0 });
+  assert.deepEqual(mkgPadaSkDasar({ ...kgb, tmtSK: null }), { tahun: 4, bulan: 0 });
 });

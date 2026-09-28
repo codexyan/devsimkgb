@@ -86,6 +86,24 @@ interface RiwayatPangkat {
   keterangan: string | null;
 }
 
+/** Satu peninjauan masa kerja dari GET /api/pegawai/[id]/pmk. */
+interface RiwayatPmk {
+  id: string;
+  nomorSK: string;
+  tanggalSK: string | null;
+  tmtPmk: string | null;
+  tambahBulan: number;
+  mkgTahunSebelum: number;
+  mkgBulanSebelum: number;
+  mkgTahunSesudah: number;
+  mkgBulanSesudah: number;
+  gajiPokokLama: number;
+  gajiPokokBaru: number;
+  tmtKgbBerikutnyaLama: string | null;
+  tmtKgbBerikutnyaBaru: string | null;
+  keterangan: string | null;
+}
+
 interface RiwayatHukdis {
   id: string;
   jenisHukdis: string;
@@ -163,6 +181,7 @@ export default function RiwayatKGBPage() {
   const [riwayat, setRiwayat] = useState<RiwayatKGB[]>([]);
   const [hukdisList, setHukdisList] = useState<RiwayatHukdis[]>([]);
   const [pangkatList, setPangkatList] = useState<RiwayatPangkat[]>([]);
+  const [pmkList, setPmkList] = useState<RiwayatPmk[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"kgb" | "pangkat" | "hukdis">("kgb");
 
@@ -242,17 +261,22 @@ export default function RiwayatKGBPage() {
     const pangkatPromise = fetch(`/api/pegawai/${id}/pangkat`)
       .then(async (r) => (r.ok ? ((await r.json()) as unknown) : []))
       .catch(() => []);
+    const pmkPromise = fetch(`/api/pegawai/${id}/pmk`)
+      .then(async (r) => (r.ok ? ((await r.json()) as unknown) : []))
+      .catch(() => []);
 
     return Promise.all([
       fetch(`/api/pegawai/${id}/riwayat-kgb`).then((r) => r.json() as Promise<{ pegawai?: Pegawai; riwayat?: RiwayatKGB[] }>),
       hukdisPromise,
       pangkatPromise,
+      pmkPromise,
     ])
-      .then(([kgbData, hukdisData, pangkatData]) => {
+      .then(([kgbData, hukdisData, pangkatData, pmkData]) => {
         setPegawai(kgbData.pegawai ?? null);
         setRiwayat(Array.isArray(kgbData.riwayat) ? kgbData.riwayat : []);
         setHukdisList(Array.isArray(hukdisData) ? (hukdisData as RiwayatHukdis[]) : []);
         setPangkatList(Array.isArray(pangkatData) ? (pangkatData as RiwayatPangkat[]) : []);
+        setPmkList(Array.isArray(pmkData) ? (pmkData as RiwayatPmk[]) : []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -553,7 +577,7 @@ export default function RiwayatKGBPage() {
             {tab === "kgb"
               ? `Riwayat KGB (${riwayat.length})`
               : tab === "pangkat"
-                ? `Riwayat Pangkat (${pangkatList.length})`
+                ? `Pangkat & PMK (${pangkatList.length + pmkList.length})`
                 : `Riwayat Hukdis (${hukdisList.length})`}
           </button>
         ))}
@@ -562,7 +586,7 @@ export default function RiwayatKGBPage() {
       {/* Riwayat pangkat: dasar gaji setiap kali pangkat naik (lib/kenaikanPangkat.ts) */}
       {activeTab === "pangkat" && (
         <div>
-          {pangkatList.length === 0 ? (
+          {pangkatList.length === 0 && pmkList.length > 0 ? null : pangkatList.length === 0 ? (
             <div
               className="rounded-2xl flex flex-col items-center justify-center py-16 gap-2"
               style={{ background: "var(--card)", border: "0.5px solid var(--ln1)" }}
@@ -605,6 +629,61 @@ export default function RiwayatKGBPage() {
                     </div>
                     <div>
                       <dt style={{ color: "var(--dt5)" }}>SK kenaikan pangkat</dt>
+                      <dd style={{ margin: 0, color: "var(--dtn)" }}>
+                        {p.nomorSK || "-"}
+                        <span style={{ display: "block", color: "var(--dt5)" }}>
+                          {p.tanggalSK ? formatTanggalId(p.tanggalSK, { day: "numeric", month: "long", year: "numeric" }) : "-"}
+                        </span>
+                      </dd>
+                    </div>
+                    {p.keterangan && (
+                      <div>
+                        <dt style={{ color: "var(--dt5)" }}>Keterangan</dt>
+                        <dd style={{ margin: 0, color: "var(--dt3)" }}>{p.keterangan}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Peninjauan masa kerja: menambah MKG dan dapat memajukan KGB berikutnya (lib/pmk.ts, ADR-021) */}
+          {pmkList.length > 0 && (
+            <div className="flex flex-col gap-3" style={{ marginTop: 16 }}>
+              {pmkList.map((p) => (
+                <div key={p.id} className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "0.5px solid var(--ln1)" }}>
+                  <div className="px-4 py-3 flex flex-wrap items-center gap-2" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
+                    <span className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>
+                      Peninjauan masa kerja · tambah {Math.floor(p.tambahBulan / 12)} thn {p.tambahBulan % 12} bln
+                    </span>
+                    <span className="dsb-tag" data-garis="">PMK</span>
+                    <span className="text-xs" style={{ color: "var(--dt4)", marginLeft: "auto" }}>
+                      TMT {p.tmtPmk ? formatTanggalId(p.tmtPmk, { day: "numeric", month: "long", year: "numeric" }) : "-"}
+                    </span>
+                  </div>
+                  <dl className="px-4 py-3 grid gap-x-6 gap-y-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", fontSize: "12px" }}>
+                    <div>
+                      <dt style={{ color: "var(--dt5)" }}>Masa kerja pada TMT PMK</dt>
+                      <dd style={{ margin: 0, color: "var(--dtn)" }}>
+                        {p.mkgTahunSebelum} thn {p.mkgBulanSebelum} bln → {p.mkgTahunSesudah} thn {p.mkgBulanSesudah} bln
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style={{ color: "var(--dt5)" }}>Gaji pokok</dt>
+                      <dd style={{ margin: 0, color: "var(--dtn)" }}>
+                        Rp {p.gajiPokokLama.toLocaleString("id-ID")} → <span style={{ color: "var(--st-green)" }}>Rp {p.gajiPokokBaru.toLocaleString("id-ID")}</span>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style={{ color: "var(--dt5)" }}>KGB berikutnya</dt>
+                      <dd style={{ margin: 0, color: "var(--dtn)" }}>
+                        {p.tmtKgbBerikutnyaLama ? formatTanggalId(p.tmtKgbBerikutnyaLama) : "-"} →{" "}
+                        {p.tmtKgbBerikutnyaBaru ? formatTanggalId(p.tmtKgbBerikutnyaBaru) : "-"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style={{ color: "var(--dt5)" }}>SK PMK</dt>
                       <dd style={{ margin: 0, color: "var(--dtn)" }}>
                         {p.nomorSK || "-"}
                         <span style={{ display: "block", color: "var(--dt5)" }}>

@@ -145,6 +145,25 @@ export async function ambilRiwayatPangkat(pegawaiId: string): Promise<HasilAksi<
   return { ok: true, data: Array.isArray(hasil.data) ? hasil.data : [] };
 }
 
+/** Riwayat peninjauan masa kerja pegawai, terbaru dulu (GET /api/pegawai/[id]/pmk). */
+export interface RiwayatPmkItem {
+  id: string;
+  nomorSK: string | null;
+  tanggalSK: string | null;
+  tmtPmk: string | null;
+  penetapSK: string | null;
+}
+
+export async function ambilRiwayatPmk(pegawaiId: string): Promise<HasilAksi<RiwayatPmkItem[]>> {
+  const hasil = await kirimJson<RiwayatPmkItem[]>(
+    `/api/pegawai/${encodeURIComponent(pegawaiId)}/pmk`,
+    { cache: "no-store" },
+    "Riwayat PMK gagal dimuat.",
+  );
+  if (!hasil.ok) return hasil;
+  return { ok: true, data: Array.isArray(hasil.data) ? hasil.data : [] };
+}
+
 /** SK dasar dari usulan UPT yang disetujui (GET /api/pegawai/[id]/sk-dasar); null bila tidak ada. */
 export interface SkDasarUsulan {
   usulanId: string;

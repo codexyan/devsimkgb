@@ -5,6 +5,7 @@ import {
   ambilPegawaiKgb,
   ambilRiwayatKgb,
   ambilRiwayatPangkat,
+  ambilRiwayatPmk,
   ambilSkDasarUsulan,
   inputKgb,
   type DataDasarSk,
@@ -84,9 +85,16 @@ export default function ModalInputKgb({
   useEffect(() => {
     if (dasarDiketahui === null) return;
     let batal = false;
-    ambilRiwayatPangkat(ringkas.id).then((hasilKp) => {
-      if (batal || !hasilKp.ok) return;
-      const kp = dasarDariKenaikanPangkat(dasarDiketahui, hasilKp.data);
+    Promise.all([ambilRiwayatPangkat(ringkas.id), ambilRiwayatPmk(ringkas.id)]).then(([hasilKp, hasilPmk]) => {
+      if (batal) return;
+      // SK kenaikan pangkat dan SK PMK sama-sama menetapkan gaji pokok; yang TMT-nya paling baru menang.
+      const kandidat = [
+        ...(hasilKp.ok ? hasilKp.data.map((r) => ({ ...r, jenis: "kp" as const })) : []),
+        ...(hasilPmk.ok
+          ? hasilPmk.data.map((r) => ({ jenis: "pmk" as const, nomorSK: r.nomorSK, tanggalSK: r.tanggalSK, tmtPangkat: r.tmtPmk, penetapSK: r.penetapSK }))
+          : []),
+      ];
+      const kp = dasarDariKenaikanPangkat(dasarDiketahui, kandidat);
       if (!kp) return;
       setDasarKp(kp);
       const semula = isianDasarSk(dasarDiketahui);
@@ -152,7 +160,10 @@ export default function ModalInputKgb({
   // KGB pertama berdasar SK CPNS; sesudahnya berdasar SK KGB terakhir. Masa kerja golongan 0 berarti
   // pegawai belum pernah KGB, aturan yang sama dengan formulir UPT (lib/usulanPegawai.ts).
   const kgbPertama = !!pegawai && !pernahKgb(pegawai.mkgTahun, pegawai.mkgBulan);
-  const sk = dasarKp
+  const dasarPmk = dasarKp?.kp.jenis === "pmk";
+  const sk = dasarPmk
+    ? { nama: "SK PMK", nomor: "Nomor SK PMK", tanggal: "Tanggal SK PMK", tmt: "TMT PMK" }
+    : dasarKp
     ? { nama: "SK kenaikan pangkat", nomor: "Nomor SK Kenaikan Pangkat", tanggal: "Tanggal SK Kenaikan Pangkat", tmt: "TMT Pangkat" }
     : kgbPertama
       ? { nama: "SK CPNS", nomor: "Nomor SK CPNS", tanggal: "Tanggal SK CPNS", tmt: "TMT CPNS" }
@@ -269,7 +280,7 @@ export default function ModalInputKgb({
         </Catatan>
       )}
       <BagianForm
-        judul={`Atas Dasar ${dasarKp ? "SK Kenaikan Pangkat" : kgbPertama ? "SK CPNS" : "SK KGB Terakhir"}`}
+        judul={`Atas Dasar ${dasarPmk ? "SK PMK" : dasarKp ? "SK Kenaikan Pangkat" : kgbPertama ? "SK CPNS" : "SK KGB Terakhir"}`}
         keterangan={
           dasarKp
             ? "SK terbaru yang menetapkan gaji pokok pegawai, dasar KGB ini; tercetak pada bagian Atas dasar di SK KGB."
@@ -281,7 +292,8 @@ export default function ModalInputKgb({
         {riwayatDimuat && <Memuat teks="Mencari SK dasar di riwayat KGB dan usulan UPT..." />}
         {dasarKp && (
           <Catatan nada={dasarKp.penetapSkDasar ? undefined : "amber"}>
-            Diisi dari SK kenaikan pangkat{dasarKp.kp.jenisLabel ? ` (${dasarKp.kp.jenisLabel.replace(/^Pilihan: /, "")})` : ""}
+            Diisi dari {dasarPmk ? "SK peninjauan masa kerja (PMK)" : "SK kenaikan pangkat"}
+            {!dasarPmk && dasarKp.kp.jenisLabel ? ` (${dasarKp.kp.jenisLabel.replace(/^Pilihan: /, "")})` : ""}
             {dasarKp.kp.nomorSK ? ` nomor ${dasarKp.kp.nomorSK}` : ""}
             {dasarKp.kp.tmtPangkat ? `, TMT ${formatTanggalId(dasarKp.kp.tmtPangkat)}` : ""}, karena SK itu lebih baru dari{" "}
             {kgbPertama ? "SK CPNS" : "SK KGB terakhir"} dan menetapkan gaji pokok sekarang.
@@ -363,7 +375,7 @@ export default function ModalInputKgb({
             wajib
             nilai={form.tmtSK}
             onUbah={ubah("tmtSK")}
-            petunjuk={dasarKp ? "Tanggal mulai berlaku pangkat pada SK kenaikan pangkat." : kgbPertama ? "Tanggal mulai berlaku pengangkatan CPNS." : "Tanggal mulai berlaku SK KGB terakhir."}
+            petunjuk={dasarPmk ? "Tanggal mulai berlaku pada SK PMK." : dasarKp ? "Tanggal mulai berlaku pangkat pada SK kenaikan pangkat." : kgbPertama ? "Tanggal mulai berlaku pengangkatan CPNS." : "Tanggal mulai berlaku SK KGB terakhir."}
             nonaktif={sibuk}
           />
         </div>

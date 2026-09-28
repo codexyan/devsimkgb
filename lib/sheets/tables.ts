@@ -63,6 +63,21 @@ export interface RiwayatPangkatRow {
 }
 
 /**
+ * Peninjauan masa kerja (lib/pmk.ts, ADR-021). MKG "sebelum" dan "sesudah" adalah masa kerja pada TMT PMK; MKG
+ * dasar adalah yang disimpan pada data pegawai (pada TMT KGB terakhir), sebelum dan sesudah tambahan PMK.
+ */
+export interface RiwayatPmkRow {
+  id: string; pegawaiId: string; nomorSK: string; tanggalSK: Date | null; tmtPmk: Date | null;
+  golonganRuang: string; tambahBulan: number;
+  mkgTahunSebelum: number; mkgBulanSebelum: number; mkgTahunSesudah: number; mkgBulanSesudah: number;
+  mkgTahunDasarLama: number; mkgBulanDasarLama: number; mkgTahunDasarBaru: number; mkgBulanDasarBaru: number;
+  gajiPokokLama: number; gajiPokokBaru: number;
+  tmtKgbBerikutnyaLama: Date | null; tmtKgbBerikutnyaBaru: Date | null;
+  penetapSK: string | null; keterangan: string | null;
+  createdAt: Date | null; createdBy: string | null;
+}
+
+/**
  * Laporan perpindahan atau pemberhentian dari UPT, sebelum ditetapkan Kanwil (lib/laporanMutasi.ts).
  * Satker yang paling dulu tahu pegawainya pindah atau berhenti; yang menetapkan tetap Kanwil.
  */
@@ -297,6 +312,16 @@ export const defs = {
       s("keterangan"), d("createdAt"), s("createdBy"), s("penetapSK"),
     ],
   },
+  RiwayatPmk: {
+    tab: "RiwayatPmk",
+    columns: [
+      s("id"), s("pegawaiId"), s("nomorSK"), d("tanggalSK"), d("tmtPmk"), s("golonganRuang"), i("tambahBulan"),
+      i("mkgTahunSebelum"), i("mkgBulanSebelum"), i("mkgTahunSesudah"), i("mkgBulanSesudah"),
+      i("mkgTahunDasarLama"), i("mkgBulanDasarLama"), i("mkgTahunDasarBaru"), i("mkgBulanDasarBaru"),
+      i("gajiPokokLama"), i("gajiPokokBaru"), d("tmtKgbBerikutnyaLama"), d("tmtKgbBerikutnyaBaru"),
+      s("penetapSK"), s("keterangan"), d("createdAt"), s("createdBy"),
+    ],
+  },
   RiwayatHukdis: {
     tab: "RiwayatHukdis",
     columns: [s("id"), s("pegawaiId"), s("jenisHukdis"), s("nomorSK"), d("tanggalSK"), d("tmtMulai"), d("tmtBerakhir"), b("berdampakKGB"), i("durasiTunda"), s("dasarHukum"), s("keterangan"), d("createdAt"), s("createdBy")],
@@ -337,6 +362,7 @@ export const sheets = {
   notifikasi: new Table<NotifikasiRow>(defs.Notifikasi),
   riwayatHukdis: new Table(defs.RiwayatHukdis),
   riwayatPangkat: new Table<RiwayatPangkatRow>(defs.RiwayatPangkat),
+  riwayatPmk: new Table<RiwayatPmkRow>(defs.RiwayatPmk),
   riwayatMutasi: new Table<RiwayatMutasiRow>(defs.RiwayatMutasi),
   laporanMutasi: new Table<LaporanMutasiRow>(defs.LaporanMutasi),
   laporanHukdis: new Table<LaporanHukdisRow>(defs.LaporanHukdis),

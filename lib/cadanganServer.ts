@@ -78,6 +78,11 @@ export async function barisCadangan(jenis: JenisCadangan, pengguna: Pick<UserRow
         ((await db.riwayatPangkat.findMany()) as { pegawaiId: string }[]).filter((r) => lingkup.idPegawai.has(r.pegawaiId)),
         lingkup,
       );
+    case "riwayat_pmk":
+      return denganPegawai(
+        ((await db.riwayatPmk.findMany()) as { pegawaiId: string }[]).filter((r) => lingkup.idPegawai.has(r.pegawaiId)),
+        lingkup,
+      );
     case "riwayat_mutasi":
       return denganPegawai(
         ((await db.riwayatMutasi.findMany()) as { pegawaiId: string }[]).filter((r) => lingkup.idPegawai.has(r.pegawaiId)),

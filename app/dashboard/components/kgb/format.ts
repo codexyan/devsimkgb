@@ -177,6 +177,8 @@ export function hitungKgbPegawai(
 
 /** Riwayat kenaikan pangkat pegawai (GET /api/pegawai/[id]/pangkat), sebatas yang dipakai sebagai SK dasar. */
 export interface KenaikanPangkatDasar {
+  /** "pmk" untuk SK peninjauan masa kerja (ADR-021); selain itu SK kenaikan pangkat. */
+  jenis?: "kp" | "pmk";
   jenisLabel?: string | null;
   nomorSK: string | null;
   tanggalSK: string | null;

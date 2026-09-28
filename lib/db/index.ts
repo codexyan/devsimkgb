@@ -46,6 +46,7 @@ export const db: Db = {
   get notifikasi() { return pilih("notifikasi"); },
   get riwayatHukdis() { return pilih("riwayatHukdis"); },
   get riwayatPangkat() { return pilih("riwayatPangkat"); },
+  get riwayatPmk() { return pilih("riwayatPmk"); },
   get riwayatMutasi() { return pilih("riwayatMutasi"); },
   get laporanMutasi() { return pilih("laporanMutasi"); },
   get laporanHukdis() { return pilih("laporanHukdis"); },

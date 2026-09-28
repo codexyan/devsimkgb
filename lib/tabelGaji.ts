@@ -535,7 +535,7 @@ export function tambahBulan(tanggal: Date, bulan: number): Date {
 }
 
 /** Selisih bulan penuh dari `awal` ke `akhir`. */
-function selisihBulan(awal: Date, akhir: Date): number {
+export function selisihBulan(awal: Date, akhir: Date): number {
   const bulan = (akhir.getFullYear() - awal.getFullYear()) * 12 + (akhir.getMonth() - awal.getMonth());
   return akhir.getDate() < awal.getDate() ? bulan - 1 : bulan;
 }

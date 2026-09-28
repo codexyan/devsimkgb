@@ -9,6 +9,7 @@ import {
   pdf,
 } from "@react-pdf/renderer";
 import type { JenisPenandatangan } from "./penandatangan";
+import { mkgPadaSkDasar } from "./prosesKgb";
 import { formatTanggalId, type NilaiTanggal } from "./waktu";
 import {
   TEMPLATE_BAWAAN,
@@ -262,6 +263,8 @@ function BarisHuruf({ huruf, label, nilai }: { huruf: string; label: string; nil
 
 export function SuratKGBDocument(props: SuratKGBProps) {
   const { nomorSurat, satker, pegawai, kgb, penandatangan, srikandi = false, aset } = props;
+  // MKG pada TMT SK dasar: berbeda dari MKG lama bila SK dasarnya SK kenaikan pangkat atau PMK (ADR-020, ADR-021).
+  const mkgDasar = mkgPadaSkDasar(kgb);
   const t = props.template ?? TEMPLATE_BAWAAN;
   const nilai = nilaiPenandaSurat(props);
 
@@ -403,7 +406,7 @@ export function SuratKGBDocument(props: SuratKGBProps) {
           <BarisHuruf
             huruf="e"
             label="Masa kerja golongan pada tanggal tersebut"
-            nilai={masaKerja(kgb.mkgTahunLama, kgb.mkgBulanLama)}
+            nilai={masaKerja(mkgDasar.tahun, mkgDasar.bulan)}
           />
         </View>
 

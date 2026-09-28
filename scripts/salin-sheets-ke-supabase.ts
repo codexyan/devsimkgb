@@ -40,6 +40,7 @@ const DEF: Record<Kunci, TableDef> = {
   notifikasi: defs.Notifikasi,
   riwayatHukdis: defs.RiwayatHukdis,
   riwayatPangkat: defs.RiwayatPangkat,
+  riwayatPmk: defs.RiwayatPmk,
   riwayatMutasi: defs.RiwayatMutasi,
   laporanMutasi: defs.LaporanMutasi,
   laporanHukdis: defs.LaporanHukdis,

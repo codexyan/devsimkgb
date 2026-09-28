@@ -2,7 +2,7 @@
 // untuk membuat SK, mengubah data SK terakhir, dan mengunggah SK, penahanan oleh hukuman disiplin,
 // serta pemulihan jadwal saat KGB dibatalkan. Modul ini murni (tanpa akses data).
 
-import { tambahBulan } from "./tabelGaji";
+import { selisihBulan, tambahBulan } from "./tabelGaji";
 import { tanggalKalender, type NilaiTanggal } from "./waktu";
 
 /** Bagian baris SuratKGB yang dibaca route KGB. */
@@ -244,4 +244,30 @@ export function adaPenandaPdf(bytes: Uint8Array): boolean {
     if (PENANDA_PDF.every((b, j) => bytes[i + j] === b)) return true;
   }
   return false;
+}
+
+/**
+ * Masa kerja golongan pada TMT SK dasar: baris "Masa kerja golongan pada tanggal tersebut" di SK KGB. MKG lama
+ * pada KGB adalah MKG pada TMT KGB terakhir. Bila SK dasarnya ber-TMT di tengah siklus, yaitu SK kenaikan pangkat
+ * atau SK PMK sesudah KGB terakhir (ADR-020, ADR-021), MKG pada tanggal itu adalah MKG baru dikurangi jarak dari
+ * TMT SK dasar ke TMT KGB. SK dasar pada atau sebelum awal siklus (SK KGB terakhir, SK CPNS) tetap memakai MKG lama.
+ */
+export function mkgPadaSkDasar(kgb: {
+  tmtSK: NilaiTanggal;
+  tmtKgbBaru: NilaiTanggal;
+  mkgTahunLama: number;
+  mkgBulanLama: number;
+  mkgTahunBaru: number;
+  mkgBulanBaru: number;
+}): { tahun: number; bulan: number } {
+  const lama = { tahun: kgb.mkgTahunLama || 0, bulan: kgb.mkgBulanLama || 0 };
+  const tmtKgb = tanggalKalender(kgb.tmtKgbBaru);
+  const tmtDasar = tanggalKalender(kgb.tmtSK);
+  if (!tmtKgb || !tmtDasar || tmtDasar >= tmtKgb) return lama;
+  const baru = (kgb.mkgTahunBaru || 0) * 12 + (kgb.mkgBulanBaru || 0);
+  const tambah = baru - (lama.tahun * 12 + lama.bulan);
+  const jarak = selisihBulan(tmtDasar, tmtKgb);
+  if (tambah <= 0 || jarak >= tambah) return lama;
+  const pada = baru - jarak;
+  return { tahun: Math.floor(pada / 12), bulan: pada % 12 };
 }

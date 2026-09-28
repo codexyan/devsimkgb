@@ -17,6 +17,7 @@ import { ROLES } from "@/lib/auth";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiSaatIni } from "@/lib/pilihanPegawai";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
 import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
+import ModalPmk from "@/app/dashboard/components/ModalPmk";
 import ModalMutasiPegawai from "@/app/dashboard/components/ModalMutasiPegawai";
 import { ringkasKeadaanPegawai } from "@/lib/mutasiPegawai";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
@@ -36,6 +37,7 @@ interface Pegawai {
   mkgTahun: number;
   mkgBulan: number;
   tmtKgbBerikutnya: string;
+  tmtKgbTerakhir?: string | null;
   statusHukdis: boolean;
   tanggalHukdisBerakhir?: string | null;
   jenisHukdis?: string | null;
@@ -175,6 +177,8 @@ export default function PegawaiPage() {
   const [showHapus, setShowHapus] = useState<Pegawai | null>(null);
   // Catat SK kenaikan pangkat: mengubah golongan, MKG, dan gaji pokok sebagai dasar KGB berikutnya.
   const [showPangkat, setShowPangkat] = useState<Pegawai | null>(null);
+  // Catat SK peninjauan masa kerja: menambah MKG dan gaji pokok, dan bisa memajukan KGB berikutnya (ADR-021).
+  const [showPmk, setShowPmk] = useState<Pegawai | null>(null);
   const [showHapusPermanent, setShowHapusPermanent] = useState<Pegawai | null>(
     null,
   );
@@ -799,6 +803,9 @@ export default function PegawaiPage() {
                               <button type="button" onClick={() => setShowPangkat(p)} className="dsb-ikon-tombol" title="Catat kenaikan pangkat" aria-label={`Catat kenaikan pangkat ${p.nama}`}>
                                 <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 11 12 6 7 11" /><polyline points="17 18 12 13 7 18" /></svg>
                               </button>
+                              <button type="button" onClick={() => setShowPmk(p)} className="dsb-ikon-tombol" title="Catat peninjauan masa kerja (PMK)" aria-label={`Catat peninjauan masa kerja ${p.nama}`}>
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8" /><polyline points="12 9 12 13 14.5 15" /><line x1="9" y1="2" x2="15" y2="2" /></svg>
+                              </button>
                               <button type="button" onClick={() => setShowMutasi(p)} className="dsb-ikon-tombol" title="Mutasi atau pemberhentian" aria-label={`Catat mutasi atau pemberhentian ${p.nama}`}>
                                 <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8" /><line x1="21" y1="3" x2="13" y2="11" /><polyline points="8 21 3 21 3 16" /><line x1="3" y1="21" x2="11" y2="13" /></svg>
                               </button>
@@ -1334,6 +1341,29 @@ export default function PegawaiPage() {
             setSuccess(pesan);
             fetchAll();
             setTimeout(() => setSuccess(""), 4000);
+          }}
+        />
+      )}
+
+      {showPmk && (
+        <ModalPmk
+          pegawai={{
+            id: showPmk.id,
+            nama: showPmk.nama,
+            nip: showPmk.nip,
+            golonganRuang: showPmk.golonganRuang,
+            mkgTahun: showPmk.mkgTahun,
+            mkgBulan: showPmk.mkgBulan,
+            gajiPokok: showPmk.gajiPokok,
+            tmtKgbTerakhir: showPmk.tmtKgbTerakhir ?? null,
+            tmtKgbBerikutnya: showPmk.tmtKgbBerikutnya || null,
+          }}
+          onTutup={() => setShowPmk(null)}
+          onBerhasil={(pesan) => {
+            setShowPmk(null);
+            setSuccess(pesan);
+            setTimeout(() => setSuccess(""), 8000);
+            void fetchAll();
           }}
         />
       )}

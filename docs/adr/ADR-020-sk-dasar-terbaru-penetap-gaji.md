@@ -27,8 +27,8 @@ dengan SK peninjauan masa kerja (PMK), yang menambah masa kerja golongan dan men
    - Mencatat kenaikan pangkat yang lebih baru dari KGB terakhir yang selesai mengganti penetap SK dasar pada
      jadwal "belum diproses" dengan penetap SK kenaikan pangkat (`skKpLebihBaru`); kosong bila belum diketahui,
      supaya penetap SK KGB lama tidak ikut tercetak.
-3. Tahap 2, PMK: belum dibangun. PMK dapat menggeser jadwal KGB, sehingga perlu pencatatan tersendiri di Data
-   Pegawai. Sampai saat itu, formulir inventarisasi KGB sudah mencatat SK PMK pegawai Kanwil.
+3. Tahap 2, PMK: lihat ADR-021. PMK dapat menggeser jadwal KGB, sehingga dicatat tersendiri di Data
+   Pegawai, dan SK PMK ikut dibandingkan sebagai Atas dasar.
 
 ## Akibat
 

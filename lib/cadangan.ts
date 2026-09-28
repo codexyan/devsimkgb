@@ -73,6 +73,7 @@ export type JenisCadangan =
   | "riwayat_kgb"
   | "surat_kgb"
   | "riwayat_pangkat"
+  | "riwayat_pmk"
   | "riwayat_mutasi"
   | "laporan_mutasi"
   | "usulan_pegawai"
@@ -85,6 +86,7 @@ export const LABEL_JENIS_CADANGAN: Record<JenisCadangan, string> = {
   riwayat_kgb: "Riwayat KGB",
   surat_kgb: "Surat keputusan KGB",
   riwayat_pangkat: "Riwayat kenaikan pangkat",
+  riwayat_pmk: "Riwayat peninjauan masa kerja",
   riwayat_mutasi: "Riwayat mutasi dan pemberhentian",
   laporan_mutasi: "Laporan mutasi dari UPT",
   usulan_pegawai: "Usulan data dari UPT",
@@ -101,11 +103,11 @@ export const LABEL_JENIS_CADANGAN: Record<JenisCadangan, string> = {
  */
 export const CAKUPAN_PERAN: Record<string, readonly JenisCadangan[]> = {
   [ROLES.SUPER_ADMIN]: [
-    "pegawai", "riwayat_kgb", "surat_kgb", "riwayat_pangkat", "riwayat_mutasi", "laporan_mutasi",
+    "pegawai", "riwayat_kgb", "surat_kgb", "riwayat_pangkat", "riwayat_pmk", "riwayat_mutasi", "laporan_mutasi",
     "usulan_pegawai", "riwayat_hukdis", "laporan_hukdis", "pengguna",
   ],
   [ROLES.SDM_KGB]: [
-    "pegawai", "riwayat_kgb", "surat_kgb", "riwayat_pangkat", "riwayat_mutasi", "laporan_mutasi", "usulan_pegawai",
+    "pegawai", "riwayat_kgb", "surat_kgb", "riwayat_pangkat", "riwayat_pmk", "riwayat_mutasi", "laporan_mutasi", "usulan_pegawai",
   ],
   [ROLES.SDM_HUKDIS]: ["pegawai", "riwayat_hukdis", "laporan_hukdis"],
   [ROLES.KEUANGAN]: ["pegawai", "riwayat_kgb", "surat_kgb"],
