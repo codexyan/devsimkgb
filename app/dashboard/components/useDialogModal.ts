@@ -17,20 +17,32 @@ const tumpukanDialog: object[] = [];
  * sedangkan isi dialognya diam, persis seperti dialog yang tidak dapat digulir. Dasbor menggulir di
  * dalam <main>, bukan di body, jadi keduanya dikunci.
  */
-let gulirTerkunci: { body: string; wadah: HTMLElement | null; nilaiWadah: string } | null = null;
+let gulirTerkunci: { body: string; wadah: HTMLElement | null; x: string; y: string } | null = null;
 
+/*
+ * Wadah gulir dasbor (<main class="dsb-main">) mendapat gulirnya dari gaya sebaris overflow-y: auto. Nilai itu
+ * disimpan dan dipulihkan per sumbu: membaca style.overflow memberi "" bila hanya overflow-y yang diisi, sehingga
+ * memulihkan "" lewat shorthand ikut menghapus overflow-y: auto dan halaman tidak dapat digulir lagi sampai dimuat
+ * ulang. React tidak memasang ulang gaya itu karena nilai prop-nya tidak berubah.
+ */
 function kunciGulirLatar() {
   if (gulirTerkunci) return;
   const wadah = document.querySelector<HTMLElement>("main.dsb-main");
-  gulirTerkunci = { body: document.body.style.overflow, wadah, nilaiWadah: wadah?.style.overflow ?? "" };
+  gulirTerkunci = { body: document.body.style.overflow, wadah, x: wadah?.style.overflowX ?? "", y: wadah?.style.overflowY ?? "" };
   document.body.style.overflow = "hidden";
-  if (wadah) wadah.style.overflow = "hidden";
+  if (wadah) {
+    wadah.style.overflowX = "hidden";
+    wadah.style.overflowY = "hidden";
+  }
 }
 
 function lepasGulirLatar() {
   if (!gulirTerkunci) return;
   document.body.style.overflow = gulirTerkunci.body;
-  if (gulirTerkunci.wadah) gulirTerkunci.wadah.style.overflow = gulirTerkunci.nilaiWadah;
+  if (gulirTerkunci.wadah) {
+    gulirTerkunci.wadah.style.overflowX = gulirTerkunci.x;
+    gulirTerkunci.wadah.style.overflowY = gulirTerkunci.y;
+  }
   gulirTerkunci = null;
 }
 
