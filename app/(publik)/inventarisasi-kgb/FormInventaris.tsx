@@ -34,6 +34,7 @@ const KOSONG: IsianInventaris = {
   bidang: "",
   golonganRuang: "",
   tmtGolongan: "",
+  naikSetelahKgb: "",
   mkgTahun: "",
   mkgBulan: "",
   tmtDasar: "",
@@ -72,6 +73,8 @@ export default function FormInventaris() {
 
   const ubah = <K extends keyof IsianInventaris>(k: K, v: IsianInventaris[K]) => setIsian((s) => ({ ...s, [k]: v }));
   const pernah = isian.keadaan === "pernah";
+  // Naik pangkat setelah KGB terakhir: golongan dan MKG berasal dari SK kenaikan pangkat, bukan SK KGB (lib/inventarisKgb.ts).
+  const naik = pernah && isian.naikSetelahKgb === "ya";
   const daftarBerkas = BERKAS_KEADAAN[isian.keadaan];
   const nipSah = /^\d{18}$/.test(isian.nip);
 
@@ -106,7 +109,7 @@ export default function FormInventaris() {
       TANGGAL.test(isian.tmtDasar) &&
       !!isian.nomorSkDasar.trim() &&
       TANGGAL.test(isian.tanggalSkDasar) &&
-      (!pernah || (/^\d{1,2}$/.test(isian.mkgTahun) && TANGGAL.test(isian.tanggalSkPendukung))),
+      (!pernah || (!!isian.naikSetelahKgb && /^\d{1,2}$/.test(isian.mkgTahun) && TANGGAL.test(isian.tanggalSkPendukung))),
     berkas: daftarBerkas.every((b) => !galatBerkas(berkas[b.jenis], b)),
     setuju,
   };
@@ -305,10 +308,33 @@ export default function FormInventaris() {
 
         <fieldset className="iv-kelompok" disabled={mengirim}>
           <legend><span className="iv-nomor">4</span>{pernah ? "Pangkat dan KGB terakhir" : "Pangkat dan pengangkatan"}</legend>
+          {pernah && (
+            <div className="iv-bidang iv-tanya" data-salah={dicoba && !isian.naikSetelahKgb ? "" : undefined}>
+              <span className="iv-label" data-wajib="" id={`${id}-naik`}>
+                Apakah Anda naik pangkat setelah KGB terakhir, termasuk penyesuaian ijazah (PI)?
+              </span>
+              <div className="iv-pilihan" role="radiogroup" aria-labelledby={`${id}-naik`}>
+                {(["ya", "tidak"] as const).map((v) => (
+                  <button key={v} type="button" role="radio" aria-checked={isian.naikSetelahKgb === v} className="iv-opsi" onClick={() => ubah("naikSetelahKgb", v)}>
+                    <span className="iv-opsi-titik" aria-hidden="true" />
+                    <span className="iv-opsi-teks">
+                      <strong>{v === "ya" ? "Ya" : "Tidak"}</strong>
+                      <span>
+                        {v === "ya"
+                          ? "TMT SK pangkat atau PI saya sesudah TMT KGB terakhir. Golongan dan masa kerja golongan diisi dari SK itu."
+                          : "Golongan saya sama dengan yang tertulis di SK KGB terakhir."}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="iv-kisi">
             {bidang({
               label: "Golongan ruang",
               salah: !isian.golonganRuang,
+              bantuan: "Golongan yang berlaku sekarang.",
               children: (
                 <select className="iv-isian" value={isian.golonganRuang} onChange={(e) => ubah("golonganRuang", e.target.value)}>
                   <option value="">Pilih golongan</option>
@@ -323,8 +349,11 @@ export default function FormInventaris() {
               <>
                 {bidang({ label: "TMT KGB terakhir", salah: salahTanggal("tmtDasar"), children: tanggal("tmtDasar") })}
                 {bidang({
-                  label: "Masa kerja golongan pada SK KGB terakhir",
+                  label: naik ? "Masa kerja golongan pada SK kenaikan pangkat terakhir" : "Masa kerja golongan pada SK KGB terakhir",
                   salah: !/^\d{1,2}$/.test(isian.mkgTahun),
+                  bantuan: naik
+                    ? "Salin dari SK pangkat atau PI. Naik dari golongan II ke III memotong masa kerja 5 tahun, dan potongan itu sudah tertulis di SK."
+                    : undefined,
                   children: (
                     <span className="iv-mkg">
                       <span className="iv-satuan">
@@ -343,7 +372,7 @@ export default function FormInventaris() {
                 {bidang({
                   label: "Tanggal SK kenaikan pangkat terakhir",
                   salah: salahTanggal("tanggalSkPendukung"),
-                  bantuan: "Belum pernah naik pangkat? Isi tanggal SK CPNS.",
+                  bantuan: naik ? "Tanggal SK pangkat atau PI yang terbit setelah KGB terakhir." : "Belum pernah naik pangkat? Isi tanggal SK CPNS.",
                   children: tanggal("tanggalSkPendukung"),
                 })}
               </>

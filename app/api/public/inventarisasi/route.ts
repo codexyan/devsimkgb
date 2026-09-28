@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 
 const BIDANG: (keyof IsianInventaris)[] = [
   "nip", "nama", "tempatLahir", "tanggalLahir", "jabatan", "bidang", "golonganRuang", "tmtGolongan",
-  "mkgTahun", "mkgBulan", "tmtDasar", "nomorSkDasar", "tanggalSkDasar", "tanggalSkPendukung", "nomorWa", "catatan",
+  "naikSetelahKgb", "mkgTahun", "mkgBulan", "tmtDasar", "nomorSkDasar", "tanggalSkDasar", "tanggalSkPendukung", "nomorWa", "catatan",
 ];
 
 /**

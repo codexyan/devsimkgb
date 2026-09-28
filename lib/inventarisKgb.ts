@@ -38,7 +38,8 @@ export const BERKAS_KEADAAN: Record<KeadaanKgb, readonly AturanBerkas[]> = {
     {
       jenis: "SK-KP-Terakhir",
       label: "SK kenaikan pangkat terakhir",
-      keterangan: "SK pangkat yang berlaku sekarang. Bila belum pernah naik pangkat, unggah SK CPNS.",
+      keterangan:
+        "SK yang menetapkan golongan Anda sekarang, yaitu SK kenaikan pangkat yang paling baru, termasuk SK penyesuaian ijazah (PI). Bila belum pernah naik pangkat, unggah SK CPNS.",
       wajib: true,
     },
   ],
@@ -55,6 +56,9 @@ export const BERKAS_KEADAAN: Record<KeadaanKgb, readonly AturanBerkas[]> = {
 
 export const BATAS_BERKAS_INVENTARIS_BYTE = 1024 * 1024;
 
+/** Jawaban "naik pangkat (termasuk PI) setelah KGB terakhir?"; kosong pada kiriman sebelum pertanyaan ini ada. */
+export type NaikSetelahKgb = "" | "ya" | "tidak";
+
 export interface IsianInventaris {
   keadaan: KeadaanKgb;
   nip: string;
@@ -67,6 +71,13 @@ export interface IsianInventaris {
   golonganRuang: string;
   /** yyyy-mm-dd */
   tmtGolongan: string;
+  /**
+   * Pernah KGB: apakah kenaikan pangkat terakhir (termasuk penyesuaian ijazah) ber-TMT setelah KGB terakhir.
+   * Bila "ya", golongan dan MKG diambil dari SK kenaikan pangkat itu, bukan dari SK KGB terakhir: kenaikan
+   * lintas golongan memotong MKG (II/x ke III/a dipotong 5 tahun), jadi MKG pada SK KGB lama tidak berlaku lagi.
+   */
+  naikSetelahKgb: NaikSetelahKgb;
+  /** Pernah KGB: MKG pada SK terbaru, yaitu SK KGB terakhir, atau SK kenaikan pangkat bila naikSetelahKgb "ya". */
   mkgTahun: string;
   mkgBulan: string;
   /** Pernah KGB: TMT KGB terakhir. Belum pernah: TMT CPNS. yyyy-mm-dd */
@@ -124,6 +135,15 @@ export function periksaIsianInventaris(isian: IsianInventaris): string[] {
     if (!/^\d{1,2}$/.test(isian.mkgTahun) || th > 40) kurang.push("masa kerja golongan (tahun)");
     if (!/^\d{0,2}$/.test(isian.mkgBulan) || bl > 11) kurang.push("masa kerja golongan (bulan) 0 sampai 11");
     if (!TANGGAL.test(isian.tanggalSkPendukung)) kurang.push("tanggal SK kenaikan pangkat terakhir");
+    if (isian.naikSetelahKgb !== "ya" && isian.naikSetelahKgb !== "tidak") {
+      kurang.push("jawab apakah Anda naik pangkat setelah KGB terakhir (muat ulang halaman bila pertanyaannya tidak tampil)");
+    } else if (TANGGAL.test(isian.tmtGolongan) && TANGGAL.test(isian.tmtDasar)) {
+      // Tanggal ISO dapat dibandingkan sebagai teks. TMT yang sama diterima untuk kedua jawaban.
+      if (isian.naikSetelahKgb === "ya" && isian.tmtGolongan < isian.tmtDasar)
+        kurang.push("TMT golongan lebih awal dari TMT KGB terakhir, padahal Anda menjawab naik pangkat setelah KGB terakhir");
+      if (isian.naikSetelahKgb === "tidak" && isian.tmtGolongan > isian.tmtDasar)
+        kurang.push("TMT golongan sesudah TMT KGB terakhir: pilih Ya pada pertanyaan kenaikan pangkat, lalu isi MKG dari SK kenaikan pangkat itu");
+    }
   }
   if (isian.nomorWa && !/^(\+?62|0)8\d{7,12}$/.test(isian.nomorWa.replace(/[\s-]/g, "")))
     kurang.push("nomor WhatsApp tidak valid");
@@ -144,6 +164,7 @@ export const KOLOM_REKAP = [
   "Golongan ruang",
   "Pangkat",
   "TMT golongan",
+  "Naik pangkat setelah KGB terakhir",
   "MKG tahun",
   "MKG bulan",
   "TMT KGB terakhir / TMT CPNS",
@@ -156,7 +177,8 @@ export const KOLOM_REKAP = [
 
 /**
  * Nilai kolom rekap untuk satu isian, mulai kolom "Keadaan KGB" (dua kolom pertama diisi skrip Drive).
- * Pegawai yang belum pernah KGB tercatat dengan masa kerja golongan 0 tahun 0 bulan.
+ * Pegawai yang belum pernah KGB tercatat dengan masa kerja golongan 0 tahun 0 bulan. MKG berasal dari SK terbaru:
+ * SK kenaikan pangkat bila kolom "Naik pangkat setelah KGB terakhir" berisi Ya, selain itu SK KGB terakhir.
  */
 export function barisRekap(isian: IsianInventaris): string[] {
   const belum = isian.keadaan === "belum";
@@ -171,6 +193,7 @@ export function barisRekap(isian: IsianInventaris): string[] {
     isian.golonganRuang,
     GOLONGAN_PANGKAT[isian.golonganRuang as keyof typeof GOLONGAN_PANGKAT] ?? "",
     isian.tmtGolongan,
+    belum ? "" : isian.naikSetelahKgb === "ya" ? "Ya" : isian.naikSetelahKgb === "tidak" ? "Tidak" : "",
     belum ? "0" : String(Number(isian.mkgTahun)),
     belum ? "0" : String(Number(isian.mkgBulan || "0")),
     isian.tmtDasar,

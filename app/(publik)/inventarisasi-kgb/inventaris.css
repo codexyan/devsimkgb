@@ -202,6 +202,11 @@
 }
 
 /* ── Pilihan keadaan KGB ──────────────────────────────────────────────── */
+.pub .iv-tanya {
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
 .pub .iv-pilihan {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

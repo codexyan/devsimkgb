@@ -24,6 +24,7 @@ const pernah: IsianInventaris = {
   bidang: "Bagian Umum",
   golonganRuang: "III/b",
   tmtGolongan: "2023-04-01",
+  naikSetelahKgb: "tidak",
   mkgTahun: "8",
   mkgBulan: "0",
   tmtDasar: "2024-10-01",
@@ -61,8 +62,34 @@ test("belum pernah KGB tidak menuntut masa kerja dan SK kenaikan pangkat", () =>
   assert.deepEqual(periksaIsianInventaris(belum), []);
   const baris = barisRekap(belum);
   assert.equal(baris[0], "Belum pernah KGB");
-  assert.equal(baris[10], "0");
+  assert.equal(baris[10], "");
   assert.equal(baris[11], "0");
+  assert.equal(baris[12], "0");
+});
+
+test("kenaikan pangkat setelah KGB terakhir: pertanyaannya wajib dan TMT golongan harus cocok dengan jawabannya", () => {
+  // Penyesuaian ijazah II/c MKG 9 th ke III/a (dipotong 5 tahun) sesudah KGB terakhir.
+  const pi: IsianInventaris = {
+    ...pernah,
+    golonganRuang: "III/a",
+    tmtGolongan: "2026-04-01",
+    naikSetelahKgb: "ya",
+    mkgTahun: "4",
+    mkgBulan: "1",
+    tmtDasar: "2025-03-01",
+    tanggalSkPendukung: "2026-03-20",
+  };
+  assert.deepEqual(periksaIsianInventaris(pi), []);
+  assert.equal(barisRekap(pi)[10], "Ya");
+  assert.ok(periksaIsianInventaris({ ...pi, naikSetelahKgb: "" }).some((k) => k.startsWith("jawab apakah Anda naik pangkat")));
+  assert.ok(periksaIsianInventaris({ ...pi, naikSetelahKgb: "tidak" }).some((k) => k.startsWith("TMT golongan sesudah TMT KGB")));
+  assert.ok(periksaIsianInventaris({ ...pi, tmtGolongan: "2024-04-01" }).some((k) => k.startsWith("TMT golongan lebih awal")));
+});
+
+test("kiriman lama tanpa jawaban kenaikan pangkat tetap terbaca di rekap", () => {
+  const lama = { ...pernah } as Partial<IsianInventaris>;
+  delete lama.naikSetelahKgb;
+  assert.equal(barisRekap(lama as IsianInventaris)[10], "");
 });
 
 test("baris rekap sejajar dengan kolomnya dan dirapikan", () => {
@@ -70,5 +97,6 @@ test("baris rekap sejajar dengan kolomnya dan dirapikan", () => {
   assert.equal(baris.length, KOLOM_REKAP.length - 2);
   assert.equal(baris[2], "Budi Hartono, S.H.");
   assert.equal(baris[8], "Penata Muda Tingkat I");
-  assert.equal(baris[16], "081234567890");
+  assert.equal(baris[10], "Tidak");
+  assert.equal(baris[17], "081234567890");
 });
