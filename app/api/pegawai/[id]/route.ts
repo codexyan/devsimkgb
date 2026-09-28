@@ -8,7 +8,7 @@ import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 import { canManageHukdis, canEditPegawai } from "@/lib/auth";
 import { NON_KEUANGAN } from "@/lib/authGuard";
-import { bacaIsianPegawai, bacaTanggal, kgbBerjalanTerbaru, teksAtauNull } from "@/lib/dataPegawai";
+import { gabungIsianPegawai, bacaIsianPegawai, bacaTanggal, kgbBerjalanTerbaru, teksAtauNull } from "@/lib/dataPegawai";
 import { samaTanggalKalender } from "@/lib/waktu";
 import { penandaHukdisBerlaku } from "@/lib/hukdisKedaluwarsa";
 import { rencanaSiklusBerikutnya, type RencanaSiklusKgb } from "@/lib/jadwalKgb";
@@ -70,9 +70,10 @@ export async function PATCH(
   if (!lama)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
-  // NIP diperiksa tersendiri di bawah; unit kerja yang tidak dikirim tetap memakai nilai tersimpan.
+  // NIP diperiksa tersendiri di bawah. Kolom yang tidak dikirim memakai nilai tersimpan (ADR-025), sehingga
+  // mengubah satu bagian data pegawai tidak menimpa bagian lain.
   const hasil = bacaIsianPegawai(
-    { ...body, unitKerja: body.unitKerja === undefined ? lama.unitKerja : body.unitKerja },
+    gabungIsianPegawai(body, lama as unknown as Record<string, unknown>),
     { denganNip: false },
   );
   if (hasil.galat !== undefined)

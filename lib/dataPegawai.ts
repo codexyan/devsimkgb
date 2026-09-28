@@ -284,3 +284,33 @@ export function kgbBerjalanTerbaru<T extends { status: string; createdAt: Date |
   }
   return hasil;
 }
+
+/** Kolom isian pegawai yang dapat dikirim pada PATCH; di luar ini diabaikan (mis. nip dan kolom hukdis). */
+export const KOLOM_ISIAN_PEGAWAI = [
+  "nama", "tempatLahir", "tanggalLahir", "jenisKelamin", "pendidikanTerakhir", "jabatan", "pangkat",
+  "golonganRuang", "unitKerja", "eselon", "jenisJabatan", "tmtGolongan", "mkgTahun", "mkgBulan", "gajiPokok",
+  "tmtKgbTerakhir", "tmtKgbBerikutnya", "nomorSkDasar", "tanggalSkDasar", "penetapSkDasar",
+] as const;
+
+/** Kolom yang menentukan gaji pokok; bila salah satunya berubah, gaji dihitung ulang dari tabel PP 5/2024. */
+const KOLOM_DASAR_GAJI = ["golonganRuang", "mkgTahun", "mkgBulan"] as const;
+
+/**
+ * Isian lengkap untuk bacaIsianPegawai dari perubahan sebagian (ADR-025): kolom yang tidak dikirim memakai nilai
+ * tersimpan, sehingga mengubah satu bagian tidak menimpa bagian lain. Gaji pokok yang tidak dikirim dikosongkan
+ * bila dasar gajinya berubah, agar dibaca ulang dari tabel gaji, bukan mempertahankan gaji lama yang keliru.
+ */
+export function gabungIsianPegawai(
+  body: Record<string, unknown>,
+  lama: Record<string, unknown>,
+): Record<string, unknown> {
+  const hasil: Record<string, unknown> = {};
+  for (const kolom of KOLOM_ISIAN_PEGAWAI) {
+    hasil[kolom] = body[kolom] === undefined ? lama[kolom] : body[kolom];
+  }
+  const dasarBerubah = KOLOM_DASAR_GAJI.some(
+    (k) => body[k] !== undefined && teksIsian(body[k]) !== teksIsian(lama[k]),
+  );
+  if (body.gajiPokok === undefined && dasarBerubah) hasil.gajiPokok = "";
+  return hasil;
+}

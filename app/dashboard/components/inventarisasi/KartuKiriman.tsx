@@ -1,12 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  LABEL_TINDAK_LANJUT,
-  isoTanggal,
-  type BarisBanding,
-  type StatusTindakLanjut,
-} from "@/lib/pemutakhiranPegawai";
+import { LABEL_TINDAK_LANJUT, type BarisBanding, type StatusTindakLanjut } from "@/lib/pemutakhiranPegawai";
 import type { KirimanInventaris } from "@/lib/inventarisServer";
 import { LABEL_KEADAAN } from "@/lib/inventarisKgb";
 import { formatTanggalId } from "@/lib/waktu";
@@ -35,14 +30,6 @@ export interface Pemutakhiran {
   banding: BarisBanding[];
   peringatan: string[];
 }
-
-/** Kolom yang dikirim ulang pada PATCH /api/pegawai/[id], yang mengganti seluruh isian Data Pegawai. */
-const KOLOM_PATCH = [
-  "nama", "tempatLahir", "tanggalLahir", "jenisKelamin", "pendidikanTerakhir", "jabatan", "pangkat", "golonganRuang",
-  "unitKerja", "eselon", "jenisJabatan", "tmtGolongan", "mkgTahun", "mkgBulan", "gajiPokok", "tmtKgbTerakhir",
-  "tmtKgbBerikutnya", "nomorSkDasar", "tanggalSkDasar", "penetapSkDasar",
-] as const;
-const KOLOM_TANGGAL = new Set(["tanggalLahir", "tmtGolongan", "tmtKgbTerakhir", "tmtKgbBerikutnya", "tanggalSkDasar"]);
 
 export const NADA_STATUS: Record<StatusTindakLanjut, string> = {
   belum_diperiksa: "kuning",
@@ -116,12 +103,8 @@ export default function KartuKiriman({
     setSibuk(true);
     onGalat(null);
     try {
-      // PATCH mengganti seluruh isian, jadi nilai tersimpan dikirim ulang dan hanya kolom terpilih yang diganti.
+      // PATCH menerima perubahan sebagian (ADR-025): hanya kolom terpilih yang dikirim.
       const badan: Record<string, unknown> = {};
-      for (const k of KOLOM_PATCH) {
-        const v = pegawai[k];
-        badan[k] = KOLOM_TANGGAL.has(k) ? isoTanggal(v as string | null) : (v ?? "");
-      }
       for (const b of dipilih) badan[b.kolom!] = b.nilaiBaru ?? "";
       const res = await fetch(`/api/pegawai/${pegawai.id}`, {
         method: "PATCH",

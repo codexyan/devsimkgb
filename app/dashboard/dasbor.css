@@ -2327,3 +2327,19 @@ html[data-gerak="kurangi"] .dsb-putar {
 .pmh-status { grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto; }
 .pmh-status .pmh-catatan .dsb-cari { width: 100%; }
 .pmh-berkas { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Ubah data pegawai per bagian (ADR-025) */
+.pgw-ubah { padding: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.pgw-ubah .inv-bidang { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--dt2); }
+.pgw-gaji { display: grid; gap: 10px; padding-top: 10px; border-top: 0.5px dashed var(--ln2); }
+.pgw-gaji h3 { margin: 0; font-size: 12px; font-weight: 600; color: var(--dtn); }
+.pgw-koreksi { padding: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pgw-tautan { border: 0; background: none; padding: 0; font: inherit; color: var(--st-blue); text-decoration: underline; cursor: pointer; }
+@media (max-width: 760px) { .pgw-ubah { grid-template-columns: minmax(0, 1fr); } }
+.pgw-menu { position: relative; }
+.pgw-menu > summary { cursor: pointer; list-style: none; background: var(--sub); color: var(--dt4); border: 0.5px solid var(--ln1); }
+.pgw-menu > summary::-webkit-details-marker { display: none; }
+.pgw-menu > summary::after { content: " ▾"; }
+.pgw-menu-isi { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; display: grid; min-width: 230px; padding: 6px; border-radius: 12px; background: var(--card); border: 0.5px solid var(--ln1); box-shadow: 0 16px 40px rgba(9, 17, 53, 0.16); }
+.pgw-menu-isi button { padding: 8px 10px; border: 0; border-radius: 8px; background: none; text-align: left; font-size: 12px; font-weight: 500; color: var(--dtn); cursor: pointer; }
+.pgw-menu-isi button:hover { background: var(--sub); }

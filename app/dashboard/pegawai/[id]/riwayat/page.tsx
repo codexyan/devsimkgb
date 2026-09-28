@@ -5,6 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { canEditPegawai, canManageHukdis, canProcessKGB } from "@/lib/auth";
 import TabDokumenPemutakhiran from "./TabDokumenPemutakhiran";
+import ModalUbahPegawai, { LABEL_BAGIAN, LABEL_BAGIAN_KECIL, type BagianUbah, type PegawaiUbah } from "@/app/dashboard/components/pegawai/ModalUbahPegawai";
+import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
+import ModalPmk from "@/app/dashboard/components/ModalPmk";
+import ModalMutasiPegawai from "@/app/dashboard/components/ModalMutasiPegawai";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 import {
@@ -183,10 +187,15 @@ export default function RiwayatKGBPage() {
   const [hukdisList, setHukdisList] = useState<RiwayatHukdis[]>([]);
   const [pangkatList, setPangkatList] = useState<RiwayatPangkat[]>([]);
   const [pmkList, setPmkList] = useState<RiwayatPmk[]>([]);
+  // Data pegawai lengkap untuk modal tindakan (ubah per bagian, KP, PMK, mutasi); ADR-025.
+  const [lengkap, setLengkap] = useState<PegawaiUbah | null>(null);
+  const [tindakan, setTindakan] = useState<BagianUbah | "kp" | "pmk" | "mutasi" | null>(null);
+  const [pesanTindakan, setPesanTindakan] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"kgb" | "pangkat" | "hukdis" | "dokumen">("kgb");
   // Dokumen & Pemutakhiran hanya untuk Super Admin dan Tim SDM KGB (ADR-023); ?tab=dokumen membukanya langsung.
   const bolehDokumen = canProcessKGB(role);
+  const bolehUbah = canEditPegawai(role);
   useEffect(() => {
     if (!bolehDokumen) return;
     const t = setTimeout(() => {
@@ -271,6 +280,10 @@ export default function RiwayatKGBPage() {
     const pangkatPromise = fetch(`/api/pegawai/${id}/pangkat`)
       .then(async (r) => (r.ok ? ((await r.json()) as unknown) : []))
       .catch(() => []);
+    fetch(`/api/pegawai/${id}`, { cache: "no-store" })
+      .then(async (r) => (r.ok ? ((await r.json()) as PegawaiUbah) : null))
+      .then(setLengkap)
+      .catch(() => {});
     const pmkPromise = fetch(`/api/pegawai/${id}/pmk`)
       .then(async (r) => (r.ok ? ((await r.json()) as unknown) : []))
       .catch(() => []);
@@ -543,7 +556,22 @@ export default function RiwayatKGBPage() {
             ))}
           </div>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex flex-wrap gap-2 shrink-0 items-start">
+          {bolehUbah && lengkap && (
+            <details className="pgw-menu">
+              <summary className="text-xs px-4 py-2 rounded-xl font-semibold">Tindakan</summary>
+              <div className="pgw-menu-isi">
+                {(Object.keys(LABEL_BAGIAN) as BagianUbah[]).map((b) => (
+                  <button key={b} type="button" onClick={() => setTindakan(b)}>
+                    Ubah {LABEL_BAGIAN_KECIL[b]}
+                  </button>
+                ))}
+                <button type="button" onClick={() => setTindakan("kp")}>Catat kenaikan pangkat</button>
+                <button type="button" onClick={() => setTindakan("pmk")}>Catat peninjauan masa kerja</button>
+                <button type="button" onClick={() => setTindakan("mutasi")}>Mutasi atau pemberhentian</button>
+              </div>
+            </details>
+          )}
           {canHukdis && (
             <button
               type="button"
@@ -567,6 +595,13 @@ export default function RiwayatKGBPage() {
           )}
         </div>
       </div>
+
+      {pesanTindakan && (
+        <div role="status" className="dsb-pesan" data-nada="hijau" style={{ marginBottom: 16 }}>
+          <span className="dsb-pesan-ikon" aria-hidden="true">✓</span>
+          <p>{pesanTindakan}</p>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 mb-5">
@@ -596,7 +631,7 @@ export default function RiwayatKGBPage() {
       </div>
 
       {activeTab === "dokumen" && bolehDokumen && (
-        <TabDokumenPemutakhiran pegawaiId={id} bolehUbah={canEditPegawai(role)} onDataBerubah={() => fetchData()} />
+        <TabDokumenPemutakhiran pegawaiId={id} bolehUbah={bolehUbah} onDataBerubah={() => fetchData()} />
       )}
 
       {/* Riwayat pangkat: dasar gaji setiap kali pangkat naik (lib/kenaikanPangkat.ts) */}
@@ -972,6 +1007,52 @@ export default function RiwayatKGBPage() {
             </div>
           )}
         </div>
+      )}
+
+      {lengkap && tindakan && tindakan !== "kp" && tindakan !== "pmk" && tindakan !== "mutasi" && (
+        <ModalUbahPegawai
+          pegawai={lengkap}
+          bagian={tindakan}
+          onTutup={() => setTindakan(null)}
+          onBerhasil={(pesan) => {
+            setTindakan(null);
+            setPesanTindakan(pesan);
+            fetchData();
+          }}
+        />
+      )}
+      {lengkap && tindakan === "kp" && (
+        <ModalKenaikanPangkat
+          pegawai={lengkap}
+          onTutup={() => setTindakan(null)}
+          onBerhasil={(pesan) => {
+            setTindakan(null);
+            setPesanTindakan(pesan);
+            fetchData();
+          }}
+        />
+      )}
+      {lengkap && tindakan === "pmk" && (
+        <ModalPmk
+          pegawai={{ ...lengkap, tmtKgbTerakhir: lengkap.tmtKgbTerakhir ?? null, tmtKgbBerikutnya: lengkap.tmtKgbBerikutnya ?? null }}
+          onTutup={() => setTindakan(null)}
+          onBerhasil={(pesan) => {
+            setTindakan(null);
+            setPesanTindakan(pesan);
+            fetchData();
+          }}
+        />
+      )}
+      {lengkap && tindakan === "mutasi" && (
+        <ModalMutasiPegawai
+          pegawai={lengkap}
+          onTutup={() => setTindakan(null)}
+          onBerhasil={(pesan) => {
+            setTindakan(null);
+            setPesanTindakan(pesan);
+            fetchData();
+          }}
+        />
       )}
 
       {/* Popup Proses KGB */}
