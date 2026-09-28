@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { canManageHukdis, canProcessKGB } from "@/lib/auth";
+import { canEditPegawai, canManageHukdis, canProcessKGB } from "@/lib/auth";
+import TabDokumenPemutakhiran from "./TabDokumenPemutakhiran";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 import {
@@ -183,7 +184,16 @@ export default function RiwayatKGBPage() {
   const [pangkatList, setPangkatList] = useState<RiwayatPangkat[]>([]);
   const [pmkList, setPmkList] = useState<RiwayatPmk[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"kgb" | "pangkat" | "hukdis">("kgb");
+  const [activeTab, setActiveTab] = useState<"kgb" | "pangkat" | "hukdis" | "dokumen">("kgb");
+  // Dokumen & Pemutakhiran hanya untuk Super Admin dan Tim SDM KGB (ADR-023); ?tab=dokumen membukanya langsung.
+  const bolehDokumen = canProcessKGB(role);
+  useEffect(() => {
+    if (!bolehDokumen) return;
+    const t = setTimeout(() => {
+      if (new URLSearchParams(window.location.search).get("tab") === "dokumen") setActiveTab("dokumen");
+    }, 0);
+    return () => clearTimeout(t);
+  }, [bolehDokumen]);
 
   // Popup Proses KGB dan modal aksi KGB bersama
   const [showKgbPopup, setShowKgbPopup] = useState(false);
@@ -559,13 +569,13 @@ export default function RiwayatKGBPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-5">
-        {(["kgb", "pangkat", ...(canHukdis ? ["hukdis"] : [])] as const).map((tab) => (
+      <div className="flex flex-wrap gap-2 mb-5">
+        {(["kgb", "pangkat", ...(canHukdis ? ["hukdis"] : []), ...(bolehDokumen ? ["dokumen"] : [])] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             aria-pressed={activeTab === tab}
-            onClick={() => setActiveTab(tab as "kgb" | "pangkat" | "hukdis")}
+            onClick={() => setActiveTab(tab as "kgb" | "pangkat" | "hukdis" | "dokumen")}
             className="text-xs px-4 py-2 rounded-xl font-semibold transition"
             style={{
               background: activeTab === tab ? "var(--navy-solid)" : "var(--sub)",
@@ -578,10 +588,16 @@ export default function RiwayatKGBPage() {
               ? `Riwayat KGB (${riwayat.length})`
               : tab === "pangkat"
                 ? `Pangkat & PMK (${pangkatList.length + pmkList.length})`
-                : `Riwayat Hukdis (${hukdisList.length})`}
+                : tab === "dokumen"
+                  ? "Dokumen & Pemutakhiran"
+                  : `Riwayat Hukdis (${hukdisList.length})`}
           </button>
         ))}
       </div>
+
+      {activeTab === "dokumen" && bolehDokumen && (
+        <TabDokumenPemutakhiran pegawaiId={id} bolehUbah={canEditPegawai(role)} onDataBerubah={() => fetchData()} />
+      )}
 
       {/* Riwayat pangkat: dasar gaji setiap kali pangkat naik (lib/kenaikanPangkat.ts) */}
       {activeTab === "pangkat" && (

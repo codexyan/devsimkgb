@@ -23,6 +23,32 @@ import { ringkasKeadaanPegawai } from "@/lib/mutasiPegawai";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId, hariIniWita, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 import { useRole } from "@/app/dashboard/components/RoleContext";
+import { canProcessKGB } from "@/lib/auth";
+import { LABEL_TINDAK_LANJUT, type StatusTindakLanjut } from "@/lib/pemutakhiranPegawai";
+
+interface RingkasPemutakhiran {
+  status: StatusTindakLanjut;
+  waktu: string;
+  kegiatan: string;
+  jumlah: number;
+}
+
+/** Penanda kiriman formulir pemutakhiran di baris pegawai; membuka tab Dokumen & Pemutakhiran. */
+function PenandaPemutakhiran({ r, id }: { r: RingkasPemutakhiran | undefined; id: string }) {
+  if (!r) return null;
+  const nada = r.status === "belum_diperiksa" ? "kuning" : r.status === "perlu_perbaikan" ? "merah" : r.status === "sesuai" ? "hijau" : "biru";
+  return (
+    <Link
+      href={`/dashboard/pegawai/${id}/riwayat?tab=dokumen`}
+      className="dsb-tag"
+      data-nada={nada}
+      style={{ marginTop: 3, display: "inline-flex", textDecoration: "none" }}
+      title={`${r.kegiatan}, dikirim ${formatTanggalId(r.waktu)}`}
+    >
+      Pemutakhiran: {LABEL_TINDAK_LANJUT[r.status]}
+    </Link>
+  );
+}
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 
 interface Pegawai {
@@ -179,6 +205,23 @@ export default function PegawaiPage() {
   const [showPangkat, setShowPangkat] = useState<Pegawai | null>(null);
   // Catat SK peninjauan masa kerja: menambah MKG dan gaji pokok, dan bisa memajukan KGB berikutnya (ADR-021).
   const [showPmk, setShowPmk] = useState<Pegawai | null>(null);
+  // Kiriman formulir pemutakhiran terbaru per NIP beserta status tindak lanjutnya (ADR-023).
+  const [ringkasan, setRingkasan] = useState<Record<string, RingkasPemutakhiran>>({});
+  const [muatUlangRingkasan, setMuatUlangRingkasan] = useState(0);
+  // Dimuat terpisah dari daftar pegawai agar daftar itu tidak menunggu penyimpanan berkas.
+  useEffect(() => {
+    if (!canProcessKGB(role) || muatUlangRingkasan === 0) return;
+    let batal = false;
+    fetch("/api/inventarisasi/ringkasan", { cache: "no-store" })
+      .then(async (r) => (r.ok ? ((await r.json()) as Record<string, RingkasPemutakhiran>) : {}))
+      .then((d) => {
+        if (!batal) setRingkasan(d);
+      })
+      .catch(() => {});
+    return () => {
+      batal = true;
+    };
+  }, [role, muatUlangRingkasan]);
   const [showHapusPermanent, setShowHapusPermanent] = useState<Pegawai | null>(
     null,
   );
@@ -203,6 +246,7 @@ export default function PegawaiPage() {
 
   async function fetchAll() {
     setLoading(true);
+    setMuatUlangRingkasan((n) => n + 1);
     try {
       const [r1, r2] = await Promise.all([
         fetch("/api/pegawai?search=&status="),
@@ -736,6 +780,7 @@ export default function PegawaiPage() {
                           <div className="min-w-0" style={{ lineHeight: 1.35 }}>
                             <p className="dsb-nama" style={{ margin: 0 }}>{p.nama}</p>
                             <p className="dsb-kecil" style={{ margin: 0 }}>{p.nip}</p>
+                            <PenandaPemutakhiran r={ringkasan[p.nip]} id={p.id} />
                             {(() => {
                               const keadaan = ringkasKeadaanPegawai(p, hariIniWita());
                               return keadaan ? (
@@ -851,6 +896,7 @@ export default function PegawaiPage() {
                     <div className="flex-1 min-w-0">
                       <p className="dsb-nama" style={{ margin: 0 }}>{p.nama}</p>
                       <p className="dsb-kecil" style={{ margin: 0 }}>{p.nip}</p>
+                      <PenandaPemutakhiran r={ringkasan[p.nip]} id={p.id} />
                       <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>{p.golonganRuang} · {p.jabatan}</p>
                       <p className="dsb-kecil" style={{ margin: "2px 0 0", color: uk.dikenal ? undefined : "var(--st-amber)" }}>
                         {uk.teks}{uk.dikenal ? "" : " (belum sesuai daftar satker)"}

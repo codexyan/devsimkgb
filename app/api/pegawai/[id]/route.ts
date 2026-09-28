@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { db } from "@/lib/db";
+import { hapusSemuaDokumenArsip } from "@/lib/dokumenPegawaiServer";
 import { makeRiwayatKGB, type PegawaiRow } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
@@ -283,6 +284,8 @@ export async function DELETE(
     // Berkas dihapus setelah data, agar kegagalan penyimpanan tidak meninggalkan data yang menunjuk berkas hilang.
     const berkas = await hapusBerkasSk(kunciBerkas, pegawai.nip);
     if (berkas.galat) console.error(`[hapus pegawai ${id}] berkas SK tidak terhapus:`, berkas.galat);
+    // Arsip dokumen pegawai (ADR-023) ikut dihapus; best effort, sama dengan berkas SK.
+    await hapusSemuaDokumenArsip(id).catch((err) => console.error(`[hapus pegawai ${id}] arsip dokumen tidak terhapus:`, err));
 
     logAudit({
       userId: userLogin.id,

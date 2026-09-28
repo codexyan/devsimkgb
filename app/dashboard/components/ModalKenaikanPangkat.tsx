@@ -35,19 +35,22 @@ const LABEL_STATUS: Record<string, string> = {
 
 export default function ModalKenaikanPangkat({
   pegawai,
+  awal,
   onTutup,
   onBerhasil,
 }: {
   pegawai: PegawaiPangkat;
+  /** Isian awal, mis. dari kiriman formulir pemutakhiran data (ADR-023); tetap dapat diubah. */
+  awal?: { golonganBaru?: string; nomorSK?: string; tanggalSK?: string; tmtPangkat?: string };
   onTutup: () => void;
   /** Dipanggil setelah tersimpan; pesan sudah siap ditampilkan di halaman. */
   onBerhasil: (pesan: string) => void;
 }) {
   const [jenisKp, setJenisKp] = useState<JenisKp>("reguler");
-  const [golonganBaru, setGolonganBaru] = useState("");
-  const [nomorSK, setNomorSK] = useState("");
-  const [tanggalSK, setTanggalSK] = useState(isoTanggalLokal());
-  const [tmtPangkat, setTmtPangkat] = useState("");
+  const [golonganBaru, setGolonganBaru] = useState(awal?.golonganBaru ?? "");
+  const [nomorSK, setNomorSK] = useState(awal?.nomorSK ?? "");
+  const [tanggalSK, setTanggalSK] = useState(awal?.tanggalSK || isoTanggalLokal());
+  const [tmtPangkat, setTmtPangkat] = useState(awal?.tmtPangkat ?? "");
   const [keterangan, setKeterangan] = useState("");
   const [penetapSK, setPenetapSK] = useState("");
   const [sibuk, setSibuk] = useState(false);

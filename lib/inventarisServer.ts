@@ -13,6 +13,7 @@
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { IsianInventaris, JenisBerkasInventaris } from "./inventarisKgb";
+import type { StatusTindakLanjut, TindakLanjut } from "./pemutakhiranPegawai";
 import {
   ID_KEGIATAN_KANWIL,
   awalanKegiatan,
@@ -39,6 +40,11 @@ export interface KirimanInventaris {
   /** ISO */
   waktu: string;
   berkas: BerkasTersimpan[];
+  /**
+   * Tindak lanjut Tim SDM atas kiriman ini (ADR-023). Kiriman ulang menulis data.json baru tanpa kolom ini,
+   * sehingga kiriman yang baru selalu berstatus belum diperiksa.
+   */
+  tindakLanjut?: TindakLanjut;
 }
 
 type Bucket = R2Bucket;
@@ -145,4 +151,45 @@ export async function hapusKiriman(kegiatan: string, nip: string): Promise<void>
   const daftar = await b.list({ prefix: folderNip(kegiatan, nip) });
   const kunci = daftar.objects.map((o) => o.key);
   if (kunci.length > 0) await b.delete(kunci);
+}
+
+/** Kiriman satu pegawai dari semua kegiatan, terbaru lebih dulu. */
+export async function kirimanPegawai(nip: string): Promise<{ kegiatan: { id: string; nama: string }; kiriman: KirimanInventaris }[]> {
+  const kegiatan = await daftarKegiatan();
+  const hasil = await Promise.all(
+    kegiatan.map(async (k) => {
+      const kiriman = await bacaKiriman(k.id, nip).catch(() => null);
+      return kiriman ? { kegiatan: { id: k.id, nama: k.nama }, kiriman } : null;
+    }),
+  );
+  return hasil
+    .filter((h): h is NonNullable<typeof h> => !!h)
+    .sort((a, b) => b.kiriman.waktu.localeCompare(a.kiriman.waktu));
+}
+
+/** Catat tindak lanjut satu kiriman; null bila kirimannya tidak ada. */
+export async function simpanTindakLanjut(kegiatan: string, nip: string, tindakLanjut: TindakLanjut): Promise<KirimanInventaris | null> {
+  const kiriman = await bacaKiriman(kegiatan, nip);
+  if (!kiriman) return null;
+  const baru: KirimanInventaris = { ...kiriman, tindakLanjut };
+  await (await bucket()).put(kunciData(kegiatan, nip), JSON.stringify(baru), { httpMetadata: { contentType: "application/json" } });
+  return baru;
+}
+
+/** Ringkasan kiriman terbaru tiap NIP dari semua kegiatan, untuk penanda di daftar Data Pegawai. */
+export async function ringkasanKirimanPegawai(): Promise<
+  Record<string, { status: StatusTindakLanjut; waktu: string; kegiatan: string; jumlah: number }>
+> {
+  const kegiatan = await daftarKegiatan();
+  const hasil: Record<string, { status: StatusTindakLanjut; waktu: string; kegiatan: string; jumlah: number }> = {};
+  for (const k of kegiatan) {
+    for (const kiriman of await daftarKiriman(k.id)) {
+      const nip = kiriman.isian.nip;
+      const lama = hasil[nip];
+      const status = kiriman.tindakLanjut?.status ?? "belum_diperiksa";
+      if (!lama || kiriman.waktu > lama.waktu) hasil[nip] = { status, waktu: kiriman.waktu, kegiatan: k.nama, jumlah: (lama?.jumlah ?? 0) + 1 };
+      else lama.jumlah += 1;
+    }
+  }
+  return hasil;
 }

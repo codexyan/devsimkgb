@@ -37,19 +37,22 @@ const LABEL_STATUS: Record<string, string> = {
 
 export default function ModalPmk({
   pegawai,
+  awal,
   onTutup,
   onBerhasil,
 }: {
   pegawai: PegawaiPmk;
+  /** Isian awal, mis. dari kiriman formulir pemutakhiran data (ADR-023); tetap dapat diubah. */
+  awal?: { tanggalSK?: string; tmtPmk?: string; mkgTahunSk?: string; mkgBulanSk?: string };
   onTutup: () => void;
   /** Dipanggil setelah tersimpan; pesan sudah siap ditampilkan di halaman. */
   onBerhasil: (pesan: string) => void;
 }) {
   const [nomorSK, setNomorSK] = useState("");
-  const [tanggalSK, setTanggalSK] = useState(isoTanggalLokal());
-  const [tmtPmk, setTmtPmk] = useState("");
-  const [mkgTahunSk, setMkgTahunSk] = useState("");
-  const [mkgBulanSk, setMkgBulanSk] = useState("");
+  const [tanggalSK, setTanggalSK] = useState(awal?.tanggalSK || isoTanggalLokal());
+  const [tmtPmk, setTmtPmk] = useState(awal?.tmtPmk ?? "");
+  const [mkgTahunSk, setMkgTahunSk] = useState(awal?.mkgTahunSk ?? "");
+  const [mkgBulanSk, setMkgBulanSk] = useState(awal?.mkgBulanSk ?? "");
   // Kosong berarti memakai usulan hitungan.
   const [tmtKgbKoreksi, setTmtKgbKoreksi] = useState("");
   const [penetapSK, setPenetapSK] = useState("");

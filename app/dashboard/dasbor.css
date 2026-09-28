@@ -2302,3 +2302,27 @@ html[data-gerak="kurangi"] .dsb-putar {
 .inv-berkas { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
 .inv-berkas a { color: var(--st-blue); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
 @media (max-width: 760px) { .inv-atur { grid-template-columns: minmax(0, 1fr); } .inv-atur .inv-lebar-2 { grid-column: auto; } }
+
+/* Tab Dokumen & Pemutakhiran di halaman pegawai (ADR-023) */
+.pmh-kartu { display: grid; gap: 10px; padding: 14px 16px; border-top: 0.5px solid var(--ln2); }
+.pmh-kartu:first-of-type { border-top: 0; }
+.pmh-kepala { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.pmh-judul { margin: 0; font-size: 13px; font-weight: 600; color: var(--dtn); }
+.pmh-riwayat { margin: 0; color: var(--dt3); }
+.pmh-ringkas { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--dt2); }
+.pmh-tabel th[scope="row"] { font-weight: 600; color: var(--dt2); white-space: nowrap; }
+.pmh-tabel tr[data-beda] td, .pmh-tabel tr[data-beda] th { background: var(--tint-amber-bg); }
+.pmh-baru { font-weight: 600; color: var(--dtn); }
+.pmh-lain { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px 18px; margin: 0; font-size: 12px; }
+.pmh-lain dt { color: var(--dt5); }
+.pmh-lain dd { margin: 0; color: var(--dtn); overflow-wrap: anywhere; }
+.pmh-aksi { display: flex; flex-wrap: wrap; gap: 8px; }
+.pmh-status { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto; align-items: end; gap: 10px 12px; padding-top: 10px; border-top: 0.5px dashed var(--ln2); }
+.pmh-status .inv-bidang { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--dt2); }
+.pmh-unggah { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto; }
+@media (max-width: 760px) {
+  .pmh-status, .pmh-unggah { grid-template-columns: minmax(0, 1fr); }
+}
+.pmh-peringatan { margin: 0; padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; color: var(--dt2); background: var(--tint-amber-bg); border: 0.5px solid var(--tint-amber-ln); }
+.pmh-status { grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto; }
+.pmh-status .pmh-catatan .dsb-cari { width: 100%; }
