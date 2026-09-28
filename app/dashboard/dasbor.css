@@ -2343,3 +2343,5 @@ html[data-gerak="kurangi"] .dsb-putar {
 .pgw-menu-isi { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; display: grid; min-width: 230px; padding: 6px; border-radius: 12px; background: var(--card); border: 0.5px solid var(--ln1); box-shadow: 0 16px 40px rgba(9, 17, 53, 0.16); }
 .pgw-menu-isi button { padding: 8px 10px; border: 0; border-radius: 8px; background: none; text-align: left; font-size: 12px; font-weight: 500; color: var(--dtn); cursor: pointer; }
 .pgw-menu-isi button:hover { background: var(--sub); }
+/* Dokumen lain milik pegawai yang sama pada satu kartu papan UPT (ADR-026) */
+.upt-kartu-lain { margin: 2px 0 0; font-size: 11px; line-height: 1.45; color: var(--dt5); }

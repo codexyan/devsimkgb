@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useDashUser } from "@/app/dashboard/components/RoleContext";
 import { PanelNavy, namaSapaan, sapaanWita, tanggalPanjangWita, type Nada } from "@/app/dashboard/components/PanelNavy";
@@ -11,6 +11,7 @@ import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/
 import { LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { BELUM_SELESAI, LABEL_JENIS_USULAN } from "@/lib/usulanPegawai";
 import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
+import { kartuPerKolom, type KolomUpt, type SumberKartu } from "@/lib/papanUpt";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
 import ModalImporUpt from "@/app/dashboard/components/upt/ModalImporUpt";
 import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
@@ -177,7 +178,10 @@ function keadaan(p: PegawaiUpt): { teks: string; nada?: Nada } {
   return { teks: "Menunggu diproses Kanwil", nada: "kuning" };
 }
 
-type KolomUpt = "kerja" | "kanwil" | "sk" | "selesai";
+/** Satu dokumen di papan beserta cara menggambarnya; penggabungan per pegawai di lib/papanUpt.ts. */
+interface SumberPapan extends SumberKartu {
+  render: (lain: string[]) => React.ReactNode;
+}
 
 /** Kolom papan alur KGB dari kacamata UPT. */
 const KOLOM_UPT: { k: KolomUpt; judul: string; ket: string; nada: Nada }[] = [
@@ -204,6 +208,7 @@ function KartuUpt({
   petunjuk,
   pilih,
   aksi,
+  lain,
 }: {
   nama: string;
   sub: string;
@@ -214,6 +219,8 @@ function KartuUpt({
   petunjuk?: string;
   pilih?: React.ReactNode;
   aksi?: React.ReactNode;
+  /** Dokumen lain milik pegawai yang sama, supaya satu orang tetap satu kartu (lib/papanUpt.ts). */
+  lain?: string[];
 }) {
   return (
     <article className="dsb-kartu-kgb upt-kartu" data-nada={nada} title={petunjuk} aria-label={nama}>
@@ -228,6 +235,9 @@ function KartuUpt({
         </p>
       )}
       {catatan && <p className="upt-kartu-catatan">{catatan}</p>}
+      {lain && lain.length > 0 && (
+        <p className="upt-kartu-lain">Juga: {lain.join(" · ")}</p>
+      )}
       {aksi && <div className="dsb-kartu-aksi">{aksi}</div>}
     </article>
   );
@@ -733,15 +743,22 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const baruDitinjau = (t: string | null) => !!t && new Date(t).getTime() >= batasSelesai;
   const tmtSingkat = (t: string | null) => (t ? `TMT ${formatTanggalId(t, { month: "short", year: "numeric" })}` : "TMT belum tercatat");
 
-  const kolomPapan: Record<KolomUpt, React.ReactNode[]> = {
-    kerja: [
-      ...tugas.map((t) => {
-        const u = usulanById(t.usulanId);
-        const p = pegawaiById(t.pegawaiId);
-        const cfg = TUGAS_UPT[t.jenis];
-        return (
+  /** Sumber kartu papan; satu entri per dokumen, digabungkan per pegawai di bawah (ADR-026). */
+  const sumberPapan: SumberPapan[] = [
+    ...tugas.map((t) => {
+      const u = usulanById(t.usulanId);
+      const p = pegawaiById(t.pegawaiId);
+      const cfg = TUGAS_UPT[t.jenis];
+      return {
+        kolom: "kerja" as const,
+        kunci: t.kunci,
+        pegawaiId: t.pegawaiId,
+        nip: t.nip,
+        waktu: u?.diajukanAt ?? null,
+        ringkas: cfg.judul.toLowerCase(),
+        render: (lain: string[]) => (
           <KartuUpt
-            key={t.kunci}
+            lain={lain}
             nama={t.nama}
             sub={`${t.nip} · ${tmtSingkat(t.tmt)}`}
             nada={t.jenis === "perbaiki" ? "ungu" : undefined}
@@ -782,13 +799,21 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               ) : null
             }
           />
-        );
-      }),
-      ...laporan
-        .filter((l) => l.status === "dikembalikan")
-        .map((l) => (
+        ),
+      };
+    }),
+    ...laporan
+      .filter((l) => l.status === "dikembalikan")
+      .map((l) => ({
+        kolom: "kerja" as const,
+        kunci: `laporan:${l.id}`,
+        pegawaiId: l.pegawaiId ?? null,
+        nip: l.nip,
+        waktu: l.tmt ?? null,
+        ringkas: `laporan ${l.label.toLowerCase()} dikembalikan`,
+        render: (lain: string[]) => (
           <KartuUpt
-            key={`laporan:${l.id}`}
+            lain={lain}
             nama={l.nama}
             sub={`${l.nip} · ${l.label}`}
             nada="ungu"
@@ -800,14 +825,20 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               </button>
             }
           />
-        )),
-    ],
-    kanwil: [
-      ...terkirim
-        .filter((u) => u.status === "menunggu")
-        .map((u) => (
+        ),
+      })),
+    ...terkirim
+      .filter((u) => u.status === "menunggu")
+      .map((u) => ({
+        kolom: "kanwil" as const,
+        kunci: `usulan:${u.id}`,
+        pegawaiId: u.pegawaiId,
+        nip: u.nip,
+        waktu: u.diajukanAt ?? null,
+        ringkas: `${LABEL_JENIS_USULAN[u.jenis] ?? u.jenis} menunggu tinjauan Kanwil`,
+        render: (lain: string[]) => (
           <KartuUpt
-            key={`usulan:${u.id}`}
+            lain={lain}
             nama={u.nama}
             sub={`${u.nip} · dikirim ${fmtTgl(u.diajukanAt)}`}
             tanda={{ teks: `${LABEL_JENIS_USULAN[u.jenis] ?? u.jenis}: menunggu tinjauan`, nada: "kuning" }}
@@ -818,20 +849,36 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               </button>
             }
           />
-        )),
-      ...sedangDiproses.map((p) => (
+        ),
+      })),
+    ...sedangDiproses.map((p) => ({
+      kolom: "kanwil" as const,
+      kunci: `proses:${p.id}`,
+      pegawaiId: p.id,
+      nip: p.nip,
+      waktu: null,
+      ringkas: "SK sedang dibuat Kanwil",
+      render: (lain: string[]) => (
         <KartuUpt
-          key={`proses:${p.id}`}
+          lain={lain}
           nama={p.nama}
           sub={`${p.nip} · ${tmtSingkat(p.tmtKgb)}`}
           tanda={{ teks: "SK sedang dibuat Kanwil", nada: "biru" }}
         />
-      )),
-      ...laporan
-        .filter((l) => l.status === "menunggu")
-        .map((l) => (
+      ),
+    })),
+    ...laporan
+      .filter((l) => l.status === "menunggu")
+      .map((l) => ({
+        kolom: "kanwil" as const,
+        kunci: `laporan:${l.id}`,
+        pegawaiId: l.pegawaiId ?? null,
+        nip: l.nip,
+        waktu: l.tmt ?? null,
+        ringkas: `laporan ${l.label.toLowerCase()} menunggu tinjauan`,
+        render: (lain: string[]) => (
           <KartuUpt
-            key={`laporan:${l.id}`}
+            lain={lain}
             nama={l.nama}
             sub={`${l.nip} · ${l.label}${l.tmt ? ` · TMT ${fmtTgl(l.tmt)}` : ""}`}
             tanda={{ teks: "Laporan menunggu tinjauan", nada: "kuning" }}
@@ -842,13 +889,20 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               </button>
             }
           />
-        )),
-    ],
-    sk: skSelesai
+        ),
+      })),
+    ...skSelesai
       .filter((sk) => !sk.gajiWebAt)
-      .map((sk) => (
+      .map((sk) => ({
+        kolom: "sk" as const,
+        kunci: `sk:${sk.id}`,
+        pegawaiId: sk.pegawaiId ?? null,
+        nip: sk.nip ?? "",
+        waktu: sk.diunggahAt ?? null,
+        ringkas: sk.berkasAda ? "SK terbit, belum direkam di Gaji Web" : "SK menunggu berkas dari Tim SDM",
+        render: (lain: string[]) => (
         <KartuUpt
-          key={`sk:${sk.id}`}
+          lain={lain}
           nama={sk.nama}
           sub={`TMT ${fmtTgl(sk.tmtKgbBaru)} · ${sk.golonganBaru} · ${fmtRp(sk.gajiPokokBaru)}`}
           // Berkas SK yang belum diunggah Tim SDM berarti belum dapat direkam; rapelan tetap disebut di catatan.
@@ -888,13 +942,20 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             </>
           }
         />
-      )),
-    selesai: [
-      ...skSelesai
-        .filter((sk) => sk.gajiWebAt)
-        .map((sk) => (
+        ),
+      })),
+    ...skSelesai
+      .filter((sk) => sk.gajiWebAt)
+      .map((sk) => ({
+        kolom: "selesai" as const,
+        kunci: `sk:${sk.id}`,
+        pegawaiId: sk.pegawaiId ?? null,
+        nip: sk.nip ?? "",
+        waktu: sk.gajiWebAt ?? null,
+        ringkas: `SK TMT ${fmtTgl(sk.tmtKgbBaru)} sudah direkam di Gaji Web`,
+        render: (lain: string[]) => (
           <KartuUpt
-            key={`sk:${sk.id}`}
+            lain={lain}
             nama={sk.nama}
             sub={`TMT ${fmtTgl(sk.tmtKgbBaru)} · ${fmtRp(sk.gajiPokokBaru)}`}
             tanda={{ teks: `Direkam di Gaji Web ${fmtTgl(sk.gajiWebAt)}`, nada: "hijau" }}
@@ -906,12 +967,20 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               ) : null
             }
           />
-        )),
-      ...terkirim
-        .filter((u) => (u.status === "disetujui" || u.status === "ditolak") && baruDitinjau(u.ditinjauAt))
-        .map((u) => (
+        ),
+      })),
+    ...terkirim
+      .filter((u) => (u.status === "disetujui" || u.status === "ditolak") && baruDitinjau(u.ditinjauAt))
+      .map((u) => ({
+        kolom: "selesai" as const,
+        kunci: `usulan:${u.id}`,
+        pegawaiId: u.pegawaiId,
+        nip: u.nip,
+        waktu: u.ditinjauAt ?? null,
+        ringkas: `${LABEL_JENIS_USULAN[u.jenis] ?? u.jenis} ${u.status} ${fmtTgl(u.ditinjauAt)}`,
+        render: (lain: string[]) => (
           <KartuUpt
-            key={`usulan:${u.id}`}
+            lain={lain}
             nama={u.nama}
             sub={`${u.nip} · ditinjau ${fmtTgl(u.ditinjauAt)}`}
             tanda={
@@ -921,9 +990,12 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             }
             catatan={u.status === "ditolak" && u.alasanTolak ? `Alasan: ${u.alasanTolak}` : null}
           />
-        )),
-    ],
-  };
+        ),
+      })),
+  ];
+
+  /** Satu kartu per pegawai; dokumen lain miliknya disebut di kartu itu (lib/papanUpt.ts). */
+  const kolomPapan = kartuPerKolom(sumberPapan);
 
   return (
     <div className="dsb-halaman" data-muat-layar="">
@@ -1242,7 +1314,9 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                     {isi.length === 0 && (
                       <p className="dsb-papan-kosong">{memuat && !data ? "Memuat…" : KOSONG_UPT[k]}</p>
                     )}
-                    {isi}
+                    {isi.map((g) => (
+                      <React.Fragment key={g.kunci}>{g.utama.render(g.lain.map((l) => l.ringkas))}</React.Fragment>
+                    ))}
                     {k === "selesai" && isi.length > 0 && (
                       <Link href="/dashboard/upt/riwayat" className="dsb-tautan" style={{ padding: "4px 4px 8px" }}>
                         Selengkapnya di Riwayat →

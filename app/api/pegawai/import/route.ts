@@ -9,6 +9,7 @@ import { bacaIsianPegawai, teksAtauNull, teksIsian } from "@/lib/dataPegawai";
 import { rencanaSiklusBerikutnya } from "@/lib/jadwalKgb";
 import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
 import { hariIniWita } from "@/lib/waktu";
+import { BELUM_SELESAI } from "@/lib/usulanPegawai";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
@@ -40,6 +41,13 @@ export async function POST(req: Request) {
   // satu kali baca daftar NIP terdaftar, satu append Pegawai, satu append
   // RiwayatKGB. Per-baris create dulu membuat import besar kena 429.
   const terdaftar = new Set((await db.pegawai.findMany()).map((p) => p.nip));
+  // NIP yang sedang diusulkan UPT dilewati: menyetujui usulannya yang akan menambahkan pegawai itu, sehingga
+  // orang yang sama tidak masuk dua kali dan papan UPT tidak menampilkannya dua kartu (ADR-026).
+  const diusulkan = new Map(
+    ((await db.usulanPegawai.findMany({ where: { status: { in: BELUM_SELESAI } } })) as { nip: string | null; satker: string }[])
+      .filter((u) => !!u.nip)
+      .map((u) => [u.nip as string, u.satker]),
+  );
   const hariIni = hariIniWita();
   // Kolom hukdis di berkas hanya dipakai bila pengimpor mengelola hukdis (Super Admin); peran lain
   // mencatat hukdis lewat Riwayat Hukdis.
@@ -66,6 +74,12 @@ export async function POST(req: Request) {
       if (terdaftar.has(isian.nip)) {
         results.gagal++;
         results.errors.push(`${identitas}: NIP sudah terdaftar, dilewati`);
+        continue;
+      }
+      const satkerUsulan = diusulkan.get(isian.nip);
+      if (satkerUsulan) {
+        results.gagal++;
+        results.errors.push(`${identitas}: sedang diusulkan ${satkerUsulan}, tinjau usulannya lebih dulu`);
         continue;
       }
 

@@ -12,6 +12,7 @@ import { rencanaSiklusBerikutnya, type RencanaSiklusKgb } from "@/lib/jadwalKgb"
 import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
 import { hariIniWita } from "@/lib/waktu";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { BELUM_SELESAI } from "@/lib/usulanPegawai";
 
 export const runtime = "nodejs";
 
@@ -106,6 +107,21 @@ export async function POST(req: Request) {
   const existing = await db.pegawai.findUnique({ nip: isian.nip });
   if (existing)
     return NextResponse.json({ error: "NIP sudah terdaftar" }, { status: 409 });
+
+  // Usulan pegawai baru dari UPT untuk NIP yang sama ditinjau lebih dulu, supaya orang yang sama tidak masuk
+  // dua kali dan papan UPT tidak menampilkannya dua kartu (ADR-026).
+  const usulanBerjalan = (await db.usulanPegawai.findMany({
+    where: { nip: isian.nip, status: { in: BELUM_SELESAI } },
+  })) as { satker: string; nama: string }[];
+  if (usulanBerjalan.length > 0) {
+    const u = usulanBerjalan[0];
+    return NextResponse.json(
+      {
+        error: `NIP ${isian.nip} sedang diusulkan ${u.satker} atas nama ${u.nama}. Tinjau usulannya di Usulan UPT; menyetujuinya akan menambahkan pegawai ini.`,
+      },
+      { status: 409 },
+    );
+  }
 
   const userLogin = await db.user.findUnique({ nip: session.user.nip! });
   if (!userLogin)
