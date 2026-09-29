@@ -531,7 +531,7 @@ function DashboardMain() {
       isi: (
         <>
           <strong>{usulanMenunggu.length} usulan data UPT</strong>
-          {` menunggu tinjauan${hariTerlama > 0 ? `, terlama ${hariTerlama} hari${asalTerlama ? ` (${asalTerlama})` : ""}` : ""}${usulanPerPegawai.size > 0 ? `; proses KGB ${usulanPerPegawai.size} pegawainya tertahan sampai ditinjau` : ""}.`}
+          {` menunggu tinjauan${hariTerlama > 0 ? `, terlama ${hariTerlama} hari${asalTerlama ? ` (${asalTerlama})` : ""}` : ""}${usulanPerPegawai.size > 0 ? `; proses KGB ${usulanPerPegawai.size} pegawai tertahan sampai ditinjau` : ""}.`}
         </>
       ),
       aksi: { label: "Semua usulan", href: "/dashboard/usulan" },
