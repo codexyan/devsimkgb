@@ -25,9 +25,18 @@ export async function GET(req: Request) {
   if (!canProcessKGB(session.user.role ?? ""))
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
-  const status = new URL(req.url).searchParams.get("status") ?? "";
+  const params = new URL(req.url).searchParams;
+  const status = params.get("status") ?? "";
   // Draf adalah data yang masih disiapkan UPT dan belum diajukan, jadi tidak pernah tampil di Kanwil.
   const saring = status && status !== "draf" ? { status } : { status: { not: "draf" } };
+
+  // Lencana sidebar hanya perlu angkanya, dan sidebar ikut pada setiap halaman. Tanpa jalan pintas ini
+  // satu lencana menarik seluruh pegawai, riwayat KGB, dan surat hanya untuk dihitung panjangnya.
+  if (params.get("ringkas") === "1") {
+    const menunggu = (await db.usulanPegawai.findMany({ where: saring })) as UsulanPegawaiRow[];
+    return NextResponse.json({ jumlah: menunggu.length });
+  }
+
   const [semuaUsulan, semuaPegawai, semuaKgb, semuaSurat] = await Promise.all([
     db.usulanPegawai.findMany({ where: saring }) as Promise<UsulanPegawaiRow[]>,
     db.pegawai.findMany(),

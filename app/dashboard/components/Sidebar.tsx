@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { ROLES, ROLE_LABEL } from "@/lib/auth";
+import { ROLES, ROLE_LABEL, canProcessKGB } from "@/lib/auth";
 import { useThemeMode } from "@/lib/ui/themeMode";
 import { LABEL_GERAK, usePilihanGerak, useKurangiGerakBerlaku, type PilihanGerak } from "@/lib/ui/gerak";
 
@@ -171,10 +171,12 @@ const SB = {
 
 /* ── NavItem ──────────────────────────────────────────────────────────────── */
 function NavItem({
-  href, label, icon, isActive, expanded, onClose, indent = false, newTab = false,
+  href, label, icon, isActive, expanded, onClose, indent = false, newTab = false, badge = 0,
 }: {
   href: string; label: string; icon: React.ReactNode;
   isActive: boolean; expanded: boolean; onClose: () => void; indent?: boolean; newTab?: boolean;
+  /** Pekerjaan yang menunggu di halaman ini; 0 atau tanpa nilai berarti tidak ada lencana. */
+  badge?: number;
 }) {
   return (
     <Link
@@ -182,7 +184,7 @@ function NavItem({
       onClick={onClose}
       target={newTab ? "_blank" : undefined}
       rel={newTab ? "noopener" : undefined}
-      title={!expanded ? label : undefined}
+      title={!expanded ? (badge > 0 ? `${label} (${badge})` : label) : undefined}
       className={isActive ? "sb-item sb-active" : "sb-item"}
       style={{
         display: "flex",
@@ -218,14 +220,41 @@ function NavItem({
         color: isActive ? SB.goldHi : SB.icon,
         flexShrink: 0,
         display: "flex",
+        position: "relative",
         transform: indent ? "scale(0.88)" : "none",
       }}>
         {icon}
+        {/* Rail ikon: lencana menempel di ikon, sebab labelnya tidak tampil. */}
+        {!expanded && badge > 0 && (
+          <span style={{
+            position: "absolute", top: "-4px", right: "-5px",
+            minWidth: "14px", height: "14px", borderRadius: "9999px",
+            background: "#ef4444", color: "#fff",
+            fontSize: "8px", fontWeight: 700,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "0 2px", boxShadow: "0 0 0 1.5px #0a1a42",
+          }}>
+            {badge > 9 ? "9+" : badge}
+          </span>
+        )}
       </span>
       {expanded && (
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "0.01em" }}>
-          {label}
-        </span>
+        <>
+          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "0.01em" }}>
+            {label}
+          </span>
+          {badge > 0 && (
+            <span style={{
+              minWidth: "18px", height: "18px", borderRadius: "9999px",
+              background: "#ef4444", color: "#fff",
+              fontSize: "9px", fontWeight: 700,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "0 4px", flexShrink: 0,
+            }}>
+              {badge > 99 ? "99+" : badge}
+            </span>
+          )}
+        </>
       )}
     </Link>
   );
@@ -235,11 +264,15 @@ function NavItem({
    Saat sidebar diciutkan (rail ikon), anak-anak tampil sebagai item ikon biasa
    (tanpa chrome grup) agar tetap terjangkau.                                  */
 function NavGroup({
-  entry, pathname, expanded, onClose,
+  entry, pathname, expanded, onClose, badges,
 }: {
   entry: Group; pathname: string; expanded: boolean; onClose: () => void;
+  /** Pekerjaan menunggu per href anak; dipakai untuk lencana. */
+  badges?: Record<string, number>;
 }) {
   const anyActive = entry.children.some((c) => pathname === c.href);
+  // Saat grup tertutup, anaknya tidak terlihat, jadi lencananya dijumlahkan ke kepala grup.
+  const badgeGrup = entry.children.reduce((n, c) => n + (badges?.[c.href] ?? 0), 0);
   // manual = null → ikuti anyActive (auto-buka saat rute anak aktif);
   // sekali di-klik, hormati pilihan manual. Menghindari setState-in-effect.
   const [manual, setManual] = useState<boolean | null>(null);
@@ -249,7 +282,7 @@ function NavGroup({
     return (
       <>
         {entry.children.map((c) => (
-          <NavItem key={c.href} {...c} isActive={pathname === c.href} expanded={false} onClose={onClose} />
+          <NavItem key={c.href} {...c} isActive={pathname === c.href} expanded={false} onClose={onClose} badge={badges?.[c.href]} />
         ))}
       </>
     );
@@ -278,6 +311,17 @@ function NavGroup({
         <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "0.01em" }}>
           {entry.groupLabel}
         </span>
+        {!open && badgeGrup > 0 && (
+          <span style={{
+            minWidth: "18px", height: "18px", borderRadius: "9999px",
+            background: "#ef4444", color: "#fff",
+            fontSize: "9px", fontWeight: 700,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "0 4px", flexShrink: 0, marginRight: "4px",
+          }}>
+            {badgeGrup > 99 ? "99+" : badgeGrup}
+          </span>
+        )}
         <span style={{ flexShrink: 0, display: "flex", color: SB.label, transform: open ? "none" : "rotate(-90deg)", transition: "transform .18s" }}>
           {Ic.chevDown}
         </span>
@@ -289,7 +333,7 @@ function NavGroup({
       }}>
         <div style={{ overflow: "hidden" }}>
           {entry.children.map((c) => (
-            <NavItem key={c.href} {...c} isActive={pathname === c.href} expanded onClose={onClose} indent />
+            <NavItem key={c.href} {...c} isActive={pathname === c.href} expanded onClose={onClose} indent badge={badges?.[c.href]} />
           ))}
         </div>
       </div>
@@ -326,6 +370,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [notifList,   setNotifList]   = useState<Notif[]>([]);
   const [unread,      setUnread]      = useState(0);
+  const [usulanMenunggu, setUsulanMenunggu] = useState(0);
   const [showNotif,   setShowNotif]   = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [themeMode, toggleTheme]      = useThemeMode();
@@ -373,6 +418,25 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
     return () => { clearTimeout(t); clearInterval(iv); };
   }, []);
 
+  /* Usulan UPT yang menunggu tinjauan, untuk lencana menu. Hanya peninjaunya yang mengambil angka ini;
+     peran lain tidak punya menunya. Memakai mode ringkas agar tidak menarik seluruh data pegawai. */
+  useEffect(() => {
+    if (!canProcessKGB(role)) return;
+    let batal = false;
+    const ambil = () => {
+      fetch("/api/usulan?status=menunggu&ringkas=1")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: unknown) => {
+          const jumlah = (d as { jumlah?: unknown } | null)?.jumlah;
+          if (!batal && typeof jumlah === "number") setUsulanMenunggu(jumlah);
+        })
+        .catch(() => { /* lencana hanya pelengkap; kegagalannya dibiarkan */ });
+    };
+    const t  = setTimeout(ambil, 1400);
+    const iv = setInterval(ambil, 5 * 60 * 1000);
+    return () => { batal = true; clearTimeout(t); clearInterval(iv); };
+  }, [role]);
+
   async function markRead(id: string) {
     await fetch(`/api/notifikasi/${id}/baca`, { method: "PATCH" }).catch(() => {});
     setNotifList((prev) => prev.map((n) => n.id === id ? { ...n, dibaca: true } : n));
@@ -415,6 +479,9 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
     menuUtama;
 
   const roleLabel = ROLE_LABEL[role] ?? role;
+
+  /* Lencana per href menu. Sementara hanya Usulan UPT; menu lain tinggal menambah kuncinya di sini. */
+  const lencanaMenu: Record<string, number> = { "/dashboard/usulan": usulanMenunggu };
 
   /* popup offset: mengikuti sidebar di layar lebar, melebar penuh di layar sempit */
   const popupLeft = expanded ? "232px" : "70px";
@@ -551,6 +618,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
                   pathname={pathname}
                   expanded={expanded}
                   onClose={() => setIsOpen(false)}
+                  badges={lencanaMenu}
                 />
               ) : (
                 <NavItem
@@ -560,6 +628,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
                   isActive={pathname === item.href || (item.href === menuSatker.href && pathname.startsWith(`${item.href}/`))}
                   expanded={expanded}
                   onClose={() => setIsOpen(false)}
+                  badge={lencanaMenu[item.href]}
                 />
               )
             )}

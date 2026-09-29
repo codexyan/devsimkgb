@@ -128,6 +128,11 @@ function daysDiff(date: string) {
   return Math.ceil((new Date(date).getTime() - new Date().getTime()) / 86400000);
 }
 
+/** Umur dalam hari penuh sejak sebuah waktu lampau; 0 bila belum genap sehari. */
+function hariSejak(iso: string) {
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+}
+
 /* -----------------------------------------
    Main Dashboard
    ----------------------------------------- */
@@ -509,13 +514,29 @@ function DashboardMain() {
     });
 
   // Usulan data UPT yang menunggu tinjauan: ditinjau langsung dari kartu atau baris (ADR-011).
-  if (usulanMenunggu.length > 0)
+  // Yang menentukan mendesaknya adalah usulan terlama, bukan jumlahnya: selama usulan perbaikan
+  // menunggu, proses KGB pegawainya tertahan. Ambangnya memakai yang sudah dipakai di dasbor ini
+  // (7 hari untuk batas input) dan di Pantau satker (14 hari untuk satker yang perlu diingatkan).
+  if (usulanMenunggu.length > 0) {
+    const berdiajukan = usulanMenunggu.filter((u) => u.diajukanAt);
+    const terlama = berdiajukan.length
+      ? berdiajukan.reduce((a, b) => ((a.diajukanAt as string) <= (b.diajukanAt as string) ? a : b))
+      : null;
+    const hariTerlama = terlama ? hariSejak(terlama.diajukanAt as string) : 0;
+    const satkerTerlama = terlama ? cariSatker(terlama.unitKerja) : null;
+    const asalTerlama = satkerTerlama ? namaRingkasSatker(satkerTerlama) : terlama?.unitKerja ?? "";
     tindakan.push({
       id: "usulan-upt",
-      nada: "ungu",
-      isi: <><strong>{usulanMenunggu.length} usulan data UPT</strong> menunggu tinjauan{usulanPerPegawai.size > 0 ? `; proses KGB ${usulanPerPegawai.size} pegawainya tertahan sampai ditinjau` : ""}.</>,
+      nada: hariTerlama > 14 ? "merah" : hariTerlama > 7 ? "kuning" : "ungu",
+      isi: (
+        <>
+          <strong>{usulanMenunggu.length} usulan data UPT</strong>
+          {` menunggu tinjauan${hariTerlama > 0 ? `, terlama ${hariTerlama} hari${asalTerlama ? ` (${asalTerlama})` : ""}` : ""}${usulanPerPegawai.size > 0 ? `; proses KGB ${usulanPerPegawai.size} pegawainya tertahan sampai ditinjau` : ""}.`}
+        </>
+      ),
       aksi: { label: "Semua usulan", href: "/dashboard/usulan" },
     });
+  }
 
   // Permintaan follow up dari keuangan
   for (const notif of (followupNotifs ?? [])) {
