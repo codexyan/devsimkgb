@@ -72,11 +72,42 @@ export const SEMUA = "semua";
 /** Peran panduan untuk role akun; null bila role tidak dikenal (panduan lengkap yang tampil). */
 export const PERAN_UNTUK_ROLE: Record<string, string> = {
   admin_upt: "upt",
-  sdm_kgb: "sdm",
   sdm_hukdis: "hukdis",
+  sdm_kgb: "sdm",
   keuangan: "keuangan",
   superAdminCore: "super",
 };
+
+/** Role yang boleh membaca panduan seluruh peran. */
+const ROLE_SEMUA_PERAN = "superAdminCore";
+
+/**
+ * Peran panduan yang boleh dibaca sebuah role akun.
+ *
+ * Hanya Super Admin membaca seluruh peran; peran lain membaca panduannya sendiri saja. Sebelumnya
+ * seluruh bagian dirender untuk semua orang dan yang tidak relevan hanya disembunyikan CSS, sehingga
+ * Admin UPT tinggal menekan "Semua" — atau membaca sumber halaman — untuk melihat isi kerja Kanwil.
+ *
+ * Role yang tidak dikenal mendapat panduan lengkap. Itu tidak terjadi setelah authGuard, yang hanya
+ * meloloskan lima role di lib/auth/roles.ts; pilihan ini sekadar menjaga halaman tidak pernah kosong.
+ */
+export function peranBolehUntukRole(role: string | null | undefined): readonly string[] {
+  if (role === ROLE_SEMUA_PERAN) return PERAN.map((p) => p.id);
+  const milik = PERAN_UNTUK_ROLE[role ?? ""];
+  return milik ? [milik] : PERAN.map((p) => p.id);
+}
+
+/** Bagian yang benar-benar dirender untuk sekumpulan peran, urut sesuai DAFTAR_ISI. */
+export function bagianUntukPeran(boleh: readonly string[]): readonly BagianPanduan[] {
+  const tampil = new Set<IdBagian>();
+  for (const id of boleh) for (const b of cariPeran(id)?.bagian ?? []) tampil.add(b);
+  return DAFTAR_ISI.filter((b) => tampil.has(b.id));
+}
+
+/** true bila pembaca boleh berpindah peran, yakni saat lebih dari satu peran terbuka baginya. */
+export function bolehPilihPeran(boleh: readonly string[]): boolean {
+  return boleh.length > 1;
+}
 
 export function cariPeran(id: string | null | undefined): Peran | null {
   return PERAN.find((p) => p.id === id) ?? null;
@@ -95,7 +126,12 @@ export function daftarUntuk(pilihan: string | null): readonly BagianPanduan[] {
   return peran ? DAFTAR_ISI.filter((b) => peran.bagian.includes(b.id)) : DAFTAR_ISI;
 }
 
-/** Nilai pilihan yang sah: id peran atau "semua". */
-export function pilihanSah(nilai: string | null | undefined): nilai is string {
-  return nilai === SEMUA || !!cariPeran(nilai);
+/**
+ * Nilai pilihan yang sah bagi pembaca ini: salah satu peran yang terbuka baginya, atau "semua" ketika
+ * memang lebih dari satu peran terbuka. Dipakai menjepit ?peran= di URL, supaya kuncinya tidak dapat
+ * dilewati hanya dengan mengetik alamat.
+ */
+export function pilihanSahUntuk(nilai: string | null | undefined, boleh: readonly string[]): boolean {
+  if (nilai === SEMUA) return bolehPilihPeran(boleh);
+  return !!nilai && boleh.includes(nilai);
 }

@@ -7,7 +7,20 @@ import { STATUS_KGB, type StatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId } from "@/lib/waktu";
 import { DaftarIsiPanduan, LanjutBagian, PanduanPeran, PilihPeran } from "./NavigasiPanduan";
 import { BUTIR_KONFIRMASI_UPT } from "@/lib/konfirmasiUpt";
-import { peranUntuk } from "./peran";
+import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
+import { bagianUntukPeran, peranUntuk, type IdBagian } from "./peran";
+// Replika layar SIM-KGB untuk bagian Admin UPT; alasan memakai HTML alih-alih tangkapan layar ada di berkasnya.
+import {
+  LayarDataPegawai,
+  LayarKolektif1,
+  LayarKolektif2,
+  LayarKolektif3,
+  LayarMenu,
+  LayarPapan,
+  LayarPengingat,
+  LayarSkTerbit,
+  LayarUnggah,
+} from "./LayarUpt";
 // Isi panduan memakai kelas bersama halaman publik (.pub-prose, .pub-table, ...), semuanya di bawah .pub.
 import "@/app/(publik)/publik.css";
 import "./panduan.css";
@@ -82,10 +95,42 @@ function TandaRapelan() {
 }
 
 /**
- * Isi panduan SIM-KGB di dashboard. `bawaan` adalah peran yang tampil lebih dulu (dari role akun),
- * `milik` peran akun itu sendiri untuk penanda di pilihan peran.
+ * Satu bagian panduan. Yang tidak terbuka bagi akun pembaca menghasilkan null, bukan bagian tersembunyi:
+ * isi kerja Kanwil tidak boleh ikut terkirim ke halaman Admin UPT lalu sekadar ditutupi CSS. Atribut
+ * data-peran tetap dipasang, sebab Super Admin berpindah peran tanpa memuat ulang halaman.
  */
-export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; milik: string | null }) {
+function Bagian({
+  id,
+  tampil,
+  children,
+}: {
+  id: IdBagian;
+  tampil: ReadonlySet<IdBagian>;
+  children: React.ReactNode;
+}) {
+  if (!tampil.has(id)) return null;
+  return (
+    <section className="pub-prose pg-bagian" data-bagian={id} data-peran={peranUntuk(id)}>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * Isi panduan SIM-KGB di dashboard. `bawaan` adalah peran yang tampil lebih dulu (dari role akun),
+ * `milik` peran akun itu sendiri untuk penanda di pilihan peran, dan `boleh` daftar peran yang terbuka
+ * bagi akun itu. Bagian di luar `boleh` tidak ikut dirender sama sekali.
+ */
+export default async function IsiPanduan({
+  bawaan,
+  milik,
+  boleh,
+}: {
+  bawaan: string;
+  milik: string | null;
+  boleh: readonly string[];
+}) {
+  const tampil = new Set(bagianUntukPeran(boleh).map((b) => b.id));
   const batas = await muatBatasInputSdm();
   const { kasus, siklusBerikutnya, rekon } = hitungKasus();
   const selisihGaji = kasus.gajiPokokBaru - GAJI_MKG_0;
@@ -107,15 +152,15 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
         </div>
       </header>
 
-      <PanduanPeran bawaan={bawaan}>
-        <PilihPeran milik={milik} />
+      <PanduanPeran bawaan={bawaan} boleh={boleh}>
+        <PilihPeran milik={milik} boleh={boleh} />
 
         <div className="pg-kisi" id="panduan-isi">
           <DaftarIsiPanduan />
 
           <div className="pg-isi">
               {/* 1. Alur singkat */}
-              <section className="pub-prose pg-bagian" data-bagian="ringkasan" data-peran={peranUntuk("ringkasan")}>
+              <Bagian id="ringkasan" tampil={tampil}>
                 <h2 id="ringkasan" className="pub-h2 pub-h2-flush">
                   Alur singkat
                 </h2>
@@ -224,10 +269,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   </p>
                 </div>
                 <LanjutBagian dari="ringkasan" />
-              </section>
+              </Bagian>
 
               {/* 2. Kewenangan */}
-              <section className="pub-prose pg-bagian" data-bagian="kewenangan" data-peran={peranUntuk("kewenangan")}>
+              <Bagian id="kewenangan" tampil={tampil}>
                 <h2 id="kewenangan" className="pub-h2">
                   Siapa yang menetapkan KGB
                 </h2>
@@ -291,10 +336,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   penandatangan yang berlaku pada tanggal itu, SK tidak dapat dibuat sampai datanya dilengkapi.
                 </p>
                 <LanjutBagian dari="kewenangan" />
-              </section>
+              </Bagian>
 
               {/* 3. Jadwal */}
-              <section className="pub-prose pg-bagian" data-bagian="jadwal" data-peran={peranUntuk("jadwal")}>
+              <Bagian id="jadwal" tampil={tampil}>
                 <h2 id="jadwal" className="pub-h2">
                   Kapan KGB diberikan dan kapan diusulkan
                 </h2>
@@ -453,11 +498,11 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   sehari-hari disebut rapel atau rapelan.
                 </p>
                 <LanjutBagian dari="jadwal" />
-              </section>
+              </Bagian>
 
 
               {/* 4. KGB pertama setelah CPNS diangkat PNS */}
-              <section className="pub-prose pg-bagian" data-bagian="cpns-pns" data-peran={peranUntuk("cpns-pns")}>
+              <Bagian id="cpns-pns" tampil={tampil}>
                 <h2 id="cpns-pns" className="pub-h2">
                   KGB pertama setelah CPNS diangkat menjadi PNS
                 </h2>
@@ -581,10 +626,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   masa kerja golongan tetap dihitung dari TMT CPNS.
                 </p>
                 <LanjutBagian dari="cpns-pns" />
-              </section>
+              </Bagian>
 
               {/* 5. Kenaikan pangkat dan dampaknya pada KGB */}
-              <section className="pub-prose pg-bagian" data-bagian="kenaikan-pangkat" data-peran={peranUntuk("kenaikan-pangkat")}>
+              <Bagian id="kenaikan-pangkat" tampil={tampil}>
                 <h2 id="kenaikan-pangkat" className="pub-h2">
                   Kenaikan pangkat, PMK, dan dampaknya pada KGB
                 </h2>
@@ -670,117 +715,187 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   persetujuan Kanwil mencatat riwayatnya lewat jalur yang sama dengan kedua tombol di atas.
                 </p>
                 <LanjutBagian dari="kenaikan-pangkat" />
-              </section>
+              </Bagian>
 
               {/* 6. Untuk admin UPT */}
-              <section className="pub-prose pg-bagian" data-bagian="untuk-upt" data-peran={peranUntuk("untuk-upt")}>
+              <Bagian id="untuk-upt" tampil={tampil}>
                 <h2 id="untuk-upt" className="pub-h2">
-                  Untuk Admin UPT: menyiapkan dan mengajukan usulan
+                  Untuk Admin UPT: dari data pegawai sampai SK direkam
                 </h2>
                 <p>
-                  Bagian ini untuk Admin UPT. Pakai langkah dan daftar periksa berikut setiap kali ada pegawai yang
-                  mendekati jadwal KGB.
+                  Bagian ini menerangkan seluruh pekerjaan Admin UPT, urut sejak membuka SIM-KGB sampai SK KGB direkam
+                  di Gaji Web satker. Tiap langkah disertai gambar layarnya. Angka bernomor pada gambar dijelaskan tepat
+                  di bawahnya, dan nama menu serta tombol ditulis sama persis dengan yang tampil di layar Anda.
                 </p>
+
                 <div className="pub-note">
-                  <strong className="pub-note-title">Akun Admin UPT di SIM-KGB</strong>
+                  <strong className="pub-note-title">Yang dapat dan tidak dapat Anda lakukan</strong>
                   <p>
-                    Akun Admin UPT hanya melihat pegawai satkernya sendiri. Dari akun ini UPT menyiapkan dan mengajukan
-                    usulan data pegawai, melaporkan mutasi, pemberhentian, dan hukuman disiplin, mengunduh SK begitu
-                    diunggah Kanwil, lalu menandai SK yang sudah direkam di Gaji Web satker. Data pegawai tetap diubah
-                    Kanwil, lewat tinjauan usulan. Hukuman disiplin yang sudah dicatat Kanwil tampil terbatas: masih
-                    berlaku atau tidak, menunda KGB atau tidak, dan sampai kapan; jenis dan nomor SK-nya tidak tampil.
+                    Akun Admin UPT hanya melihat pegawai satker Anda sendiri. Dari akun ini Anda menyiapkan dan
+                    mengajukan usulan data pegawai, melaporkan mutasi, pemberhentian, dan hukuman disiplin, mengunduh SK
+                    begitu diunggah Kanwil, lalu menandai SK yang sudah direkam di Gaji Web satker.
+                  </p>
+                  <p>
+                    Yang <strong>tidak</strong> dapat Anda lakukan: mengubah data pegawai secara langsung. Setiap
+                    perubahan harus lewat usulan, dan Kanwil meninjaunya lebih dulu. Hukuman disiplin yang sudah dicatat
+                    Kanwil pun tampil terbatas bagi Anda: hanya masih berlaku atau tidak, menunda KGB atau tidak, dan
+                    sampai kapan. Jenis dan nomor SK-nya tidak ditampilkan.
                   </p>
                 </div>
 
-                <h3 className="pub-h3">Meremajakan data pegawai lewat usulan</h3>
+                <h3 className="pub-h3">Enam langkah yang berulang tiap periode</h3>
+                <ol>
+                  <li>Buka SIM-KGB dan kenali enam menu Anda.</li>
+                  <li>Tunggu pengingat masa kirim, atau lihat sendiri pita jadwal di dashboard.</li>
+                  <li>Pastikan data pegawai sudah sama dengan SK; yang keliru dibetulkan lewat usulan.</li>
+                  <li>Siapkan usulan di Usulan kolektif: pilih pegawainya, lengkapi data dan berkasnya.</li>
+                  <li>Kirim surat usulan lewat Srikandi, lalu ajukan ke Kanwil dengan nomor surat itu.</li>
+                  <li>Setelah SK terbit: unduh, rekam di Gaji Web satker, lalu tandai di SIM-KGB.</li>
+                </ol>
+
+                <h3 className="pub-h3">Langkah 1 — Kenali menu Anda</h3>
                 <p>
-                  Dokumen aslinya ada di UPT, sedangkan yang mengetik datanya selama ini Kanwil. Pengetikan ganda itu
-                  sumber salah masa kerja golongan. Karena itu UPT mendata sendiri pegawainya, dan mengusulkannya dalam
-                  dua langkah terpisah: <strong>data dulu, ajukan kemudian</strong>.
+                  Sesudah masuk, menu di sisi kiri layar hanya berisi enam pilihan. Seluruhnya terbatas pada satker
+                  Anda: pegawai satker lain tidak pernah tampil, dan tidak ada menu Kanwil di sana.
                 </p>
+                <LayarMenu />
+
+                <h3 className="pub-h3">Langkah 2 — Kapan usulan harus dikirim</h3>
+                <p>
+                  Surat usulan dikirim ke Kanwil pada <strong>tanggal 1 sampai {KIRIM_SURAT_BATAS}</strong>, di{" "}
+                  <strong>bulan kedua sebelum TMT</strong> KGB pegawainya. Untuk KGB yang TMT-nya{" "}
+                  {bulanTahun(TMT_KGB)}, berarti suratnya dikirim {jendelaKirim(TMT_KGB)}. Jaraknya dibuat dua bulan
+                  supaya Kanwil sempat meninjau, membuat SK, dan menandatanganinya sebelum gaji bulan itu dibayarkan.
+                </p>
+                <p>
+                  Anda tidak perlu mengingatnya sendiri. Begitu masa kirim dibuka, dashboard menampilkan jendela
+                  pengingat berisi nama pegawai yang belum Anda ajukan.
+                </p>
+                <LayarPengingat namaBulan={bulanTahun(TMT_KGB)} batas={tgl(hitungKirimSurat(TMT_KGB).batas)} />
+                <p>
+                  Terlambat mengirim surat tidak membatalkan hak KGB pegawai, tetapi menggeser prosesnya: SK terbit
+                  setelah gaji bulan itu dibayarkan, sehingga selisihnya dibayar belakangan sebagai rapelan. Itu
+                  pekerjaan tambahan bagi keuangan satker Anda sendiri.
+                </p>
+
+                <h3 className="pub-h3">Langkah 3 — Pastikan data pegawai sudah benar</h3>
+                <p>
+                  Dokumen aslinya ada di UPT, sedangkan yang mengetik datanya selama ini Kanwil. Pengetikan ganda itulah
+                  sumber salah masa kerja golongan. Karena itu UPT mendata sendiri pegawainya. Ada empat jalan masuk,
+                  semuanya dari menu <strong>Data Pegawai</strong>.
+                </p>
+                <LayarDataPegawai />
+                <p>
+                  Apa pun jalannya, isian Anda tersimpan sebagai <strong>draf milik satker</strong>: belum terlihat
+                  Kanwil, boleh ditinggal dan dilanjutkan kapan saja, dan boleh dihapus bila keliru. NIP yang tercatat
+                  salah juga dibetulkan lewat <strong>Usulkan perbaikan data</strong>: ketik NIP yang benar, lalu Kanwil
+                  mencocokkannya dengan SK CPNS sebelum menyetujui.
+                </p>
+
+                <h4 className="pub-h3">Mengisi banyak pegawai sekaligus dengan Unggah daftar</h4>
+                <p>
+                  Untuk mengisi data pertama kali, atau meremajakan banyak data sekaligus, pakai{" "}
+                  <strong>Unggah daftar</strong>. Unduh templat CSV-nya dari layar itu, isi satu baris untuk satu
+                  pegawai, lalu unggah kembali. Isinya diperiksa dan ditampilkan lebih dulu; tidak ada yang tersimpan
+                  sebelum Anda mencentang dan menekan Simpan.
+                </p>
+                <LayarUnggah />
+                <p>
+                  Pegawai yang <strong>sudah tercatat tidak ditolak</strong>. Barisnya dibandingkan dengan data yang ada:
+                  bila ada yang berbeda, barisnya menjadi usulan perbaikan dan Anda dapat melihat data lama berdampingan
+                  dengan data berkas; bila sama persis, barisnya dilewati karena memang tidak ada yang perlu diusulkan.
+                  Jadi satu berkas boleh berisi seluruh pegawai satker Anda, tanpa perlu memilah lebih dulu mana yang
+                  sudah ada.
+                </p>
+                <p>
+                  Dua hal yang sering menyulitkan saat menyiapkan berkasnya. Pertama, <strong>NIP di Excel</strong>:
+                  18 angka berubah menjadi 1,99E+17 bila kolomnya tidak diformat sebagai Text lebih dulu, dan barisnya
+                  akan ditolak. Kedua, <strong>tanggal</strong>: Excel berbahasa Indonesia menyimpannya sebagai
+                  dd/mm/yyyy, dan itu terbaca benar — tetapi periksalah tetap pada layar pratinjau, sebab tanggal yang
+                  tertukar hari dan bulannya tidak dapat dikenali sistem sebagai kekeliruan.
+                </p>
+
+                <h3 className="pub-h3">Langkah 4 — Siapkan usulan di Usulan kolektif</h3>
+                <p>
+                  Inilah tempat kerja utama Anda tiap periode. <strong>Usulan kolektif</strong> menyiapkan banyak
+                  pegawai untuk satu surat, dalam tiga langkah. Draf pegawai baru hasil Unggah daftar ikut otomatis.
+                </p>
+                <LayarKolektif1 namaBulan={bulanTahun(TMT_KGB)} />
+                <p>
+                  Sesudah memilih, Anda melengkapi data dan berkas tiap pegawai satu per satu. Daftar di kiri
+                  menunjukkan siapa yang belum lengkap; kerjakan sampai lingkaran kelengkapannya penuh.
+                </p>
+                <LayarKolektif2 />
+
+                <h4 className="pub-h3">Lima aturan yang menentukan benar atau tidaknya isian</h4>
                 <ol>
                   <li>
-                    <strong>Siapkan datanya.</strong> Tekan <strong>Tambah pegawai</strong> untuk pegawai yang belum
-                    tercatat, misalnya CPNS yang baru dilantik, atau <strong>Usulkan perbaikan data</strong> pada baris
-                    pegawai yang sudah ada. Isian disimpan sebagai draf milik satker: belum terlihat Kanwil, boleh
-                    ditinggal dan dilanjutkan kapan saja, dan boleh dihapus bila keliru. NIP yang tercatat keliru juga
-                    dibetulkan lewat Usulkan perbaikan data: ketik NIP yang benar, lalu Kanwil mencocokkannya dengan SK CPNS
-                    sebelum menyetujui. NIP pegawai baru masih dapat dibetulkan selama datanya belum diajukan.
+                    <strong>Pilih dulu keadaan pegawainya.</strong> <em>Belum pernah KGB</em> hanya meminta TMT CPNS,
+                    dan masa kerjanya 0 tahun 0 bulan. <em>Sudah pernah KGB</em> meminta TMT dan masa kerja golongan
+                    yang tertulis pada SK KGB terakhir.
                   </li>
                   <li>
-                    <strong>Golongan dan masa kerja golongan disalin dari SK, bukan dihitung sendiri.</strong> Pilih
-                    dulu keadaan pegawainya. <em>Belum pernah KGB</em> cukup meminta TMT CPNS, dan masa kerjanya 0 tahun
-                    0 bulan. <em>Sudah pernah KGB</em> meminta TMT dan masa kerja golongan pada SK KGB terakhir; TMT-nya
+                    <strong>Golongan dan masa kerja golongan disalin dari SK, bukan dihitung sendiri.</strong> TMT-nya
                     tetap dari siklus KGB sebelumnya walau pegawainya baru naik pangkat, sebab kenaikan pangkat tidak
                     mengulang hitungan KGB. Bila sesudah SK KGB itu terbit SK kenaikan pangkat, penyesuaian ijazah, atau
-                    PMK, isikan golongan dan masa kerja golongan dari SK yang paling baru, lalu sebutkan SK-nya seperti
-                    pada butir 7.
+                    peninjauan masa kerja, isikan golongan dan masa kerja dari SK yang paling baru.
                   </li>
                   <li>
                     <strong>Pangkat, gaji pokok, dan TMT KGB berikutnya dihitung sistem</strong> dari tabel PP 5/2024,
-                    lengkap dengan keterangan asal angkanya. Ketiganya tidak diketik operator karena salah ketik di situ
-                    langsung menggeser uang. Perhatikan pegawai golongan II/a: KGB pertamanya jatuh satu tahun setelah
-                    TMT CPNS, bukan dua tahun seperti golongan lain.
+                    lengkap dengan keterangan asal angkanya. Ketiganya sengaja tidak dapat diketik, karena salah ketik
+                    di situ langsung menggeser uang. Perhatikan pegawai golongan II/a: KGB pertamanya jatuh{" "}
+                    <strong>satu tahun</strong> setelah TMT CPNS, bukan dua tahun seperti golongan lain.
                   </li>
                   <li>
-                    <strong>Unggah berkas dasarnya</strong>, masing-masing PDF paling besar 1 MB. Pindai sebagai
-                    dokumen, bukan foto kamera, agar ukurannya muat. Setiap berkas dapat dipratinjau begitu dipilih, sebelum
-                    diunggah, lalu diganti atau dihapus dari kartunya, agar dapat dipastikan tidak tertukar.
+                    <strong>Bila golongan atau masa kerja berubah, sebutkan SK penyebabnya.</strong> Keduanya hanya
+                    berubah karena kenaikan pangkat (termasuk penyesuaian ijazah), peninjauan masa kerja, atau salah
+                    ketik. Untuk SK baru, isi nomor, tanggal, TMT, dan pejabat penetapnya. Kanwil mencatatnya sebagai
+                    riwayat, menghitung ulang gaji pokoknya, dan <strong>SK itulah yang menjadi dasar SK KGB
+                    berikutnya</strong>. Untuk kenaikan pangkat, masa kerja yang Anda ketik hanya menjadi keterangan:
+                    sistem menghitungnya sendiri, dan naik dari golongan II ke III memotong masa kerja 5 tahun.
                   </li>
                   <li>
-                    Berkas yang diminta mengikuti keadaan pegawai. Yang <strong>sudah pernah KGB</strong>:{" "}
-                    <strong>SK KGB terakhir</strong> dan <strong>SK kenaikan pangkat terakhir</strong>, keduanya wajib.
-                    Yang <strong>belum pernah KGB</strong>: <strong>SK CPNS</strong>, wajib karena SK inilah acuan
-                    pertamanya (TMT CPNS awal masa kerja golongan, dan nomor serta tanggalnya tercetak sebagai SK dasar
-                    pada surat KGB pertama), dan <strong>SK pengangkatan PNS</strong> bila sudah terbit, boleh digabung
-                    dengan SPMT. Berkas ini diminta tim keuangan agar masa kerja golongan dapat dicocokkan dengan dokumen
-                    aslinya. Berkas wajib ditagih saat diajukan: bagi pegawai baru selalu, bagi usulan perbaikan hanya
-                    bila golongan, TMT golongan, masa kerja golongan, atau TMT KGB terakhirnya ikut diubah.{" "}
-                    <strong>Surat usulan Srikandi</strong> tidak diunggah di sini, melainkan sekali pada langkah Ajukan,
-                    karena satu surat memuat banyak pegawai.
-                  </li>
-                  <li>
-                    <strong>SK dasar dan berkas yang sudah disetujui ikut terbawa.</strong> Pada usulan perbaikan
-                    berikutnya, nomor dan tanggal SK dasar serta berkas terakhir yang sudah disetujui Kanwil terisi
-                    sendiri, bertanda <em>disetujui</em>, dan disalin ke usulan baru saat disimpan. Pilih PDF baru hanya
-                    bila SK-nya memang berganti.
-                  </li>
-                  <li>
-                    <strong>Golongan atau masa kerja berubah? Sebutkan SK-nya.</strong> Keduanya hanya berubah karena
-                    kenaikan pangkat (termasuk penyesuaian ijazah), peninjauan masa kerja, atau salah ketik. Formulir
-                    usulan meminta Anda memilih salah satunya; untuk SK baru, isi nomor, tanggal, TMT, dan pejabat
-                    penetapnya. Kanwil lalu mencatatnya sebagai riwayat, menghitung ulang gaji pokoknya, dan{" "}
-                    <strong>SK itulah yang menjadi dasar SK KGB berikutnya</strong>. Masa kerja golongan yang Anda
-                    ketik menjadi keterangan: untuk kenaikan pangkat sistem menghitungnya sendiri (naik dari golongan
-                    II ke III memotong 5 tahun), dan untuk PMK angka itu dibaca sebagai masa kerja yang tertulis di SK.
-                  </li>
-                  <li>
-                    <strong>Dasar KGB berikutnya terlihat di Data Pegawai.</strong> Setelah SK KGB direkam di Gaji Web,
-                    SK itulah dasar KGB reguler berikutnya. Kolom <em>Dasar KGB berikutnya</em> menunjukkan SK mana
-                    yang berlaku sekarang, dan berpindah sendiri begitu ada SK kenaikan pangkat, penyesuaian ijazah,
-                    atau PMK yang lebih baru disetujui Kanwil.
-                  </li>
-                  <li>
-                    Hukuman disiplin tidak dilaporkan di formulir usulan data. Laporkan lewat menu{" "}
-                    <strong>Hukuman Disiplin</strong> beserta pindaian SK-nya (lihat{" "}
-                    <a href="#hukdis">hukuman disiplin dari UPT</a>).
-                  </li>
-                  <li>
-                    <strong>Banyak pegawai sekaligus?</strong> Pakai <strong>Usulan kolektif</strong> di menu UPT, dalam
-                    tiga langkah: pilih pegawainya (dikelompokkan per bulan TMT, dengan saringan jatuh tempo periode
-                    ini), lengkapi data dan berkas tiap pegawai di daftar-detail sampai lingkar kelengkapannya penuh,
-                    lalu ajukan dengan satu surat Srikandi. Draf pegawai baru hasil Unggah daftar ikut otomatis. Saat
-                    masa kirim surat dibuka (tanggal 1 sampai 10 bulan kedua sebelum TMT), dashboard menampilkan
-                    pengingat berisi pegawai yang belum diajukan, dengan tombol yang langsung membuka Usulan kolektif.
-                  </li>
-                  <li>
-                    <strong>Ajukan ke Kanwil.</strong> Di kolom <strong>Perlu dikerjakan</strong>, centang draf yang
-                    bertanda <em>Siap diajukan</em>, lalu tekan <strong>Ajukan ke Kanwil</strong>. Nomor, tanggal, dan
-                    PDF surat usulan Srikandi diisi sekali pada jendela itu dan berlaku untuk semuanya, karena satu surat
-                    usulan lazim memuat beberapa pegawai. Data yang belum lengkap disebutkan satu per satu sebelum apa
-                    pun terkirim.
+                    <strong>Unggah pindaian SK-nya</strong>, masing-masing PDF paling besar 1 MB. Pindai sebagai
+                    dokumen, bukan foto kamera, agar ukurannya muat. Tiap berkas dapat dipratinjau sebelum diunggah,
+                    lalu diganti atau dihapus, supaya dapat dipastikan tidak tertukar.
                   </li>
                 </ol>
+                <p>
+                  Berkas yang diminta mengikuti keadaan pegawai. Yang <strong>sudah pernah KGB</strong>:{" "}
+                  <strong>SK KGB terakhir</strong> dan <strong>SK kenaikan pangkat terakhir</strong>, keduanya wajib.
+                  Yang <strong>belum pernah KGB</strong>: <strong>SK CPNS</strong>, wajib karena SK inilah acuan
+                  pertamanya — TMT CPNS menjadi awal masa kerja golongan, dan nomor serta tanggalnya tercetak sebagai SK
+                  dasar pada surat KGB pertama — dan <strong>SK pengangkatan PNS</strong> bila sudah terbit, boleh
+                  digabung dengan SPMT. Berkas ini diminta tim keuangan agar masa kerja golongan dapat dicocokkan dengan
+                  dokumen aslinya, bukan dengan ingatan.
+                </p>
+                <p>
+                  Berkas wajib ditagih saat diajukan: bagi pegawai baru selalu, bagi usulan perbaikan hanya bila
+                  golongan, TMT golongan, masa kerja golongan, atau TMT KGB terakhirnya ikut diubah. Pada usulan
+                  perbaikan berikutnya, nomor dan tanggal SK dasar serta berkas terakhir yang sudah disetujui Kanwil{" "}
+                  <strong>terisi sendiri</strong> dan bertanda <em>disetujui</em>; pilih PDF baru hanya bila SK-nya
+                  memang berganti.
+                </p>
+                <p>
+                  Dua hal yang <strong>tidak</strong> diisi di sini. <strong>Hukuman disiplin</strong> dilaporkan lewat
+                  menu <strong>Hukuman Disiplin</strong> beserta pindaian SK-nya (lihat{" "}
+                  <a href="#hukdis">hukuman disiplin dari UPT</a>). <strong>Surat usulan Srikandi</strong> diunggah
+                  sekali saja pada langkah berikutnya, karena satu surat memuat banyak pegawai.
+                </p>
+                <p>
+                  Setelah SK KGB direkam di Gaji Web, SK itulah dasar KGB reguler berikutnya. Kolom{" "}
+                  <em>Dasar KGB berikutnya</em> di Data Pegawai menunjukkan SK mana yang berlaku sekarang, dan berpindah
+                  sendiri begitu ada SK kenaikan pangkat, penyesuaian ijazah, atau peninjauan masa kerja yang lebih baru
+                  disetujui Kanwil.
+                </p>
+
+                <h3 className="pub-h3">Langkah 5 — Kirim surat lewat Srikandi, lalu ajukan</h3>
+                <p>
+                  Urutannya penting: <strong>kirim suratnya dulu lewat Srikandi</strong>, baru ajukan di SIM-KGB dengan
+                  nomor surat yang sama. Nomor, tanggal, dan PDF suratnya diisi sekali dan berlaku untuk semua pegawai
+                  pada surat itu, karena satu surat usulan lazim memuat beberapa pegawai.
+                </p>
+                <LayarKolektif3 />
                 <p>
                   Sesudah diajukan, usulannya pindah ke kolom <strong>Di Kanwil</strong> dan tidak lagi dapat disunting,
                   sebab peninjau di Kanwil harus melihat persis apa yang dikirim UPT. Yang telanjur salah dapat
@@ -796,7 +911,14 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   belum selesai, agar antrian tinjauan tidak berisi dua versi yang saling menimpa.
                 </p>
 
-                <h3 className="pub-h3">Setelah SK terbit: yang merekam di Gaji Web</h3>
+                <h4 className="pub-h3">Memantau semuanya dari papan Alur KGB</h4>
+                <p>
+                  Dashboard Anda memuat satu papan berisi empat kolom. Tiap pegawai berada di kolom tahapnya, jadi
+                  cukup melihat papan ini untuk tahu apa yang masih menunggu Anda dan apa yang sedang di Kanwil.
+                </p>
+                <LayarPapan />
+
+                <h3 className="pub-h3">Langkah 6 — Setelah SK terbit: unduh dan rekam di Gaji Web</h3>
                 <p>
                   Tiap UPT adalah satuan kerja tersendiri dengan daftar isian pelaksanaan anggaran, bagian keuangan, dan
                   akun Gaji Web sendiri. Karena itu keuangan Kanwil hanya menindaklanjuti <strong>pegawai Kanwil</strong>.
@@ -832,12 +954,13 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                     </tbody>
                   </table>
                 </div>
+                <LayarSkTerbit />
                 <p>
-                  Setelah merekamnya, UPT menekan <strong>Sudah direkam di Gaji Web</strong> pada kolom SK terbit di
-                  dashboardnya, memilih apakah KGB itu dibayar sebagai rapelan, lalu Simpan. Langkah ini sekaligus
-                  konfirmasi keuangan: data pegawai diperbarui dan jadwal KGB berikutnya dibuat. Kanwil hanya memantau SK
-                  yang belum direkam lewat panel SK UPT belum direkam. Batas waktunya sama untuk semua satuan kerja, karena
-                  SPM gaji induk bulan berjalan tetap paling lambat tanggal 15 bulan sebelumnya.
+                  Urutan yang benar: <strong>unduh SK, rekam di Gaji Web satker, baru tandai di SIM-KGB</strong>. Jangan
+                  menandainya lebih dulu, sebab penandaan itu sekaligus menjadi konfirmasi keuangan: data pegawai
+                  diperbarui, jadwal KGB berikutnya dibuat, dan tidak dapat dibatalkan dari layar itu. Kanwil hanya
+                  memantau SK yang belum direkam lewat panel SK UPT belum direkam. Batas waktunya sama untuk semua
+                  satuan kerja, karena SPM gaji induk bulan berjalan tetap paling lambat tanggal 15 bulan sebelumnya.
                 </p>
 
                 <h3 className="pub-h3">Yang wajib dipastikan sebelum surat dikirim</h3>
@@ -1024,10 +1147,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   </li>
                 </ul>
                 <LanjutBagian dari="untuk-upt" />
-              </section>
+              </Bagian>
 
               {/* 5. Di Kanwil */}
-              <section className="pub-prose pg-bagian" data-bagian="di-kanwil" data-peran={peranUntuk("di-kanwil")}>
+              <Bagian id="di-kanwil" tampil={tampil}>
                 <h2 id="di-kanwil" className="pub-h2">
                   Di Kanwil: agenda dan disposisi
                 </h2>
@@ -1115,10 +1238,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   <li>surat dan disposisi menjadi arsip bila SK perlu diperiksa kemudian.</li>
                 </ul>
                 <LanjutBagian dari="di-kanwil" />
-              </section>
+              </Bagian>
 
               {/* 6. Di SIM-KGB */}
-              <section className="pub-prose pg-bagian" data-bagian="di-sim-kgb" data-peran={peranUntuk("di-sim-kgb")}>
+              <Bagian id="di-sim-kgb" tampil={tampil}>
                 <h2 id="di-sim-kgb" className="pub-h2">
                   Di SIM-KGB: langkah Tim SDM
                 </h2>
@@ -1394,10 +1517,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   </li>
                 </ul>
                 <LanjutBagian dari="di-sim-kgb" />
-              </section>
+              </Bagian>
 
               {/* Hukuman disiplin dari UPT (ADR-016) */}
-              <section className="pub-prose pg-bagian" data-bagian="hukdis" data-peran={peranUntuk("hukdis")}>
+              <Bagian id="hukdis" tampil={tampil}>
                 <h2 id="hukdis" className="pub-h2">
                   Hukuman disiplin dari UPT
                 </h2>
@@ -1457,10 +1580,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   hukumnya hanya terlihat di Kanwil.
                 </p>
                 <LanjutBagian dari="hukdis" />
-              </section>
+              </Bagian>
 
               {/* 7. Keuangan */}
-              <section className="pub-prose pg-bagian" data-bagian="keuangan" data-peran={peranUntuk("keuangan")}>
+              <Bagian id="keuangan" tampil={tampil}>
                 <h2 id="keuangan" className="pub-h2">
                   Konfirmasi keuangan Kanwil
                 </h2>
@@ -1536,10 +1659,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   </p>
                 </div>
                 <LanjutBagian dari="keuangan" />
-              </section>
+              </Bagian>
 
               {/* 8. Pengiriman SK */}
-              <section className="pub-prose pg-bagian" data-bagian="pengiriman-sk" data-peran={peranUntuk("pengiriman-sk")}>
+              <Bagian id="pengiriman-sk" tampil={tampil}>
                 <h2 id="pengiriman-sk" className="pub-h2">
                   Pengiriman SK dan KPPN mitra
                 </h2>
@@ -1614,10 +1737,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   </table>
                 </div>
                 <LanjutBagian dari="pengiriman-sk" />
-              </section>
+              </Bagian>
 
               {/* 9. Contoh kasus */}
-              <section className="pub-prose pg-bagian" data-bagian="contoh-kasus" data-peran={peranUntuk("contoh-kasus")}>
+              <Bagian id="contoh-kasus" tampil={tampil}>
                 <h2 id="contoh-kasus" className="pub-h2">
                   Contoh kasus: usulan Rumah Tahanan Negara Kelas IIB Rantau
                 </h2>
@@ -1771,10 +1894,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   </li>
                 </ul>
                 <LanjutBagian dari="contoh-kasus" />
-              </section>
+              </Bagian>
 
               {/* 10. Status */}
-              <section className="pub-prose pg-bagian" data-bagian="status" data-peran={peranUntuk("status")}>
+              <Bagian id="status" tampil={tampil}>
                 <h2 id="status" className="pub-h2">
                   Arti status
                 </h2>
@@ -1827,10 +1950,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   </table>
                 </div>
                 <LanjutBagian dari="status" />
-              </section>
+              </Bagian>
 
               {/* 11. Pertanyaan */}
-              <section className="pub-prose pg-bagian" data-bagian="pertanyaan" data-peran={peranUntuk("pertanyaan")}>
+              <Bagian id="pertanyaan" tampil={tampil}>
                 <h2 id="pertanyaan" className="pub-h2">
                   Pertanyaan umum
                 </h2>
@@ -1936,10 +2059,10 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   </details>
                 </div>
                 <LanjutBagian dari="pertanyaan" />
-              </section>
+              </Bagian>
 
               {/* 12. Dasar hukum */}
-              <section className="pub-prose pg-bagian" data-bagian="dasar-hukum" data-peran={peranUntuk("dasar-hukum")}>
+              <Bagian id="dasar-hukum" tampil={tampil}>
                 <h2 id="dasar-hukum" className="pub-h2">
                   Dasar hukum dan rujukan
                 </h2>
@@ -2029,7 +2152,7 @@ export default async function IsiPanduan({ bawaan, milik }: { bawaan: string; mi
                   tunjangan PNS mulai berlaku. Bila peraturan itu terbit, bagian terkait panduan ini perlu disesuaikan.
                 </p>
                 <LanjutBagian dari="dasar-hukum" />
-              </section>
+              </Bagian>
           </div>
         </div>
       </PanduanPeran>

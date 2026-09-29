@@ -1,13 +1,15 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { cariPeran, daftarUntuk, PERAN, pilihanSah, SEMUA, type BagianPanduan } from "./peran";
+import { bolehPilihPeran, cariPeran, daftarUntuk, PERAN, pilihanSahUntuk, SEMUA, type BagianPanduan } from "./peran";
 import { kurangiGerak as kurangiGerakPengguna } from "@/lib/ui/gerak";
 
-/* Navigasi panduan dashboard. Bagian yang tampil mengikuti peran akun yang masuk (dipilih server, jadi tidak
-   ada kedipan); pembaca boleh beralih ke peran lain atau membaca seluruhnya. Pilihan dipasang pada atribut
-   data-peran pembungkus .pg-dasbor, dan panduan.css menyembunyikan bagian yang tidak relevan. Daftar isi
-   mengikuti posisi baca di area gulir dashboard (<main>). */
+/* Navigasi panduan dashboard. Peran yang boleh dibaca ditentukan server (peran.ts, peranBolehUntukRole) dan
+   diteruskan lewat `boleh`: bagian di luar itu tidak pernah dirender. Bagi akun yang hanya membaca satu peran
+   — semua peran kecuali Super Admin — pemilih peran tidak ditampilkan sama sekali, ?peran= di URL diabaikan,
+   dan tautan ke bagian yang tidak ada tidak lagi membuka seluruh panduan. Pilihan dipasang pada atribut
+   data-peran pembungkus .pg-dasbor, dan panduan.css menyembunyikan bagian peran lain saat Super Admin
+   berpindah peran. Daftar isi mengikuti posisi baca di area gulir dashboard (<main>). */
 
 interface KeadaanPanduan {
   pilihan: string;
@@ -24,33 +26,49 @@ function gulirKe(id: string) {
   });
 }
 
-/** Pembungkus panduan: memegang peran yang sedang dibaca. `bawaan` berasal dari role akun. */
-export function PanduanPeran({ bawaan, children }: { bawaan: string; children: React.ReactNode }) {
+/** Pembungkus panduan: memegang peran yang sedang dibaca. `bawaan` dan `boleh` berasal dari role akun. */
+export function PanduanPeran({
+  bawaan,
+  boleh,
+  children,
+}: {
+  bawaan: string;
+  boleh: readonly string[];
+  children: React.ReactNode;
+}) {
   const [pilihan, setPilihan] = useState(bawaan);
+  const bisaPindah = bolehPilihPeran(boleh);
 
-  const pilih = useCallback((nilai: string, gulir = true) => {
-    setPilihan(nilai);
-    const url = new URL(window.location.href);
-    url.searchParams.set("peran", nilai);
-    url.hash = "";
-    window.history.replaceState(null, "", url);
-    if (gulir) gulirKe("panduan-isi");
-  }, []);
+  const pilih = useCallback(
+    (nilai: string, gulir = true) => {
+      if (!pilihanSahUntuk(nilai, boleh)) return;
+      setPilihan(nilai);
+      const url = new URL(window.location.href);
+      url.searchParams.set("peran", nilai);
+      url.hash = "";
+      window.history.replaceState(null, "", url);
+      if (gulir) gulirKe("panduan-isi");
+    },
+    [boleh],
+  );
 
-  // ?peran= di URL didahulukan; tautan ke bagian yang tersembunyi bagi peran ini membuka seluruh panduan.
+  // ?peran= di URL didahulukan, tetapi hanya bila peran itu memang terbuka bagi akun ini. Tautan ke bagian
+  // yang tersembunyi membuka seluruh panduan hanya bagi pembaca yang boleh berpindah peran.
   useLayoutEffect(() => {
     const dariUrl = new URL(window.location.href).searchParams.get("peran");
     const tujuan = window.location.hash.slice(1);
     const bagian = tujuan ? document.getElementById(tujuan)?.closest<HTMLElement>(".pg-bagian") : null;
-    let awal = pilihanSah(dariUrl) ? dariUrl : bawaan;
-    if (bagian && awal !== SEMUA && !(bagian.dataset.peran ?? "").split(" ").includes(awal)) awal = SEMUA;
+    let awal = pilihanSahUntuk(dariUrl, boleh) ? dariUrl! : bawaan;
+    if (bisaPindah && bagian && awal !== SEMUA && !(bagian.dataset.peran ?? "").split(" ").includes(awal)) awal = SEMUA;
     // Sinkron dengan URL sekali saat dibuka; sesudahnya pilihan hanya berubah lewat pilih().
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (awal !== bawaan) setPilihan(awal);
     if (tujuan) gulirKe(tujuan);
-  }, [bawaan]);
+  }, [bawaan, boleh, bisaPindah]);
 
   useEffect(() => {
+    // Hanya berlaku bagi pembaca yang boleh berpindah peran; bagi yang lain, bagian itu memang tidak ada.
+    if (!bisaPindah) return;
     const saatKlik = (e: MouseEvent) => {
       const a = (e.target as HTMLElement | null)?.closest<HTMLAnchorElement>('.pg-isi a[href^="#"]');
       if (!a) return;
@@ -63,7 +81,7 @@ export function PanduanPeran({ bawaan, children }: { bawaan: string; children: R
     };
     document.addEventListener("click", saatKlik);
     return () => document.removeEventListener("click", saatKlik);
-  }, []);
+  }, [bisaPindah]);
 
   return (
     <KonteksPanduan.Provider value={{ pilihan, pilih }}>
@@ -74,11 +92,16 @@ export function PanduanPeran({ bawaan, children }: { bawaan: string; children: R
   );
 }
 
-/** Pilihan peran yang ringkas di atas isi panduan. */
-export function PilihPeran({ milik }: { milik: string | null }) {
+/**
+ * Keterangan peran yang sedang dibaca, dengan tombol pindah peran bagi yang boleh. Akun yang hanya membaca
+ * satu peran tidak diberi tombol sama sekali: menampilkan tombol yang tidak menghasilkan apa-apa, atau
+ * tombol peran lain yang isinya tidak ada, hanya membuat halaman terasa rusak.
+ */
+export function PilihPeran({ milik, boleh }: { milik: string | null; boleh: readonly string[] }) {
   const { pilihan, pilih } = useContext(KonteksPanduan);
   const aktif = cariPeran(pilihan);
   const jumlah = daftarUntuk(pilihan).length;
+  const bisaPindah = bolehPilihPeran(boleh);
 
   return (
     <div className="pg-peran" id="pilih-peran">
@@ -95,17 +118,19 @@ export function PilihPeran({ milik }: { milik: string | null }) {
         )}{" "}
         <span className="pg-peran-jumlah">{jumlah} bagian</span>
       </p>
-      <div className="pg-peran-pilihan" role="group" aria-label="Baca panduan untuk peran">
-        {PERAN.map((p) => (
-          <button key={p.id} type="button" aria-pressed={pilihan === p.id} onClick={() => pilih(p.id)}>
-            {p.label}
-            {milik === p.id && <span className="pg-peran-milik" aria-label="peran Anda" />}
+      {bisaPindah && (
+        <div className="pg-peran-pilihan" role="group" aria-label="Baca panduan untuk peran">
+          {PERAN.filter((p) => boleh.includes(p.id)).map((p) => (
+            <button key={p.id} type="button" aria-pressed={pilihan === p.id} onClick={() => pilih(p.id)}>
+              {p.label}
+              {milik === p.id && <span className="pg-peran-milik" aria-label="peran Anda" />}
+            </button>
+          ))}
+          <button type="button" aria-pressed={pilihan === SEMUA} onClick={() => pilih(SEMUA)}>
+            Semua
           </button>
-        ))}
-        <button type="button" aria-pressed={pilihan === SEMUA} onClick={() => pilih(SEMUA)}>
-          Semua
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
