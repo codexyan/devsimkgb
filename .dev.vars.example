@@ -2,19 +2,18 @@
 # (opennextjs-cloudflare preview / wrangler dev).
 #
 # Salin file ini menjadi `.dev.vars` (sudah gitignored) lalu isi nilainya.
-# Catatan: preview berjalan di runtime Workers (workerd), sehingga TIDAK bisa
-# memakai SQLite lokal — DATABASE_URL harus menunjuk Neon. Untuk `next dev`
-# biasa (SQLite) gunakan .env, bukan file ini.
+# Untuk `next dev` biasa gunakan .env, bukan file ini.
 
 # Rahasia penanda-tangan sesi NextAuth (buat: openssl rand -base64 32)
 NEXTAUTH_SECRET="ganti-dengan-rahasia-acak-panjang"
 
-# Neon Postgres (produksi & preview)
-DATABASE_URL="postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/dbname?sslmode=require"
-DIRECT_URL="postgresql://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require"
-
 # Rahasia untuk melindungi endpoint cron /api/cron/notifikasi
 CRON_SECRET="ganti-dengan-rahasia-acak-panjang"
+
+# ===== Supabase (penyimpanan produksi) =====
+# Secret key hanya untuk server karena melewati RLS.
+SUPABASE_URL="https://PROJECT_REF.supabase.co"
+SUPABASE_SECRET_KEY="sb_secret_XXXXXXXX"
 
 # ===== Google Sheets (mode Sheets-as-backend) =====
 GOOGLE_SERVICE_ACCOUNT_EMAIL="nama-sa@project-id.iam.gserviceaccount.com"

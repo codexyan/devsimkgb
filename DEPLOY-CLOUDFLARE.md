@@ -111,8 +111,9 @@ npx wrangler secret put SUPABASE_SECRET_KEY
 | `SUPABASE_SECRET_KEY` | Untuk Supabase | Secret key proyek (hanya server). |
 | `AUTH_URL` | Tidak | URL kanonik. Tidak diperlukan karena `auth.config.ts` memakai `trustHost: true`. |
 
-Nama variabel sama dengan `.env.example`. Variabel lama di `.env.example` dan `.dev.vars.example`
-(`DATABASE_URL`, `DIRECT_URL`, `BLOB_READ_WRITE_TOKEN`, `SEED_PASSWORD_*`) tidak dibaca kode aplikasi.
+Nama variabel sama dengan `.env.example`. Sisa Neon dan Prisma (`DATABASE_URL`, `DIRECT_URL`,
+`SEED_PASSWORD_*`) sudah dibuang dari kedua berkas contoh. `BLOB_READ_WRITE_TOKEN` masih tertinggal di
+`.env.example` dan juga tidak dibaca kode aplikasi, sebab berkas SK sekarang disimpan di R2.
 
 Secret dibaca dari `process.env` saat request berjalan, sehingga perubahan secret berlaku setelah
 Worker menerima versi konfigurasi baru tanpa perlu build ulang.
