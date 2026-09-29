@@ -4,10 +4,17 @@ import { auth } from "@/auth";
 import { newId } from "@/lib/sheets/id";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
-import { BELUM_SELESAI } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, nilaiUsulan } from "@/lib/usulanPegawai";
 import { isiHitungan } from "@/lib/usulanFormulir";
-import { BATAS_BARIS_IMPOR, periksaImporUpt, ringkasImpor } from "@/lib/imporUsulanUpt";
+import {
+  BATAS_BARIS_IMPOR,
+  dapatDisimpan,
+  periksaImporUpt,
+  ringkasImpor,
+  type HasilBarisImpor,
+} from "@/lib/imporUsulanUpt";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { kodeSatkerPegawai } from "@/lib/rekapSatker";
 import { SATKER } from "@/lib/satker";
 import type { PegawaiRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
 
@@ -25,8 +32,15 @@ const PESAN_BUKAN_UPT = "Unggahan hanya dapat dilakukan akun Admin UPT yang tert
  * diabaikan, supaya satu UPT tidak dapat menuliskan pegawai ke satker lain hanya dengan mengetik nama
  * satker itu di berkasnya sendiri.
  *
- * `periksaSaja` menjalankan pemeriksaan yang sama tanpa menyimpan apa pun, sehingga operator melihat
- * lebih dulu baris mana yang bermasalah. Aturannya satu, di sini, bukan disalin ke peramban.
+ * Dua tahap, dua permintaan:
+ *   - `periksaSaja: true` menilai berkas tanpa menyimpan apa pun, dan mengembalikan penilaian tiap
+ *     baris beserta nilai hasil pembacaannya. Operator memeriksanya di layar pratinjau, sehingga
+ *     tanggal yang salah tafsir atau kolom yang bergeser ketahuan sebelum tersimpan, bukan sesudah.
+ *   - tanpa `periksaSaja`, baris yang nomornya disebut di `pilih` disimpan. Berkasnya dinilai ulang di
+ *     sini, bukan dipercaya dari hasil pratinjau, sebab keadaan basis data dapat berubah di sela
+ *     kedua permintaan itu; baris yang penilaiannya sudah berbeda dilewati dan dilaporkan.
+ *
+ * Aturan penilaiannya satu tempat, di lib/imporUsulanUpt.ts, bukan disalin ke peramban.
  */
 export async function POST(req: Request) {
   await muatBatasInputSdm();
@@ -35,7 +49,7 @@ export async function POST(req: Request) {
   const { pengguna, kode } = akun;
   const satker = SATKER.find((s) => s.kode === kode)!;
 
-  const body = (await req.json().catch(() => ({}))) as { baris?: unknown; periksaSaja?: unknown };
+  const body = (await req.json().catch(() => ({}))) as { baris?: unknown; periksaSaja?: unknown; pilih?: unknown };
   const baris = Array.isArray(body.baris) ? (body.baris as Record<string, unknown>[]) : null;
   if (!baris || baris.length === 0)
     return NextResponse.json({ error: "Berkas tidak berisi satu baris data pun" }, { status: 400 });
@@ -49,30 +63,81 @@ export async function POST(req: Request) {
     db.pegawai.findMany() as Promise<PegawaiRow[]>,
     db.usulanPegawai.findMany({ where: { status: { in: BELUM_SELESAI } } }) as Promise<UsulanPegawaiRow[]>,
   ]);
+
+  // NIP diperiksa terhadap seluruh satker, bukan satker ini saja: satu pegawai hanya boleh ada satu kali
+  // di data induk. Yang tercatat di satker ini menjadi bahan usulan perbaikan; yang di satker lain
+  // ditolak dengan menyebut satkernya, supaya operator menghubungi Kanwil alih-alih mengira NIP-nya salah.
+  const pegawaiSatkerIni = new Map<string, PegawaiRow>();
+  const satkerLain = new Map<string, string>();
+  for (const p of semuaPegawai) {
+    if (kodeSatkerPegawai(p.unitKerja) === kode) pegawaiSatkerIni.set(p.nip, p);
+    else satkerLain.set(p.nip, p.unitKerja || "satker lain");
+  }
+
   const hasil = periksaImporUpt(baris, {
-    // NIP diperiksa terhadap seluruh satker, bukan satker ini saja: satu pegawai hanya boleh ada satu
-    // kali di data induk, dan usulan kembar dari dua satker justru yang paling sulit diurai belakangan.
-    nipPegawai: new Set(semuaPegawai.map((p) => p.nip)),
-    nipUsulan: new Set(berjalan.map((u) => u.nip).filter((nip): nip is string => !!nip)),
+    pegawaiSatker: pegawaiSatkerIni,
+    satkerLain,
+    nipUsulan: new Set(berjalan.filter((u) => u.jenis === "baru").map((u) => u.nip).filter((nip): nip is string => !!nip)),
+    pegawaiIdUsulan: new Set(berjalan.map((u) => u.pegawaiId).filter((id): id is string => !!id)),
   });
   const ringkas = ringkasImpor(hasil);
-  const galat = hasil.filter((h) => h.galat).map((h) => `Baris ${h.baris} (NIP ${h.nip || "-"}): ${h.galat}`);
 
-  if (body.periksaSaja === true)
-    return NextResponse.json({ ...ringkas, galat, periksaSaja: true });
+  if (body.periksaSaja === true) {
+    return NextResponse.json({
+      periksaSaja: true,
+      ...ringkas,
+      baris: hasil.map((h) => ({
+        baris: h.baris,
+        nip: h.nip,
+        nama: h.nama,
+        hasil: h.hasil,
+        galat: h.galat,
+        kurang: h.kurang,
+        namaTercatat: h.namaTercatat,
+        beda: h.beda.map((b) => ({ label: b.label, sekarang: b.sekarang, diusulkan: b.diusulkan })),
+        // Nilai yang benar-benar akan tersimpan, sudah lewat pembacaan tanggal dan hitungan sistem.
+        // Inilah yang diperiksa operator: tanggal yang salah tafsir terlihat di sini, bukan setelah tersimpan.
+        nilai: h.isian
+          ? nilaiUsulan(isiHitungan(h.isian, pegawaiSatkerIni.get(h.nip) ?? null)).map((n) => ({
+              label: n.label,
+              nilai: n.nilai,
+            }))
+          : [],
+      })),
+    });
+  }
+
+  // Tanpa daftar pilihan, seluruh baris yang dapat disimpan ikut; dengan daftar, hanya nomor yang disebut.
+  const pilih = Array.isArray(body.pilih) ? new Set(body.pilih.map(Number)) : null;
+  const diminta = pilih ? hasil.filter((h) => pilih.has(h.baris)) : dapatDisimpan(hasil);
+  const disimpan = diminta.filter((h) => h.hasil === "baru" || h.hasil === "perubahan");
+  // Baris yang dipilih operator tetapi penilaiannya sudah berbeda saat disimpan, misalnya karena operator
+  // lain mengirim usulan atas pegawai yang sama di sela pratinjau dan penyimpanan.
+  const berubahSejakPratinjau = diminta.length - disimpan.length;
 
   const sekarang = new Date();
   const diajukanOleh = `${pengguna.nama} (${pengguna.nip})`;
-  const rows: UsulanPegawaiRow[] = hasil
-    .filter((h) => !h.galat && h.isian)
-    .map((h) => ({
+  const kosong = {
+    nama: null, tempatLahir: null, tanggalLahir: null, jenisKelamin: null,
+    pendidikanTerakhir: null, jabatan: null, pangkat: null, golonganRuang: null,
+    eselon: null, jenisJabatan: null, tmtGolongan: null,
+    mkgTahun: null, mkgBulan: null, gajiPokok: null,
+    tmtKgbTerakhir: null, tmtKgbBerikutnya: null,
+  } as const;
+
+  const barisUsulan = (h: HasilBarisImpor): UsulanPegawaiRow => {
+    const baru = h.hasil === "baru";
+    const tercatat = h.pegawaiId ? pegawaiSatkerIni.get(h.nip) ?? null : null;
+    return {
       id: newId(),
-      pegawaiId: null,
+      pegawaiId: h.pegawaiId,
       satker: kode,
       status: "draf",
-      jenis: "baru",
-      nip: h.nip,
-      unitKerja: satker.nama,
+      jenis: baru ? "baru" : "perubahan",
+      // NIP kolom atas hanya penanda draf pegawai baru; pada usulan perbaikan, pegawainya ditunjuk
+      // pegawaiId dan NIP-nya ikut lewat isian bila memang sedang dibetulkan.
+      nip: baru ? h.nip : null,
+      unitKerja: baru ? satker.nama : null,
       nomorSurat: null,
       tanggalSurat: null,
       pathBerkas: null,
@@ -80,15 +145,11 @@ export async function POST(req: Request) {
       pathSyaratCpns: null,
       pathSkPangkat: null,
       pathSkCpns: null,
-      nama: null, tempatLahir: null, tanggalLahir: null, jenisKelamin: null,
-      pendidikanTerakhir: null, jabatan: null, pangkat: null, golonganRuang: null,
-      eselon: null, jenisJabatan: null, tmtGolongan: null,
-      mkgTahun: null, mkgBulan: null, gajiPokok: null,
-      tmtKgbTerakhir: null, tmtKgbBerikutnya: null,
+      ...kosong,
       nomorSkTerakhir: null,
       tanggalSkTerakhir: null,
-      // Pegawai baru belum punya data tercatat, jadi tidak ada golongan atau masa kerja yang berubah
-      // karena SK (ADR-030); kolomnya diisi saat UPT melengkapi draf ini.
+      // Sebab golongan atau masa kerja berubah (ADR-030) tidak dapat dibaca dari berkas: SK-nya tidak
+      // lewat CSV. Kolomnya dibiarkan kosong dan ditagih saat draf ini dilengkapi di Usulan kolektif.
       dasarBaruJenis: null,
       dasarBaruJenisKp: null,
       dasarBaruNomorSk: null,
@@ -107,20 +168,41 @@ export async function POST(req: Request) {
       ditinjauOleh: null,
       ditinjauAt: null,
       alasanTolak: null,
-      ...isiHitungan(h.isian!, null),
-    }));
+      ...isiHitungan(h.isian!, tercatat),
+    };
+  };
 
+  const rows = disimpan.map(barisUsulan);
   if (rows.length > 0) await db.usulanPegawai.createMany(rows);
+
+  const jumlahBaru = disimpan.filter((h) => h.hasil === "baru").length;
+  const jumlahPerubahan = disimpan.length - jumlahBaru;
+  const belumLengkap = disimpan.filter((h) => h.kurang.length > 0).length;
 
   logAudit({
     userId: pengguna.id,
     aksi: "impor_draf_pegawai",
     detail:
-      `Unggah massal ${satker.nama}: ${rows.length} data pegawai disiapkan dari ${baris.length} baris berkas` +
-      (galat.length > 0 ? `, ${galat.length} baris ditolak` : "") +
-      (ringkas.belumLengkap > 0 ? `, ${ringkas.belumLengkap} belum lengkap` : ""),
+      `Unggah massal ${satker.nama}: ${jumlahBaru} pegawai baru dan ${jumlahPerubahan} usulan perbaikan ` +
+      `disiapkan dari ${baris.length} baris berkas` +
+      (ringkas.sama > 0 ? `, ${ringkas.sama} baris sama dengan data tercatat` : "") +
+      (ringkas.ditolak > 0 ? `, ${ringkas.ditolak} baris ditolak` : "") +
+      (belumLengkap > 0 ? `, ${belumLengkap} belum lengkap` : ""),
     targetNama: satker.nama,
   });
 
-  return NextResponse.json({ ...ringkas, galat }, { status: 201 });
+  // Angkanya sengaja tentang yang tersimpan, bukan tentang seluruh berkas, kecuali "sama" dan "ditolak"
+  // yang memang menerangkan baris yang tidak pernah ikut tersimpan.
+  return NextResponse.json(
+    {
+      disimpan: disimpan.length,
+      baru: jumlahBaru,
+      perubahan: jumlahPerubahan,
+      sama: ringkas.sama,
+      ditolak: ringkas.ditolak,
+      belumLengkap,
+      berubahSejakPratinjau,
+    },
+    { status: 201 },
+  );
 }

@@ -13,7 +13,6 @@ import { BELUM_SELESAI, LABEL_JENIS_USULAN } from "@/lib/usulanPegawai";
 import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
 import { kartuPerKolom, type KolomUpt, type SumberKartu } from "@/lib/papanUpt";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
-import ModalImporUpt from "@/app/dashboard/components/upt/ModalImporUpt";
 import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
@@ -305,7 +304,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const [pilihAjukan, setPilihAjukan] = useState<Set<string>>(() => new Set());
   const [dialogAjukan, setDialogAjukan] = useState(false);
   /** Unggahan massal: satu berkas menjadi banyak draf sekaligus. */
-  const [dialogImpor, setDialogImpor] = useState(false);
   const [suratAjukan, setSuratAjukan] = useState({ nomorSurat: "", tanggalSurat: "" });
   const [berkasAjukan, setBerkasAjukan] = useState<File | null>(null);
   const [mengajukan, setMengajukan] = useState(false);
@@ -629,9 +627,14 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               <Link href="/dashboard/upt/kolektif" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" title="Siapkan banyak pegawai untuk satu surat Srikandi sekaligus">
                 Usulan kolektif
               </Link>
-              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setDialogImpor(true)}>
+              <Link
+                href="/dashboard/upt/unggah"
+                className="dsb-tombol dsb-tombol-kecil"
+                data-jenis="garis"
+                title="Satu berkas CSV berisi banyak pegawai, diperiksa dan dikonfirmasi per baris sebelum tersimpan"
+              >
                 Unggah daftar
-              </button>
+              </Link>
               <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={bukaPegawaiBaru}>
                 Tambah pegawai
               </button>
@@ -1232,13 +1235,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           pegawai={{ id: laporMutasi.id, nama: laporMutasi.nama, nip: laporMutasi.nip }}
           onTutup={() => setLaporMutasi(null)}
           onSelesai={(pesan) => { setLaporMutasi(null); selesaiFormulir(pesan); }}
-        />
-      )}
-
-      {dialogImpor && (
-        <ModalImporUpt
-          onTutup={() => setDialogImpor(false)}
-          onSelesai={(pesan) => { setDialogImpor(false); selesaiFormulir(pesan); }}
         />
       )}
 

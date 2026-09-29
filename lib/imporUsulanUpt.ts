@@ -13,10 +13,10 @@
 // Excel lebih dulu, padahal dokumennya sering baru terkumpul belakangan.
 
 import { BIDANG_DIISI, bacaIsianBaris } from "./usulanFormulir";
-import { kekuranganUsulan } from "./usulanPegawai";
+import { bandingkanUsulan, kekuranganUsulan, type PerubahanUsulan } from "./usulanPegawai";
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "./dataPegawai";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR } from "./pilihanPegawai";
-import type { UsulanPegawaiRow } from "./sheets/tables";
+import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 
 /** Kolom yang harus ada pada baris kepala berkas; isinya boleh kosong kecuali NIP dan nama. */
 export const KOLOM_IMPOR_UPT = ["nip", "nama"] as const;
@@ -118,16 +118,36 @@ function seragamkanTanggal(row: Record<string, unknown>): { row: Record<string, 
  */
 export const BATAS_BARIS_IMPOR = 500;
 
+/**
+ * Hasil penilaian satu baris berkas.
+ *
+ * - "baru"      : NIP belum tercatat; barisnya menjadi draf usulan pegawai baru.
+ * - "perubahan" : NIP sudah tercatat di satker ini dan ada kolom yang berbeda; barisnya menjadi draf
+ *                 usulan perbaikan data atas pegawai itu.
+ * - "sama"      : NIP sudah tercatat dan tidak ada satu kolom pun yang berbeda; tidak ada yang perlu
+ *                 diusulkan, jadi barisnya dilewati. Ini keadaan yang paling sering terjadi ketika UPT
+ *                 mengunggah daftar pegawainya secara utuh berulang kali.
+ * - "ditolak"   : barisnya tidak dapat dipakai; sebabnya di `galat`.
+ */
+export type HasilImpor = "baru" | "perubahan" | "sama" | "ditolak";
+
 export interface HasilBarisImpor {
   /** Nomor baris pada berkas, tidak menghitung baris kepala; dipakai menunjuk baris yang salah. */
   baris: number;
   nip: string;
   nama: string;
-  /** Sebab baris ini tidak dapat dipakai; null berarti sah. */
+  hasil: HasilImpor;
+  /** Sebab baris ini tidak dapat dipakai; hanya terisi bila `hasil` === "ditolak". */
   galat: string | null;
   /** Yang masih kurang sebelum draf ini boleh diajukan; baris tetap diterima. */
   kurang: string[];
   isian: Partial<UsulanPegawaiRow> | null;
+  /** Pegawai yang NIP-nya cocok; terisi untuk "perubahan" dan "sama". */
+  pegawaiId: string | null;
+  /** Nama yang tercatat pada data induk, supaya operator tahu baris ini mengubah siapa. */
+  namaTercatat: string | null;
+  /** Kolom yang berbeda dari data tercatat, lama berdampingan dengan baru; hanya untuk "perubahan". */
+  beda: PerubahanUsulan[];
 }
 
 function teks(baris: Record<string, unknown>, kunci: string): string {
@@ -138,55 +158,126 @@ function teks(baris: Record<string, unknown>, kunci: string): string {
 }
 
 /**
+ * Yang sudah ada di basis data, dibaca pemanggil agar modul ini tetap murni dan dapat diuji tanpa
+ * lapisan data.
+ */
+export interface KonteksImpor {
+  /** Pegawai satker ini, dikunci NIP. Baris yang cocok menjadi usulan perbaikan, bukan ditolak. */
+  pegawaiSatker: ReadonlyMap<string, PegawaiRow>;
+  /**
+   * NIP yang tercatat di satker lain, dipetakan ke nama satker itu. UPT tidak boleh mengusulkan
+   * perbaikan atas pegawai satker lain, jadi barisnya ditolak; menyebut satkernya membuat operator
+   * tahu harus menghubungi siapa, alih-alih mengira NIP-nya salah ketik.
+   */
+  satkerLain: ReadonlyMap<string, string>;
+  /** NIP pada usulan pegawai baru yang belum selesai. */
+  nipUsulan: ReadonlySet<string>;
+  /**
+   * Pegawai yang sedang punya usulan belum selesai. Diperiksa terpisah dari `nipUsulan` karena usulan
+   * perbaikan menyimpan pegawaiId dan mengosongkan NIP, sehingga tidak terjaring pemeriksaan NIP.
+   */
+  pegawaiIdUsulan: ReadonlySet<string>;
+}
+
+/**
  * Periksa seluruh baris berkas. Tiap baris dinilai sendiri: satu baris yang salah tidak menggagalkan
  * yang lain, sebab berkas berisi ratusan nama hampir selalu punya satu dua baris bermasalah dan
  * menolak seluruhnya berarti operator mengulang dari awal tanpa tahu mana yang keliru.
  *
- * `nipPegawai` dan `nipUsulan` adalah NIP yang sudah dipakai di data induk dan di usulan yang belum
- * selesai; keduanya dibaca pemanggil agar modul ini tetap murni.
+ * NIP yang sudah tercatat tidak lagi ditolak. Dulu barisnya dibuang dengan alasan "NIP sudah tercatat
+ * sebagai pegawai", padahal justru itu keadaan yang paling lazim: UPT mengunggah daftar pegawainya
+ * secara utuh, dan yang sudah tercatat terhitung gagal semua. Sekarang barisnya dibandingkan dengan
+ * data induk, dan hanya yang benar-benar berbeda yang menjadi usulan perbaikan.
  */
 export function periksaImporUpt(
   baris: readonly Record<string, unknown>[],
-  konteks: { nipPegawai: ReadonlySet<string>; nipUsulan: ReadonlySet<string> },
+  konteks: KonteksImpor,
 ): HasilBarisImpor[] {
   const terlihat = new Set<string>();
 
   return baris.map((row, i) => {
     const nip = teks(row, "nip");
     const nama = teks(row, "nama");
-    const dasar = { baris: i + 1, nip, nama, isian: null, kurang: [] as string[] };
+    const dasar = {
+      baris: i + 1,
+      nip,
+      nama,
+      isian: null,
+      kurang: [] as string[],
+      pegawaiId: null,
+      namaTercatat: null,
+      beda: [] as PerubahanUsulan[],
+    };
+    const tolak = (galat: string): HasilBarisImpor => ({ ...dasar, hasil: "ditolak", galat });
 
-    if (!/^\d{18}$/.test(nip)) return { ...dasar, galat: "NIP harus tepat 18 digit angka" };
-    if (!nama) return { ...dasar, galat: "Nama lengkap wajib diisi" };
-    if (terlihat.has(nip)) return { ...dasar, galat: "NIP ini muncul lebih dari sekali pada berkas" };
+    if (!/^\d{18}$/.test(nip)) return tolak("NIP harus tepat 18 digit angka");
+    if (!nama) return tolak("Nama lengkap wajib diisi");
+    if (terlihat.has(nip)) return tolak("NIP ini muncul lebih dari sekali pada berkas");
     terlihat.add(nip);
-    if (konteks.nipPegawai.has(nip)) return { ...dasar, galat: "NIP sudah tercatat sebagai pegawai" };
-    if (konteks.nipUsulan.has(nip)) return { ...dasar, galat: "NIP sudah ada pada usulan yang belum selesai" };
+
+    const satkerLain = konteks.satkerLain.get(nip);
+    if (satkerLain) return tolak(`NIP ini tercatat di ${satkerLain}. Mintakan pemindahannya lewat Kanwil.`);
+
+    const tercatat = konteks.pegawaiSatker.get(nip) ?? null;
+    if (tercatat && konteks.pegawaiIdUsulan.has(tercatat.id))
+      return tolak("Pegawai ini sedang punya usulan yang belum selesai di Kanwil");
+    if (!tercatat && konteks.nipUsulan.has(nip))
+      return tolak("NIP ini sudah ada pada usulan pegawai baru yang belum selesai");
 
     const seragam = seragamkanTanggal(row);
-    if ("galat" in seragam) return { ...dasar, galat: seragam.galat };
+    if ("galat" in seragam) return tolak(seragam.galat);
     const dibaca = bacaIsianBaris(seragam.row);
-    if ("galat" in dibaca) return { ...dasar, galat: dibaca.galat };
+    if ("galat" in dibaca) return tolak(dibaca.galat);
+
+    if (!tercatat) {
+      return {
+        ...dasar,
+        hasil: "baru",
+        galat: null,
+        isian: dibaca.isian,
+        kurang: kekuranganUsulan({ ...dibaca.isian, nip, nama }, "baru"),
+      };
+    }
+
+    // Nama pada berkas ikut dibandingkan lewat isian, sehingga pembetulan ejaan nama pun terbaca sebagai
+    // perubahan. NIP-nya sudah pasti sama, sebab pencocokannya memakai NIP.
+    const beda = bandingkanUsulan(tercatat, { ...dibaca.isian, nama });
+    if (beda.length === 0)
+      return { ...dasar, hasil: "sama", galat: null, pegawaiId: tercatat.id, namaTercatat: tercatat.nama };
 
     return {
       ...dasar,
+      hasil: "perubahan",
       galat: null,
-      isian: dibaca.isian,
-      kurang: kekuranganUsulan({ ...dibaca.isian, nip, nama }, "baru"),
+      isian: { ...dibaca.isian, nama },
+      pegawaiId: tercatat.id,
+      namaTercatat: tercatat.nama,
+      beda,
+      kurang: kekuranganUsulan({ ...dibaca.isian, nama }, "perubahan", tercatat),
     };
   });
 }
 
 /** Ringkasan hasil pemeriksaan, untuk kalimat yang dibaca operator sebelum menyimpan. */
 export function ringkasImpor(hasil: readonly HasilBarisImpor[]): {
-  sah: number;
-  gagal: number;
+  baru: number;
+  perubahan: number;
+  sama: number;
+  ditolak: number;
+  /** Baris yang akan tersimpan namun masih perlu dilengkapi sebelum boleh diajukan. */
   belumLengkap: number;
 } {
-  const sah = hasil.filter((h) => !h.galat);
+  const hitung = (h: HasilImpor) => hasil.filter((x) => x.hasil === h).length;
   return {
-    sah: sah.length,
-    gagal: hasil.length - sah.length,
-    belumLengkap: sah.filter((h) => h.kurang.length > 0).length,
+    baru: hitung("baru"),
+    perubahan: hitung("perubahan"),
+    sama: hitung("sama"),
+    ditolak: hitung("ditolak"),
+    belumLengkap: hasil.filter((h) => (h.hasil === "baru" || h.hasil === "perubahan") && h.kurang.length > 0).length,
   };
+}
+
+/** Baris yang benar-benar tersimpan bila disetujui operator. */
+export function dapatDisimpan(hasil: readonly HasilBarisImpor[]): HasilBarisImpor[] {
+  return hasil.filter((h) => h.hasil === "baru" || h.hasil === "perubahan");
 }

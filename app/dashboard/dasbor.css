@@ -2749,3 +2749,97 @@ html[data-gerak="kurangi"] .dsb-putar {
 .usl-sk-baru { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--tint-blue-ln); border-radius: 10px; background: var(--tint-blue-bg); }
 .usl-sk-baru strong { font-size: 12.5px; font-weight: 600; color: var(--dtn); }
 .usl-sk-baru span { font-size: 12px; line-height: 1.5; color: var(--dt2); }
+
+/* ── Unggah daftar pegawai UPT: pratinjau dan konfirmasi per baris (ADR-031) ───────────────────
+   Barisnya sengaja bukan <table> yang digulir mendatar. Berkas berisi ratusan nama dibaca operator
+   UPT di ponsel, dan gulir mendatar itulah yang membuat Usulan kolektif lama tidak terpakai
+   (ADR-029). Di layar lebar kisi ini berbaris rapi seperti tabel, lengkap dengan baris kepalanya;
+   di layar sempit tiap baris menumpuk menjadi kartu. */
+.ung-panel { padding: 0; }
+.ung-isi { display: grid; gap: 14px; padding: 16px; }
+
+.ung-ringkas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 8px;
+  padding: 14px 16px; border-bottom: 1px solid var(--ln2); }
+.ung-ringkas-butir { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--ln1); border-radius: 12px; background: var(--card); }
+.ung-ringkas-butir strong { font-size: 22px; font-weight: 700; line-height: 1.1; color: var(--dtn); font-variant-numeric: tabular-nums; }
+.ung-ringkas-butir > span { font-size: 12.5px; font-weight: 600; color: var(--dt2); }
+.ung-ringkas-butir small { font-size: 11px; line-height: 1.45; color: var(--dt5); }
+.ung-ringkas-butir[data-nada="hijau"] { border-color: var(--tint-green-ln); background: var(--tint-green-bg); }
+.ung-ringkas-butir[data-nada="hijau"] strong { color: var(--st-green); }
+.ung-ringkas-butir[data-nada="kuning"] { border-color: var(--tint-amber-ln); background: var(--tint-amber-bg); }
+.ung-ringkas-butir[data-nada="kuning"] strong { color: var(--st-amber); }
+.ung-ringkas-butir[data-nada="merah"] { border-color: var(--tint-red-ln); background: var(--tint-red-bg); }
+.ung-ringkas-butir[data-nada="merah"] strong { color: var(--st-red); }
+
+/* Baris kepala; disembunyikan di layar sempit karena tiap baris di bawahnya sudah menumpuk berlabel. */
+.ung-kepala { display: grid; grid-template-columns: 34px 44px minmax(0, 1.1fr) minmax(0, 1.6fr); gap: 10px; align-items: center;
+  padding: 8px 16px; border-bottom: 1px solid var(--ln2); background: var(--sub);
+  font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--dt5); }
+
+.ung-daftar { margin: 0; padding: 0; list-style: none; }
+.ung-daftar > li { border-bottom: 1px solid var(--ln2); }
+.ung-daftar > li:last-child { border-bottom: 0; }
+
+.ung-baris { display: grid; grid-template-columns: 34px 44px minmax(0, 1.1fr) minmax(0, 1.6fr); gap: 10px; align-items: start;
+  padding: 10px 16px; transition: background .15s; }
+.ung-baris[data-pilih] { background: var(--tint-navy); box-shadow: inset 3px 0 0 var(--navy-solid); }
+.ung-baris[data-mati] { opacity: .68; }
+
+.ung-centang { display: grid; place-items: center; width: 20px; height: 20px; margin-top: 1px; border: 1.5px solid var(--ln0);
+  border-radius: 6px; background: var(--card); font-size: 12px; font-weight: 800; color: #fff; cursor: pointer; }
+.ung-baris[data-pilih] .ung-centang, .ung-centang[data-pilih] { border-color: var(--navy-solid); background: var(--navy-solid); }
+.ung-centang:has(input:disabled) { cursor: not-allowed; background: var(--sub); }
+.ung-baris[data-mati] .ung-centang { cursor: not-allowed; background: var(--sub); }
+.ung-centang:focus-within { box-shadow: var(--focus-ring); }
+
+.ung-nomor { font-size: 12px; color: var(--dt5); font-variant-numeric: tabular-nums; }
+.ung-orang { display: grid; gap: 1px; }
+.ung-orang strong { font-size: 13px; font-weight: 600; color: var(--dtn); overflow-wrap: anywhere; }
+.ung-orang > span { font-size: 11.5px; color: var(--dt5); font-variant-numeric: tabular-nums; }
+.ung-tercatat { font-size: 11px; color: var(--st-amber); }
+
+.ung-hasil { display: grid; justify-items: start; gap: 4px; }
+.ung-hasil .dsb-tag { font-size: 10.5px; }
+.ung-galat { font-size: 11.5px; line-height: 1.45; color: var(--st-red); }
+.ung-beda-ringkas { font-size: 11.5px; line-height: 1.45; color: var(--dt2); }
+.ung-kurang { font-size: 11.5px; line-height: 1.45; color: var(--dt5); }
+
+.ung-rinci { padding: 0 16px 12px 88px; }
+.ung-rinci > summary { display: inline-block; font-size: 11.5px; font-weight: 600; color: var(--accent); cursor: pointer; }
+.ung-rinci > summary:hover { text-decoration: underline; }
+.ung-rinci[open] > summary { margin-bottom: 8px; }
+
+.ung-tabel { width: 100%; margin: 0 0 10px; border-collapse: collapse; font-size: 12px; }
+.ung-tabel caption { padding-bottom: 4px; font-size: 11px; font-weight: 600; text-align: left; color: var(--dt5); }
+.ung-tabel th, .ung-tabel td { padding: 5px 8px; border: 1px solid var(--ln2); text-align: left; vertical-align: top; }
+.ung-tabel thead th { background: var(--sub); font-size: 11px; font-weight: 600; color: var(--dt5); }
+.ung-tabel tbody th { font-weight: 600; color: var(--dt2); }
+.ung-tabel td { color: var(--dt3); }
+.ung-tabel td[data-baru] { background: var(--tint-amber-bg); font-weight: 600; color: var(--dtn); }
+
+.ung-nilai { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 6px 12px; margin: 0; }
+.ung-nilai > div { display: grid; gap: 1px; min-width: 0; }
+.ung-nilai dt { font-size: 10.5px; letter-spacing: .02em; text-transform: uppercase; color: var(--dt5); }
+.ung-nilai dd { margin: 0; font-size: 12.5px; color: var(--dtn); overflow-wrap: anywhere; }
+.ung-nilai-besar > div { padding: 10px 12px; border: 1px solid var(--ln1); border-radius: 10px; background: var(--sub); }
+.ung-nilai-besar dd { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.ung-selesai { display: flex; align-items: flex-start; gap: 12px; }
+.ung-selesai-ikon { display: grid; place-items: center; flex-shrink: 0; width: 38px; height: 38px; border-radius: 99px;
+  background: var(--st-green); font-size: 19px; font-weight: 800; color: #fff; }
+.ung-selesai h2 { margin: 0 0 2px; font-size: 16px; font-weight: 650; color: var(--dtn); }
+.ung-selesai p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--dt3); }
+.ung-panel .kol-kaki { margin: 0 -16px -16px; border-radius: 0; }
+
+@media (max-width: 760px) {
+  /* Tiap baris menumpuk menjadi kartu: centang dan nomor di baris atas, sisanya penuh selebar kartu. */
+  .ung-kepala { display: none; }
+  .ung-baris { grid-template-columns: 34px minmax(0, 1fr); gap: 4px 10px; padding: 12px; }
+  .ung-nomor { grid-column: 2; font-size: 11px; }
+  .ung-orang, .ung-hasil { grid-column: 2; }
+  .ung-rinci { padding: 0 12px 12px 56px; }
+  .ung-ringkas { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
+  .ung-ringkas-butir small { display: none; }
+  .ung-isi { padding: 12px; }
+  .ung-panel .kol-kaki { margin: 0 -12px -12px; }
+}
