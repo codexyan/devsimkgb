@@ -31,10 +31,21 @@ function pesanMasihBerjalan(status: string, subjek: string): string {
 }
 
 /** Usulan dan draf satker ini, terbaru lebih dulu. */
-export async function GET() {
+export async function GET(req: Request) {
   await muatBatasInputSdm();
   const akun = await akunUpt(await auth(), PESAN_BUKAN_UPT);
   if ("galat" in akun) return akun.galat;
+
+  // Lencana sidebar hanya perlu angkanya, dan sidebar ikut pada setiap halaman. Tanpa jalan pintas ini
+  // satu lencana menarik seluruh usulan satker beserta seluruh data pegawai hanya untuk dihitung.
+  const params = new URL(req.url).searchParams;
+  if (params.get("ringkas") === "1") {
+    const status = params.get("status") ?? "revisi";
+    const daftar = (await db.usulanPegawai.findMany({
+      where: { satker: akun.kode, status },
+    })) as UsulanPegawaiRow[];
+    return NextResponse.json({ jumlah: daftar.length });
+  }
 
   const [semuaUsulan, semuaPegawai] = await Promise.all([
     db.usulanPegawai.findMany({ where: { satker: akun.kode } }) as Promise<UsulanPegawaiRow[]>,

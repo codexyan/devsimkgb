@@ -370,7 +370,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [notifList,   setNotifList]   = useState<Notif[]>([]);
   const [unread,      setUnread]      = useState(0);
-  const [usulanMenunggu, setUsulanMenunggu] = useState(0);
+  const [usulanPerluAksi, setUsulanPerluAksi] = useState(0);
   const [showNotif,   setShowNotif]   = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [themeMode, toggleTheme]      = useThemeMode();
@@ -418,17 +418,25 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
     return () => { clearTimeout(t); clearInterval(iv); };
   }, []);
 
-  /* Usulan UPT yang menunggu tinjauan, untuk lencana menu. Hanya peninjaunya yang mengambil angka ini;
-     peran lain tidak punya menunya. Memakai mode ringkas agar tidak menarik seluruh data pegawai. */
+  /* Usulan yang menunggu giliran pemakai, untuk lencana menu. Kanwil: usulan UPT yang belum ditinjau.
+     UPT: usulan yang dikembalikan Kanwil untuk diperbaiki. Keduanya pekerjaan yang datang dari pihak
+     seberang, bukan yang dibuat sendiri, jadi draf UPT sengaja tidak ikut dihitung — draf sudah punya
+     pengingat masa kirim sendiri di dasbor UPT (ADR-029). Mode ringkas dipakai agar sidebar, yang ikut
+     pada setiap halaman, tidak menarik seluruh data pegawai hanya untuk sebuah angka. */
   useEffect(() => {
-    if (!canProcessKGB(role)) return;
+    const alamat = canProcessKGB(role)
+      ? "/api/usulan?status=menunggu&ringkas=1"
+      : role === ROLES.ADMIN_UPT
+        ? "/api/upt/usulan?status=revisi&ringkas=1"
+        : null;
+    if (!alamat) return;
     let batal = false;
     const ambil = () => {
-      fetch("/api/usulan?status=menunggu&ringkas=1")
+      fetch(alamat)
         .then((r) => (r.ok ? r.json() : null))
         .then((d: unknown) => {
           const jumlah = (d as { jumlah?: unknown } | null)?.jumlah;
-          if (!batal && typeof jumlah === "number") setUsulanMenunggu(jumlah);
+          if (!batal && typeof jumlah === "number") setUsulanPerluAksi(jumlah);
         })
         .catch(() => { /* lencana hanya pelengkap; kegagalannya dibiarkan */ });
     };
@@ -480,8 +488,11 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
 
   const roleLabel = ROLE_LABEL[role] ?? role;
 
-  /* Lencana per href menu. Sementara hanya Usulan UPT; menu lain tinggal menambah kuncinya di sini. */
-  const lencanaMenu: Record<string, number> = { "/dashboard/usulan": usulanMenunggu };
+  /* Lencana per href menu; menunya berbeda per peran, jadi kuncinya pun berbeda. Menu lain tinggal
+     menambah kuncinya di sini. */
+  const lencanaMenu: Record<string, number> = canProcessKGB(role)
+    ? { "/dashboard/usulan": usulanPerluAksi }
+    : { "/dashboard/upt/kolektif": usulanPerluAksi };
 
   /* popup offset: mengikuti sidebar di layar lebar, melebar penuh di layar sempit */
   const popupLeft = expanded ? "232px" : "70px";
