@@ -17,7 +17,9 @@ Aplikasi web tunggal untuk mengelola data pegawai Kanwil dan UPT, proses KGB (In
 Semua route membaca dan menulis lewat `import { db } from "@/lib/db"`. Penyimpanan dipilih di `lib/db/index.ts`:
 
 - `DATA_BACKEND=sheets` atau `DATA_BACKEND=supabase` memilih secara tegas.
-- Tanpa `DATA_BACKEND`, Supabase dipakai bila `SUPABASE_URL` diisi; selain itu **Google Sheets** (penyimpanan produksi saat ini).
+- Tanpa `DATA_BACKEND`, Supabase dipakai bila `SUPABASE_URL` diisi; selain itu **Google Sheets**.
+
+Produksi memakai **Supabase**. Migrasinya diterapkan manual di SQL Editor, tidak ikut terbawa deploy, jadi commit yang menambah kolom harus disertai migrasinya dijalankan; tanpa itu setiap penyimpanan ke tabel tersebut gagal. Lihat bagian Penyimpanan data di `DEPLOY-CLOUDFLARE.md`.
 
 Definisi tab Sheets ada di `lib/sheets/tables.ts`; skema Supabase untuk migrasi ada di `supabase/migrations/`. Keduanya harus tetap memuat tabel dan kolom yang sama.
 

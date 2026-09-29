@@ -47,14 +47,41 @@ Saat `next dev`, binding tersedia lewat `initOpenNextCloudflareForDev()` di `nex
 Semua route memakai `import { db } from "@/lib/db"`. Penyimpanan dipilih di `lib/db/index.ts` setiap kali
 data diakses:
 
-- `DATA_BACKEND=sheets` memakai Google Sheets (penyimpanan produksi saat ini).
-- `DATA_BACKEND=supabase` memakai Supabase (Postgres lewat REST).
+- `DATA_BACKEND=sheets` memakai Google Sheets.
+- `DATA_BACKEND=supabase` memakai Supabase (Postgres lewat REST). **Ini yang dipakai produksi.**
 - Tanpa `DATA_BACKEND`, Supabase dipakai bila `SUPABASE_URL` terisi; selain itu Google Sheets.
 - Nilai `DATA_BACKEND` lain membuat request gagal dengan pesan galat yang jelas.
 
 Google Sheets membutuhkan akun layanan yang diberi akses Editor ke spreadsheet, dengan Google Sheets API
 aktif di project Google Cloud. Supabase membutuhkan secret key proyek; key itu melewati RLS, jadi hanya
 boleh dipakai di server.
+
+### Migrasi Supabase diterapkan manual
+
+Berkas di `supabase/migrations/` **tidak** dijalankan oleh deploy. Migrasi diterapkan dengan menempelkan
+isinya ke SQL Editor proyek Supabase, jadi kode yang sudah terpasang bisa mendahului tabelnya. Commit yang
+menambah kolom harus disertai migrasinya dijalankan; bila tidak, setiap penulisan ke tabel itu gagal dengan
+500 dan peramban hanya menampilkan pesan umum. Diagnosanya lewat `npx wrangler tail sim-kgb --format pretty`
+sambil memicu ulang galatnya.
+
+Setiap `create table` memakai `if not exists`, sehingga sebuah migrasi aman diputar ulang terhadap basis data
+yang skemanya sudah ada. Untuk memeriksa apakah produksi sinkron, jalankan dua query ini di SQL Editor lalu
+bandingkan hasilnya dengan `supabase/migrations/`:
+
+```sql
+select table_name, string_agg(column_name, ',' order by column_name) as kolom
+from information_schema.columns
+where table_schema = 'public'
+group by table_name
+order by table_name;
+
+select version, name from supabase_migrations.schema_migrations order by version;
+```
+
+Nomor versi di ledger tidak akan cocok dengan awalan nama berkas, karena migrasi tidak pernah diterapkan
+lewat `supabase db push`. Yang dibandingkan cakupannya, bukan angkanya. Ledger juga memuat dua entri tanpa
+berkas di repo, keduanya wajar: `arsip_tabel_prisma` (mengarsipkan tabel Prisma lama sebelum skema Supabase
+ada) dan `usulan_pegawai_urutan_sisip` (kolom yang di repo sudah menyatu di dalam `create table`).
 
 ## 4. Variabel dan secret
 
