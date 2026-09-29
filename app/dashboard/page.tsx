@@ -256,7 +256,10 @@ function DashboardMain() {
   // Saringan satker (ADR-012): "semua", "upt", atau kode satker ("kanwil" untuk pegawai Kanwil).
   const [saringSatker, setSaringSatker] = useState("semua");
   const [modal, setModal] = useState<ModalAksi | null>(null);
+  // Seluruh usulan UPT yang menunggu tinjauan, termasuk pegawai baru yang belum punya pegawaiId.
+  const [usulanMenunggu, setUsulanMenunggu] = useState<UsulanMenunggu[]>([]);
   // Usulan data UPT yang menunggu tinjauan, per pegawai: tampil langsung di papan dan daftar (ADR-011).
+  // Hanya usulan perbaikan yang masuk sini, sebab hanya itu yang menahan proses KGB pegawai tertentu.
   const [usulanPerPegawai, setUsulanPerPegawai] = useState<Map<string, UsulanMenunggu>>(() => new Map());
   const [usulanDibuka, setUsulanDibuka] = useState<UsulanMenunggu | null>(null);
   const [pesanBerhasil, setPesanBerhasil] = useState<string | null>(null);
@@ -339,6 +342,7 @@ function DashboardMain() {
       .then((r) => (r.ok ? (r.json() as Promise<UsulanMenunggu[]>) : []))
       .then((daftar) => {
         if (batal || !Array.isArray(daftar)) return;
+        setUsulanMenunggu(daftar);
         setUsulanPerPegawai(new Map(daftar.filter((u) => u.pegawaiId).map((u) => [u.pegawaiId as string, u])));
       })
       .catch(() => {
@@ -437,7 +441,7 @@ function DashboardMain() {
 
   // Pantau satker: angka per tahap dari antrian yang sama, ditambah usulan UPT yang menunggu.
   const usulanPerSatker = new Map<string, number>();
-  for (const u of usulanPerPegawai.values()) {
+  for (const u of usulanMenunggu) {
     const kode = cariSatker(u.unitKerja)?.kode;
     if (kode) usulanPerSatker.set(kode, (usulanPerSatker.get(kode) ?? 0) + 1);
   }
@@ -505,11 +509,11 @@ function DashboardMain() {
     });
 
   // Usulan data UPT yang menunggu tinjauan: ditinjau langsung dari kartu atau baris (ADR-011).
-  if (usulanPerPegawai.size > 0)
+  if (usulanMenunggu.length > 0)
     tindakan.push({
       id: "usulan-upt",
       nada: "ungu",
-      isi: <><strong>{usulanPerPegawai.size} usulan data UPT</strong> menunggu tinjauan; proses KGB pegawainya tertahan sampai ditinjau.</>,
+      isi: <><strong>{usulanMenunggu.length} usulan data UPT</strong> menunggu tinjauan{usulanPerPegawai.size > 0 ? `; proses KGB ${usulanPerPegawai.size} pegawainya tertahan sampai ditinjau` : ""}.</>,
       aksi: { label: "Semua usulan", href: "/dashboard/usulan" },
     });
 
