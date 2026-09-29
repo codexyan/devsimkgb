@@ -116,7 +116,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       `Terima laporan ${label} ${pegawai.nama} (${pegawai.nip}) dari ${laporan.satker}` +
       (laporan.satkerTujuan ? `, tujuan ${laporan.satkerTujuan}` : "") +
       (laporan.alasan ? `, alasan ${laporan.alasan}` : "") +
-      `, TMT ${formatTanggalId(laporan.tmt)}, SK ${laporan.nomorSK ?? "-"}`,
+      // Pembatalan tidak berdasar SK dan tidak bertanggal berlaku; menuliskan "TMT -, SK -" hanya
+      // mengotori log. Yang menerangkannya justru keterangan dari UPT.
+      (laporan.jenis === "pembatalan"
+        ? `, keterangan: ${laporan.keterangan ?? "-"}, pegawai dinonaktifkan`
+        : `, TMT ${formatTanggalId(laporan.tmt)}, SK ${laporan.nomorSK ?? "-"}`),
     targetNama: pegawai.nama,
   });
 

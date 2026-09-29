@@ -301,6 +301,10 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   /** Laporan mutasi satker ini beserta hasil tinjauan Kanwil. */
   const [laporan, setLaporan] = useState<LaporanUpt[]>([]);
   const [laporMutasi, setLaporMutasi] = useState<PegawaiUpt | null>(null);
+  /** Kartu pita jadwal yang sedang dibuka: satu bulan TMT, atau kumpulan yang terlambat. */
+  const [dialogPeriode, setDialogPeriode] = useState<
+    { jenis: "bulan"; bulanTmt: string } | { jenis: "terlambat" } | null
+  >(null);
   const [pilihAjukan, setPilihAjukan] = useState<Set<string>>(() => new Set());
   const [dialogAjukan, setDialogAjukan] = useState(false);
   /** Unggahan massal: satu berkas menjadi banyak draf sekaligus. */
@@ -551,6 +555,12 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const usulanById = (id: string | null) => (id ? usulan.find((u) => u.id === id) ?? null : null);
   const pegawaiById = (id: string | null) => (id ? pegawai.find((p) => p.id === id) ?? null : null);
   const perluDiusulkan = pegawai.filter((p) => p.bulanTmt === bulanUsulan);
+  /**
+   * KGB yang jendela kirimnya sudah terlewat namun belum selesai: TMT-nya sebelum bulan usulan berjalan.
+   * Pita jadwal hanya melihat ke depan, sehingga tanpa daftar ini satker yang tertinggal tidak melihat
+   * tanda apa pun di dashboardnya, dan angka "Selesai TMT tahun ini" yang timpang tidak dapat ditelusuri.
+   */
+  const tertinggal = pegawai.filter((p) => p.bulanTmt && p.bulanTmt < bulanUsulan && p.statusKGB !== "selesai");
   /**
    * Pegawai jatuh tempo periode ini yang belum masuk surat usulan: tidak ada usulan yang sedang ditinjau atau
    * sudah diajukan sejak awal bulan ini, dan Kanwil belum memproses KGB-nya. Dasar pengingat periode (ADR-029).
@@ -1084,17 +1094,38 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         onMuatUlang={muat}
         memuat={memuat}
       >
-        {/* Kapan surat usulan tiap bulan TMT dikirim; bulan yang jendela kirimnya sedang terbuka disorot. */}
-        <div className="upt-jadwal" role="list" aria-label="Jadwal surat usulan per bulan TMT">
+        {/* Kapan surat usulan tiap bulan TMT dikirim; bulan yang jendela kirimnya sedang terbuka disorot.
+            Tiap kartu dapat dibuka untuk melihat siapa saja yang jatuh tempo pada periode itu, sebab angka
+            saja tidak dapat ditindaklanjuti: operator tetap harus tahu namanya. */}
+        <div className="upt-jadwal" aria-label="Jadwal surat usulan per bulan TMT">
+          {/* Yang TMT-nya sudah lewat jendela kirim namun belum selesai. Tanpa kartu ini mereka lenyap dari
+              pita, sebab pita hanya melihat ke depan, dan satker tidak punya penanda bahwa ada yang tertinggal. */}
+          {tertinggal.length > 0 && (
+            <button
+              type="button"
+              className="upt-jadwal-bulan"
+              data-terlambat=""
+              onClick={() => setDialogPeriode({ jenis: "terlambat" })}
+            >
+              <span className="upt-jadwal-nama">Terlambat</span>
+              <span className="upt-jadwal-angka">
+                {tertinggal.length}
+                <small> pegawai</small>
+              </span>
+              {/* Teksnya sengaja pendek: pita ini memotong keterangan yang melebihi satu baris. */}
+              <span className="upt-jadwal-ket">TMT sudah lewat</span>
+            </button>
+          )}
           {jadwal.map((m) => {
             const sekarang = m.bulanTmt === bulanUsulan;
             return (
-              <div
+              <button
                 key={m.bulanTmt}
-                role="listitem"
+                type="button"
                 className="upt-jadwal-bulan"
                 data-sekarang={sekarang ? "" : undefined}
                 data-kosong={m.jumlah === 0 ? "" : undefined}
+                onClick={() => setDialogPeriode({ jenis: "bulan", bulanTmt: m.bulanTmt })}
               >
                 <span className="upt-jadwal-nama">TMT {namaBulan(m.bulanTmt)}</span>
                 <span className="upt-jadwal-angka">
@@ -1104,7 +1135,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 <span className="upt-jadwal-ket">
                   {sekarang ? `kirim bulan ini, 1–${KIRIM_SURAT_BATAS}` : `kirim 1–${KIRIM_SURAT_BATAS} ${namaBulan(geserBulan(m.bulanTmt, -2))}`}
                 </span>
-              </div>
+              </button>
             );
           })}
           <div className="upt-jadwal-bulan" data-ringkas="">
@@ -1120,6 +1151,88 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         </div>
       </PanelNavy>
       )}
+
+      {/* Isi satu kartu pita jadwal: siapa saja yang jatuh tempo pada periode itu dan sedang di mana. */}
+      {dialogPeriode && (() => {
+        const terlambatMode = dialogPeriode.jenis === "terlambat";
+        const daftar = terlambatMode
+          ? tertinggal
+          : pegawai.filter((p) => p.bulanTmt === dialogPeriode.bulanTmt);
+        // Yang masih menunggu tindakan UPT: tidak ada usulan yang sedang ditinjau, dan Kanwil belum memproses.
+        const perluDikerjakan = daftar.filter((p) => p.usulanBerjalan !== "menunggu" && !p.statusKGB);
+        const tautan = terlambatMode
+          ? "/dashboard/upt/kolektif?terlambat=1"
+          : `/dashboard/upt/kolektif?bulan=${dialogPeriode.bulanTmt}`;
+        return (
+          <KerangkaModal
+            judul={terlambatMode ? "KGB yang sudah lewat jadwal kirim" : `KGB TMT ${namaBulan(dialogPeriode.bulanTmt)}`}
+            subjudul={
+              terlambatMode
+                ? "TMT-nya sudah lewat dan KGB-nya belum selesai"
+                : `Surat usulannya dikirim 1–${KIRIM_SURAT_BATAS} ${namaBulan(geserBulan(dialogPeriode.bulanTmt, -2))}`
+            }
+            nada={terlambatMode ? "amber" : undefined}
+            ukuran="md"
+            onTutup={() => setDialogPeriode(null)}
+            kaki={
+              <>
+                <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogPeriode(null)}>
+                  Tutup
+                </button>
+                {perluDikerjakan.length > 0 && (
+                  <Link href={tautan} className="kgbm-tombol kgbm-utama" onClick={() => setDialogPeriode(null)}>
+                    Siapkan usulan kolektif
+                  </Link>
+                )}
+              </>
+            }
+          >
+            {daftar.length === 0 ? (
+              <p className="dsb-kosong" style={{ padding: "18px 0" }}>
+                Tidak ada pegawai dengan KGB pada periode ini.
+              </p>
+            ) : (
+              <>
+                <div className="pgu-angka">
+                  <div>
+                    <strong>{daftar.length}</strong>
+                    <span>pegawai pada periode ini</span>
+                  </div>
+                  <div data-nada={perluDikerjakan.length > 0 ? "amber" : undefined}>
+                    <strong>{perluDikerjakan.length}</strong>
+                    <span>menunggu tindakan Anda</span>
+                  </div>
+                </div>
+                <ul className="pgu-daftar upt-periode-daftar" aria-label="Pegawai pada periode ini">
+                  {daftar.map((p) => {
+                    const k = keadaan(p);
+                    return (
+                      <li key={p.id}>
+                        <span className="min-w-0">
+                          <strong>{p.nama}</strong>
+                          <span>
+                            {p.nip} · {p.golonganRuang} · TMT {fmtTgl(p.tmtKgb)}
+                          </span>
+                        </span>
+                        <span className="dsb-tag" data-garis="" data-nada={k.nada}>
+                          {k.teks}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {perluDikerjakan.length > 0 && (
+                  <p className="kgbm-bantuan">
+                    {terlambatMode
+                      ? "Yang terlambat tetap berhak KGB; selisihnya dibayar sebagai rapelan. Ajukan secepatnya agar tidak makin menumpuk."
+                      : "Tombol di bawah membuka Usulan kolektif dengan pegawai periode ini sudah tercentang."}
+                  </p>
+                )}
+              </>
+            )}
+          </KerangkaModal>
+        );
+      })()}
 
       {dialogGajiWeb && (
         <KerangkaModal

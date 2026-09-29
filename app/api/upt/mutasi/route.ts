@@ -16,7 +16,7 @@ import type { LaporanMutasiRow, PegawaiRow } from "@/lib/sheets/tables";
 export const runtime = "nodejs";
 
 const PESAN_BUKAN_UPT = "Laporan mutasi hanya dapat dikirim akun Admin UPT yang tertaut ke satker.";
-const JENIS_SAH: JenisMutasi[] = ["definitif", "bko", "selesai_bko", "pemberhentian"];
+const JENIS_SAH: JenisMutasi[] = ["definitif", "bko", "selesai_bko", "pemberhentian", "pembatalan"];
 
 /** Laporan mutasi satker ini, terbaru lebih dulu. */
 export async function GET() {
@@ -96,6 +96,7 @@ export async function POST(req: Request) {
     tmt,
     nomorSk: teks("nomorSk") || null,
     alasan: teks("alasan") || null,
+    keterangan: teks("keterangan") || null,
   };
   const kurang = kekuranganMutasi(isian);
   if (kurang.length > 0) return NextResponse.json({ error: `Belum lengkap: ${kurang.join(", ")}.` }, { status: 400 });

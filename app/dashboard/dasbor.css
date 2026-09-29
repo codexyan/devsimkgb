@@ -1537,16 +1537,43 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
   border-top: 1px solid var(--ln1);
 }
 
+/* Kartu ini <button>: tiap periode dapat dibuka untuk melihat siapa saja yang jatuh tempo di dalamnya.
+   Gaya bawaan tombol dinetralkan supaya tampilannya tetap sama dengan pita sebelumnya. */
 .upt-jadwal-bulan {
   display: flex;
   flex-direction: column;
   gap: 1px;
   min-width: 0;
   padding: 10px 22px 12px;
+  border: 0;
   border-left: 1px solid var(--ln1);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s;
 }
+.upt-jadwal-bulan:hover { background: var(--sub); }
+.upt-jadwal-bulan:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* Kartu ringkas "Selesai TMT" bukan tombol; kursornya tidak boleh menjanjikan klik. */
+.upt-jadwal-bulan[data-ringkas] { cursor: default; }
+.upt-jadwal-bulan[data-ringkas]:hover { background: var(--sub); }
 
 .upt-jadwal-bulan:first-child { border-left: 0; }
+
+/* KGB yang jendela kirimnya sudah terlewat: merah, dan selalu di kepala pita. Seluruh teksnya diberi warna
+   merah; memerahkan angkanya saja membuat nama dan satuannya nyaris hilang di atas latar bertint. */
+.upt-jadwal-bulan[data-terlambat] { box-shadow: inset 0 3px 0 var(--st-red); background: var(--tint-red-bg); }
+.upt-jadwal-bulan[data-terlambat] .upt-jadwal-nama,
+.upt-jadwal-bulan[data-terlambat] .upt-jadwal-angka,
+.upt-jadwal-bulan[data-terlambat] .upt-jadwal-angka small,
+.upt-jadwal-bulan[data-terlambat] .upt-jadwal-ket { color: var(--st-red); }
+.upt-jadwal-bulan[data-terlambat] .upt-jadwal-nama { font-weight: 600; }
+.upt-jadwal-bulan[data-terlambat] .upt-jadwal-ket { font-weight: 500; }
+.upt-jadwal-bulan[data-terlambat]:hover { background: var(--tint-red-bg); filter: brightness(0.98); }
+
+/* Daftar nama di dalam jendela periode: beri batas tinggi agar satker besar tetap dapat digulir. */
+.upt-periode-daftar { max-height: 46vh; overflow-y: auto; }
 .upt-jadwal-nama { font-size: 12px; color: var(--dt3); }
 .upt-jadwal-angka { font-size: 20px; font-weight: 600; line-height: 1.2; color: var(--dt1); font-variant-numeric: tabular-nums; }
 .upt-jadwal-angka small { font-size: 12px; font-weight: 400; color: var(--dt4); }

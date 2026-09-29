@@ -193,7 +193,13 @@ export default function UsulanKolektif() {
   const [galat, setGalat] = useState<string | null>(null);
   const [terpilih, setTerpilih] = useState<Set<string>>(() => new Set());
   const [cari, setCari] = useState("");
-  const [saring, setSaring] = useState<Saring>("periode");
+  // Dibuka dari kartu Terlambat, saringan periode justru menyembunyikan yang baru saja dicentang:
+  // TMT mereka sudah lewat bulan usulan. Karena itu halaman langsung dibuka pada "Semua".
+  const [saring, setSaring] = useState<Saring>(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("terlambat") === "1"
+      ? "semua"
+      : "periode",
+  );
   const [baris, setBaris] = useState<Baris[] | null>(null);
   const [aktif, setAktif] = useState<string | null>(null);
   const [langkah, setLangkah] = useState<Langkah>(1);
@@ -210,7 +216,13 @@ export default function UsulanKolektif() {
     return dariTautan && /^\d{4}-\d{2}$/.test(dariTautan) ? dariTautan : geserBulan(kunciBulanTmt(hariIniWita()) ?? "", 2);
   });
 
-  async function muat(pilihPeriode = false) {
+  /**
+   * Pencentangan awal saat halaman dibuka dari dashboard:
+   *   "periode"   — ?bulan=yyyy-mm, pegawai jatuh tempo bulan itu;
+   *   "terlambat" — ?terlambat=1, seluruh pegawai yang TMT-nya sudah lewat bulan usulan dan belum selesai.
+   * Keduanya melewatkan pegawai yang usulannya sedang ditinjau Kanwil, sebab datanya memang terkunci.
+   */
+  async function muat(pilihAwal: "periode" | "terlambat" | null = null) {
     setMemuat(true);
     try {
       const [rp, ru] = await Promise.all([fetch("/api/upt"), fetch("/api/upt/usulan")]);
@@ -220,8 +232,16 @@ export default function UsulanKolektif() {
       const daftar = dp.pegawai ?? [];
       setPegawai(daftar);
       setDraf(Array.isArray(du) ? du : []);
-      // Dibuka dari pengingat: pegawai jatuh tempo periode itu langsung tercentang.
-      if (pilihPeriode) setTerpilih(new Set(daftar.filter((p) => p.bulanTmt === bulanUsulan && p.usulanBerjalan !== "menunggu").map((p) => p.id)));
+      if (pilihAwal) {
+        // Untuk yang terlambat, yang dicentang hanya yang benar-benar masih menunggu tindakan UPT: Kanwil
+        // belum memproses KGB-nya sama sekali. Yang SK-nya sudah terbit atau sedang diproses tidak perlu
+        // diusulkan lagi, dan angka "menunggu tindakan Anda" di dashboard memakai batasan yang sama.
+        const cocok = (p: PegawaiUpt) =>
+          pilihAwal === "periode"
+            ? p.bulanTmt === bulanUsulan
+            : !!p.bulanTmt && p.bulanTmt < bulanUsulan && !p.statusKGB;
+        setTerpilih(new Set(daftar.filter((p) => cocok(p) && p.usulanBerjalan !== "menunggu").map((p) => p.id)));
+      }
     } catch (e) {
       setGalat(e instanceof Error ? e.message : "Data gagal dimuat");
     } finally {
@@ -230,8 +250,9 @@ export default function UsulanKolektif() {
   }
 
   useEffect(() => {
-    const dariPengingat = new URLSearchParams(window.location.search).has("bulan");
-    const t = setTimeout(() => void muat(dariPengingat), 0);
+    const q = new URLSearchParams(window.location.search);
+    const pilihAwal = q.has("bulan") ? "periode" : q.get("terlambat") === "1" ? "terlambat" : null;
+    const t = setTimeout(() => void muat(pilihAwal), 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

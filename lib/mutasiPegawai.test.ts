@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  ALASAN_PEMBATALAN,
   berhakKgb,
   kekuranganMutasi,
   perubahanPegawaiMutasi,
@@ -73,4 +74,26 @@ test("pencatatan yang belum lengkap menyebut apa yang kurang", () => {
     kekuranganMutasi({ jenis: "bko", tmt: tgl(2026, 11), nomorSk: "W.19-9", satkerTujuan: "rutan-rantau" }),
     [],
   );
+});
+
+test("pembatalan pencatatan menuntut alasan dan keterangan, bukan SK atau TMT", () => {
+  // Barisnya keliru sejak awal, jadi tidak ada SK yang mendasarinya dan tidak ada tanggal berlaku.
+  assert.deepEqual(kekuranganMutasi({ jenis: "pembatalan" }), ["alasan pembatalan", "keterangan beserta buktinya"]);
+  assert.deepEqual(
+    kekuranganMutasi({ jenis: "pembatalan", alasan: ALASAN_PEMBATALAN[0], keterangan: "kembaran NIP 1990…" }),
+    [],
+  );
+  // Jenis lain tetap menuntut SK dan TMT seperti semula.
+  assert.deepEqual(kekuranganMutasi({ jenis: "pemberhentian", alasan: "Pensiun", keterangan: "x" }), [
+    "TMT berlaku",
+    "nomor SK",
+  ]);
+});
+
+test("pembatalan yang diterima menonaktifkan pegawai, tanpa menyentuh unit kerja atau tanggal berhenti", () => {
+  const perubahan = perubahanPegawaiMutasi({ jenis: "pembatalan", alasan: ALASAN_PEMBATALAN[1], keterangan: "x" }, null);
+  assert.deepEqual(perubahan, { aktif: false });
+  // Riwayat KGB dan berkas SK tidak ikut dihapus: yang berubah hanya satu kolom.
+  assert.equal("unitKerja" in perubahan, false);
+  assert.equal("berhentiTmt" in perubahan, false);
 });

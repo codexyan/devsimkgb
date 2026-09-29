@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
 import {
+  ALASAN_PEMBATALAN,
   ALASAN_PEMBERHENTIAN,
   KETERANGAN_JENIS_MUTASI,
   LABEL_JENIS_MUTASI,
@@ -17,7 +18,7 @@ import { hariIniWita, isoTanggalLokal } from "@/lib/waktu";
    Kanwil. Karena itu jendela ini tidak mengubah apa pun pada data pegawai: yang dikirim adalah laporan,
    dan pegawainya baru berpindah atau berhenti setelah Kanwil menerimanya. */
 
-const JENIS: JenisMutasi[] = ["definitif", "bko", "selesai_bko", "pemberhentian"];
+const JENIS: JenisMutasi[] = ["definitif", "bko", "selesai_bko", "pemberhentian", "pembatalan"];
 
 export default function ModalLaporMutasi({
   pegawai,
@@ -39,7 +40,8 @@ export default function ModalLaporMutasi({
   const [galat, setGalat] = useState<string | null>(null);
 
   const perluSatker = jenis === "definitif" || jenis === "bko";
-  const kurang = kekuranganMutasi({ jenis, satkerTujuan, tmt, nomorSk, alasan });
+  const pembatalan = jenis === "pembatalan";
+  const kurang = kekuranganMutasi({ jenis, satkerTujuan, tmt, nomorSk, alasan, keterangan });
 
   async function kirim() {
     if (kurang.length > 0) {
@@ -71,7 +73,7 @@ export default function ModalLaporMutasi({
 
   return (
     <KerangkaModal
-      judul="Laporkan mutasi atau pemberhentian"
+      judul="Laporkan mutasi, pemberhentian, atau pembatalan"
       subjudul={`${pegawai.nama} · ${pegawai.nip}`}
       ukuran="md"
       sibuk={sibuk}
@@ -96,13 +98,24 @@ export default function ModalLaporMutasi({
 
       <label className="kgbm-label">
         Jenis laporan
-        <select className="kgbm-input" value={jenis} onChange={(e) => setJenis(e.target.value as JenisMutasi)}>
+        <select
+          className="kgbm-input"
+          value={jenis}
+          onChange={(e) => {
+            // Daftar alasan berbeda antara pemberhentian dan pembatalan, jadi pilihan lama dikosongkan
+            // supaya tidak terkirim alasan yang tidak ada pada daftar jenis yang baru.
+            setJenis(e.target.value as JenisMutasi);
+            setAlasan("");
+          }}
+        >
           {JENIS.map((j) => (
             <option key={j} value={j}>{LABEL_JENIS_MUTASI[j]}</option>
           ))}
         </select>
       </label>
-      <Catatan nada={jenis === "pemberhentian" ? "amber" : "netral"}>{KETERANGAN_JENIS_MUTASI[jenis]}</Catatan>
+      <Catatan nada={jenis === "pemberhentian" || jenis === "pembatalan" ? "amber" : "netral"}>
+        {KETERANGAN_JENIS_MUTASI[jenis]}
+      </Catatan>
 
       <div className="kgbm-grid2">
         {perluSatker && (
@@ -116,39 +129,55 @@ export default function ModalLaporMutasi({
             </select>
           </label>
         )}
-        {jenis === "pemberhentian" && (
+        {(jenis === "pemberhentian" || jenis === "pembatalan") && (
           <label className="kgbm-label">
             <span className="kgbm-wajib">Alasan</span>
             <select className="kgbm-input" value={alasan} onChange={(e) => setAlasan(e.target.value)}>
               <option value="">Pilih alasan</option>
-              {ALASAN_PEMBERHENTIAN.map((a) => (
+              {(jenis === "pembatalan" ? ALASAN_PEMBATALAN : ALASAN_PEMBERHENTIAN).map((a) => (
                 <option key={a} value={a}>{a}</option>
               ))}
             </select>
           </label>
         )}
-        <label className="kgbm-label">
-          <span className="kgbm-wajib">TMT berlaku</span>
-          <input className="kgbm-input" type="date" value={tmt} onChange={(e) => setTmt(e.target.value)} />
-          <span className="kgbm-bantuan">
-            {jenis === "pemberhentian"
-              ? "KGB yang TMT-nya sebelum tanggal ini tetap sah diproses."
-              : "Tanggal berlakunya perpindahan menurut SK."}
-          </span>
-        </label>
-        <label className="kgbm-label">
-          <span className="kgbm-wajib">Nomor SK</span>
-          <input className="kgbm-input" value={nomorSk} onChange={(e) => setNomorSk(e.target.value)} placeholder="Nomor SK yang mendasari" />
-        </label>
-        <label className="kgbm-label">
-          Tanggal SK
-          <input className="kgbm-input" type="date" value={tanggalSk} onChange={(e) => setTanggalSk(e.target.value)} />
-        </label>
+        {/* Pembatalan tidak lahir dari SK dan tidak punya tanggal berlaku: barisnya keliru sejak awal. */}
+        {!pembatalan && (
+          <>
+            <label className="kgbm-label">
+              <span className="kgbm-wajib">TMT berlaku</span>
+              <input className="kgbm-input" type="date" value={tmt} onChange={(e) => setTmt(e.target.value)} />
+              <span className="kgbm-bantuan">
+                {jenis === "pemberhentian"
+                  ? "KGB yang TMT-nya sebelum tanggal ini tetap sah diproses."
+                  : "Tanggal berlakunya perpindahan menurut SK."}
+              </span>
+            </label>
+            <label className="kgbm-label">
+              <span className="kgbm-wajib">Nomor SK</span>
+              <input className="kgbm-input" value={nomorSk} onChange={(e) => setNomorSk(e.target.value)} placeholder="Nomor SK yang mendasari" />
+            </label>
+            <label className="kgbm-label">
+              Tanggal SK
+              <input className="kgbm-input" type="date" value={tanggalSk} onChange={(e) => setTanggalSk(e.target.value)} />
+            </label>
+          </>
+        )}
       </div>
 
       <label className="kgbm-label">
-        Keterangan
-        <textarea className="kgbm-input" rows={2} value={keterangan} onChange={(e) => setKeterangan(e.target.value)} />
+        {pembatalan ? <span className="kgbm-wajib">Keterangan</span> : "Keterangan"}
+        <textarea
+          className="kgbm-input"
+          rows={2}
+          value={keterangan}
+          onChange={(e) => setKeterangan(e.target.value)}
+          placeholder={pembatalan ? "mis. tercatat dua kali, NIP yang benar 1990…" : undefined}
+        />
+        {pembatalan && (
+          <span className="kgbm-bantuan">
+            Sebutkan buktinya supaya Kanwil dapat memastikan: NIP kembarannya, atau NIP yang benar.
+          </span>
+        )}
       </label>
     </KerangkaModal>
   );

@@ -15,13 +15,22 @@
 
 import { tanggalKalender, type NilaiTanggal } from "./waktu";
 
-export type JenisMutasi = "definitif" | "bko" | "selesai_bko" | "pemberhentian";
+/**
+ * "pembatalan" bukan perpindahan, melainkan pembetulan administratif: pegawai yang seharusnya tidak
+ * pernah tercatat, misalnya entri ganda atau NIP salah ketik yang melahirkan orang yang tidak ada.
+ * Jenis ini menumpang jalur laporan mutasi karena bentuknya sama persis — UPT melapor, Kanwil menetapkan —
+ * dan memberinya tabel sendiri berarti menyalin seluruh antrian tinjauan, notifikasi, dan jejak auditnya.
+ * UPT tetap tidak pernah menghapus apa pun sendiri (ADR-004); yang dilakukan Kanwil pun menonaktifkan,
+ * bukan menghapus, supaya keliru lapor masih dapat dipulihkan.
+ */
+export type JenisMutasi = "definitif" | "bko" | "selesai_bko" | "pemberhentian" | "pembatalan";
 
 export const LABEL_JENIS_MUTASI: Record<JenisMutasi, string> = {
   definitif: "Mutasi definitif",
   bko: "Penugasan BKO",
   selesai_bko: "Selesai BKO, kembali ke satker asal",
   pemberhentian: "Pemberhentian",
+  pembatalan: "Pembatalan pencatatan",
 };
 
 /** Penjelasan singkat tiap jenis, ditampilkan pada formulir agar pilihannya tidak ditebak. */
@@ -33,7 +42,16 @@ export const KETERANGAN_JENIS_MUTASI: Record<JenisMutasi, string> = {
   selesai_bko: "Penugasan BKO berakhir; keterangan satker tempat bertugas dihapus.",
   pemberhentian:
     "Pegawai berhenti sebagai PNS pada satker ini. Datanya tetap tersimpan sebagai riwayat, dan KGB yang TMT-nya sebelum tanggal berhenti tetap sah diproses.",
+  pembatalan:
+    "Pegawai ini seharusnya tidak pernah tercatat, misalnya entri ganda atau NIP salah ketik. Bukan untuk pegawai yang pindah, pensiun, atau meninggal — pakai Pemberhentian untuk itu. Bila Kanwil menerima, datanya dinonaktifkan, bukan dihapus.",
 };
+
+/** Sebab sebuah pencatatan dibatalkan; menentukan apa yang diperiksa Kanwil sebelum menetapkannya. */
+export const ALASAN_PEMBATALAN = [
+  "Entri ganda, pegawai yang sama sudah tercatat",
+  "NIP salah ketik, orangnya tidak ada",
+  "Pegawai tidak pernah bertugas di satker ini",
+] as const;
 
 /** Alasan pemberhentian yang lazim; "Lainnya" tetap mungkin lewat isian keterangan. */
 export const ALASAN_PEMBERHENTIAN = [
@@ -53,6 +71,8 @@ export interface IsianMutasi {
   nomorSk?: string | null;
   tanggalSk?: NilaiTanggal;
   alasan?: string | null;
+  /** Penjelasan bebas; wajib pada pembatalan, sebab di situlah buktinya disebutkan. */
+  keterangan?: string | null;
 }
 
 /**
@@ -61,6 +81,15 @@ export interface IsianMutasi {
  */
 export function kekuranganMutasi(isian: IsianMutasi): string[] {
   const kurang: string[] = [];
+  // Pembatalan pencatatan tidak lahir dari SK dan tidak punya tanggal berlaku: ia menyatakan bahwa
+  // barisnya keliru sejak awal. Yang wajib justru sebabnya, sebab itulah yang diperiksa Kanwil.
+  if (isian.jenis === "pembatalan") {
+    if (!String(isian.alasan ?? "").trim()) kurang.push("alasan pembatalan");
+    // Keterangan wajib di sini, tidak seperti jenis lain: pembatalan tidak membawa SK yang dapat
+    // dicocokkan, jadi buktinya hanya ada pada kalimat UPT — NIP kembarannya, atau NIP yang benar.
+    if (!String(isian.keterangan ?? "").trim()) kurang.push("keterangan beserta buktinya");
+    return kurang;
+  }
   if (!tanggalKalender(isian.tmt)) kurang.push("TMT berlaku");
   if ((isian.jenis === "definitif" || isian.jenis === "bko") && !String(isian.satkerTujuan ?? "").trim()) {
     kurang.push("satker tujuan");
@@ -78,7 +107,13 @@ export function kekuranganMutasi(isian: IsianMutasi): string[] {
 export function perubahanPegawaiMutasi(
   isian: IsianMutasi,
   namaSatkerTujuan: string | null,
-): { unitKerja?: string; satkerTugas?: string | null; berhentiTmt?: Date | null; berhentiAlasan?: string | null } {
+): {
+  unitKerja?: string;
+  satkerTugas?: string | null;
+  berhentiTmt?: Date | null;
+  berhentiAlasan?: string | null;
+  aktif?: boolean;
+} {
   const tmt = tanggalKalender(isian.tmt);
   switch (isian.jenis) {
     case "definitif":
@@ -89,6 +124,10 @@ export function perubahanPegawaiMutasi(
       return { satkerTugas: null };
     case "pemberhentian":
       return { berhentiTmt: tmt, berhentiAlasan: String(isian.alasan ?? "").trim() || null };
+    // Dinonaktifkan, bukan dihapus: riwayat KGB dan berkas SK-nya tetap utuh, dan Super Admin masih dapat
+    // mengaktifkannya kembali bila ternyata laporannya yang keliru.
+    case "pembatalan":
+      return { aktif: false };
   }
 }
 

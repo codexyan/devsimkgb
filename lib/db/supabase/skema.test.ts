@@ -24,7 +24,8 @@ function bacaSql(): string {
 /** Nama tabel → kolom, dibaca dari create table lalu alter table ... add column di migrasi. */
 function tabelDiSql(sql: string): Map<string, string[]> {
   const hasil = new Map<string, string[]>();
-  for (const cocok of sql.matchAll(/create table public\.(\w+) \(\n([\s\S]*?)\n\);/g)) {
+  // "if not exists" opsional: seluruh migrasi memakainya agar aman diputar ulang (ADR pada commit a5f78f6).
+  for (const cocok of sql.matchAll(/create table (?:if not exists )?public\.(\w+) \(\n([\s\S]*?)\n\);/g)) {
     const kolom = cocok[2]
       .split("\n")
       .map((baris) => baris.trim())
