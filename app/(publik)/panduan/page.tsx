@@ -4,6 +4,9 @@ import { getGajiPokok, getPangkat, kalkulasiKGB } from "@/lib/tabelGaji";
 import { satkerPerKppn } from "@/lib/satker";
 import { STATUS_KGB, type StatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId } from "@/lib/waktu";
+import GarisTangga from "../GarisTangga";
+import Kata from "../Kata";
+import { DaftarIsiPanduan, PilihPeran } from "./NavigasiPanduan";
 import "./panduan.css";
 
 export const metadata: Metadata = {
@@ -80,92 +83,40 @@ function TandaRapelan() {
   return <span className="pub-status pub-status-rapelan">Berpotensi rapelan</span>;
 }
 
-function DaftarIsi() {
-  return (
-    <ol className="pub-toc-list">
-      {DAFTAR_ISI.map((b) => (
-        <li key={b.id}>
-          <a href={`#${b.id}`}>{b.judul}</a>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 export default function PanduanPage() {
   const kppn = satkerPerKppn();
 
   return (
-    <div className="pub-container">
-      <h1 className="pub-h1">Panduan kenaikan gaji berkala</h1>
-      <p className="pub-lead">
-        Panduan ini untuk admin kepegawaian UPT yang mengusulkan kenaikan gaji berkala (KGB), serta Tata Usaha, Tim
-        SDM, dan bagian keuangan Kanwil yang memprosesnya. Isinya mencakup kewenangan, jadwal, cara menyusun surat
-        permohonan, langkah di SIM-KGB, sampai pengiriman SK.
-      </p>
-      <p className="pub-meta">
-        Berlaku untuk pegawai Kanwil dan UPT di lingkungan Kanwil Ditjenpas Kalimantan Selatan. Diperbarui September
-        2026.
-      </p>
+    <div className="pub-container pg">
+      <header className="pg-kepala">
+        <p className="pg-atas masuk">
+          <GarisTangga anak={2} className="pg-atas-garis" />
+          Panduan untuk UPT dan Kanwil
+        </p>
+        <h1 className="pub-h1 pg-judul">
+          <Kata teks="Panduan kenaikan gaji berkala" />
+        </h1>
+        <div className="pg-pengantar masuk" style={{ "--d": 180 } as React.CSSProperties}>
+          <p className="pub-lead">
+            Panduan ini untuk admin kepegawaian UPT yang mengusulkan kenaikan gaji berkala (KGB), serta Tata Usaha, Tim
+            SDM, dan bagian keuangan Kanwil yang memprosesnya. Isinya mencakup kewenangan, jadwal, cara menyusun surat
+            permohonan, langkah di SIM-KGB, sampai pengiriman SK.
+          </p>
+          <p className="pub-meta">
+            Berlaku untuk pegawai Kanwil dan UPT di lingkungan Kanwil Ditjenpas Kalimantan Selatan. Diperbarui September
+            2026.
+          </p>
+        </div>
+      </header>
 
-      <div className="pg-peran">
-        <p className="pg-peran-judul">Bagian yang perlu dibaca menurut tugas</p>
-        <dl className="pub-dl">
-          <div>
-            <dt>Admin kepegawaian UPT</dt>
-            <dd>
-              <a href="#jadwal">Jadwal</a>, <a href="#untuk-upt">menyiapkan surat permohonan</a>, dan{" "}
-              <a href="#contoh-kasus">contoh kasus</a>
-            </dd>
-          </div>
-          <div>
-            <dt>Tata Usaha Kanwil</dt>
-            <dd>
-              <a href="#di-kanwil">Agenda dan disposisi</a>
-            </dd>
-          </div>
-          <div>
-            <dt>Tim SDM Kanwil</dt>
-            <dd>
-              <a href="#kewenangan">Kewenangan</a>, <a href="#di-sim-kgb">langkah di SIM-KGB</a>, dan{" "}
-              <a href="#pengiriman-sk">pengiriman SK</a>
-            </dd>
-          </div>
-          <div>
-            <dt>Bagian keuangan</dt>
-            <dd>
-              <a href="#keuangan">Konfirmasi keuangan</a> dan <a href="#pengiriman-sk">KPPN mitra</a>
-            </dd>
-          </div>
-          <div>
-            <dt>Super Admin</dt>
-            <dd>
-              <a href="#kewenangan">Data penandatangan</a> dan <a href="#keadaan-khusus">keadaan khusus</a>
-            </dd>
-          </div>
-          <div>
-            <dt>Pegawai</dt>
-            <dd>
-              <a href="#status">Arti status</a> dan <a href="#pertanyaan">pertanyaan umum</a>
-            </dd>
-          </div>
-        </dl>
+      <div className="masuk" style={{ "--d": 260 } as React.CSSProperties}>
+        <PilihPeran />
       </div>
 
-      <div className="pub-guide">
-        <details className="pub-toc-details">
-          <summary>Daftar isi</summary>
-          <nav aria-label="Daftar isi">
-            <DaftarIsi />
-          </nav>
-        </details>
+      <div className="pg-kisi">
+        <DaftarIsiPanduan daftar={DAFTAR_ISI} />
 
-        <nav className="pub-toc" aria-label="Daftar isi">
-          <p className="pub-toc-title">Daftar isi</p>
-          <DaftarIsi />
-        </nav>
-
-        <div>
+        <div className="pg-isi">
           {/* 1. Alur singkat */}
           <section className="pub-prose pg-bagian">
             <h2 id="ringkasan" className="pub-h2 pub-h2-flush">
@@ -1366,7 +1317,8 @@ export default function PanduanPage() {
                   Peraturan Pemerintah Nomor 5 Tahun 2024 tentang Perubahan Kesembilan Belas atas Peraturan Pemerintah
                   Nomor 7 Tahun 1977 tentang Peraturan Gaji Pegawai Negeri Sipil
                 </a>
-                . Mengubah daftar gaji pokok PNS (Lampiran II) dan berlaku mulai 1 Januari 2024.
+                . Mengubah daftar gaji pokok PNS (Lampiran II) dan berlaku mulai 1 Januari 2024. Daftarnya dapat dibaca
+                sebagai <Link href="/tabel-gaji">tabel gaji digital</Link>.
               </li>
               <li>
                 <a href="https://www.bkn.go.id/storage/2024/02/Peraturan-BKN-1-Tahun-2024-PENYESUAIAN-GAJI-POKOK-PNS.pdf">

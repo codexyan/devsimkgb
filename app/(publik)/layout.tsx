@@ -1,41 +1,38 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
-import HeaderPublik from "./HeaderPublik";
+import { Newsreader } from "next/font/google";
+import NavPublik from "./NavPublik";
+import KakiPublik from "./KakiPublik";
+import DokPublik from "./DokPublik";
+import Muncul from "./Muncul";
 import "./publik.css";
+import "./kerangka.css";
 
-/* Kerangka bersama halaman publik (/kgb, /panduan, /login). Kelas dan token
-   warna didokumentasikan di awal publik.css. */
+// Serif untuk judul: suara dokumen dinas (surat, SK) yang menjadi inti layanan KGB. Teks isi tetap Inter,
+// huruf yang sama dengan dashboard SIM-KGB.
+const hurufJudul = Newsreader({
+  subsets: ["latin"],
+  variable: "--font-serif",
+  style: ["normal", "italic"],
+  axes: ["opsz"],
+  display: "swap",
+});
+
+/* Kerangka bersama halaman publik (/kgb, /tabel-gaji, /panduan, /login). Token dan kelas didokumentasikan
+   di awal publik.css; nav, kaki, dan dok di kerangka.css. */
 export default function LayoutPublik({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <div className="pub">
+    <div className={`pub ${hurufJudul.variable}`}>
+      <span id="puncak" aria-hidden="true" className="pub-puncak" />
       <a href="#konten" className="pub-skip">
         Lewati ke konten
       </a>
-      <HeaderPublik />
+      <NavPublik />
       <main id="konten" className="pub-main" tabIndex={-1}>
         {children}
       </main>
-      <footer className="pub-footer">
-        <div className="pub-container pub-footer-row">
-          <div className="pub-footer-org">
-            <p className="pub-footer-name">Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan</p>
-            <p>Kementerian Imigrasi dan Pemasyarakatan Republik Indonesia</p>
-          </div>
-          <nav className="pub-footer-nav" aria-label="Tautan halaman">
-            <ul>
-              <li>
-                <Link href="/kgb">Cek status</Link>
-              </li>
-              <li>
-                <Link href="/panduan">Panduan</Link>
-              </li>
-              <li>
-                <Link href="/login">Masuk</Link>
-              </li>
-            </ul>
-          </nav>
-        </div>
-      </footer>
+      <KakiPublik />
+      <DokPublik />
+      <Muncul />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 // Server Cloudflare Workers berjalan dalam UTC dan server lokal bisa berjalan dalam zona lain,
 // sehingga "hari ini" dan tanggal yang tersimpan selalu dibaca menurut WITA, bukan zona proses.
 
-const ZONA_WITA = "Asia/Makassar";
+export const ZONA_WITA = "Asia/Makassar";
 
 export type NilaiTanggal = Date | string | number | null | undefined;
 
