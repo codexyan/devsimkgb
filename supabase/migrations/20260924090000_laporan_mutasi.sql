@@ -8,7 +8,7 @@
 -- dengan catatan. Yang diterima menerbitkan barisnya sendiri di riwayat_mutasi, dan riwayat_id di sini
 -- menunjuk ke baris itu, sehingga penetapannya tetap satu pintu dan laporannya tetap terbaca sebagai
 -- asal usulnya.
-create table public.laporan_mutasi (
+create table if not exists public.laporan_mutasi (
   id              text primary key default gen_random_uuid()::text,
   pegawai_id      text not null references public.pegawai (id) on delete cascade,
   -- Satker pelapor, bukan satker tujuan; dipakai membatasi apa yang terlihat akun UPT.

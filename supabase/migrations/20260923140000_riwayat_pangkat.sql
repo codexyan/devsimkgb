@@ -2,7 +2,7 @@
 -- golongan saat pindah jenjang (I/x → II/a dikurangi 6 tahun, II/x → III/a dikurangi 5 tahun) mengikuti
 -- Buku Saku Kenaikan Pangkat 2026 dan dihitung di lib/kenaikanPangkat.ts. Nilai gaji dan MKG disalin saat
 -- SK dicatat, sehingga perubahan tabel gaji berikutnya tidak mengubah riwayat.
-create table public.riwayat_pangkat (
+create table if not exists public.riwayat_pangkat (
   id               text primary key default gen_random_uuid()::text,
   pegawai_id       text not null references public.pegawai (id) on delete cascade,
   jenis_kp         text,

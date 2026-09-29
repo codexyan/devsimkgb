@@ -2,7 +2,7 @@
 -- UPT memegang dokumen aslinya (SK KGB terakhir, SK hukuman disiplin), sehingga UPT yang
 -- menginventarisir datanya; Kanwil tetap memegang keputusan menerapkannya.
 
-create table public.usulan_pegawai (
+create table if not exists public.usulan_pegawai (
   id text primary key,
   pegawai_id text not null,
   satker text not null,

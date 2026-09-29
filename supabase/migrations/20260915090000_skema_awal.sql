@@ -17,7 +17,7 @@
 
 -- ============================ Pengguna ============================
 
-create table public.users (
+create table if not exists public.users (
   id            text primary key default gen_random_uuid()::text,
   nip           text not null unique,
   password      text not null,
@@ -29,7 +29,7 @@ create table public.users (
   urutan_sisip  bigint generated always as identity
 );
 
-create table public.profile_change_request (
+create table if not exists public.profile_change_request (
   id            text primary key default gen_random_uuid()::text,
   user_id       text not null references public.users (id) on delete cascade,
   nama          text,
@@ -47,7 +47,7 @@ create index on public.profile_change_request (status);
 
 -- ============================ Pegawai dan KGB ============================
 
-create table public.pegawai (
+create table if not exists public.pegawai (
   id                       text primary key default gen_random_uuid()::text,
   nip                      text not null unique,
   nama                     text not null,
@@ -79,7 +79,7 @@ create table public.pegawai (
 create index on public.pegawai (aktif, tmt_kgb_berikutnya);
 create index on public.pegawai (status_hukdis);
 
-create table public.riwayat_kgb (
+create table if not exists public.riwayat_kgb (
   id                      text primary key default gen_random_uuid()::text,
   pegawai_id              text not null references public.pegawai (id) on delete cascade,
   nomor_sk                text,
@@ -115,7 +115,7 @@ create index on public.riwayat_kgb (tmt_kgb_baru);
 
 -- ============================ Penandatangan dan surat ============================
 
-create table public.penandatangan (
+create table if not exists public.penandatangan (
   id                text primary key default gen_random_uuid()::text,
   jenis             text not null check (jenis in ('definitif', 'plh', 'plt', 'dirjen')),
   nama              text not null,
@@ -132,7 +132,7 @@ create table public.penandatangan (
 );
 create index on public.penandatangan (jenis, berlaku_mulai);
 
-create table public.surat_kgb (
+create table if not exists public.surat_kgb (
   id                     text primary key default gen_random_uuid()::text,
   -- Satu surat per KGB; juga mencegah catatan ganda saat dua permintaan tiba bersamaan.
   kgb_id                 text not null unique references public.riwayat_kgb (id) on delete cascade,
@@ -151,7 +151,7 @@ create table public.surat_kgb (
   urutan_sisip           bigint generated always as identity
 );
 
-create table public.serah_terima (
+create table if not exists public.serah_terima (
   id                    text primary key default gen_random_uuid()::text,
   kgb_id                text not null references public.riwayat_kgb (id) on delete cascade,
   nama_admin            text,
@@ -162,7 +162,7 @@ create table public.serah_terima (
 );
 create index on public.serah_terima (kgb_id);
 
-create table public.konfigurasi_kanwil (
+create table if not exists public.konfigurasi_kanwil (
   id                  text primary key default gen_random_uuid()::text,
   -- nama_kepala dan nip_kepala tidak dipakai lagi sejak tabel penandatangan ada.
   nama_kepala         text,
@@ -178,7 +178,7 @@ create table public.konfigurasi_kanwil (
   urutan_sisip        bigint generated always as identity
 );
 
-create table public.rekon_bulanan (
+create table if not exists public.rekon_bulanan (
   id             text primary key default gen_random_uuid()::text,
   -- Format "YYYY-MM".
   bulan_tmt      text not null unique,
@@ -192,7 +192,7 @@ create table public.rekon_bulanan (
 
 -- ============================ Hukuman disiplin ============================
 
-create table public.regulasi (
+create table if not exists public.regulasi (
   id                  text primary key default gen_random_uuid()::text,
   nomor               text,
   tahun               text,
@@ -209,7 +209,7 @@ create table public.regulasi (
 );
 create index on public.regulasi (status);
 
-create table public.hukdis_jenis (
+create table if not exists public.hukdis_jenis (
   id             text primary key default gen_random_uuid()::text,
   kode           text not null unique,
   label          text,
@@ -227,7 +227,7 @@ create table public.hukdis_jenis (
 );
 create index on public.hukdis_jenis (regulasi_id);
 
-create table public.hukdis_konfigurasi (
+create table if not exists public.hukdis_konfigurasi (
   id             text primary key default gen_random_uuid()::text,
   notif_hari_h1  integer default 30,
   notif_hari_h2  integer default 14,
@@ -236,7 +236,7 @@ create table public.hukdis_konfigurasi (
   urutan_sisip   bigint generated always as identity
 );
 
-create table public.riwayat_hukdis (
+create table if not exists public.riwayat_hukdis (
   id             text primary key default gen_random_uuid()::text,
   pegawai_id     text not null references public.pegawai (id) on delete cascade,
   jenis_hukdis   text,
@@ -257,7 +257,7 @@ create index on public.riwayat_hukdis (pegawai_id);
 
 -- ============================ Notifikasi dan log ============================
 
-create table public.notifikasi (
+create table if not exists public.notifikasi (
   id            text primary key default gen_random_uuid()::text,
   judul         text,
   pesan         text,
@@ -272,7 +272,7 @@ create table public.notifikasi (
 );
 create index on public.notifikasi (dibaca, created_at desc);
 
-create table public.audit_log (
+create table if not exists public.audit_log (
   id            text primary key default gen_random_uuid()::text,
   waktu         timestamptz default now(),
   aksi          text,

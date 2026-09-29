@@ -4,7 +4,7 @@
 -- tertulis di kode. Setiap perubahan disimpan sebagai versi baru dengan tanggal mulai berlaku; SK memakai
 -- versi yang berlaku pada tanggal suratnya, sehingga SK lama tetap tercetak persis seperti ketika terbit.
 -- Versi yang sudah mulai berlaku tidak diubah atau dihapus; hanya versi terjadwal yang boleh dihapus.
-create table public.template_surat (
+create table if not exists public.template_surat (
   id             text primary key default gen_random_uuid()::text,
   -- Nomor urut versi, 1, 2, 3, …
   versi          integer not null,

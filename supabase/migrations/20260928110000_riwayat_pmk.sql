@@ -2,7 +2,7 @@
 --
 -- SK PMK menambah masa kerja golongan dan menetapkan gaji pokok baru, sehingga dapat menggeser jadwal KGB
 -- berikutnya. Nilai sebelum dan sesudah disimpan agar perubahan pada data pegawai dapat ditelusuri.
-create table public.riwayat_pmk (
+create table if not exists public.riwayat_pmk (
   id                        text primary key default gen_random_uuid()::text,
   pegawai_id                text not null references public.pegawai (id) on delete cascade,
   nomor_sk                  text,

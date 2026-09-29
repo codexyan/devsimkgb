@@ -6,7 +6,7 @@
 --
 -- Bentuknya meniru laporan_mutasi: menunggu, lalu diterima atau dikembalikan dengan catatan. Yang
 -- diterima menerbitkan barisnya sendiri di riwayat_hukdis, dan riwayat_id di sini menunjuk ke baris itu.
-create table public.laporan_hukdis (
+create table if not exists public.laporan_hukdis (
   id              text primary key default gen_random_uuid()::text,
   pegawai_id      text not null references public.pegawai (id) on delete cascade,
   -- Satker pelapor; dipakai membatasi apa yang terlihat akun UPT.

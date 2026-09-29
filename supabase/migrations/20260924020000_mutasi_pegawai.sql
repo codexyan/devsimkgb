@@ -6,7 +6,7 @@
 --
 -- BKO tidak mengubah unit kerja: gaji pegawai BKO tetap dibayar satker asal, sehingga KGB, SK, dan
 -- KPPN tujuannya juga tetap di sana. Yang dicatat hanya satker tempat bertugas, sebagai keterangan.
-create table public.riwayat_mutasi (
+create table if not exists public.riwayat_mutasi (
   id             text primary key default gen_random_uuid()::text,
   pegawai_id     text not null references public.pegawai (id) on delete cascade,
   -- definitif, bko, selesai_bko, atau pemberhentian
