@@ -131,11 +131,35 @@ Deploy produksi berjalan dengan Workers Builds yang terhubung ke repositori Git.
 Workers Builds memasang dependensi dengan `npm ci`, jadi `package-lock.json` harus sesuai dengan
 `package.json` setiap kali dependensi berubah.
 
+Push ke `main` sudah cukup untuk merilis; versi baru biasanya aktif 2–8 menit kemudian. Tidak perlu deploy
+manual.
+
 Deploy manual dari komputer lokal:
 
 ```bash
 npm run cf:deploy     # cf:typegen, opennextjs-cloudflare build, lalu deploy
 ```
+
+> **Hanya jalankan dari Linux atau WSL, jangan dari Windows.** OpenNext mencetak `WARN OpenNext is not
+> fully compatible with Windows`, dan kegagalan menyalin paket muncul sebagai baris
+> `ERROR Failed to copy ...\node_modules\<paket>` yang **tidak** menggagalkan build. Perintah tetap selesai
+> dengan sukses, aset terunggah, binding terdaftar benar, dan wrangler melaporkan `Deployed sim-kgb
+> triggers` — padahal bundle-nya kehilangan modul dan setiap request menjadi 500. Pada 2026-09-29 hal ini
+> menjatuhkan produksi selama dua menit, sementara build CI dari commit yang sama persis sehat.
+>
+> Bila terpaksa deploy dari lokal, segera cek `curl -o /dev/null -w '%{http_code}' https://<domain-produksi>/`
+> sesudahnya. Bila 500, kembalikan dengan:
+>
+> ```bash
+> npx wrangler rollback <version-id-sebelumnya> --name sim-kgb
+> ```
+>
+> Daftar versi sebelumnya ada di `npx wrangler deployments list --name sim-kgb`.
+
+Peringatan `A DurableObjectNamespace in the config referenced the class "PembatasCekKgb", but no such
+Durable Object class is exported from the worker` saat deploy bukan tanda kerusakan. Peringatan itu berasal
+dari tahap populate cache yang memuat `.open-next/worker.js` langsung, sedangkan kelasnya diekspor dari
+pembungkus `worker-entry.js`. Build yang sehat pun menampilkannya.
 
 `cloudflare-env.d.ts` dibuat oleh `npm run cf:typegen` dan tidak disimpan di Git. Tanpa berkas itu,
 `tsc` melaporkan `Property 'SK_BUCKET' does not exist on type 'CloudflareEnv'`. Jalankan ulang setelah
