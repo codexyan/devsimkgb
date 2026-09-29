@@ -70,6 +70,9 @@ export default function UsulanPage() {
   const [daftar, setDaftar] = useState<UsulanKanwil[]>([]);
   const [laporan, setLaporan] = useState<LaporanMutasi[]>([]);
   const [memuat, setMemuat] = useState(true);
+  // Hasil tinjauan ditandai di state lokal supaya daftar dan angka tab langsung benar tanpa menarik
+  // ulang seluruh riwayat. Penanda ini membuat data segar ditarik sekali saat pengguna pindah tab.
+  const [perluSegar, setPerluSegar] = useState(false);
   const [tab, setTab] = useState<Tab>("menunggu");
   const [cari, setCari] = useState("");
   const [upt, setUpt] = useState("semua");
@@ -93,6 +96,7 @@ export default function UsulanPage() {
     const resMutasi = await fetch("/api/mutasi/laporan");
     const m: unknown = resMutasi.ok ? await resMutasi.json().catch(() => []) : [];
     setLaporan(Array.isArray(m) ? (m as LaporanMutasi[]) : []);
+    setPerluSegar(false);
     setMemuat(false);
   }, [router]);
 
@@ -104,6 +108,22 @@ export default function UsulanPage() {
   function beriKabar(teks: string, lama = 7000) {
     setKabar(teks);
     setTimeout(() => setKabar(null), lama);
+  }
+
+  /**
+   * Menandai hasil tinjauan pada salinan lokal. Butirnya langsung pindah tab dan angka tab ikut benar,
+   * tanpa memanggil muat() yang menarik seluruh usulan, seluruh pegawai, riwayat KGB, dan surat. Beberapa
+   * medan hasil hitungan server (mis. nilaiDiusulkan) baru menyusul saat data segar ditarik, dan itu
+   * terjadi begitu pengguna membuka tab lain — tepat di tempat medan itu dipakai.
+   */
+  function tandaiUsulan(id: string, ubah: Partial<UsulanKanwil>) {
+    setDaftar((lama) => lama.map((u) => (u.id === id ? { ...u, ...ubah } : u)));
+    setPerluSegar(true);
+  }
+
+  function tandaiLaporan(id: string, ubah: Partial<LaporanMutasi>) {
+    setLaporan((lama) => lama.map((l) => (l.id === id ? { ...l, ...ubah } : l)));
+    setPerluSegar(true);
   }
 
   async function tinjau(u: UsulanKanwil, aksi: "setujui" | "kembalikan", catatan?: string) {
@@ -130,7 +150,12 @@ export default function UsulanPage() {
       setDialogKembali(null);
       setCatatanKembali("");
       setTerpilih(null);
-      void muat();
+      tandaiUsulan(
+        u.id,
+        aksi === "setujui"
+          ? { status: "disetujui", ditinjauAt: new Date().toISOString() }
+          : { status: "revisi", ditinjauAt: new Date().toISOString(), alasanTolak: catatan ?? "" },
+      );
     } catch {
       setGalat("Tinjauan gagal disimpan");
     } finally {
@@ -157,7 +182,14 @@ export default function UsulanPage() {
       );
       setDialogMassal(null);
       setTerpilih(null);
-      void muat();
+      // Sebagian gagal berarti tidak semua id berubah status, dan hanya server yang tahu yang mana.
+      if (d.gagal) void muat();
+      else {
+        const ditinjauAt = new Date().toISOString();
+        const idDisetujui = new Set(sasaran.isi.map((u) => u.id));
+        setDaftar((lama) => lama.map((u) => (idDisetujui.has(u.id) ? { ...u, status: "disetujui", ditinjauAt } : u)));
+        setPerluSegar(true);
+      }
     } catch {
       setGalat("Persetujuan gagal disimpan");
     } finally {
@@ -181,7 +213,10 @@ export default function UsulanPage() {
       setDialogLaporan(null);
       setCatatanLaporan("");
       setTerpilih(null);
-      void muat();
+      tandaiLaporan(l.id, {
+        status: aksi === "terima" ? "diterima" : "dikembalikan",
+        catatanKanwil: aksi === "kembalikan" ? catatan ?? "" : null,
+      });
     } catch {
       setGalat("Laporan gagal ditinjau");
     } finally {
@@ -346,7 +381,13 @@ export default function UsulanPage() {
                 type="button"
                 role="tab"
                 aria-selected={tab === t.nilai}
-                onClick={() => { setTab(t.nilai); setTerpilih(null); }}
+                onClick={() => {
+                  setTab(t.nilai);
+                  setTerpilih(null);
+                  // Tab yang baru dibuka memakai medan hasil hitungan server, jadi di sinilah data
+                  // segar ditarik: sekali setelah serangkaian tinjauan, bukan sekali per tinjauan.
+                  if (perluSegar) void muat();
+                }}
               >
                 {t.label}
                 <span className="usl-tab-angka" data-nada={jumlah[t.nilai] > 0 ? t.nada : undefined}>{jumlah[t.nilai]}</span>
