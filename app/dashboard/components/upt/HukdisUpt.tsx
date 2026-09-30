@@ -121,11 +121,11 @@ export default function HukdisUpt() {
     <div className="dsb-halaman" data-muat-layar="">
       <header className="dsb-halaman-kepala dsb-muncul">
         <div className="min-w-0">
-          <p className="dsb-label">Hukuman disiplin</p>
+          <p className="dsb-label">Lapor Hukdis</p>
           <h1 className="dsb-halaman-judul">Laporan hukuman disiplin</h1>
           <p className="dsb-sub">
-            Laporkan SK hukuman disiplin pegawai satker ini ke SDM Hukdis Kanwil. Kanwil yang mencatatnya dan, bila
-            hukumannya menunda KGB, menggeser jadwal KGB pegawainya.
+            Laporkan SK hukuman disiplin pegawai satker ini ke SDM Hukdis Kanwil. Wewenang Anda berhenti pada
+            melaporkan: yang menetapkan hukuman, mencatatnya, dan menggeser jadwal KGB karenanya adalah Kanwil.
           </p>
         </div>
         <button
@@ -152,6 +152,17 @@ export default function HukdisUpt() {
           <p>{pesan}</p>
         </div>
       )}
+
+      {/* Batas wewenang dinyatakan menetap di layar, bukan hanya di jendela lapor: operator yang membuka
+          halaman ini untuk memeriksa status tidak selalu melewati jendela itu (ADR-016, ADR-039). */}
+      <div className="dsb-pesan" data-nada="biru">
+        <span className="dsb-pesan-ikon" aria-hidden="true">i</span>
+        <p>
+          <strong>Satker melaporkan, Kanwil yang menetapkan.</strong> Hukuman disiplin dijatuhkan lewat SK pejabat
+          berwenang, dan yang mencatatnya di SIM-KGB serta menggeser jadwal KGB karenanya hanya SDM Hukdis Kanwil.
+          Laporan di halaman ini tidak mengubah data pegawai maupun jadwal KGB sebelum Kanwil mencatatnya.
+        </p>
+      </div>
 
       <div className="dsb-angka-kisi dsb-muncul" style={{ "--i": 1 } as React.CSSProperties}>
         <div className="dsb-angka">

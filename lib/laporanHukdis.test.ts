@@ -66,3 +66,50 @@ test("TMT berakhir sebelum TMT mulai ditolak", () => {
   assert.equal(galatTanggalLaporanHukdis({ tmtMulai: "2026-09-01", tmtBerakhir: "2026-09-01" }), null);
   assert.equal(galatTanggalLaporanHukdis({ tmtMulai: "2026-09-01" }), null);
 });
+
+/*
+ * Penjaga batas wewenang (ADR-016, ditegaskan ADR-039).
+ *
+ * Hukuman disiplin dijatuhkan dengan SK pejabat berwenang, dan di dalam SIM-KGB hanya SDM Hukdis Kanwil
+ * yang boleh mencatatnya serta menggeser jadwal KGB karenanya. Jalur UPT hanya menulis baris laporan.
+ * Aturan itu tidak terbaca dari satu berkas mana pun, jadi diuji langsung pada sumber rutenya: sekali
+ * ada yang menambahkan tulisan ke riwayat hukdis, ke pegawai, atau ke riwayat KGB dari jalur UPT,
+ * uji ini gagal sebelum perubahannya sempat naik.
+ */
+test("rute hukdis Admin UPT hanya menulis laporan, tidak pernah mencatat hukuman atau menggeser KGB", async () => {
+  const { readFileSync, readdirSync } = await import("node:fs");
+  const { join } = await import("node:path");
+
+  const akar = join(__dirname, "..", "app", "api", "upt", "hukdis");
+  const berkas: string[] = [];
+  const telusuri = (dir: string) => {
+    for (const entri of readdirSync(dir, { withFileTypes: true })) {
+      const jalur = join(dir, entri.name);
+      if (entri.isDirectory()) telusuri(jalur);
+      else if (entri.name.endsWith(".ts")) berkas.push(jalur);
+    }
+  };
+  telusuri(akar);
+  assert.ok(berkas.length >= 2, "rute hukdis UPT tidak ditemukan; jalurnya mungkin berpindah");
+
+  // Tabel yang tidak boleh ditulis dari jalur hukdis UPT. Data pegawai ikut dilarang: penanda hukdis
+  // pada pegawai ditulis lib/catatHukdis.ts, milik Kanwil. Notifikasi dan audit sengaja tidak di sini,
+  // sebab keduanya jejak, bukan penetapan.
+  const terlarang = ["riwayatHukdis", "riwayatKGB", "suratKGB", "pegawai"];
+  // Pencocokan teks biasa, bukan RegExp yang dirakit: pola berisi \. dan \b mudah rusak diam-diam saat
+  // dirangkai di template literal, dan penjaga yang rusak justru lulus tanpa memeriksa apa pun.
+  const menulis = ["create", "update", "delete", "createMany", "updateMany", "deleteMany"];
+  for (const jalur of berkas) {
+    const sumber = readFileSync(jalur, "utf8");
+    for (const tabel of terlarang) {
+      for (const aksi of menulis) {
+        assert.ok(
+          !sumber.includes(`db.${tabel}.${aksi}`),
+          `${jalur} memanggil db.${tabel}.${aksi}; mencatat hukdis, mengubah pegawai, dan menggeser KGB adalah wewenang Kanwil`,
+        );
+      }
+    }
+    // Yang boleh ditulis dari sini hanya baris laporannya sendiri.
+    assert.ok(sumber.includes("db.laporanHukdis."), `${jalur} tidak menyentuh laporanHukdis; jalurnya mungkin berubah`);
+  }
+});

@@ -407,7 +407,8 @@ export default async function IsiPanduan({
                   KGB akhirnya dihitung, selisih waktu sejak TMT KGB terakhir dihitung penuh. Bila pegawai sedang
                   memiliki KGB berstatus Sedang Diproses atau Menunggu Keuangan, hukuman disiplin yang menunda KGB hanya
                   dapat dicatat bila mulai berlaku setelah TMT KGB tersebut, dan penundaannya menggeser KGB berikutnya.
-                  UPT melaporkan hukuman disiplin pegawainya lewat menu Hukuman Disiplin (lihat{" "}
+                  UPT melaporkan hukuman disiplin pegawainya lewat menu <strong>Lapor Hukdis</strong>; yang
+                  menetapkan hukumannya dan menggeser jadwal KGB tetap Kanwil (lihat{" "}
                   <a href="#hukdis">hukuman disiplin dari UPT</a>).
                 </p>
 
@@ -907,7 +908,7 @@ export default async function IsiPanduan({
                 </p>
                 <p>
                   Dua hal yang <strong>tidak</strong> diisi di sini. <strong>Hukuman disiplin</strong> dilaporkan lewat
-                  menu <strong>Hukuman Disiplin</strong> beserta pindaian SK-nya (lihat{" "}
+                  menu <strong>Lapor Hukdis</strong> beserta pindaian SK-nya (lihat{" "}
                   <a href="#hukdis">hukuman disiplin dari UPT</a>). <strong>Surat usulan Srikandi</strong> diunggah
                   sekali saja pada langkah berikutnya, karena satu surat memuat banyak pegawai.
                 </p>
@@ -1036,7 +1037,7 @@ export default async function IsiPanduan({
                     Pegawai yang KGB-nya masuk bulan usulan muncul di kolom <strong>Perlu dikerjakan</strong> sebagai
                     pengingat <em>Perlu diperiksa</em>, lengkap dengan batas input Kanwil. Bila ada yang keliru, pilih{" "}
                     <strong>Usulkan perbaikan data</strong> sebelum batas itu. Hukuman disiplin yang belum dilaporkan
-                    disampaikan lewat menu <strong>Hukuman Disiplin</strong>; pegawai yang pindah, BKO, atau berhenti
+                    disampaikan lewat menu <strong>Lapor Hukdis</strong>; pegawai yang pindah, BKO, atau berhenti
                     dilaporkan dengan <strong>Laporkan mutasi</strong> pada barisnya.
                   </p>
                   <p>
@@ -1380,8 +1381,9 @@ export default async function IsiPanduan({
                     <h3 className="pub-step-title">Input KGB</h3>
                     <p className="pub-step-who">Tim SDM, menu Dashboard atau Proses KGB</p>
                     <p>
-                      Di Dashboard, buka Antrian kerja KGB pada ubin Perlu diproses (tampilan Daftar atau Papan), lalu
-                      pilih Input KGB pada baris atau kartu pegawai. Di menu Proses KGB, pilih Input KGB pada baris
+                      Di Dashboard, buka Antrian kerja KGB pada ubin Perlu diproses, lalu pilih Input KGB pada kartu
+                      pegawai. Antrian itu kini hanya bertampilan papan; tampilan Daftar sudah dilepas karena kolom
+                      papan sudah menjawab pertanyaan yang sama. Di menu Proses KGB, pilih Input KGB pada baris
                       berstatus Belum Diproses. Jendela Input KGB menampilkan
                       data kepegawaian saat ini dan hasil perhitungan: masa kerja golongan baru, gaji pokok baru, TMT KGB
                       baru, TMT KGB berikutnya, dan batas input SDM.
@@ -1591,13 +1593,21 @@ export default async function IsiPanduan({
                 </h2>
                 <p>
                   UPT memegang SK hukuman disiplin pegawainya, tetapi yang mencatatnya dan menggeser jadwal KGB adalah
-                  Tim SDM Hukdis Kanwil. Laporannya berjalan lewat modul Hukuman Disiplin, terpisah dari usulan data.
+                  Tim SDM Hukdis Kanwil. Laporannya berjalan lewat modul <strong>Lapor Hukdis</strong>, terpisah dari
+                  usulan data.
+                </p>
+                <p>
+                  Pembagian wewenangnya tegas, dan nama menunya sengaja dibedakan supaya tidak tertukar. Hukuman
+                  disiplin dijatuhkan dengan SK pejabat yang berwenang, di luar SIM-KGB. Di dalam SIM-KGB, hanya
+                  Tim SDM Hukdis Kanwil yang dapat <em>mencatat</em> hukuman itu dan karenanya menunda KGB; menu Admin
+                  UPT bernama <strong>Lapor Hukdis</strong> dan tidak pernah mengubah data pegawai maupun jadwal KGB.
+                  Karena itu pula UPT tidak dapat menghapus hukuman yang sudah tercatat: yang salah dibetulkan Kanwil.
                 </p>
 
                 <h3 className="pub-h3">Di UPT: melaporkan</h3>
                 <ol>
                   <li>
-                    Buka menu <strong>Hukuman Disiplin</strong>, lalu pilih <strong>Laporkan hukuman disiplin</strong>.
+                    Buka menu <strong>Lapor Hukdis</strong>, lalu pilih <strong>Laporkan hukuman disiplin</strong>.
                   </li>
                   <li>
                     Pilih pegawai dan jenis hukuman sesuai SK, lalu isi nomor dan tanggal SK serta TMT mulai. TMT berakhir

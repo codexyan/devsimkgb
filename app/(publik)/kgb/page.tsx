@@ -330,7 +330,8 @@ export default async function HalamanBeranda() {
               <p>
                 Setiap UPT memegang akun Admin UPT untuk menyiapkan usulan, melaporkan mutasi dan hukuman disiplin,
                 melihat SK yang menjadi dasar KGB berikutnya tiap pegawainya, mengunduh SK begitu diunggah Kanwil, dan
-                menandai SK yang sudah direkam di Gaji Web satker.
+                menandai SK yang sudah direkam di Gaji Web satker. Akun itu melaporkan, bukan memutuskan: yang
+                menetapkan KGB, mencatat hukuman disiplin, dan menggeser jadwal karenanya tetap Kanwil.
               </p>
             </li>
           </ul>
@@ -421,7 +422,8 @@ export default async function HalamanBeranda() {
                 </li>
                 <li>
                   KGB ditunda bila pegawai menjalani hukuman disiplin yang menunda KGB, atau penilaian kinerjanya belum
-                  memenuhi syarat.
+                  memenuhi syarat. Penundaan itu berlaku setelah Kanwil mencatat hukumannya, bukan sejak satker
+                  melaporkannya.
                 </li>
                 <li>
                   Usulan yang terlambat tetap diproses. TMT tidak bergeser; selisih gaji dibayar sebagai kekurangan

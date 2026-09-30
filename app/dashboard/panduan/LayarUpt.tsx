@@ -109,7 +109,7 @@ export function LayarMenu() {
     ["Dashboard", "jadwal, pengingat, dan papan Alur KGB"],
     ["Data Pegawai", "daftar pegawai satker Anda"],
     ["Usulan kolektif", "menyiapkan dan mengajukan banyak pegawai"],
-    ["Hukuman Disiplin", "melaporkan hukuman disiplin"],
+    ["Lapor Hukdis", "melaporkan SK hukuman disiplin ke Kanwil"],
     ["Riwayat", "riwayat KGB tiap pegawai, dan jejak usulan yang pernah dikirim"],
     ["Profil Saya", "mengganti kata sandi Anda sendiri"],
   ];
@@ -212,7 +212,7 @@ export function LayarPapan() {
     ["Perlu dikerjakan", "kuning", "3", "Menunggu tindakan UPT"],
     ["Di Kanwil", "biru", "5", "Ditinjau atau diproses Kanwil"],
     ["SK terbit", "hijau", "2", "Unduh, lalu rekam di Gaji Web"],
-    ["Selesai", "hijau", "8", "60 hari terakhir"],
+    ["Selesai", "hijau", "8", "Sudah direkam di Gaji Web"],
   ];
   return (
     <Layar
