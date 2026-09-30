@@ -172,13 +172,17 @@ export default function RiwayatUpt() {
     <div className="dsb-halaman" data-muat-layar="">
       <header className="dsb-halaman-kepala dsb-muncul">
         <div className="min-w-0">
-          <p className="dsb-label">Riwayat</p>
+          <p className="dsb-label">Riwayat aktivitas</p>
           <h1 className="dsb-halaman-judul">Riwayat usulan dan laporan</h1>
           <p className="dsb-sub">
             Semua usulan data pegawai dan laporan mutasi atau pemberhentian yang pernah dikirim ke Kanwil, beserta
             hasil tinjauannya. Data yang masih disiapkan ada di{" "}
-            <Link href="/dashboard" className="kgbm-tautan">Perlu dikerjakan</Link>.
+            <Link href="/dashboard" className="kgbm-tautan">Perlu dikerjakan</Link>, dan perjalanan gaji tiap pegawai
+            ada di <Link href="/dashboard/upt/riwayat" className="kgbm-tautan">Riwayat KGB</Link>.
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/dashboard/upt/riwayat" className="dsb-tombol" data-jenis="garis">Riwayat KGB</Link>
         </div>
       </header>
 

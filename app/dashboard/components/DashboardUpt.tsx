@@ -197,14 +197,16 @@ const KOLOM_UPT: { k: KolomUpt; judul: string; ket: string; nada: Nada }[] = [
   { k: "kerja", judul: "Perlu dikerjakan", ket: "Menunggu tindakan UPT", nada: "kuning" },
   { k: "kanwil", judul: "Di Kanwil", ket: "Ditinjau atau diproses Kanwil", nada: "biru" },
   { k: "sk", judul: "SK terbit", ket: "Unduh, lalu rekam di Gaji Web", nada: "hijau" },
-  { k: "selesai", judul: "Selesai", ket: "60 hari terakhir", nada: "hijau" },
+  // "Selesai" hanya berarti KGB-nya sudah direkam di Gaji Web satker, langkah terakhir yang memang
+  // dipegang Admin UPT. Usulan data yang ditinjau Kanwil tidak masuk sini (lihat sumberPapan).
+  { k: "selesai", judul: "Selesai", ket: "Sudah direkam di Gaji Web", nada: "hijau" },
 ];
 
 const KOSONG_UPT: Record<KolomUpt, string> = {
   kerja: "Tidak ada yang perlu dikerjakan. Pegawai baru ditambahkan dari Data Pegawai.",
   kanwil: "Tidak ada yang sedang di Kanwil.",
   sk: "Belum ada SK baru yang perlu direkam.",
-  selesai: "Belum ada yang selesai dalam 60 hari terakhir.",
+  selesai: "Belum ada KGB yang direkam di Gaji Web.",
 };
 
 /** Satu kartu di papan: nama, satu baris keterangan, satu label, catatan pendek, dan tombol. */
@@ -793,8 +795,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     });
   })();
   const adaDraf = tugas.some((t) => t.usulanId);
-  const batasSelesai = hariIni.getTime() - 60 * 86_400_000;
-  const baruDitinjau = (t: string | null) => !!t && new Date(t).getTime() >= batasSelesai;
   const tmtSingkat = (t: string | null) => (t ? `TMT ${formatTanggalId(t, { month: "short", year: "numeric" })}` : "TMT belum tercatat");
 
   /** Sumber kartu papan; satu entri per dokumen, digabungkan per pegawai di bawah (ADR-026). */
@@ -1029,29 +1029,10 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           />
         ),
       })),
-    ...terkirim
-      .filter((u) => (u.status === "disetujui" || u.status === "ditolak") && baruDitinjau(u.ditinjauAt))
-      .map((u) => ({
-        kolom: "selesai" as const,
-        kunci: `usulan:${u.id}`,
-        pegawaiId: u.pegawaiId,
-        nip: u.nip,
-        waktu: u.ditinjauAt ?? null,
-        ringkas: `${LABEL_JENIS_USULAN[u.jenis] ?? u.jenis} ${u.status} ${fmtTgl(u.ditinjauAt)}`,
-        render: (lain: string[]) => (
-          <KartuUpt
-            lain={lain}
-            nama={u.nama}
-            sub={`${u.nip} · ditinjau ${fmtTgl(u.ditinjauAt)}`}
-            tanda={
-              u.status === "disetujui"
-                ? { teks: `${LABEL_JENIS_USULAN[u.jenis] ?? u.jenis} disetujui`, nada: "hijau" }
-                : { teks: `${LABEL_JENIS_USULAN[u.jenis] ?? u.jenis} ditolak`, nada: "merah" }
-            }
-            catatan={u.status === "ditolak" && u.alasanTolak ? `Alasan: ${u.alasanTolak}` : null}
-          />
-        ),
-      })),
+    // Usulan yang sudah ditinjau Kanwil sengaja tidak masuk kolom Selesai. "Selesai" di papan ini berarti
+    // satu hal saja: KGB-nya sudah direkam di Gaji Web satker. Usulan yang disetujui hanya mengubah data
+    // pegawai, dan yang ditolak justru belum selesai sama sekali. Hasil tinjauannya ada di notifikasi dan
+    // di Riwayat usulan dan laporan (/dashboard/upt/riwayat/aktivitas).
   ];
 
   /** Satu kartu per pegawai; dokumen lain miliknya disebut di kartu itu (lib/papanUpt.ts). */

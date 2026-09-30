@@ -807,12 +807,41 @@ export default async function IsiPanduan({
                   Jadi satu berkas boleh berisi seluruh pegawai satker Anda, tanpa perlu memilah lebih dulu mana yang
                   sudah ada.
                 </p>
+                <h4 className="pub-h3">Yang paling sering merusak berkas: NIP di Excel</h4>
                 <p>
-                  Dua hal yang sering menyulitkan saat menyiapkan berkasnya. Pertama, <strong>NIP di Excel</strong>:
-                  18 angka berubah menjadi 1,99E+17 bila kolomnya tidak diformat sebagai Text lebih dulu, dan barisnya
-                  akan ditolak. Kedua, <strong>tanggal</strong>: Excel berbahasa Indonesia menyimpannya sebagai
-                  dd/mm/yyyy, dan itu terbaca benar — tetapi periksalah tetap pada layar pratinjau, sebab tanggal yang
-                  tertukar hari dan bulannya tidak dapat dikenali sistem sebagai kekeliruan.
+                  Excel memperlakukan NIP sebagai <em>angka</em>, bukan teks. Karena 18 digit tidak muat di lebar
+                  kolom, Excel menampilkannya sebagai <code>1,97E+17</code>. Sampai di sini belum ada yang rusak.
+                  Kerusakan terjadi <strong>saat berkasnya disimpan sebagai CSV</strong>: Excel menuliskan angka yang
+                  tampil itu, sehingga NIP <code>197112051998031004</code> tersimpan menjadi{" "}
+                  <code>197112000000000000</code>. Angka aslinya hilang dari berkas dan tidak dapat dikembalikan
+                  dengan melebarkan kolom.
+                </p>
+                <p>
+                  Yang membuatnya berbahaya: NIP rusak itu <strong>tetap 18 angka</strong>, jadi sekilas terlihat
+                  wajar. Karena itu SIM-KGB tidak hanya menghitung panjangnya, melainkan memeriksa{" "}
+                  <strong>susunannya</strong> — delapan angka pertama harus berupa tanggal lahir yang ada, enam
+                  berikutnya bulan dan tahun TMT CPNS, lalu angka jenis kelamin (1 atau 2) dan nomor urut. Pada NIP
+                  yang rusak, tanggal lahirnya menjadi 00 dan angka jenis kelaminnya 0, sehingga barisnya ditolak
+                  dengan keterangan bahwa NIP-nya kemungkinan dirusak Excel, bukan diam-diam tersimpan sebagai
+                  pegawai baru dengan NIP palsu.
+                </p>
+                <p>
+                  <strong>Cara menghindarinya.</strong> Jangan membuka CSV dengan klik ganda. Buka Excel lebih dulu,
+                  lalu <strong>Data → From Text/CSV</strong>, dan pada jendela pratinjau setel kolom <code>nip</code>{" "}
+                  sebagai <strong>Text</strong> sebelum ditarik masuk. Bila mengetik NIP secara manual, awali dengan
+                  tanda petik satu: <code>&apos;197112051998031004</code>.
+                </p>
+                <p>
+                  <strong>Bila sudah telanjur.</strong> Selama berkasnya <em>belum</em> disimpan, NIP aslinya masih
+                  utuh: tutup tanpa menyimpan, lalu buka ulang dengan cara di atas. Bila sudah telanjur disimpan,
+                  berkas itu tidak dapat diperbaiki — ambil salinan aslinya, atau ketik ulang NIP yang rusak dari SK
+                  pegawai yang bersangkutan.
+                </p>
+                <p>
+                  Satu hal lagi yang sering menyulitkan: <strong>tanggal</strong>. Excel berbahasa Indonesia
+                  menyimpannya sebagai dd/mm/yyyy, dan itu terbaca benar — tetapi periksalah tetap pada layar
+                  pratinjau, sebab tanggal yang tertukar hari dan bulannya tidak dapat dikenali sistem sebagai
+                  kekeliruan.
                 </p>
 
                 <h3 className="pub-h3">Langkah 4 — Siapkan usulan di Usulan kolektif</h3>
@@ -907,8 +936,9 @@ export default async function IsiPanduan({
                   dikembalikan muncul lagi di Perlu dikerjakan beserta catatannya: perbaiki, lalu ajukan ulang; nomor
                   surat yang lama sudah terisi di jendela Ajukan ke Kanwil. Selama usulan menunggu tinjauan, proses KGB
                   pegawainya (Input KGB, Buat SK, Unggah SK TTE) tertahan agar SK dibuat dari data yang sudah
-                  diperbarui. Hasil tinjauan tercatat di menu Riwayat. Satu pegawai hanya boleh punya satu usulan yang
-                  belum selesai, agar antrian tinjauan tidak berisi dua versi yang saling menimpa.
+                  diperbarui. Hasil tinjauan tercatat di <strong>Riwayat → Usulan dan laporan</strong>. Satu pegawai
+                  hanya boleh punya satu usulan yang belum selesai, agar antrian tinjauan tidak berisi dua versi yang
+                  saling menimpa.
                 </p>
 
                 <h4 className="pub-h3">Memantau semuanya dari papan Alur KGB</h4>
@@ -917,6 +947,13 @@ export default async function IsiPanduan({
                   cukup melihat papan ini untuk tahu apa yang masih menunggu Anda dan apa yang sedang di Kanwil.
                 </p>
                 <LayarPapan />
+                <p>
+                  Perhatikan arti kolom terakhir. <strong>Selesai</strong> berisi satu hal saja: KGB yang SK-nya sudah
+                  Anda rekam di Gaji Web satker. Usulan perbaikan data yang disetujui Kanwil <em>tidak</em> masuk ke
+                  sana, sebab yang berubah hanya datanya, bukan gajinya; hasil tinjauannya ada di{" "}
+                  <strong>Riwayat → Usulan dan laporan</strong>. Dengan begitu jumlah pada kolom Selesai selalu dapat
+                  dibaca sebagai &ldquo;sudah beres sampai Gaji Web&rdquo;.
+                </p>
 
                 <h3 className="pub-h3">Langkah 6 — Setelah SK terbit: unduh dan rekam di Gaji Web</h3>
                 <p>
@@ -961,6 +998,23 @@ export default async function IsiPanduan({
                   diperbarui, jadwal KGB berikutnya dibuat, dan tidak dapat dibatalkan dari layar itu. Kanwil hanya
                   memantau SK yang belum direkam lewat panel SK UPT belum direkam. Batas waktunya sama untuk semua
                   satuan kerja, karena SPM gaji induk bulan berjalan tetap paling lambat tanggal 15 bulan sebelumnya.
+                </p>
+
+                <h4 className="pub-h3">Menu Riwayat: dua catatan yang berbeda</h4>
+                <p>
+                  Menu <strong>Riwayat</strong> terbuka pada <strong>Riwayat KGB</strong>: satu baris untuk tiap
+                  pegawai satker Anda, berisi KGB terakhirnya, golongan dan gaji pokok sebelum dan sesudahnya, serta
+                  jumlah siklus yang pernah dijalani. Buka satu baris untuk melihat seluruh siklusnya dari yang
+                  terbaru, lengkap dengan nomor SK, masa kerja golongan, dan tanggal perekamannya di Gaji Web. SK
+                  lama yang direkam Kanwil sebagai arsip ikut tampil di sini, sehingga dasar KGB berikutnya dapat
+                  ditelusuri sampai ke belakang. Inilah yang dibuka bila ada yang bertanya &ldquo;gaji pegawai ini
+                  terakhir naik kapan, dan berapa&rdquo;.
+                </p>
+                <p>
+                  Tombol <strong>Usulan dan laporan</strong> di kanan atas membuka catatan yang lain: semua usulan
+                  data dan laporan mutasi atau pemberhentian yang pernah Anda kirim ke Kanwil beserta hasil
+                  tinjauannya. Dua hal ini sengaja dipisah karena menjawab pertanyaan yang berbeda — yang satu tentang
+                  perjalanan gaji pegawai, yang lain tentang kiriman Anda sudah ditinjau atau belum.
                 </p>
 
                 <h3 className="pub-h3">Yang wajib dipastikan sebelum surat dikirim</h3>

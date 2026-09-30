@@ -16,6 +16,7 @@ import { BIDANG_DIISI, bacaIsianBaris } from "./usulanFormulir";
 import { bandingkanUsulan, kekuranganUsulan, type PerubahanUsulan } from "./usulanPegawai";
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "./dataPegawai";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR } from "./pilihanPegawai";
+import { periksaNip } from "./nipPns";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 
 /** Kolom yang harus ada pada baris kepala berkas; isinya boleh kosong kecuali NIP dan nama. */
@@ -42,7 +43,7 @@ export const KOLOM_TEMPLAT_UPT: readonly {
     kolom: "nip",
     peran: "wajib",
     keterangan:
-      "18 digit angka. Di Excel, format kolom ini sebagai Text sebelum mengetik, atau tulis =\"199001012025061001\"; tanpa itu NIP berubah menjadi 1,99E+17 dan barisnya ditolak.",
+      "18 digit angka, susunannya tanggal lahir + TMT CPNS + jenis kelamin + nomor urut. Di Excel, setel kolom ini sebagai Text sebelum mengetik, atau tulis =\"199001012025061001\"; tanpa itu NIP berubah menjadi 1,99E+17 dan barisnya ditolak.",
     contoh: "199001012025061001",
   },
   { kolom: "nama", peran: "wajib", keterangan: "Nama lengkap sesuai SK pengangkatan.", contoh: "NAMA PEGAWAI CONTOH" },
@@ -210,7 +211,11 @@ export function periksaImporUpt(
     };
     const tolak = (galat: string): HasilBarisImpor => ({ ...dasar, hasil: "ditolak", galat });
 
-    if (!/^\d{18}$/.test(nip)) return tolak("NIP harus tepat 18 digit angka");
+    // Susunan NIP diperiksa, bukan hanya panjangnya. NIP yang dirusak Excel tetap 18 digit
+    // (197112000000000000), jadi pemeriksaan panjang saja meloloskannya sebagai pegawai baru ber-NIP
+    // palsu — kejadian nyata 30 September 2026. Lihat lib/nipPns.ts.
+    const periksa = periksaNip(nip);
+    if (!periksa.ok) return tolak(periksa.galat.pesan);
     if (!nama) return tolak("Nama lengkap wajib diisi");
     if (terlihat.has(nip)) return tolak("NIP ini muncul lebih dari sekali pada berkas");
     terlihat.add(nip);

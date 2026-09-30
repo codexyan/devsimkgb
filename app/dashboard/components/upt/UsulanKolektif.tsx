@@ -499,7 +499,8 @@ export default function UsulanKolektif() {
         <div role="status" className="dsb-pesan" data-nada="hijau">
           <span className="dsb-pesan-ikon" aria-hidden="true">✓</span>
           <p>
-            {selesai} Pantau hasilnya di <Link href="/dashboard/upt/riwayat">Riwayat</Link>.
+            {selesai} Pantau hasilnya di{" "}
+            <Link href="/dashboard/upt/riwayat/aktivitas">Riwayat usulan dan laporan</Link>.
           </p>
         </div>
       )}

@@ -70,3 +70,36 @@ test("sumber tanpa pegawaiId dan tanpa NIP tidak pernah tergabung satu sama lain
   ]);
   assert.equal(hasil.length, 2);
 });
+
+/*
+ * Penjaga arti kolom "Selesai" (keputusan pemilik, 30 September 2026).
+ *
+ * Kolom Selesai pernah menampung dua hal sekaligus: SK yang sudah direkam di Gaji Web, dan usulan
+ * perubahan data yang baru ditinjau Kanwil. Yang kedua keliru — usulan yang disetujui hanya mengubah
+ * data pegawai, dan yang ditolak justru belum selesai sama sekali, sehingga kartu merah "ditolak"
+ * ikut mendarat di kolom hijau. Sejak itu "Selesai" berarti satu hal saja: KGB-nya sudah direkam di
+ * Gaji Web oleh Admin UPT. Uji ini membaca sumbernya agar aturan itu tidak pelan-pelan kembali.
+ */
+test("kolom Selesai pada papan UPT hanya diisi SK yang sudah direkam di Gaji Web", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const sumber = readFileSync(
+    join(__dirname, "..", "app", "dashboard", "components", "DashboardUpt.tsx"),
+    "utf8",
+  );
+
+  const penanda = 'kolom: "selesai" as const';
+  const tempat: number[] = [];
+  for (let i = sumber.indexOf(penanda); i !== -1; i = sumber.indexOf(penanda, i + 1)) tempat.push(i);
+
+  assert.equal(tempat.length, 1, "kolom Selesai kini punya lebih dari satu sumber kartu");
+  // Sumber satu-satunya itu memang cabang SK yang disaring pada gajiWebAt, bukan usulan yang ditinjau.
+  const sebelum = sumber.slice(Math.max(0, tempat[0] - 400), tempat[0]);
+  assert.match(sebelum, /skSelesai\s*\r?\n?\s*\.filter\(\(sk\) => sk\.gajiWebAt\)/);
+  // Usulan yang disetujui atau ditolak tidak boleh lagi menjadi kartu papan mana pun di kolom Selesai.
+  assert.doesNotMatch(
+    sumber,
+    /u\.status === "disetujui" \|\| u\.status === "ditolak"/,
+    'usulan yang sudah ditinjau kembali dijadikan kartu papan; tempatnya di Riwayat usulan dan laporan',
+  );
+});

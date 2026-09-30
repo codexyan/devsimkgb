@@ -173,10 +173,10 @@ test("NIP yang tidak sah, kembar, atau sudah diusulkan sebagai pegawai baru dito
     ],
     konteks({ nipUsulan: new Set(["200409072025061002"]) }),
   );
+  assert.match(hasil[0].galat ?? "", /18 digit angka/);
   assert.deepEqual(
-    hasil.map((h) => h.galat),
+    hasil.slice(1).map((h) => h.galat),
     [
-      "NIP harus tepat 18 digit angka",
       null,
       "NIP ini muncul lebih dari sekali pada berkas",
       "NIP ini sudah ada pada usulan pegawai baru yang belum selesai",
@@ -185,6 +185,21 @@ test("NIP yang tidak sah, kembar, atau sudah diusulkan sebagai pegawai baru dito
   );
   // Nomor barisnya ikut dilaporkan supaya operator tahu baris mana yang harus dibetulkan.
   assert.deepEqual(hasil.map((h) => h.baris), [1, 2, 3, 4, 5]);
+});
+
+test("NIP yang dirusak Excel ditolak, meskipun panjangnya tetap 18 digit", () => {
+  // 197112051998031004 yang disimpan Excel menjadi angka pembulatan. Sebelum lib/nipPns.ts, baris ini
+  // lolos sebagai pegawai baru ber-NIP palsu karena /^\d{18}$/ meloloskannya.
+  const [h] = periksaImporUpt([baris({ nip: "197112000000000000" })], kosong);
+  assert.equal(h.hasil, "ditolak");
+  assert.match(h.galat ?? "", /Excel/);
+  assert.match(h.galat ?? "", /From Text\/CSV/);
+});
+
+test("NIP yang masih berbentuk notasi ilmiah disebut sebabnya", () => {
+  const [h] = periksaImporUpt([baris({ nip: "1,97E+17" })], kosong);
+  assert.equal(h.hasil, "ditolak");
+  assert.match(h.galat ?? "", /notasi ilmiah/);
 });
 
 test("NIP yang disimpan Excel sebagai rumus teks tetap terbaca", () => {

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import RiwayatUpt from "@/app/dashboard/components/upt/RiwayatUpt";
+import RiwayatKgbUpt from "@/app/dashboard/components/upt/RiwayatKgbUpt";
 
-export const metadata: Metadata = { title: "Riwayat" };
+export const metadata: Metadata = { title: "Riwayat KGB" };
 
-/** Modul Riwayat Admin UPT: semua usulan dan laporan yang pernah dikirim ke Kanwil. */
+/** Modul Riwayat Admin UPT: riwayat KGB pegawai satker, sebangun dengan panel Keuangan Kanwil. */
 export default function HalamanRiwayatUpt() {
-  return <RiwayatUpt />;
+  return <RiwayatKgbUpt />;
 }

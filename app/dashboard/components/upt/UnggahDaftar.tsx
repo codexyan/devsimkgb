@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Papa from "papaparse";
 import { Catatan } from "@/app/dashboard/components/kgb";
+import { GAYA_MODAL_KGB } from "@/app/dashboard/components/kgb/gayaModal";
 import {
   BATAS_BARIS_IMPOR,
   KOLOM_IMPOR_UPT,
@@ -267,6 +268,13 @@ export default function UnggahDaftar() {
 
   return (
     <div className="dsb-halaman">
+      {/* Halaman ini memakai komponen tampilan modal KGB (Catatan, kgbm-data, kgbm-panduan) di luar modal,
+          sehingga gayanya tidak ikut termuat oleh KerangkaModal dan seluruh kotaknya tampil polos —
+          termasuk peringatan NIP yang justru harus menonjol. href dan precedence-nya sama dengan yang
+          dipasang KerangkaModal, jadi React menggabungkannya menjadi satu bila keduanya tampil. */}
+      <style href="sim-kgb-modal-kgb" precedence="default">
+        {GAYA_MODAL_KGB}
+      </style>
       <header className="dsb-halaman-kepala dsb-muncul">
         <div className="min-w-0">
           <p className="dsb-label">Data Pegawai</p>
@@ -318,6 +326,25 @@ export default function UnggahDaftar() {
               Isi templat CSV di bawah, satu baris untuk satu pegawai. Isinya masuk sebagai data yang disiapkan, belum
               terkirim: setelah ini lengkapi yang masih kurang di Usulan kolektif, lalu ajukan bersama satu surat
               usulan. Kolom unit kerja pada berkas diabaikan, sebab satkernya mengikuti akun ini.
+            </Catatan>
+
+            {/* Kesalahan yang paling sering terjadi dan paling sulit disadari, karena NIP yang rusak
+                tetap berupa 18 angka. Diletakkan di depan, sebelum berkas dipilih, sebab sesudah
+                berkasnya telanjur disimpan Excel angka aslinya sudah tidak dapat dikembalikan. */}
+            <Catatan nada="amber">
+              <strong>Jaga kolom NIP sebelum menyimpan di Excel.</strong> Excel memperlakukan NIP sebagai
+              angka biasa, menampilkannya <code>1,97E+17</code>, lalu menyimpan yang tampil itu ke CSV.
+              NIP <code>197112051998031004</code> berubah menjadi <code>197112000000000000</code> —
+              tetap 18 angka, tetapi bukan lagi NIP siapa pun.
+              <br />
+              Cara amannya: buka berkas lewat <strong>Data → From Text/CSV</strong>, setel kolom{" "}
+              <code>nip</code> sebagai <strong>Text</strong> sebelum ditarik masuk. Bila mengetik manual,
+              awali dengan tanda petik satu: <code>&apos;197112051998031004</code>.
+              <br />
+              Bila NIP sudah telanjur tampil <code>1,97E+17</code>,{" "}
+              <strong>tutup berkasnya tanpa menyimpan</strong> lalu buka ulang dengan cara di atas. NIP
+              yang rusak akan ditolak di langkah berikutnya beserta sebabnya, jadi tidak akan diam-diam
+              tersimpan sebagai pegawai baru.
             </Catatan>
 
             <div className="kgbm-data">

@@ -110,7 +110,7 @@ export function LayarMenu() {
     ["Data Pegawai", "daftar pegawai satker Anda"],
     ["Usulan kolektif", "menyiapkan dan mengajukan banyak pegawai"],
     ["Hukuman Disiplin", "melaporkan hukuman disiplin"],
-    ["Riwayat", "hasil tinjauan Kanwil dan SK yang sudah terbit"],
+    ["Riwayat", "riwayat KGB tiap pegawai, dan jejak usulan yang pernah dikirim"],
     ["Profil Saya", "mengganti kata sandi Anda sendiri"],
   ];
   return (
@@ -222,7 +222,7 @@ export function LayarPapan() {
         "Perlu dikerjakan: draf yang belum Anda ajukan, dan usulan yang dikembalikan Kanwil beserta catatannya.",
         "Di Kanwil: sudah Anda ajukan. Datanya terkunci di sini, sebab peninjau harus melihat persis apa yang dikirim.",
         "SK terbit: SK sudah ditandatangani. Unduh SK-nya, rekam di Gaji Web satker, lalu tandai di sini.",
-        "Selesai: yang sudah direkam di Gaji Web dalam 60 hari terakhir. Selebihnya ada di menu Riwayat.",
+        "Selesai: KGB yang SK-nya sudah Anda rekam di Gaji Web. Hanya itu; usulan yang disetujui tidak masuk ke sini.",
       ]}
       catatan="Satu pegawai selalu satu kartu. Bila orang yang sama punya beberapa dokumen berjalan, kartunya berada di kolom yang paling perlu Anda kerjakan."
       anak={
