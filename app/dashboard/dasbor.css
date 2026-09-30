@@ -2034,6 +2034,27 @@ html[data-gerak="kurangi"] .dsb-putar {
    ditumpuk menjadi blok di layar sempit, agar tidak menempel pada teks status. */
 .upt-aksi { display: block; margin-top: 6px; }
 .upt-aksi + .upt-aksi { margin-top: 4px; }
+
+/* Baris pegawai Admin UPT (ADR-042): penanda BKO, dan kolom tindakan yang terpisah dari status. */
+.upt-bko { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; min-width: 0;
+  font-size: 11.5px; color: var(--dt4); }
+.upt-bko .dsb-tag { flex-shrink: 0; }
+.upt-tindakan { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; }
+/* Tanpa tindakan utama (usulan sedang ditinjau Kanwil), tombol titik tiga tetap sejajar tombol baris lain. */
+.upt-tindakan > .mnu-pemicu:only-child { margin-right: 0; }
+
+/* Menu titik tiga. Panelnya dirender di body lewat portal, jadi gayanya tidak bersarang di tabel. */
+.mnu-pemicu { flex-shrink: 0; }
+.mnu-panel { position: fixed; z-index: 320; display: flex; flex-direction: column; padding: 4px;
+  background: var(--card); border: 1px solid var(--ln1); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(9, 20, 40, 0.16); animation: mnuMuncul 0.14s ease backwards; }
+@keyframes mnuMuncul { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.mnu-item { display: grid; gap: 1px; width: 100%; padding: 7px 10px; border: 0; border-radius: 8px;
+  background: none; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--dtn);
+  text-align: left; cursor: pointer; }
+.mnu-item small { font-size: 11px; font-weight: 400; line-height: 1.4; color: var(--dt5); }
+.mnu-item:hover { background: var(--sub); }
+.mnu-item:focus-visible { outline: none; background: var(--sub); box-shadow: var(--focus-ring); }
 /* Deretan tombol pada bilah alat dan kepala panel UPT: sejajar dengan jarak tetap, turun baris di layar sempit. */
 .upt-deret { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 

@@ -14,6 +14,7 @@ import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
 import { kartuPerKolom, type KolomUpt, type SumberKartu } from "@/lib/papanUpt";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
 import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
+import MenuTindakan from "@/app/dashboard/components/MenuTindakan";
 import type { JenisMutasi } from "@/lib/mutasiPegawai";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
@@ -683,11 +684,13 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               <table className="dsb-tabel" style={{ minWidth: "720px" }}>
                 <thead>
                   <tr>
+                    {/* Gaji pokok menyatu dengan KGB berikutnya: keduanya menjawab hal yang sama, dan
+                        kolom Tindakan tersendiri membuat kolom Status kembali berisi status saja. */}
                     <th scope="col">Pegawai</th>
                     <th scope="col">KGB berikutnya</th>
-                    <th scope="col">Gaji pokok</th>
                     <th scope="col">Dasar KGB berikutnya</th>
                     <th scope="col">Status di Kanwil</th>
+                    <th scope="col" className="kanan">Tindakan</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -703,20 +706,25 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                     const batas = tmt ? hitungDeadlineSDM(tmt) : null;
                     return (
                       <tr key={p.id}>
-                        <td style={{ maxWidth: "240px" }}>
+                        <td style={{ maxWidth: "260px" }}>
                           <p className="dsb-nama truncate" style={{ margin: 0 }}>{p.nama}</p>
                           <p className="dsb-kecil truncate" style={{ margin: 0 }} title={p.jabatan}>{p.nip} · {p.golonganRuang} · {p.jabatan}</p>
-                          {/* BKO hanya keterangan: yang mengusulkan dan merekam KGB-nya tetap satker ini. */}
+                          {/* BKO hanya keterangan: yang mengusulkan dan merekam KGB-nya tetap satker ini.
+                              Kalimat itu pindah ke tooltip agar identitas pegawai tidak kalah menonjol oleh
+                              catatan penugasan; nama satkernya tetap resmi lengkap, hanya dipotong CSS. */}
                           {p.satkerTugas && (
-                            <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-amber)" }} title={`Bertugas di ${p.satkerTugas}`}>
-                              <span className="dsb-titik" data-nada="kuning" aria-hidden="true" /> BKO di{" "}
-                              {namaUnitKerja(p.satkerTugas)}
-                              <span style={{ color: "var(--dt5)" }}> · KGB tetap diusulkan satker ini</span>
+                            <p
+                              className="upt-bko"
+                              title={`Bertugas di ${namaUnitKerja(p.satkerTugas)}. KGB tetap diusulkan dan direkam satker ini.`}
+                            >
+                              <span className="dsb-tag" data-nada="kuning">BKO</span>
+                              <span className="truncate">{namaUnitKerja(p.satkerTugas)}</span>
                             </p>
                           )}
                         </td>
                         <td className="whitespace-nowrap">
                           {p.tmtKgb ? formatTanggalId(p.tmtKgb, { month: "short", year: "numeric" }) : "-"}
+                          <p className="dsb-kecil" style={{ margin: 0, fontVariantNumeric: "tabular-nums" }}>{fmtRp(p.gajiPokok)}</p>
                           {bulanKirim && (
                             <p className="dsb-kecil" style={{ margin: 0, color: p.bulanTmt === bulanUsulan ? "var(--st-amber)" : undefined }}>
                               {p.bulanTmt === bulanUsulan ? "usulkan bulan ini" : `usulkan ${namaBulan(bulanKirim)}`}
@@ -724,7 +732,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                             </p>
                           )}
                         </td>
-                        <td className="whitespace-nowrap" style={{ fontVariantNumeric: "tabular-nums" }}>{fmtRp(p.gajiPokok)}</td>
                         {/* SK yang gaji pokoknya dipakai SK KGB berikutnya; berpindah sendiri bila ada SK pangkat/PI atau PMK yang lebih baru (ADR-030). */}
                         <td style={{ maxWidth: "230px" }}>
                           {p.dasarKgb ? (
@@ -768,40 +775,51 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                                   : "Sudah diusulkan, menunggu tinjauan Kanwil"}
                             </p>
                           ) : null}
-                          {!sedangDitinjau && (
-                            <span className="upt-aksi">
-                              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => bukaUsulan(p)}>
+                        </td>
+                        {/* Satu tindakan utama yang berubah menurut keadaan, sisanya di menu titik tiga.
+                            Sebelumnya ketiganya bertumpuk di kolom Status, sehingga tujuh pegawai saja
+                            sudah setinggi satu layar dan tidak ada yang tampak lebih penting (ADR-042). */}
+                        <td className="kanan">
+                          <span className="upt-tindakan">
+                            {!sedangDitinjau && (
+                              // Tombol pekat hanya bila memang ada yang menunggu dikerjakan: draf yang
+                              // belum diajukan atau usulan yang dikembalikan Kanwil. Membuat seluruh baris
+                              // pekat berarti tidak ada yang menonjol, dan kolomnya menjadi dinding tinta.
+                              <button
+                                type="button"
+                                className="dsb-tombol dsb-tombol-kecil"
+                                data-jenis={milikSendiri ? undefined : "garis"}
+                                onClick={() => bukaUsulan(p)}
+                              >
                                 {milikSendiri?.status === "revisi"
                                   ? "Perbaiki usulan"
                                   : milikSendiri
                                     ? milikSendiri.kekurangan.length > 0 ? "Lengkapi draf" : "Ubah draf"
-                                    : "Usulkan perbaikan data"}
+                                    : "Usulkan perbaikan"}
                               </button>
-                            </span>
-                          )}
-                          {!laporanBerjalan(p.id) && (
-                            <>
-                              <span className="upt-aksi">
-                                <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setLaporMutasi({ pegawai: p })}>
-                                  Laporkan mutasi
-                                </button>
-                              </span>
-                              {/* Pintasan untuk baris yang seharusnya tidak pernah ada. UPT memang tidak
-                                  menghapus data pegawai (ADR-033); yang dikirim tetap laporan, dan Kanwil
-                                  yang menonaktifkannya. Tanpa pintasan ini, kemampuan itu tersembunyi di
-                                  balik tombol Laporkan mutasi, tempat yang tidak akan ditebak siapa pun. */}
-                              <span className="upt-aksi">
-                                <button
-                                  type="button"
-                                  className="dsb-tautan"
-                                  onClick={() => setLaporMutasi({ pegawai: p, jenisAwal: "pembatalan" })}
-                                  title="Entri ganda, NIP salah ketik, atau tidak pernah bertugas di satker ini"
-                                >
-                                  Seharusnya tidak tercatat?
-                                </button>
-                              </span>
-                            </>
-                          )}
+                            )}
+                            <MenuTindakan
+                              judul={`Tindakan lain untuk ${p.nama}`}
+                              item={
+                                laporanBerjalan(p.id)
+                                  ? []
+                                  : [
+                                      {
+                                        label: "Laporkan mutasi",
+                                        keterangan: "Pindah satker, BKO, selesai BKO, atau pemberhentian",
+                                        onPilih: () => setLaporMutasi({ pegawai: p }),
+                                      },
+                                      {
+                                        // UPT memang tidak menghapus data pegawai (ADR-033); yang dikirim
+                                        // tetap laporan, dan Kanwil yang menonaktifkannya.
+                                        label: "Seharusnya tidak tercatat?",
+                                        keterangan: "Entri ganda, NIP salah ketik, atau tidak pernah bertugas di sini",
+                                        onPilih: () => setLaporMutasi({ pegawai: p, jenisAwal: "pembatalan" }),
+                                      },
+                                    ]
+                              }
+                            />
+                          </span>
                         </td>
                       </tr>
                     );

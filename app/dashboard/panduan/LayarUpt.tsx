@@ -263,7 +263,8 @@ export function LayarDataPegawai() {
         "Usulan kolektif: menyiapkan banyak pegawai untuk satu surat. Ini jalur yang Anda pakai setiap periode.",
         "Unggah daftar: satu berkas CSV berisi banyak pegawai sekaligus. Dipakai saat mengisi data pertama kali atau meremajakan banyak data.",
         "Tambah pegawai: untuk satu orang yang belum tercatat, misalnya CPNS yang baru dilantik.",
-        "Usulkan perbaikan data: membetulkan data satu pegawai yang sudah tercatat, termasuk NIP yang salah ketik.",
+        "Usulkan perbaikan: membetulkan data satu pegawai yang sudah tercatat, termasuk NIP yang salah ketik.",
+        "Titik tiga: tindakan lain untuk pegawai itu — Laporkan mutasi, dan Seharusnya tidak tercatat? untuk baris yang keliru sejak awal.",
       ]}
       anak={
         <>
@@ -295,8 +296,12 @@ export function LayarDataPegawai() {
               <small>199001012025061001 · Penjaga Tahanan · II/a</small>
             </span>
             <span className="lyr-sorot-bungkus">
-              <Tombol jenis="garis" anak="Usulkan perbaikan data" />
+              <Tombol jenis="garis" anak="Usulkan perbaikan" />
               <No n={4} />
+            </span>
+            <span className="lyr-sorot-bungkus">
+              <Tombol jenis="garis" anak="⋮" />
+              <No n={5} />
             </span>
           </div>
         </>
