@@ -200,6 +200,13 @@ export interface DataArsipKgb {
   tmtSK: string;
   /** Pejabat yang menetapkan SK yang diarsipkan; boleh kosong. */
   penetapSkArsip: string;
+  /**
+   * Masa kerja golongan dan gaji pokok yang **tertulis pada SK**. Bukan data yang disimpan: server
+   * memakainya untuk memastikan arsipnya sama dengan SK-nya, lalu menolak bila berbeda (ADR-035).
+   */
+  mkgTahunSK: string;
+  mkgBulanSK: string;
+  gajiPokokSK: string;
 }
 
 /** Badan permintaan POST /api/kgb mode arsip. Penetap hanya dikirim bila diisi. */
@@ -211,6 +218,9 @@ export function badanArsipKgb(pegawaiId: string, data: DataArsipKgb): Record<str
     tanggalSK: data.tanggalSK,
     tmtSK: data.tmtSK,
     isArsip: true,
+    mkgTahunSK: data.mkgTahunSK,
+    mkgBulanSK: data.mkgBulanSK,
+    gajiPokokSK: data.gajiPokokSK,
     // Kolom SK pada record arsip menggambarkan SK yang diarsipkan, jadi penetapnya sama. penetapSkArsip
     // dipakai server sebagai penetap SK dasar untuk jadwal KGB berikutnya.
     ...(penetap ? { penetapSkDasar: penetap, penetapSkArsip: penetap } : {}),

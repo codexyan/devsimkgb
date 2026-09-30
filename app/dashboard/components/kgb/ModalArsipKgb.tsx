@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { simpanArsipKgb, unggahSk } from "@/lib/kgbAksi";
+import { bacaAngkaSk, bedaArsipSk } from "@/lib/cocokArsipSk";
 import { formatTanggalId, isoTanggalLokal } from "@/lib/waktu";
 import KerangkaModal from "./KerangkaModal";
 import {
@@ -38,11 +39,23 @@ interface IsianArsip {
   /** null berarti belum diubah; tampilan memakai TMT hasil perhitungan. */
   tmtSK: string | null;
   penetapSkArsip: string;
+  /** Angka yang tertulis pada SK; pembanding, bukan data yang disimpan (ADR-035). */
+  mkgTahunSK: string;
+  mkgBulanSK: string;
+  gajiPokokSK: string;
 }
 
 export default function ModalArsipKgb({ pegawai: ringkas, onTutup, onBerhasil }: PropsModalArsipKgb) {
   const { memuat, galat: galatMuat, pegawai, perhitungan, muatUlang } = usePegawaiKgb(ringkas.id);
-  const [form, setForm] = useState<IsianArsip>({ nomorSK: "", tanggalSK: "", tmtSK: null, penetapSkArsip: "" });
+  const [form, setForm] = useState<IsianArsip>({
+    nomorSK: "",
+    tanggalSK: "",
+    tmtSK: null,
+    penetapSkArsip: "",
+    mkgTahunSK: "",
+    mkgBulanSK: "",
+    gajiPokokSK: "",
+  });
   const [berkas, setBerkas] = useState<File | null>(null);
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
@@ -55,7 +68,28 @@ export default function ModalArsipKgb({ pegawai: ringkas, onTutup, onBerhasil }:
   const tmtBerbeda = !!hasil && !!tmtSK && tmtSK !== tmtHitung;
   const terkunci = !idTersimpan && (hasil?.isLocked ?? false);
   const isianTerkunci = sibuk || !!idTersimpan;
-  const bisaKirim = !sibuk && !memuat && !terkunci && (!!idTersimpan || perhitungan?.ok !== false);
+
+  // Pencocokan dengan angka yang tertulis pada SK (ADR-035). Selama belum cocok, tombol simpan mati:
+  // arsip yang angkanya meleset akan mengunci angka keliru itu sebagai dasar KGB berikutnya.
+  const angkaSk = bacaAngkaSk({
+    mkgTahun: form.mkgTahunSK,
+    mkgBulan: form.mkgBulanSK,
+    gajiPokok: form.gajiPokokSK,
+  });
+  const angkaSkTerbaca = !!angkaSk && !!hasil;
+  const bedaSk =
+    angkaSk && hasil
+      ? bedaArsipSk(
+          { mkgTahun: hasil.mkgTahunBaru, mkgBulan: hasil.mkgBulanBaru, gajiPokok: hasil.gajiPokokBaru },
+          angkaSk,
+        )
+      : [];
+
+  const bisaKirim =
+    !sibuk &&
+    !memuat &&
+    !terkunci &&
+    (!!idTersimpan || (perhitungan?.ok !== false && angkaSkTerbaca && bedaSk.length === 0));
 
   function tutup() {
     if (sibuk) return;
@@ -94,6 +128,9 @@ export default function ModalArsipKgb({ pegawai: ringkas, onTutup, onBerhasil }:
         tanggalSK: form.tanggalSK,
         tmtSK,
         penetapSkArsip: form.penetapSkArsip,
+        mkgTahunSK: form.mkgTahunSK,
+        mkgBulanSK: form.mkgBulanSK,
+        gajiPokokSK: form.gajiPokokSK,
       });
       if (!simpan.ok) {
         setSibuk(false);
@@ -222,6 +259,58 @@ export default function ModalArsipKgb({ pegawai: ringkas, onTutup, onBerhasil }:
             TMT SK berbeda dengan TMT KGB menurut Data Pegawai ({formatTanggalId(hasil?.tmtKgbBaru)}). Periksa kembali
             dokumen SK atau perbarui Data Pegawai sebelum menyimpan.
           </Catatan>
+        )}
+
+        {/* Pembanding, bukan data yang disimpan: yang tersimpan tetap hitungan sistem dari tabel PP 5/2024.
+            Tanpa pembanding ini, arsip yang angkanya meleset tersimpan diam-diam lalu mengunci angka keliru
+            itu menjadi dasar KGB berikutnya (ADR-035). */}
+        <div className="kgbm-grid2">
+          <div className="kgbm-grid2">
+            <BidangTeks
+              label="Masa kerja pada SK (tahun)"
+              wajib
+              nilai={form.mkgTahunSK}
+              onUbah={(nilai) => setForm((f) => ({ ...f, mkgTahunSK: nilai.replace(/\D/g, "").slice(0, 2) }))}
+              placeholder="14"
+              nonaktif={isianTerkunci}
+            />
+            <BidangTeks
+              label="bulan"
+              wajib
+              nilai={form.mkgBulanSK}
+              onUbah={(nilai) => setForm((f) => ({ ...f, mkgBulanSK: nilai.replace(/\D/g, "").slice(0, 2) }))}
+              placeholder="0"
+              nonaktif={isianTerkunci}
+            />
+          </div>
+          <BidangTeks
+            label="Gaji pokok pada SK"
+            wajib
+            nilai={form.gajiPokokSK}
+            onUbah={(nilai) => setForm((f) => ({ ...f, gajiPokokSK: nilai }))}
+            placeholder="3.607.500"
+            petunjuk="Salin dari baris Gaji Pokok Baru pada SK."
+            nonaktif={isianTerkunci}
+          />
+        </div>
+
+        {bedaSk.length > 0 && (
+          <Catatan nada="merah">
+            <strong>Angka pada SK tidak cocok dengan hitungan sistem.</strong>
+            <ul style={{ margin: "6px 0", paddingLeft: 18 }}>
+              {bedaSk.map((b) => (
+                <li key={b.label}>
+                  {b.label} — sistem <b>{b.sistem}</b>, SK <b>{b.sk}</b>
+                </li>
+              ))}
+            </ul>
+            Biasanya masa kerja golongan atau golongan pegawai di Data Pegawai yang belum sesuai SK dasarnya.
+            Perbaiki data pegawainya lebih dulu, baru arsipkan SK ini. Menyimpan sekarang akan mengunci angka
+            yang keliru sebagai dasar KGB berikutnya.
+          </Catatan>
+        )}
+        {angkaSkTerbaca && bedaSk.length === 0 && (
+          <Catatan nada="hijau">Angka pada SK cocok dengan hitungan sistem.</Catatan>
         )}
         <BidangPenetap
           nilai={form.penetapSkArsip}

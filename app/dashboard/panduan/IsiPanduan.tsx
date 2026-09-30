@@ -1471,6 +1471,17 @@ export default async function IsiPanduan({
                     Input KGB. Bila berkas SK gagal terunggah, unggah dari Detail KGB dengan Unggah SK TTE.
                   </li>
                   <li>
+                    <strong>Angka pada SK dicocokkan lebih dulu.</strong> Jendela Arsip KGB meminta{" "}
+                    <strong>masa kerja golongan</strong> dan <strong>gaji pokok yang tertulis pada SK</strong>. Keduanya
+                    tidak disimpan: yang tersimpan tetap hasil hitungan dari tabel PP 5/2024. Gunanya memastikan arsip
+                    ini sama dengan SK-nya, dan selama keduanya berbeda tombol Simpan Arsip tidak aktif. Ketidakcocokan
+                    hampir selalu berarti <strong>golongan atau masa kerja golongan pegawai di Data Pegawai belum sesuai
+                    SK dasarnya</strong> — perbaiki data pegawainya lebih dulu, jangan memaksakan arsipnya, sebab angka
+                    yang keliru akan terkunci menjadi dasar KGB berikutnya. KGB yang terlambat bertahun-tahun tidak perlu
+                    perlakuan khusus: masa kerja golongan dihitung sebesar jarak nyata dari TMT terakhir, bukan dua tahun
+                    tetap, sehingga hasilnya sudah sama dengan SK selama data dasarnya benar.
+                  </li>
+                  <li>
                     <strong>Detail dan riwayat.</strong> Di menu Proses KGB, tombol Detail membuka Detail KGB berisi data
                     pegawai, perhitungan, SK KGB Baru, tautan Lihat SK Tertandatangani, dan tombol aksi sesuai status.
                     Halaman pegawai sendiri punya lima tab: <strong>Data pegawai</strong> (kartu Identitas, Kepegawaian,

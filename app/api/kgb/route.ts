@@ -22,6 +22,7 @@ import {
   type HukdisUntukKgb,
   type SuratKgbTersimpan,
 } from "@/lib/prosesKgb";
+import { bacaAngkaSk, bedaArsipSk, pesanBedaArsip } from "@/lib/cocokArsipSk";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
@@ -308,6 +309,30 @@ export async function POST(req: Request) {
 
   // -- MODE ARSIP --
   if (isArsip) {
+    // Angka yang tertulis pada SK dicocokkan dengan hitungan sistem sebelum apa pun disimpan (ADR-035).
+    // Yang tersimpan tetap hasil hitungan, bukan ketikan operator; isian ini semata pembanding. Bila
+    // keduanya berbeda, hampir selalu data dasar pegawainya yang belum sesuai SK dasar, dan menyimpan
+    // arsipnya hanya akan mengunci angka yang keliru menjadi dasar KGB berikutnya.
+    const angkaSk = bacaAngkaSk({
+      mkgTahun: body.mkgTahunSK,
+      mkgBulan: body.mkgBulanSK,
+      gajiPokok: body.gajiPokokSK,
+    });
+    if (!angkaSk)
+      return NextResponse.json(
+        {
+          error:
+            "Masa kerja golongan dan gaji pokok yang tertulis pada SK wajib diisi untuk mengarsipkan. " +
+            "Keduanya dipakai memastikan arsip ini sama dengan SK-nya, bukan disimpan sebagai data.",
+        },
+        { status: 400 },
+      );
+    const beda = bedaArsipSk(
+      { mkgTahun: rencana.mkgTahunBaru, mkgBulan: rencana.mkgBulanBaru, gajiPokok: rencana.gajiPokokBaru },
+      angkaSk,
+    );
+    if (beda.length > 0) return NextResponse.json({ error: pesanBedaArsip(beda), beda }, { status: 409 });
+
     // Arsip dengan TMT yang sama sudah tersimpan tetapi data pegawai belum diperbarui: permintaan
     // sebelumnya terputus, jadi langkah sesudahnya diulang tanpa membuat record kedua.
     let kgbArsip = selesaiTmtSama;
