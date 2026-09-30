@@ -22,14 +22,21 @@ const JENIS: JenisMutasi[] = ["definitif", "bko", "selesai_bko", "pemberhentian"
 
 export default function ModalLaporMutasi({
   pegawai,
+  jenisAwal = "definitif",
   onTutup,
   onSelesai,
 }: {
   pegawai: { id: string; nama: string; nip: string };
+  /**
+   * Jenis yang sudah terpilih saat jendela dibuka. Dipakai pintasan "Seharusnya tidak tercatat" pada
+   * baris pegawai, supaya operator yang mencari cara membuang satu baris tidak perlu menebak bahwa
+   * tempatnya di balik tombol Laporkan mutasi (ADR-041). Jenisnya tetap dapat diganti di sini.
+   */
+  jenisAwal?: JenisMutasi;
   onTutup: () => void;
   onSelesai: (pesan: string) => void;
 }) {
-  const [jenis, setJenis] = useState<JenisMutasi>("definitif");
+  const [jenis, setJenis] = useState<JenisMutasi>(jenisAwal);
   const [satkerTujuan, setSatkerTujuan] = useState("");
   const [tmt, setTmt] = useState(isoTanggalLokal(hariIniWita()));
   const [nomorSk, setNomorSk] = useState("");

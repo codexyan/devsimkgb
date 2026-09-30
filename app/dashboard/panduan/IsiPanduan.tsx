@@ -1038,7 +1038,18 @@ export default async function IsiPanduan({
                     pengingat <em>Perlu diperiksa</em>, lengkap dengan batas input Kanwil. Bila ada yang keliru, pilih{" "}
                     <strong>Usulkan perbaikan data</strong> sebelum batas itu. Hukuman disiplin yang belum dilaporkan
                     disampaikan lewat menu <strong>Lapor Hukdis</strong>; pegawai yang pindah, BKO, atau berhenti
-                    dilaporkan dengan <strong>Laporkan mutasi</strong> pada barisnya.
+                    dilaporkan dengan <strong>Laporkan mutasi</strong> pada barisnya. Pegawai yang sedang{" "}
+                    <strong>BKO</strong> tetap tampil di daftar satker Anda dengan penanda kuning{" "}
+                    <em>BKO di …</em>, sebab penugasan itu tidak memindahkan unit kerjanya: KGB-nya tetap Anda
+                    usulkan dan Anda rekam di Gaji Web satker ini.
+                  </p>
+                  <p>
+                    Untuk baris yang <strong>seharusnya tidak pernah tercatat</strong> — entri ganda, NIP salah
+                    ketik, atau orang yang tidak pernah bertugas di satker Anda — pakai tautan{" "}
+                    <strong>Seharusnya tidak tercatat?</strong> di bawah tombol Laporkan mutasi. Isinya alasan dan
+                    keterangan, tanpa SK dan tanpa TMT. Admin UPT memang tidak dapat menghapus data pegawai: Kanwil
+                    yang meninjau lalu menonaktifkannya, sehingga riwayat KGB dan berkas SK-nya tetap utuh dan masih
+                    dapat dipulihkan bila laporannya yang keliru.
                   </p>
                   <p>
                     Bila sampai batas input tidak ada usulan, data pegawai dianggap benar dan pengingatnya hilang
@@ -2116,7 +2127,9 @@ export default async function IsiPanduan({
                       lewat kartu Status &amp; mutasi pada tab Data pegawai; SK mutasi atau SK pemberhentiannya dapat
                       dilampirkan di panel Dokumen rujukan dan langsung masuk arsip pegawai. Mutasi definitif memperbarui
                       Unit Kerja, sehingga SK ditujukan ke KPPN mitra satker baru; BKO tidak mengubah Unit Kerja maupun
-                      KPPN.
+                      KPPN. Karena itu tanggung jawab KGB pegawai BKO tetap pada satker asal, dan penugasannya hanya
+                      menjadi keterangan tambahan pada barisnya — di daftar pegawai Admin UPT maupun di Data Pegawai
+                      Kanwil. Selesainya dicatat dengan <em>Selesai BKO, kembali ke satker asal</em>.
                     </p>
                   </details>
                   <details name="faq-panduan">

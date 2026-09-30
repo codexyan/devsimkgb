@@ -7,13 +7,14 @@ import { PanelNavy, namaSapaan, sapaanWita, tanggalPanjangWita, type Nada } from
 import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { hitungDeadlineSDM } from "@/lib/tabelGaji";
 import { kunciBulanTmt, type RekapStatusKgb } from "@/lib/rekapKgb";
-import { geserBulan, namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
+import { geserBulan, namaBulan, namaTampilSatker, namaUnitKerja } from "@/app/dashboard/satker/labelSatker";
 import { LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { BELUM_SELESAI, LABEL_JENIS_USULAN } from "@/lib/usulanPegawai";
 import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
 import { kartuPerKolom, type KolomUpt, type SumberKartu } from "@/lib/papanUpt";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
 import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
+import type { JenisMutasi } from "@/lib/mutasiPegawai";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
@@ -48,6 +49,12 @@ interface PegawaiUpt {
   konfirmasi: StatusKonfirmasiUpt;
   konfirmasiAt: string | null;
   konfirmasiOleh: string | null;
+  /**
+   * Satker tempat pegawai ini sedang bertugas sebagai BKO; kosong berarti bertugas di satkernya sendiri.
+   * BKO tidak memindahkan unit kerja, jadi KGB-nya tetap diusulkan dan direkam satker asal — satker yang
+   * membuka layar ini. Karena itu ia keterangan, bukan tugas (ADR-041).
+   */
+  satkerTugas?: string | null;
   /** Pengingat pemeriksaan masih berlaku: KGB belum diinput Kanwil dan batas inputnya belum lewat. */
   perluDiperiksa: boolean;
   /** "draf", "menunggu", atau "revisi" bila ada usulan berjalan. */
@@ -302,7 +309,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const [usulan, setUsulan] = useState<UsulanTerkirim[]>([]);
   /** Laporan mutasi satker ini beserta hasil tinjauan Kanwil. */
   const [laporan, setLaporan] = useState<LaporanUpt[]>([]);
-  const [laporMutasi, setLaporMutasi] = useState<PegawaiUpt | null>(null);
+  /** Jendela laporan mutasi; `jenisAwal` terisi bila dibuka lewat pintasan pembatalan pencatatan. */
+  const [laporMutasi, setLaporMutasi] = useState<{ pegawai: PegawaiUpt; jenisAwal?: JenisMutasi } | null>(null);
   /** Kartu pita jadwal yang sedang dibuka: satu bulan TMT, atau kumpulan yang terlambat. */
   const [dialogPeriode, setDialogPeriode] = useState<
     { jenis: "bulan"; bulanTmt: string } | { jenis: "terlambat" } | null
@@ -698,6 +706,14 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                         <td style={{ maxWidth: "240px" }}>
                           <p className="dsb-nama truncate" style={{ margin: 0 }}>{p.nama}</p>
                           <p className="dsb-kecil truncate" style={{ margin: 0 }} title={p.jabatan}>{p.nip} · {p.golonganRuang} · {p.jabatan}</p>
+                          {/* BKO hanya keterangan: yang mengusulkan dan merekam KGB-nya tetap satker ini. */}
+                          {p.satkerTugas && (
+                            <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-amber)" }} title={`Bertugas di ${p.satkerTugas}`}>
+                              <span className="dsb-titik" data-nada="kuning" aria-hidden="true" /> BKO di{" "}
+                              {namaUnitKerja(p.satkerTugas)}
+                              <span style={{ color: "var(--dt5)" }}> · KGB tetap diusulkan satker ini</span>
+                            </p>
+                          )}
                         </td>
                         <td className="whitespace-nowrap">
                           {p.tmtKgb ? formatTanggalId(p.tmtKgb, { month: "short", year: "numeric" }) : "-"}
@@ -764,11 +780,27 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                             </span>
                           )}
                           {!laporanBerjalan(p.id) && (
-                            <span className="upt-aksi">
-                              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setLaporMutasi(p)}>
-                                Laporkan mutasi
-                              </button>
-                            </span>
+                            <>
+                              <span className="upt-aksi">
+                                <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setLaporMutasi({ pegawai: p })}>
+                                  Laporkan mutasi
+                                </button>
+                              </span>
+                              {/* Pintasan untuk baris yang seharusnya tidak pernah ada. UPT memang tidak
+                                  menghapus data pegawai (ADR-033); yang dikirim tetap laporan, dan Kanwil
+                                  yang menonaktifkannya. Tanpa pintasan ini, kemampuan itu tersembunyi di
+                                  balik tombol Laporkan mutasi, tempat yang tidak akan ditebak siapa pun. */}
+                              <span className="upt-aksi">
+                                <button
+                                  type="button"
+                                  className="dsb-tautan"
+                                  onClick={() => setLaporMutasi({ pegawai: p, jenisAwal: "pembatalan" })}
+                                  title="Entri ganda, NIP salah ketik, atau tidak pernah bertugas di satker ini"
+                                >
+                                  Seharusnya tidak tercatat?
+                                </button>
+                              </span>
+                            </>
                           )}
                         </td>
                       </tr>
@@ -817,7 +849,16 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             sub={`${t.nip} · ${tmtSingkat(t.tmt)}`}
             nada={t.jenis === "perbaiki" ? "ungu" : undefined}
             tanda={{ teks: cfg.judul, nada: cfg.nada }}
-            catatan={t.catatan ? `${t.jenis === "perbaiki" ? "Catatan Kanwil" : "Belum ada"}: ${t.catatan}` : null}
+            // Penugasan BKO disebut di sini supaya tidak terkira orangnya sudah pindah dan usulannya
+            // bukan urusan satker ini lagi; unit kerjanya memang tetap di satker ini.
+            catatan={
+              [
+                t.catatan ? `${t.jenis === "perbaiki" ? "Catatan Kanwil" : "Belum ada"}: ${t.catatan}` : "",
+                p?.satkerTugas ? `Sedang BKO di ${namaUnitKerja(p.satkerTugas)}; KGB tetap diusulkan satker ini` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ") || null
+            }
             petunjuk={t.langkah}
             pilih={
               u ? (
@@ -1326,7 +1367,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
 
       {laporMutasi && (
         <ModalLaporMutasi
-          pegawai={{ id: laporMutasi.id, nama: laporMutasi.nama, nip: laporMutasi.nip }}
+          pegawai={{ id: laporMutasi.pegawai.id, nama: laporMutasi.pegawai.nama, nip: laporMutasi.pegawai.nip }}
+          jenisAwal={laporMutasi.jenisAwal}
           onTutup={() => setLaporMutasi(null)}
           onSelesai={(pesan) => { setLaporMutasi(null); selesaiFormulir(pesan); }}
         />
