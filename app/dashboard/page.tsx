@@ -14,10 +14,9 @@ const Memuat = () => <div className="dsb-halaman"><div className="dsb-kerangka" 
 const DashboardHukdis = dynamic(() => import("@/app/dashboard/components/DashboardHukdis"), { ssr: false, loading: Memuat });
 const DashboardKeuangan = dynamic(() => import("@/app/dashboard/components/DashboardKeuangan"), { ssr: false, loading: Memuat });
 const DashboardUpt = dynamic(() => import("@/app/dashboard/components/DashboardUpt"), { ssr: false, loading: Memuat });
-const PanelPantauSatker = dynamic(() => import("@/app/dashboard/components/PanelPantauSatker"), { ssr: false });
-const LiniMasaKgb = dynamic(() => import("@/app/dashboard/components/LiniMasaKgb"), { ssr: false });
 const ModalUsulanUpt = dynamic(() => import("@/app/dashboard/components/ModalUsulanUpt"), { ssr: false });
 const PapanAntrian = dynamic(() => import("@/app/dashboard/components/PapanAntrian"), { ssr: false });
+const PanelKartuSatker = dynamic(() => import("@/app/dashboard/components/PanelKartuSatker"), { ssr: false });
 import {
   KerangkaDashboard,
   PanelNavy,
@@ -46,9 +45,8 @@ import { formatTanggalId, tanggalKalender } from "@/lib/waktu";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
 import { kodeSatkerPegawai } from "@/lib/rekapSatker";
+import { susunKartuSatker } from "@/lib/kartuSatkerDasbor";
 import { dipegangKeuanganKanwil } from "@/lib/aksesUpt";
-import type { BarisPantau } from "@/app/dashboard/components/PanelPantauSatker";
-import type { EntriLiniMasa, KelompokLiniMasa } from "@/app/dashboard/components/LiniMasaKgb";
 import { namaRingkasSatker } from "@/app/dashboard/satker/labelSatker";
 /* -----------------------------------------
    Interfaces
@@ -194,27 +192,6 @@ function cocokTahap(pos: PosisiAntrian, tahap: Tahap): boolean {
   }
 }
 
-/** Status di tabel antrian: titik dan teks. */
-function StatusAntrian({ pos, dibatalkan, skDibuat, buka, tertahan = false }: { pos: PosisiAntrian; dibatalkan: boolean; skDibuat: boolean; buka: Date | null; tertahan?: boolean }) {
-  const [nada, teks]: [Nada | undefined, string] =
-    tertahan ? ["ungu", "Tertahan usulan UPT"] :
-    // Lamanya lewat batas sudah tertulis di kolom TMT; status cukup menyebut keadaannya.
-    pos === "lewat" ? ["merah", dibatalkan ? "Dibatalkan" : "Belum diinput"]
-    : pos === "siap" ? ["kuning", dibatalkan ? "Dibatalkan, input ulang" : "Belum diproses"]
-    : pos === "diproses" ? ["navy", skDibuat ? "SK dibuat, tunggu TTE" : "Sedang diproses"]
-    : pos === "keuangan" ? ["ungu", "Keuangan Kanwil"]
-    : pos === "rekam_upt" ? ["ungu", "Direkam keuangan UPT"]
-    : pos === "selesai" ? ["hijau", "Selesai"]
-    : [undefined, buka ? `Dibuka ${formatTanggalId(buka, { day: "numeric", month: "short" })}` : "Belum dibuka"];
-  return (
-    <span className="dsb-status" data-nada={pos === "lewat" ? "merah" : undefined}>
-      <span className="dsb-titik" data-nada={nada} aria-hidden="true" />
-      {teks}
-    </span>
-  );
-}
-
-const KUNCI_TAMPILAN = "kgb-antrian-tampilan";
 
 /** Kolom papan untuk posisi antrian. */
 function kolomPapan(pos: PosisiAntrian): KolomPapan {
@@ -229,15 +206,6 @@ function cocokSatker(p: PegawaiJatuhTempo, saring: string): boolean {
   const kode = kodeSatkerPegawai(p.unitKerja);
   if (saring === "upt") return kode !== SATKER_KANWIL.kode;
   return kode === saring;
-}
-
-/** Kelompok lini masa untuk satu posisi antrian. */
-function kelompokLiniMasa(pos: PosisiAntrian): KelompokLiniMasa {
-  if (pos === "lewat") return "lewat";
-  if (pos === "siap" || pos === "terkunci") return "belum";
-  if (pos === "diproses") return "proses";
-  if (pos === "keuangan" || pos === "rekam_upt") return "keuangan";
-  return "selesai";
 }
 
 function pegawaiModal(p: PegawaiJatuhTempo): PegawaiModal {
@@ -255,7 +223,6 @@ function DashboardMain() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [tahap, setTahap] = useState<Tahap>("perlu");
   // Tampilan antrian: daftar (tabel) atau papan (kanban); pilihan diingat per peramban.
-  const [tampilan, setTampilan] = useState<"daftar" | "papan">("daftar");
   const [cariAntrian, setCariAntrian] = useState("");
   const [filterMonth, setFilterMonth] = useState<string | null>(null);
   // Saringan satker (ADR-012): "semua", "upt", atau kode satker ("kanwil" untuk pegawai Kanwil).
@@ -318,20 +285,6 @@ function DashboardMain() {
     return () => { document.removeEventListener("visibilitychange", onVisible); clearInterval(interval); };
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        if (localStorage.getItem(KUNCI_TAMPILAN) === "papan") setTampilan("papan");
-      } catch { /* penyimpanan tidak tersedia */ }
-    }, 0);
-    return () => clearTimeout(t);
-  }, []);
-
-  function pilihTampilan(v: "daftar" | "papan") {
-    setTampilan(v);
-    try { localStorage.setItem(KUNCI_TAMPILAN, v); } catch { /* penyimpanan tidak tersedia */ }
-  }
-
   // Pesan hasil aksi hilang sendiri setelah beberapa detik.
   useEffect(() => {
     if (!pesanBerhasil) return;
@@ -380,7 +333,6 @@ function DashboardMain() {
   /* -- Antrian kerja: satu daftar untuk semua tahap, disaring satker lalu bulan TMT -- */
   const dalamSatker = pegawaiJatuhTempo.filter((p) => cocokSatker(p, saringSatker));
   // Lini masa dihitung dari daftar yang sama dengan antrian, sehingga angkanya selalu cocok.
-  const entriLiniMasa: EntriLiniMasa[] = dalamSatker.map((p) => ({ tmt: p.tmtKgbBerikutnya, kelompok: kelompokLiniMasa(posisiAntrian(p)) }));
   const qAntrian = cariAntrian.trim().toLowerCase();
   const dalamBulan = dalamSatker
     .filter((p) => !filterMonth || kunciBulan(p.tmtKgbBerikutnya) === filterMonth)
@@ -461,20 +413,25 @@ function DashboardMain() {
     const kode = cariSatker(u.unitKerja)?.kode;
     if (kode) usulanPerSatker.set(kode, (usulanPerSatker.get(kode) ?? 0) + 1);
   }
-  const barisPantau: BarisPantau[] = SATKER.map((st) => {
-    const milik = pegawaiJatuhTempo.filter((p) => kodeSatkerPegawai(p.unitKerja) === st.kode).map(posisiAntrian);
-    return {
-      kode: st.kode,
-      nama: namaRingkasSatker(st),
-      namaLengkap: st.nama,
-      kanwil: st.kode === SATKER_KANWIL.kode,
-      lewat: milik.filter((x) => x === "lewat").length,
-      perluInput: milik.filter((x) => x === "siap").length,
-      diproses: milik.filter((x) => x === "diproses").length,
-      diKeuangan: milik.filter((x) => x === "keuangan" || x === "rekam_upt").length,
-      usulan: usulanPerSatker.get(st.kode) ?? 0,
-    };
-  });
+  /**
+   * Kartu satker (ADR-036): pekerjaan tiap satker dipecah per bulan TMT. Sumbernya sama dengan papan
+   * antrian — pegawaiJatuhTempo beserta posisinya — jadi angka di kartu dan isi papan tidak bisa berbeda.
+   * Tidak disaring satker maupun bulan, sebab kartunya justru yang memilih keduanya.
+   */
+  const kartuSatker = susunKartuSatker(
+    pegawaiJatuhTempo.map((p) => ({
+      kode: kodeSatkerPegawai(p.unitKerja) ?? SATKER_KANWIL.kode,
+      bulanTmt: kunciBulan(p.tmtKgbBerikutnya),
+      posisi: posisiAntrian(p),
+    })),
+    usulanPerSatker,
+  );
+  const namaSatkerKartu = (kode: string) => {
+    const st = SATKER.find((s) => s.kode === kode);
+    return { ringkas: st ? namaRingkasSatker(st) : kode, lengkap: st?.nama ?? kode };
+  };
+  const satkerTanpaPekerjaan = Math.max(0, SATKER.length - kartuSatker.length);
+
 
   const namaBulanFilter = filterMonth
     ? (() => {
@@ -485,7 +442,6 @@ function DashboardMain() {
 
   // Menyaring antrian lalu menggulir ke panelnya.
   const bukaAntrian = (t: Tahap, bulan: string | null = null) => () => {
-    setTampilan("daftar");
     setCariAntrian("");
     setTahap(t);
     setFilterMonth(bulan);
@@ -870,29 +826,21 @@ function DashboardMain() {
                 value={cariAntrian}
                 onChange={(e) => setCariAntrian(e.target.value)}
               />
-              <div className="dsb-segmen" role="group" aria-label="Tampilan antrian">
-                <button type="button" aria-pressed={tampilan === "daftar"} onClick={() => pilihTampilan("daftar")} title="Tampilan daftar">
-                  <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
-                  <span className="dsb-label-tampilan">Daftar</span>
-                </button>
-                <button type="button" aria-pressed={tampilan === "papan"} onClick={() => pilihTampilan("papan")} title="Tampilan papan (kanban)">
-                  <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="5" height="16" rx="1" /><rect x="10" y="4" width="5" height="10" rx="1" /><rect x="17" y="4" width="4" height="13" rx="1" /></svg>
-                  <span className="dsb-label-tampilan">Papan</span>
-                </button>
-              </div>
             </div>
           </div>
 
-          {/* Angka tahap sekaligus saringan: menggantikan kartu angka di pita dan tab tahap lama (ADR-013). */}
+          {/* Angka tahap sekaligus saringan papan (ADR-013, ADR-036). Dulu ubin ini memaksa pindah ke
+              tampilan daftar dan papan mengabaikannya; sejak daftar dilepas, ubinlah penyaring papannya.
+              Menekan ubin yang sedang aktif mengembalikan papan ke seluruh tahap. */}
           <div className="dsb-tahap" role="group" aria-label="Tahap antrian">
             {tabTahap.map((t) => (
               <button
                 key={t.nilai}
                 type="button"
                 className="dsb-tahap-ubin"
-                aria-pressed={tampilan === "daftar" && tahap === t.nilai}
+                aria-pressed={tahap === t.nilai}
                 data-nada={t.nada}
-                onClick={() => { setTahap(t.nilai); pilihTampilan("daftar"); }}
+                onClick={() => setTahap(tahap === t.nilai ? "semua" : t.nilai)}
               >
                 <span className="dsb-tahap-label">{t.label}</span>
                 <span className="dsb-tahap-angka">
@@ -907,87 +855,30 @@ function DashboardMain() {
             ))}
           </div>
 
-          {tampilan === "papan" ? (
+          {/* Papan kanban adalah satu-satunya tampilan antrian sejak ADR-036. Kartunya memakai `antrian`,
+              yakni pegawai bulan terpilih yang lolos saringan tahap, sehingga ubin tahap di atas benar-benar
+              menyaring papan ini. */}
+          {antrian.length === 0 ? (
+            <p className="dsb-kosong" style={{ padding: "48px 16px" }}>
+              {tahap === "perlu" || tahap === "lewat"
+                ? "Tidak ada KGB yang perlu diproses untuk saringan ini."
+                : "Tidak ada KGB untuk saringan ini."}
+            </p>
+          ) : (
             <PapanAntrian
               className="dsb-antrian-gulir"
-              kartu={dalamBulan.map(kartuPapan)}
+              kartu={antrian.map(kartuPapan)}
               keterangan={{
-                input: (() => { const n = dalamBulan.filter((p) => posisiAntrian(p) === "lewat").length; return n > 0 ? `${n} lewat batas` : undefined; })(),
-                proses: (() => { const n = dalamBulan.filter((p) => posisiAntrian(p) === "diproses" && p.skSudahDibuat).length; return n > 0 ? `${n} tunggu TTE` : undefined; })(),
+                input: (() => { const n = antrian.filter((p) => posisiAntrian(p) === "lewat").length; return n > 0 ? `${n} lewat batas` : undefined; })(),
+                proses: (() => { const n = antrian.filter((p) => posisiAntrian(p) === "diproses" && p.skSudahDibuat).length; return n > 0 ? `${n} tunggu TTE` : undefined; })(),
               }}
               onPindah={pindahKartu}
             />
-          ) : antrian.length === 0 ? (
-            <p className="dsb-kosong" style={{ padding: "48px 16px" }}>
-              {tahap === "perlu" || tahap === "lewat" ? "Tidak ada KGB yang perlu diproses untuk saringan ini." : "Tidak ada KGB untuk saringan ini."}
-            </p>
-          ) : (
-            <div className="dsb-antrian-gulir">
-              <table className="dsb-tabel dsb-tabel-padat" style={{ minWidth: "640px" }}>
-                <thead>
-                  <tr>
-                    <th scope="col">Pegawai</th>
-                    <th scope="col">TMT dan batas input</th>
-                    <th scope="col">Status</th>
-                    <th scope="col" className="kanan"><span className="sr-only">Aksi</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {antrian.map((p) => {
-                    const pos = posisiAntrian(p);
-                    const hari = daysDiff(p.deadlineSDM);
-                    const satker = p.unitKerja?.trim() ? cariSatker(p.unitKerja) : SATKER_KANWIL;
-                    const buka = pos === "terkunci" ? jendelaProsesKgb(p.tmtKgbBerikutnya)?.unlockDate : null;
-                    // Batas input hanya bermakna sebelum KGB diinput; sesudahnya yang penting tahapnya.
-                    const tampilBatas = pos === "lewat" || pos === "siap" || pos === "terkunci";
-                    const nadaBaris = pos === "lewat" ? "merah" : tampilBatas && hari >= 0 && hari <= 7 && pos !== "terkunci" ? "kuning" : undefined;
-                    return (
-                      <tr key={p.id} className={pos === "terkunci" ? "dsb-redup" : undefined} data-nada={nadaBaris}>
-                        <td style={{ maxWidth: "260px" }} title={`${p.nama} · NIP ${p.nip}${p.jabatan ? ` · ${p.jabatan}` : ""}\n${satker?.nama ?? p.unitKerja ?? ""}`}>
-                          <p className="dsb-nama truncate" style={{ margin: 0 }}>{p.nama}</p>
-                          <p className="dsb-kecil truncate" style={{ margin: 0 }}>
-                            {p.golonganRuang} · {satker ? namaRingkasSatker(satker) : (p.unitKerja ?? "-")}
-                          </p>
-                        </td>
-                        <td className="whitespace-nowrap">
-                          {formatTanggalId(p.tmtKgbBerikutnya, { month: "short", year: "numeric" })}
-                          {tampilBatas && (
-                            <p
-                              className="dsb-kecil"
-                              style={{ margin: 0, color: nadaBaris ? `var(--st-${nadaBaris === "merah" ? "red" : "amber"})` : undefined }}
-                              title={`Batas input ${formatTanggalId(p.deadlineSDM)}`}
-                            >
-                              {pos === "terkunci"
-                                ? `dibuka ${buka ? formatTanggalId(buka, { day: "numeric", month: "short" }) : "nanti"}`
-                                : hari < 0 ? `lewat batas ${-hari} hari`
-                                : hari === 0 ? "batas hari ini"
-                                : `batas ${formatTanggalId(p.deadlineSDM, { day: "numeric", month: "short" })}, ${hari} hari lagi`}
-                            </p>
-                          )}
-                        </td>
-                        <td>
-                          <StatusAntrian pos={pos} dibatalkan={p.statusKGB === "ditolak"} skDibuat={p.skSudahDibuat} buka={buka ?? null} tertahan={tertahanUsulan(p, pos)} />
-                          {p.statusHukdis && (
-                            <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-red)" }}>
-                              Hukdis{p.tanggalHukdisBerakhir ? ` s.d. ${formatTanggalId(p.tanggalHukdisBerakhir, { day: "numeric", month: "short" })}` : ""}
-                            </p>
-                          )}
-                        </td>
-                        <td className="kanan">
-                          <div className="dsb-aksi">{aksiBaris(p, pos)}</div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
           )}
           <div className="dsb-kaki">
             <span>
-              {tampilan === "papan"
-                ? "Seret kartu ke kolom lain untuk membuka aksinya; tombol di kartu melakukan hal yang sama."
-                : `${antrian.length} pegawai · urut lewat batas, sedang diproses, lalu TMT terdekat`}
+              {antrian.length} pegawai · seret kartu ke kolom lain untuk membuka aksinya; tombol di kartu
+              melakukan hal yang sama.
             </span>
             <Link href={tahap === "lewat" ? "/dashboard/kgb?rapelan=1" : "/dashboard/kgb"} className="dsb-tautan">Buka Proses KGB →</Link>
           </div>
@@ -997,23 +888,19 @@ function DashboardMain() {
         <aside className="dsb-samping dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-label="Ringkasan pendamping">
           <PanelTindakan className="" daftar={tindakan} kosong="Tidak ada KGB yang perlu ditindaklanjuti saat ini." lainnyaHref="/dashboard/notifikasi" />
 
-          <section className="dsb-panel" aria-labelledby="judul-jadwal-input">
-            <div className="dsb-panel-kepala">
-              <h2 id="judul-jadwal-input" className="dsb-panel-judul">Jadwal input <small>per bulan TMT</small></h2>
-              {filterMonth && (
-                <button type="button" className="dsb-tautan" onClick={() => setFilterMonth(null)}>
-                  Semua bulan
-                </button>
-              )}
-            </div>
-            <LiniMasaKgb tegak entri={entriLiniMasa} bulanTerpilih={filterMonth} onPilih={(m) => { setFilterMonth(m); setTahap("semua"); pilihTampilan("daftar"); }} />
-          </section>
-
-          <PanelPantauSatker
-            baris={barisPantau}
-            terpilih={saringSatker === "semua" || saringSatker === "upt" ? null : saringSatker}
-            onPilih={(kode) => setSaringSatker(kode ?? "semua")}
-            versi={lastRefresh?.getTime()}
+          {/* Panel Jadwal input dilepas (ADR-036): rincian per bulan TMT kini melekat pada satkernya di
+              kartu di bawah, sehingga tidak lagi perlu lini masa se-Kanwil yang berdiri sendiri. */}
+          <PanelKartuSatker
+            kartu={kartuSatker}
+            namaSatker={namaSatkerKartu}
+            tanpaPekerjaan={satkerTanpaPekerjaan}
+            satkerTerpilih={saringSatker === "semua" || saringSatker === "upt" ? null : saringSatker}
+            bulanTerpilih={filterMonth}
+            onPilih={(kode, bulan) => {
+              setSaringSatker(kode ?? "semua");
+              setFilterMonth(bulan);
+              setTahap("semua");
+            }}
           />
         </aside>
       </div>

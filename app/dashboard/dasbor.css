@@ -2931,3 +2931,89 @@ html[data-gerak="kurangi"] .dsb-putar {
   .usl-antrian li { flex-wrap: wrap; }
   .usl-antrian li > span:first-child { flex: 1 1 100%; }
 }
+
+/* ── Kartu satker di dasbor Kanwil (ADR-036) ───────────────────────────────────────────────────
+   Menggantikan Pantau satker dan menyerap Jadwal input: tiap satker satu kartu, berisi baris per
+   bulan TMT yang dapat ditekan untuk menyaring papan antrian. Tinggi dibatasi supaya rel pendamping
+   tidak memanjang tanpa akhir saat banyak satker sedang punya pekerjaan. */
+.ksk-daftar {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  max-height: min(520px, 48vh);
+  overflow-y: auto;
+}
+
+.ksk-kartu {
+  border: 1px solid var(--ln1);
+  border-radius: 12px;
+  background: var(--card);
+  overflow: hidden;
+}
+.ksk-kartu[data-aktif] { border-color: var(--navy-solid); box-shadow: inset 3px 0 0 var(--navy-solid); }
+
+.ksk-kepala {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ksk-kepala:hover { background: var(--sub); }
+.ksk-kepala:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.ksk-kepala strong { display: block; font-size: 12.5px; font-weight: 650; color: var(--dtn); overflow-wrap: anywhere; }
+.ksk-kepala small { display: block; font-size: 11px; color: var(--dt5); }
+.ksk-kepala .dsb-tag { flex-shrink: 0; font-size: 10px; }
+
+.ksk-bulan { margin: 0; padding: 0 7px 7px; list-style: none; display: grid; gap: 3px; }
+.ksk-bulan button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 7px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--sub);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ksk-bulan button:hover { border-color: var(--ln1); }
+.ksk-bulan button[aria-pressed="true"] { border-color: var(--navy-solid); background: var(--tint-navy); }
+.ksk-bulan button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.ksk-bulan .dsb-titik { align-self: center; }
+.ksk-bulan-nama { font-size: 12px; font-weight: 600; color: var(--dtn); }
+.ksk-bulan-jumlah { font-size: 12px; font-weight: 700; color: var(--dt2); font-variant-numeric: tabular-nums; }
+/* Rinciannya satu baris penuh di bawah nama bulan, supaya angka dan nama tetap sejajar antar baris. */
+.ksk-bulan button small {
+  grid-column: 2 / -1;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--dt5);
+}
+
+.ksk-kaki {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 11px 9px;
+  font-size: 11px;
+  color: var(--dt5);
+}
+.ksk-kaki .dsb-tag { font-size: 10px; }
+
+.ksk-lain {
+  margin: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--ln2);
+  font-size: 11.5px;
+  color: var(--dt5);
+}
