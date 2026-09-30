@@ -1430,7 +1430,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             </label>
           </div>
           <label className="kgbm-label">
-            Surat usulan Srikandi (PDF, paling besar 1 MB)
+            Surat usulan Srikandi (PDF, paling besar 500 KB)
             <input
               className="kgbm-input"
               type="file"

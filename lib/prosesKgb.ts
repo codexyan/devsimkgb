@@ -2,6 +2,7 @@
 // untuk membuat SK, mengubah data SK terakhir, dan mengunggah SK, penahanan oleh hukuman disiplin,
 // serta pemulihan jadwal saat KGB dibatalkan. Modul ini murni (tanpa akses data).
 
+import { BATAS_UNGGAH_BYTE, pesanBerkasTerlaluBesar } from "./batasUnggah";
 import { selisihBulan, tambahBulan } from "./tabelGaji";
 import { tanggalKalender, type NilaiTanggal } from "./waktu";
 
@@ -232,9 +233,9 @@ export function recordKgbKembarBerlebih(rows: { id: string }[]): string[] {
   return rows.slice(1).map((r) => r.id);
 }
 
-/** Batas ukuran berkas SK yang diunggah. */
-export const BATAS_UKURAN_SK_BYTE = 10 * 1024 * 1024;
-export const PESAN_SK_TERLALU_BESAR = "Ukuran file SK paling besar 10 MB.";
+/** Batas ukuran berkas SK yang diunggah; satu angka untuk seluruh unggahan (ADR-037). */
+export const BATAS_UKURAN_SK_BYTE = BATAS_UNGGAH_BYTE;
+export const PESAN_SK_TERLALU_BESAR = pesanBerkasTerlaluBesar("berkas SK");
 
 const PENANDA_PDF = [0x25, 0x50, 0x44, 0x46, 0x2d]; // "%PDF-"
 

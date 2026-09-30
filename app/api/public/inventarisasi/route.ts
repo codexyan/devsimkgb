@@ -42,7 +42,7 @@ export async function POST(req: Request) {
 
   const panjang = Number(req.headers.get("content-length"));
   if (Number.isFinite(panjang) && panjang > BERKAS_MAKS_PER_KIRIMAN * BATAS_BERKAS_INVENTARIS_BYTE + 64 * 1024)
-    return NextResponse.json({ error: "Ukuran kiriman terlalu besar. Tiap berkas paling besar 1 MB." }, { status: 413 });
+    return NextResponse.json({ error: "Ukuran kiriman terlalu besar. Tiap berkas paling besar 500 KB." }, { status: 413 });
 
   let form: FormData;
   try {
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
       continue;
     }
     if (f.size > BATAS_BERKAS_INVENTARIS_BYTE) {
-      kurang.push(`${aturan.label} lebih dari 1 MB`);
+      kurang.push(`${aturan.label} lebih dari 500 KB`);
       continue;
     }
     const isi = await f.arrayBuffer();

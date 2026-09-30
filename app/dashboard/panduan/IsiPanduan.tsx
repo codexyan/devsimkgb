@@ -855,7 +855,7 @@ export default async function IsiPanduan({
                     sistem menghitungnya sendiri, dan naik dari golongan II ke III memotong masa kerja 5 tahun.
                   </li>
                   <li>
-                    <strong>Unggah pindaian SK-nya</strong>, masing-masing PDF paling besar 1 MB. Pindai sebagai
+                    <strong>Unggah pindaian SK-nya</strong>, masing-masing PDF paling besar 500 KB. Pindai sebagai
                     dokumen, bukan foto kamera, agar ukurannya muat. Tiap berkas dapat dipratinjau sebelum diunggah,
                     lalu diganti atau dihapus, supaya dapat dipastikan tidak tertukar.
                   </li>
@@ -1419,7 +1419,7 @@ export default async function IsiPanduan({
                     <p className="pub-step-who">Tim SDM, kartu atau baris berstatus Sedang Diproses</p>
                     <p>
                       Tombol Unggah SK TTE muncul setelah SK dibuat dengan Buat SK. Unduh naskah yang sudah ditandatangani
-                      dari Srikandi, pilih Unggah SK TTE, pilih berkas PDF (paling besar 10 MB) pada jendela Unggah SK yang
+                      dari Srikandi, pilih Unggah SK TTE, pilih berkas PDF (paling besar 500 KB) pada jendela Unggah SK yang
                       Sudah Ditandatangani, lalu pilih Unggah SK. Status berubah menjadi{" "}
                       <Status status="menunggu_keuangan" />. KGB pegawai Kanwil muncul di menu Keuangan; SK pegawai UPT
                       langsung dapat diunduh UPT-nya dan menunggu keuangan satker merekamnya di Gaji Web (ubin Di
@@ -1465,7 +1465,7 @@ export default async function IsiPanduan({
                     <strong>SK sudah terbit di luar SIM-KGB.</strong> Catat dengan Arsip KGB. Tombol ini ada pada kartu
                     Belum Diproses yang terlambat di Dashboard, pada baris Belum Diproses di menu Proses KGB setelah batas
                     proses lewat, dan sebagai tautan di jendela Input KGB bila data SK terakhir belum tercatat. Isi Nomor
-                    SK, Tanggal SK, TMT SK, dan Oleh bila diketahui, pilih Berkas SK (PDF) paling besar 10 MB,
+                    SK, Tanggal SK, TMT SK, dan Oleh bila diketahui, pilih Berkas SK (PDF) paling besar 500 KB,
                     lalu pilih Simpan Arsip. KGB langsung berstatus <Status status="selesai" /> tanpa konfirmasi keuangan, data gaji pegawai
                     diperbarui, dan jadwal KGB berikutnya dibuat. Arsip KGB mengikuti jendela proses yang sama dengan
                     Input KGB. Bila berkas SK gagal terunggah, unggah dari Detail KGB dengan Unggah SK TTE.
@@ -1550,7 +1550,7 @@ export default async function IsiPanduan({
                     terisi dari masa hukuman jenisnya; sesuaikan bila SK berkata lain.
                   </li>
                   <li>
-                    Unggah pindaian SK hukuman disiplin (PDF, paling besar 1 MB, wajib), tambahkan keterangan bila perlu,
+                    Unggah pindaian SK hukuman disiplin (PDF, paling besar 500 KB, wajib), tambahkan keterangan bila perlu,
                     lalu <strong>Kirim laporan</strong>.
                   </li>
                 </ol>

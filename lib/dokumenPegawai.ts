@@ -8,6 +8,8 @@
 //
 // Kuncinya memakai id pegawai, bukan NIP, supaya berkas tidak tercecer bila NIP dikoreksi.
 
+import { BATAS_UNGGAH_BYTE, pesanBerkasTerlaluBesar } from "./batasUnggah";
+
 export const JENIS_DOKUMEN = {
   sk_cpns: "SK CPNS",
   sk_pns: "SK PNS",
@@ -47,7 +49,7 @@ export interface DokumenArsip {
 }
 
 /** Batas ukuran satu dokumen arsip. */
-export const BATAS_DOKUMEN_BYTE = 5 * 1024 * 1024;
+export const BATAS_DOKUMEN_BYTE = BATAS_UNGGAH_BYTE;
 
 export const awalanDokumen = (pegawaiId: string) => `dokumen/${pegawaiId}/`;
 export const kunciDaftarDokumen = (pegawaiId: string) => `${awalanDokumen(pegawaiId)}_daftar.json`;
@@ -64,7 +66,7 @@ export function periksaDokumen(isian: { jenis: unknown; tanggalSK: string; ukura
   if (!isJenisDokumen(isian.jenis)) kurang.push("Pilih jenis dokumen.");
   if (isian.tanggalSK && !/^\d{4}-\d{2}-\d{2}$/.test(isian.tanggalSK)) kurang.push("Tanggal SK tidak valid.");
   if (isian.ukuran <= 0) kurang.push("Pilih berkas PDF.");
-  if (isian.ukuran > BATAS_DOKUMEN_BYTE) kurang.push("Ukuran dokumen paling besar 5 MB.");
+  if (isian.ukuran > BATAS_DOKUMEN_BYTE) kurang.push(pesanBerkasTerlaluBesar("dokumen"));
   return kurang;
 }
 

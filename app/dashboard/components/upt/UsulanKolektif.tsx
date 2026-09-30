@@ -670,7 +670,7 @@ export default function UsulanKolektif() {
           <div className="kol-kaki">
             <span>
               <strong>{jumlahLengkap}</strong> dari {baris.length} lengkap · <strong>{jumlahBerubah}</strong> belum disimpan. Berkas PDF
-              paling besar 1 MB.
+              paling besar 500 KB.
             </span>
             <span className="kol-kaki-tombol">
               <button type="button" className="dsb-tombol kol-kaki-kembali" data-jenis="garis" onClick={() => setLangkah(1)} disabled={menyimpan}>
@@ -751,7 +751,7 @@ export default function UsulanKolektif() {
                 <input className="kol-isi" type="date" value={surat.tanggalSurat} onChange={(e) => setSurat((s) => ({ ...s, tanggalSurat: e.target.value }))} />
               </label>
               <KotakBerkas
-                label="Berkas surat (PDF, paling besar 1 MB)"
+                label="Berkas surat (PDF, paling besar 500 KB)"
                 berkas={berkasSurat}
                 keterangan="Surat yang sudah dikirim lewat Srikandi; berlaku untuk semua pegawai di surat ini."
                 onPilih={(f) => {

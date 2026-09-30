@@ -68,7 +68,7 @@ type Tahap = { tahap: "isi" } | { tahap: "kirim" } | { tahap: "selesai"; kiriman
 function galatBerkas(f: File | undefined, aturan: AturanBerkas): string | null {
   if (!f) return aturan.wajib ? `${aturan.label} wajib dilampirkan` : null;
   if (f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf")) return `${aturan.label} harus berupa PDF`;
-  if (f.size > BATAS_BERKAS_INVENTARIS_BYTE) return `${aturan.label} ${ukuran(f.size)}, lebih dari 1 MB`;
+  if (f.size > BATAS_BERKAS_INVENTARIS_BYTE) return `${aturan.label} ${ukuran(f.size)}, lebih dari 500 KB`;
   return null;
 }
 
@@ -476,7 +476,7 @@ export default function FormInventaris({ kegiatan }: { kegiatan: KegiatanFormuli
 
         <fieldset className="iv-kelompok" disabled={mengirim}>
           <legend><span className="iv-nomor">5</span>Berkas SK</legend>
-          <p className="iv-bantu iv-lepas">PDF hasil pindai, paling besar 1 MB per berkas. Tarik berkas ke kotaknya atau pilih dari perangkat.</p>
+          <p className="iv-bantu iv-lepas">PDF hasil pindai, paling besar 500 KB per berkas. Tarik berkas ke kotaknya atau pilih dari perangkat.</p>
           <div className="iv-berkas">
             {daftarBerkas.map((b) => (
               <KartuBerkas

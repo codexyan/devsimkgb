@@ -1,6 +1,7 @@
 // Bagian server template surat KGB (ADR-019): memuat versi dari basis data dan menyimpan serta menyajikan
 // logo kop di R2. Logika murninya di lib/templateSurat.ts.
 
+import { BATAS_UNGGAH_BYTE } from "./batasUnggah";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { db } from "./db";
 import { tabelBelumAda } from "./db/tabelBelumAda";
@@ -51,7 +52,7 @@ export async function muatVersiTemplate(): Promise<{ belumAktif: boolean; versi:
 
 /* ── Logo kop di R2 ─────────────────────────────────────────────────────────────────────────────── */
 
-export const BATAS_LOGO_BYTE = 500 * 1024;
+export const BATAS_LOGO_BYTE = BATAS_UNGGAH_BYTE;
 
 type BucketLogo = {
   put(key: string, isi: ArrayBuffer, opsi: { httpMetadata: { contentType: string } }): Promise<unknown>;

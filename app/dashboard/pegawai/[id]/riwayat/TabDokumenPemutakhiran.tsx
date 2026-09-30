@@ -181,7 +181,7 @@ function BagianDokumen({
       return;
     }
     if (f.size > BATAS_DOKUMEN_BYTE) {
-      onGalat("Ukuran dokumen paling besar 5 MB.");
+      onGalat("Ukuran dokumen paling besar 500 KB.");
       return;
     }
     onGalat(null);
@@ -270,7 +270,7 @@ function BagianDokumen({
             ) : (
               <span className="dok-lepas-teks">
                 <strong>Pilih berkas PDF</strong>
-                <span>atau tarik ke sini · paling besar 5 MB</span>
+                <span>atau tarik ke sini · paling besar 500 KB</span>
               </span>
             )}
           </label>

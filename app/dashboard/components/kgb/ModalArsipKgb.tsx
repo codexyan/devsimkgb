@@ -326,7 +326,7 @@ export default function ModalArsipKgb({ pegawai: ringkas, onTutup, onBerhasil }:
             setBerkas(b);
             setGalat(b && !berkasPdfSah(b) ? "Berkas SK harus berformat PDF." : null);
           }}
-          petunjuk="Pindaian atau berkas digital SK dari arsip kantor, paling besar 10 MB."
+          petunjuk="Pindaian atau berkas digital SK dari arsip kantor, paling besar 500 KB."
           nonaktif={sibuk}
           tinggiPratinjau={220}
         />

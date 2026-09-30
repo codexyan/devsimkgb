@@ -119,7 +119,7 @@ export default function PanelDokumenRujukan({
       return;
     }
     if (f.size > BATAS_DOKUMEN_BYTE) {
-      setGalat("Ukuran berkas paling besar 5 MB.");
+      setGalat("Ukuran berkas paling besar 500 KB.");
       return;
     }
     setGalat(null);

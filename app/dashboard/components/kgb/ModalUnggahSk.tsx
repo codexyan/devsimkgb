@@ -104,7 +104,7 @@ export default function ModalUnggahSk({
           setGalat(b && !berkasPdfSah(b) ? "Berkas SK harus berformat PDF." : null);
         }}
         nonaktif={sibuk}
-        petunjuk="Ukuran berkas paling besar 10 MB."
+        petunjuk="Ukuran berkas paling besar 500 KB."
         tinggiPratinjau={300}
       />
       <PesanGalat pesan={galat} />

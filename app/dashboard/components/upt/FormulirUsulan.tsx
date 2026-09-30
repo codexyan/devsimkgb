@@ -641,7 +641,7 @@ export default function FormulirUsulan({
       <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
         <div className="kgbm-bagian-kepala">
           <p className="kgbm-bagian-judul">Berkas pendukung</p>
-          <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 1 MB</p>
+          <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 500 KB</p>
         </div>
         <div className="kgbm-bagian-isi">
           {berkasUntukKeadaan(pernahKgb).map((b) => {

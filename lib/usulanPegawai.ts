@@ -5,6 +5,7 @@
 // UPT yang menginventarisir datanya. Yang menulis ke data induk tetap Kanwil, lewat tinjauan. Modul ini
 // murni agar dapat dipakai server maupun peramban dan diuji tanpa lapisan data.
 
+import { BATAS_UNGGAH_BYTE, pesanBerkasTerlaluBesar } from "./batasUnggah";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
 import { kekuranganDasarBaru, perluDasarBaru } from "./dasarBaruUsulan";
@@ -84,9 +85,8 @@ export type KunciBidangUsulan = (typeof BIDANG_USULAN)[number]["kunci"];
  * menahan berkas semacam itu sejak awal, sebab operator UPT mengunggah lewat data seluler dan unggahan
  * besar yang putus di tengah jalan jauh lebih menyakitkan daripada ditolak sejak awal.
  */
-export const BATAS_BERKAS_USULAN_BYTE = 1024 * 1024;
-export const PESAN_BERKAS_TERLALU_BESAR =
-  "Ukuran tiap berkas paling besar 1 MB. Pindai SK sebagai dokumen hitam putih, atau perkecil berkasnya, lalu unggah kembali.";
+export const BATAS_BERKAS_USULAN_BYTE = BATAS_UNGGAH_BYTE;
+export const PESAN_BERKAS_TERLALU_BESAR = pesanBerkasTerlaluBesar("tiap berkas");
 
 /**
  * Keadaan yang menentukan berkas mana yang diminta. Pegawai yang sudah pernah KGB dicocokkan dengan SK KGB

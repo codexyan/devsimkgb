@@ -92,9 +92,11 @@ export async function POST(
   // Simpan ke Cloudflare R2 (privat).
   const pathFile = `sk/${pegawai?.nip ?? "unknown"}_${Date.now()}.pdf`;
   try {
-    const arrayBuffer = await file.arrayBuffer();
     const { env } = await getCloudflareContext({ async: true });
-    await env.SK_BUCKET.put(pathFile, arrayBuffer, {
+    // Isi berkas dialirkan ke R2, bukan disalin dulu lewat file.arrayBuffer(). Permintaan unggah sudah
+    // memegang satu salinan dari req.formData(); menambah salinan kedua menggandakan puncak memori Worker
+    // tanpa perlu, dan itulah yang paling mungkin memicu "Worker exceeded resource limits" (ADR-037).
+    await env.SK_BUCKET.put(pathFile, file.stream(), {
       httpMetadata: { contentType: "application/pdf" },
     });
   } catch {

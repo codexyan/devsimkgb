@@ -19,7 +19,7 @@ export { tabelBelumAda } from "./db/tabelBelumAda";
 
 /**
  * Simpan pindaian SK hukuman disiplin bila formulir menyertakannya. Pemeriksaannya sama dengan berkas
- * usulan (PDF sungguhan, paling besar 1 MB), dan kuncinya memakai folder serta pola nama yang sama agar
+ * usulan (PDF sungguhan, paling besar 500 KB), dan kuncinya memakai folder serta pola nama yang sama agar
  * rute pembuka berkas dan pembaca nama aslinya dapat dipakai ulang.
  */
 export async function simpanSkHukdis(

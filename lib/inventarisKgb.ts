@@ -8,6 +8,7 @@
 // Nama folder, nama berkas, dan kolom rekap ditentukan di sini (murni dan teruji); skrip Drive hanya
 // membersihkan dan menjalankannya.
 
+import { BATAS_UNGGAH_BYTE } from "./batasUnggah";
 import { SATKER } from "./satker";
 import { GOLONGAN_PANGKAT } from "./tabelGaji";
 import { formatTanggalId } from "./waktu";
@@ -70,7 +71,7 @@ export function berkasUntuk(isian: Pick<IsianInventaris, "keadaan" | "pmkSetelah
   return isian.keadaan === "pernah" && isian.pmkSetelahKgb === "ya" ? [...dasar, BERKAS_PMK] : dasar;
 }
 
-export const BATAS_BERKAS_INVENTARIS_BYTE = 1024 * 1024;
+export const BATAS_BERKAS_INVENTARIS_BYTE = BATAS_UNGGAH_BYTE;
 /** Berkas terbanyak dalam satu kiriman (SK KGB, SK kenaikan pangkat, SK PMK). */
 export const BERKAS_MAKS_PER_KIRIMAN = 3;
 
