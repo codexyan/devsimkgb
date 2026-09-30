@@ -444,6 +444,17 @@ function DashboardMain() {
     : saringSatker === "upt" ? "seluruh UPT"
     : namaRingkasSatker(SATKER.find((st) => st.kode === saringSatker) ?? SATKER_KANWIL);
 
+  /**
+   * Usulan menunggu dikelompokkan per UPT, yang terbanyak lebih dulu. Satu surat usulan lazim memuat
+   * beberapa pegawai dari satker yang sama, jadi mengelompokkannya membuat peninjau menuntaskan satu
+   * surat sekaligus alih-alih melompat antar satker.
+   */
+  const usulanPerUpt: [string, UsulanMenunggu[]][] = (() => {
+    const peta = new Map<string, UsulanMenunggu[]>();
+    for (const u of usulanMenunggu) peta.set(u.unitKerja, [...(peta.get(u.unitKerja) ?? []), u]);
+    return [...peta.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "id"));
+  })();
+
   // Pantau satker: angka per tahap dari antrian yang sama, ditambah usulan UPT yang menunggu.
   const usulanPerSatker = new Map<string, number>();
   for (const u of usulanMenunggu) {
@@ -773,6 +784,51 @@ function DashboardMain() {
         onMuatUlang={handleManualRefresh}
         memuat={refreshing}
       />
+
+        {/* -- Usulan UPT yang menunggu: didahulukan karena menahan proses KGB pegawainya (ADR-014), dan
+             karena modul ini dibuka Super Admin sepanjang hari. Dikelompokkan per UPT supaya satu surat
+             usulan dapat dituntaskan sekaligus, dan ditinjau di tempat lewat jendela yang sama dengan menu
+             Usulan UPT. Usulan pegawai baru ikut di sini; ia tidak punya kartu di papan antrian.
+             Panel ini sengaja di luar .dsb-dasbor-isi: di dalam kisi itu ia merebut satu-satunya baris 1fr
+             pada mode "muat satu layar" dan menghimpit antrian menjadi sesobek garis. -- */}
+        {usulanMenunggu.length > 0 && (
+          <section id="panel-usulan-upt" className="dsb-panel usl-antrian-panel dsb-muncul" style={{ "--i": 0 } as React.CSSProperties} aria-labelledby="judul-usulan-upt">
+            <div className="dsb-panel-kepala">
+              <h2 id="judul-usulan-upt" className="dsb-panel-judul">
+                Usulan UPT menunggu <small>{usulanMenunggu.length} pegawai dari {usulanPerUpt.length} UPT</small>
+              </h2>
+              <Link href="/dashboard/usulan" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" style={{ marginLeft: "auto" }}>
+                Semua usulan
+              </Link>
+            </div>
+            <div className="usl-antrian">
+              {usulanPerUpt.map(([unitKerja, daftar]) => (
+                <section key={unitKerja} className="usl-antrian-upt" aria-label={unitKerja}>
+                  <p className="usl-antrian-kepala">
+                    <strong>{unitKerja}</strong>
+                    <span className="dsb-tag" data-garis="">{daftar.length}</span>
+                  </p>
+                  <ul>
+                    {daftar.map((u) => (
+                      <li key={u.id}>
+                        <span className="min-w-0">
+                          <strong>{u.nama}</strong>
+                          <span>{u.nip}</span>
+                        </span>
+                        <span className="dsb-tag" data-garis="" data-nada={u.jenis === "baru" ? "hijau" : undefined}>
+                          {u.jenis === "baru" ? "Pegawai baru" : "Perbaikan data"}
+                        </span>
+                        <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => setUsulanDibuka(u)}>
+                          Tinjau
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </section>
+        )}
 
       <div className="dsb-dasbor-isi">
 
