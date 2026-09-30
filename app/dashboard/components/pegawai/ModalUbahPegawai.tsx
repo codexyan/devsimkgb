@@ -5,6 +5,7 @@ import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/k
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiSaatIni } from "@/lib/pilihanPegawai";
 import { SATKER } from "@/lib/satker";
 import { GOLONGAN_PANGKAT, getMKGOptions } from "@/lib/tabelGaji";
+import { gajiPokokUntuk, mkgSetelahGantiGolongan, tmtKgbBerikutnyaHitung } from "@/lib/koreksiDasarGaji";
 import { formatTanggalId, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 import PanelDokumenRujukan, { unggahKeArsip, type LampiranSk } from "@/app/dashboard/components/pegawai/PanelDokumenRujukan";
 
@@ -77,6 +78,12 @@ const tgl = (v: string | null | undefined) => {
   const t = tanggalKalender(v);
   return t ? isoTanggalLokal(t) : "";
 };
+const rp = (n: number | null | undefined) => (typeof n === "number" ? "Rp " + n.toLocaleString("id-ID") : "-");
+const tglTampil = (v: string | null | undefined) => {
+  const t = tanggalKalender(v);
+  return t ? formatTanggalId(t, { day: "numeric", month: "long", year: "numeric" }) : "-";
+};
+const labelMkg = (tahun: number, bulan: number) => `${tahun} thn ${bulan} bln`;
 
 export default function ModalUbahPegawai({
   pegawai,
@@ -110,11 +117,47 @@ export default function ModalUbahPegawai({
     tmtKgbBerikutnya: tgl(pegawai.tmtKgbBerikutnya),
   }));
   const [koreksi, setKoreksi] = useState(false);
+  /** Terisi bila penggantian golongan memaksa masa kerja menyesuaikan; dinyatakan di layar, tidak diam-diam. */
+  const [catatanMkg, setCatatanMkg] = useState<string | null>(null);
+  /** TMT KGB berikutnya dihitung sistem, kecuali operator memilih menimpanya (mis. penundaan hukdis). */
+  const [timpaTmt, setTimpaTmt] = useState(false);
   const [lampiran, setLampiran] = useState<LampiranSk | null>(null);
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState("");
 
   const ubah = (kolom: string) => (nilai: string) => setForm((f) => ({ ...f, [kolom]: nilai }));
+
+  /* ── Hitungan turunan koreksi ──────────────────────────────────────────────
+     Gaji pokok dan TMT KGB berikutnya tidak diketik, melainkan dibaca dari tabel gaji PP 5/2024 dan
+     dari langkah yang sama dengan yang dipakai impor maupun formulir UPT (bulanKeKgbBerikutnya).
+     Keduanya ditampilkan hidup di layar, sebab akibat sebuah koreksi memang terletak di situ. */
+  const [mkgTahunForm, mkgBulanForm] = (form.mkg ?? "0_0").split("_").map(Number);
+  const opsiMkg = getMKGOptions(form.golonganRuang);
+  const gajiBaru = gajiPokokUntuk(form.golonganRuang, mkgTahunForm, mkgBulanForm);
+  const tmtBerikutnyaHitung = tmtKgbBerikutnyaHitung(form.golonganRuang, mkgTahunForm, mkgBulanForm, form.tmtKgbTerakhir);
+  // Tanpa TMT KGB terakhir tidak ada yang dapat dihitung; jadwal yang sudah tercatat dipertahankan
+  // apa adanya, bukan dikosongkan, supaya koreksi kolom lain tidak ikut menghapusnya.
+  const tmtBerikutnyaDipakai = timpaTmt
+    ? form.tmtKgbBerikutnya
+    : tgl(tmtBerikutnyaHitung?.toISOString() ?? null) || tgl(pegawai.tmtKgbBerikutnya);
+
+  /**
+   * Ganti golongan tanpa menghapus masa kerja. Sebelumnya masa kerja dipaksa kembali ke 0 thn 0 bln,
+   * sehingga membetulkan salah ketik golongan diam-diam menjatuhkan gaji pokok ke angka terendah.
+   */
+  function gantiGolongan(golBaru: string) {
+    const dipakai = mkgSetelahGantiGolongan(golBaru, mkgTahunForm, mkgBulanForm);
+    setCatatanMkg(
+      dipakai?.disesuaikan
+        ? `Masa kerja ${labelMkg(mkgTahunForm, mkgBulanForm)} tidak ada pada golongan ${golBaru}; disesuaikan ke ${labelMkg(dipakai.tahun, dipakai.bulan)}. Cocokkan dengan SK sebelum menyimpan.`
+        : null,
+    );
+    setForm((f) => ({
+      ...f,
+      golonganRuang: golBaru,
+      mkg: dipakai ? `${dipakai.tahun}_${dipakai.bulan}` : f.mkg,
+    }));
+  }
 
   async function simpan() {
     setGalat("");
@@ -124,10 +167,11 @@ export default function ModalUbahPegawai({
       const badan: Record<string, unknown> = {};
       for (const k of KOLOM_BAGIAN[bagian]) badan[k] = form[k] ?? "";
       if (bagian === "dasar" && koreksi) {
-        const [tahun, bulan] = (form.mkg ?? "0_0").split("_");
         for (const k of KOLOM_KOREKSI) {
-          if (k === "mkgTahun") badan.mkgTahun = tahun;
-          else if (k === "mkgBulan") badan.mkgBulan = bulan;
+          if (k === "mkgTahun") badan.mkgTahun = String(mkgTahunForm);
+          else if (k === "mkgBulan") badan.mkgBulan = String(mkgBulanForm);
+          // Jadwal berikutnya mengikuti hitungan, kecuali sengaja ditimpa operator.
+          else if (k === "tmtKgbBerikutnya") badan.tmtKgbBerikutnya = tmtBerikutnyaDipakai;
           else badan[k] = form[k] ?? "";
         }
         // Gaji pokok dibiarkan dihitung ulang dari golongan dan masa kerja yang dikoreksi.
@@ -248,60 +292,147 @@ export default function ModalUbahPegawai({
 
                 <div className="inv-lebar pgw-gaji">
                   <h3>Golongan dan masa kerja</h3>
-                  <dl className="pgw-ringkas-dl">
-                    <div>
-                      <dt>Golongan</dt>
-                      <dd>{pegawai.golonganRuang} · {GOLONGAN_PANGKAT[pegawai.golonganRuang] ?? pegawai.pangkat ?? "-"}</dd>
-                    </div>
-                    <div>
-                      <dt>Masa kerja golongan</dt>
-                      <dd>{pegawai.mkgTahun} thn {pegawai.mkgBulan} bln</dd>
-                    </div>
-                    <div>
-                      <dt>TMT KGB terakhir</dt>
-                      <dd>{pegawai.tmtKgbTerakhir ? formatTanggalId(pegawai.tmtKgbTerakhir) : "-"}</dd>
-                    </div>
-                    <div>
-                      <dt>TMT KGB berikutnya</dt>
-                      <dd>{pegawai.tmtKgbBerikutnya ? formatTanggalId(pegawai.tmtKgbBerikutnya) : "-"}</dd>
-                    </div>
-                  </dl>
                   {!koreksi ? (
-                    <Catatan>
-                      Golongan, masa kerja golongan, dan TMT KGB berubah lewat <strong>Catat kenaikan pangkat</strong> atau{" "}
-                      <strong>Catat PMK</strong>, supaya riwayat dan jadwal KGB tetap konsisten.{" "}
-                      <button type="button" className="pgw-tautan" onClick={() => setKoreksi(true)}>
-                        Koreksi data yang salah ketik
-                      </button>
-                    </Catatan>
+                    <>
+                      <dl className="pgw-ringkas-dl">
+                        <div>
+                          <dt>Golongan</dt>
+                          <dd>{pegawai.golonganRuang} · {GOLONGAN_PANGKAT[pegawai.golonganRuang] ?? pegawai.pangkat ?? "-"}</dd>
+                        </div>
+                        <div>
+                          <dt>Masa kerja golongan</dt>
+                          <dd>{labelMkg(pegawai.mkgTahun, pegawai.mkgBulan)}</dd>
+                        </div>
+                        <div>
+                          <dt>TMT KGB terakhir</dt>
+                          <dd>{pegawai.tmtKgbTerakhir ? formatTanggalId(pegawai.tmtKgbTerakhir) : "-"}</dd>
+                        </div>
+                        <div>
+                          <dt>TMT KGB berikutnya</dt>
+                          <dd>{pegawai.tmtKgbBerikutnya ? formatTanggalId(pegawai.tmtKgbBerikutnya) : "-"}</dd>
+                        </div>
+                      </dl>
+                      <Catatan>
+                        Golongan, masa kerja golongan, dan TMT KGB berubah lewat <strong>Catat kenaikan pangkat</strong> atau{" "}
+                        <strong>Catat PMK</strong>, supaya riwayat dan jadwal KGB tetap konsisten.{" "}
+                        <button type="button" className="pgw-tautan" onClick={() => setKoreksi(true)}>
+                          Koreksi data yang salah ketik
+                        </button>
+                      </Catatan>
+                    </>
                   ) : (
+                    /* Ringkasan abu-abu sengaja tidak ikut tampil di sini: dulu isinya berlabel sama dengan
+                       isian di bawahnya, tanpa keterangan mana yang tercatat dan mana yang akan disimpan.
+                       Keduanya kini digabung menjadi satu tabel berlajur "Tercatat" dan "Menjadi". */
                     <>
                       <Catatan nada="amber">
-                        Koreksi ini mengubah dasar gaji tanpa mencatat riwayat kenaikan pangkat atau PMK, jadi pakai hanya
-                        untuk membetulkan data yang salah ketik. Perubahannya tercatat di Log Aktivitas.
+                        Koreksi ini mengubah dasar gaji <strong>tanpa</strong> mencatat riwayat kenaikan pangkat atau PMK,
+                        jadi pakai hanya bila angka yang tercatat memang salah ketik. Kenaikan pangkat yang sah dicatat
+                        lewat <strong>Catat kenaikan pangkat</strong>. Perubahannya tercatat di Log Aktivitas.
                       </Catatan>
-                      <div className="inv-atur pgw-koreksi">
-                        <label className="inv-bidang">
-                          <span>Golongan ruang</span>
-                          <select className="dsb-cari" value={form.golonganRuang} onChange={(e) => { ubah("golonganRuang")(e.target.value); ubah("mkg")("0_0"); }} disabled={sibuk}>
+
+                      <div className="pgw-koreksi-tabel">
+                        <div className="pgw-koreksi-kepala" aria-hidden="true">
+                          <span />
+                          <span>Tercatat</span>
+                          <span>Menjadi</span>
+                        </div>
+
+                        <div className="pgw-koreksi-baris">
+                          <label htmlFor="koreksi-golongan">
+                            Golongan ruang
+                            <small>Hanya bila golongan yang tercatat salah ketik sejak awal.</small>
+                          </label>
+                          <span className="pgw-koreksi-lama">
+                            {pegawai.golonganRuang} · {GOLONGAN_PANGKAT[pegawai.golonganRuang] ?? pegawai.pangkat ?? "-"}
+                          </span>
+                          <select
+                            id="koreksi-golongan"
+                            className="dsb-cari"
+                            value={form.golonganRuang}
+                            onChange={(e) => gantiGolongan(e.target.value)}
+                            disabled={sibuk}
+                          >
                             {Object.entries(GOLONGAN_PANGKAT).map(([g, p]) => (
                               <option key={g} value={g}>{g} · {p}</option>
                             ))}
                           </select>
-                        </label>
-                        <label className="inv-bidang">
-                          <span>Masa kerja golongan</span>
-                          <select className="dsb-cari" value={form.mkg} onChange={(e) => ubah("mkg")(e.target.value)} disabled={sibuk}>
-                            {getMKGOptions(form.golonganRuang).map((m) => (
+                        </div>
+
+                        <div className="pgw-koreksi-baris">
+                          <label htmlFor="koreksi-mkg">
+                            Masa kerja golongan
+                            <small>Angka pada SK KGB atau SK pangkat terakhir. Inilah yang menentukan gaji pokok.</small>
+                          </label>
+                          <span className="pgw-koreksi-lama">{labelMkg(pegawai.mkgTahun, pegawai.mkgBulan)}</span>
+                          <select id="koreksi-mkg" className="dsb-cari" value={form.mkg} onChange={(e) => ubah("mkg")(e.target.value)} disabled={sibuk}>
+                            {opsiMkg.map((m) => (
                               <option key={`${m.tahun}_${m.bulan}`} value={`${m.tahun}_${m.bulan}`}>
-                                {m.tahun} thn {m.bulan} bln · Rp {m.gaji.toLocaleString("id-ID")}
+                                {labelMkg(m.tahun, m.bulan)} · {rp(m.gaji)}
                               </option>
                             ))}
                           </select>
-                        </label>
-                        {bidang("TMT golongan", "tmtGolongan", "date")}
-                        {bidang("TMT KGB terakhir", "tmtKgbTerakhir", "date")}
-                        {bidang("TMT KGB berikutnya", "tmtKgbBerikutnya", "date")}
+                        </div>
+
+                        <div className="pgw-koreksi-baris">
+                          <label htmlFor="koreksi-tmt-golongan">
+                            TMT golongan
+                            <small>Keterangan saja; tidak dipakai menghitung KGB.</small>
+                          </label>
+                          <span className="pgw-koreksi-lama">{tglTampil(pegawai.tmtGolongan)}</span>
+                          <input id="koreksi-tmt-golongan" type="date" className="dsb-cari" value={form.tmtGolongan ?? ""} onChange={(e) => ubah("tmtGolongan")(e.target.value)} disabled={sibuk} />
+                        </div>
+
+                        <div className="pgw-koreksi-baris">
+                          <label htmlFor="koreksi-tmt-kgb">
+                            TMT KGB terakhir
+                            <small>TMT pada SK KGB terakhir; menjadi titik hitung jadwal berikutnya.</small>
+                          </label>
+                          <span className="pgw-koreksi-lama">{tglTampil(pegawai.tmtKgbTerakhir)}</span>
+                          <input id="koreksi-tmt-kgb" type="date" className="dsb-cari" value={form.tmtKgbTerakhir ?? ""} onChange={(e) => ubah("tmtKgbTerakhir")(e.target.value)} disabled={sibuk} />
+                        </div>
+
+                        {catatanMkg && (
+                          <p className="pgw-koreksi-catatan" role="status">{catatanMkg}</p>
+                        )}
+
+                        {/* Akibat koreksi, dihitung hidup dari tabel gaji PP 5/2024. Inilah yang sebenarnya
+                            menentukan benar atau tidaknya koreksi, jadi ditampilkan, bukan disembunyikan. */}
+                        <div className="pgw-koreksi-baris pgw-koreksi-hasil">
+                          <label>Gaji pokok</label>
+                          <span className="pgw-koreksi-lama">{rp(pegawai.gajiPokok)}</span>
+                          <span className="pgw-koreksi-baru" data-berubah={gajiBaru !== null && gajiBaru !== pegawai.gajiPokok ? "" : undefined}>
+                            {gajiBaru === null ? "masa kerja tidak ada di tabel golongan ini" : rp(gajiBaru)}
+                          </span>
+                        </div>
+
+                        <div className="pgw-koreksi-baris pgw-koreksi-hasil">
+                          <label>TMT KGB berikutnya</label>
+                          <span className="pgw-koreksi-lama">{tglTampil(pegawai.tmtKgbBerikutnya)}</span>
+                          {timpaTmt ? (
+                            <span>
+                              <input type="date" className="dsb-cari" aria-label="TMT KGB berikutnya" value={form.tmtKgbBerikutnya ?? ""} onChange={(e) => ubah("tmtKgbBerikutnya")(e.target.value)} disabled={sibuk} />
+                              <button type="button" className="pgw-tautan" onClick={() => setTimpaTmt(false)} disabled={sibuk}>
+                                Kembali ke hitungan sistem
+                              </button>
+                            </span>
+                          ) : (
+                            <span
+                              className="pgw-koreksi-baru"
+                              data-berubah={tmtBerikutnyaDipakai && tmtBerikutnyaDipakai !== tgl(pegawai.tmtKgbBerikutnya) ? "" : undefined}
+                            >
+                              {tmtBerikutnyaHitung ? tglTampil(tmtBerikutnyaDipakai) : "isi TMT KGB terakhir lebih dulu"}
+                              <small>
+                                dihitung dari {form.golonganRuang} · {labelMkg(mkgTahunForm, mkgBulanForm)}
+                                {". "}
+                                <button type="button" className="pgw-tautan" onClick={() => { setTimpaTmt(true); ubah("tmtKgbBerikutnya")(tmtBerikutnyaDipakai); }} disabled={sibuk}>
+                                  Tulis sendiri
+                                </button>{" "}
+                                bila jadwalnya memang bergeser, misalnya karena penundaan hukuman disiplin.
+                              </small>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </>
                   )}

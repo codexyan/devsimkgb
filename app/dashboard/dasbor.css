@@ -2548,6 +2548,34 @@ html[data-gerak="kurangi"] .dsb-putar {
 .pgw-ringkas-dl dt { color: var(--dt5); }
 .pgw-ringkas-dl dd { margin: 1px 0 0; font-size: 13px; font-weight: 600; color: var(--dtn); }
 
+/* Koreksi dasar gaji: tiga lajur — nama isian, nilai yang tercatat, nilai yang akan disimpan. Dua lajur
+   terakhir sengaja sejajar supaya perubahannya terbaca sebagai perbandingan, bukan sebagai isian lepas. */
+.pgw-koreksi-tabel { display: grid; gap: 2px; border: 1px solid var(--ln1); border-radius: 12px; overflow: hidden; }
+.pgw-koreksi-kepala,
+.pgw-koreksi-baris { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr) minmax(0, 1.1fr);
+  align-items: start; gap: 10px 14px; padding: 10px 12px; background: var(--card); }
+.pgw-koreksi-kepala { padding-bottom: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  text-transform: uppercase; color: var(--dt5); background: var(--sub); }
+.pgw-koreksi-baris + .pgw-koreksi-baris { border-top: 0.5px solid var(--ln2); }
+.pgw-koreksi-baris > label { display: grid; gap: 2px; font-size: 12px; font-weight: 600; color: var(--dt2); }
+.pgw-koreksi-baris > label small { font-size: 11px; font-weight: 400; line-height: 1.45; color: var(--dt5); }
+.pgw-koreksi-baris .dsb-cari { width: 100%; min-width: 0; }
+.pgw-koreksi-lama { font-size: 12.5px; color: var(--dt4); padding-top: 1px; }
+.pgw-koreksi-baru { display: grid; gap: 2px; font-size: 13px; font-weight: 600; color: var(--dtn); padding-top: 1px; }
+.pgw-koreksi-baru small { font-size: 11px; font-weight: 400; line-height: 1.45; color: var(--dt5); }
+/* Angka yang benar-benar bergerak diberi warna, supaya koreksi yang tidak mengubah apa pun juga terlihat. */
+.pgw-koreksi-baru[data-berubah] { color: var(--st-amber2); }
+.pgw-koreksi-hasil { background: var(--sub); }
+.pgw-koreksi-hasil > label { align-self: center; }
+.pgw-koreksi-catatan { grid-column: 1 / -1; margin: 0; padding: 8px 12px; font-size: 12px; line-height: 1.5;
+  color: var(--st-amber2); background: var(--tint-amber-bg); border-top: 0.5px solid var(--tint-amber-ln); }
+@media (max-width: 640px) {
+  .pgw-koreksi-kepala { display: none; }
+  .pgw-koreksi-baris { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  /* Tanpa lajur, "Tercatat" perlu penanda tersendiri agar tidak terbaca sebagai nilai baru. */
+  .pgw-koreksi-lama::before { content: "Tercatat: "; color: var(--dt5); }
+}
+
 /* Tab Data pegawai: empat kartu per bagian */
 .pgw-data-kisi { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 14px; }
 @media (max-width: 960px) { .pgw-data-kisi { grid-template-columns: minmax(0, 1fr); } }
