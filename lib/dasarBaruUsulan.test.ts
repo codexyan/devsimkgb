@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isJenisDasarBaru, kekuranganDasarBaru, perluDasarBaru, ringkasDasarBaru } from "./dasarBaruUsulan";
+import { isJenisDasarBaru, kekuranganDasarBaru, laporanSkDasar, perluDasarBaru, ringkasDasarBaru } from "./dasarBaruUsulan";
 
 test("perubahan golongan atau masa kerja golongan menuntut sebab; kolom lain tidak", () => {
   assert.equal(perluDasarBaru([{ kunci: "golonganRuang" }]), true);
@@ -68,4 +68,23 @@ test("ringkasan menyebut jenis, nomor, tanggal, dan TMT", () => {
   assert.equal(ringkasDasarBaru({}), null);
   assert.equal(isJenisDasarBaru("pmk"), true);
   assert.equal(isJenisDasarBaru("lain"), false);
+});
+
+test("laporan SK: usulan yang hanya memindahkan isi SK KP atau PMK berangkat tanpa surat usulan", () => {
+  const kp = { dasarBaruJenis: "kp", dasarBaruJenisKp: "reguler" };
+  // Kolom hitungan ikut berubah sendiri; itu tetap akibat SK yang sama, bukan permintaan baru.
+  assert.equal(laporanSkDasar(kp, [{ kunci: "golonganRuang" }, { kunci: "pangkat" }, { kunci: "gajiPokok" }]), true);
+  assert.equal(
+    laporanSkDasar({ dasarBaruJenis: "pmk" }, [{ kunci: "mkgTahun" }, { kunci: "gajiPokok" }, { kunci: "tmtKgbBerikutnya" }]),
+    true,
+  );
+});
+
+test("laporan SK: begitu ada kolom lain yang ikut diubah, suratnya kembali diperlukan", () => {
+  assert.equal(laporanSkDasar({ dasarBaruJenis: "kp" }, [{ kunci: "golonganRuang" }, { kunci: "jabatan" }]), false);
+  // Koreksi salah ketik bukan laporan SK: tidak ada SK yang menjadi buktinya.
+  assert.equal(laporanSkDasar({ dasarBaruJenis: "koreksi" }, [{ kunci: "mkgTahun" }]), false);
+  assert.equal(laporanSkDasar({}, [{ kunci: "golonganRuang" }]), false);
+  // Tidak ada yang berubah berarti tidak ada yang dilaporkan.
+  assert.equal(laporanSkDasar({ dasarBaruJenis: "kp" }, []), false);
 });

@@ -5,6 +5,7 @@ import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/
 import KolomBerkas from "./KolomBerkas";
 import { IsianTanggal, type DrafUsulanUpt, type PegawaiUntukUsulan } from "./FormulirUsulan";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
+import { berkasDasarBaru, berkasUntukKeadaan, pernahKgb as sudahPernahKgb } from "@/lib/usulanPegawai";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { JENIS_KP, hitungKenaikanPangkat } from "@/lib/kenaikanPangkat";
 import { hitungPmk } from "@/lib/pmk";
@@ -73,7 +74,7 @@ export default function ModalDasarBaru({
   const [tanggalSk, setTanggalSk] = useState(drafSama?.tanggalSk ?? "");
   const [tmt, setTmt] = useState(drafSama?.tmt ?? "");
   const [penetap, setPenetap] = useState(drafSama?.penetap ?? "");
-  const [berkas, setBerkas] = useState<File | null>(null);
+  const [berkas, setBerkas] = useState<Record<string, File | null>>({});
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
   /** Berkas yang sedang dibuka, agar operator dapat memastikan pindaian yang dilampirkan memang benar. */
@@ -81,8 +82,27 @@ export default function ModalDasarBaru({
 
   const medanBerkas = jenis === "kp" ? "skPangkat" : "skPmk";
   const labelBerkas = jenis === "kp" ? "SK kenaikan pangkat" : "SK peninjauan masa kerja";
-  const berkasTersimpan = draf?.berkas.find((b) => b.medan === medanBerkas) ?? null;
-  const berkasBawaan = pegawai.bawaan?.berkas.find((b) => b.medan === medanBerkas) ?? null;
+
+  /**
+   * Seluruh berkas yang akan ditagih saat usulan ini diajukan, bukan hanya SK yang sedang dilaporkan:
+   * perubahan yang menyentuh golongan atau masa kerja golongan selalu disertai SK KGB terakhir dan SK
+   * kenaikan pangkat terakhir (ADR-030). Dikumpulkan di kartu ini supaya satu jendela cukup — tanpa itu,
+   * kartu selalu berakhir sebagai draf yang masih harus dilengkapi di tempat lain.
+   */
+  const berkasDiminta = [
+    ...berkasUntukKeadaan(sudahPernahKgb(mkgTahunSekarang, mkgBulanSekarang)),
+    ...berkasDasarBaru(jenis),
+  ];
+
+  /** Berkas yang sudah ada untuk satu medan: unggahan pada draf, atau salinan dari usulan yang disetujui. */
+  const tersedia = (medan: string) => ({
+    draf: draf?.berkas.find((b) => b.medan === medan) ?? null,
+    bawaan: pegawai.bawaan?.berkas.find((b) => b.medan === medan) ?? null,
+  });
+  const belumAda = berkasDiminta.filter((b) => {
+    const ada = tersedia(b.medan);
+    return b.wajib && !berkas[b.medan] && !ada.draf && !ada.bawaan;
+  });
 
   /**
    * Pratayang akibat SK ini, memakai fungsi yang sama dengan yang dipakai Kanwil saat menyetujui
@@ -152,7 +172,12 @@ export default function ModalDasarBaru({
     return perlu;
   }
 
-  async function kirim() {
+  /**
+   * `langsung` true berarti sekalian diajukan ke Kanwil sesudah tersimpan. Laporan yang isinya murni SK
+   * kenaikan pangkat atau PMK berangkat tanpa surat usulan (ADR-046); yang isinya lebih dari itu ditolak
+   * rute pengajuan dengan menyebut suratnya, dan drafnya tetap tersimpan.
+   */
+  async function kirim(langsung: boolean) {
     const perlu = kurang();
     if (perlu.length > 0) {
       setGalat(`Belum lengkap: ${perlu.join(", ")}.`);
@@ -166,7 +191,8 @@ export default function ModalDasarBaru({
     setGalat(null);
 
     const form = new FormData();
-    // Tersimpan sebagai draf: pengirimannya tetap lewat Usulan kolektif, jadi nomor surat usulan belum ada.
+    // Disimpan sebagai draf lebih dulu, baru diajukan lewat rutenya sendiri bila diminta; nomor surat
+    // usulan memang belum ada pada tahap ini.
     form.set("status", "draf");
     form.set("jenis", "perubahan");
     if (!draf) form.set("pegawaiId", pegawai.id);
@@ -192,21 +218,41 @@ export default function ModalDasarBaru({
     form.set("dasarBaruTanggalSk", tanggalSk);
     form.set("dasarBaruTmt", tmt);
     form.set("dasarBaruPenetap", penetap.trim());
-    if (berkas) form.set(medanBerkas, berkas);
+    for (const b of berkasDiminta) {
+      const dipilih = berkas[b.medan];
+      if (dipilih) form.set(b.medan, dipilih);
+    }
 
     try {
       const res = draf
         ? await fetch(`/api/upt/usulan/${draf.id}`, { method: "PATCH", body: form })
         : await fetch("/api/upt/usulan", { method: "POST", body: form });
-      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      const d = (await res.json().catch(() => ({}))) as { error?: string; id?: string };
       if (!res.ok) {
         setGalat(d.error ?? "Laporan gagal disimpan");
         return;
       }
-      onSelesai(
-        `${jenis === "kp" ? "Kenaikan pangkat" : "Peninjauan masa kerja"} ${pegawai.nama} tersimpan sebagai draf usulan. ` +
-          "Ajukan ke Kanwil lewat Usulan kolektif beserta surat usulannya.",
-      );
+      const label = jenis === "kp" ? "Kenaikan pangkat" : "Peninjauan masa kerja";
+      if (!langsung) {
+        onSelesai(`${label} ${pegawai.nama} tersimpan sebagai draf. Kirim ke Kanwil bila berkasnya sudah lengkap.`);
+        return;
+      }
+
+      const id = draf?.id ?? d.id;
+      if (!id) {
+        setGalat("Tersimpan sebagai draf, tetapi pengirimannya gagal. Kirim dari daftar Perlu dikerjakan.");
+        return;
+      }
+      const pengajuan = new FormData();
+      pengajuan.append("id", id);
+      const resAjukan = await fetch("/api/upt/usulan/ajukan", { method: "POST", body: pengajuan });
+      const dAjukan = (await resAjukan.json().catch(() => ({}))) as { error?: string };
+      if (!resAjukan.ok) {
+        // Drafnya sudah tersimpan, jadi tidak ada yang hilang; yang gagal hanya pengirimannya.
+        setGalat(`${dAjukan.error ?? "Pengiriman gagal"} Isiannya sudah tersimpan sebagai draf.`);
+        return;
+      }
+      onSelesai(`${label} ${pegawai.nama} terkirim ke Kanwil beserta pindaian SK-nya.`);
     } catch {
       setGalat("Laporan gagal disimpan. Periksa sambungan lalu coba lagi.");
     } finally {
@@ -221,14 +267,19 @@ export default function ModalDasarBaru({
       ukuran="md"
       sibuk={sibuk}
       onTutup={onTutup}
-      onKirim={() => void kirim()}
+      onKirim={() => void kirim(true)}
       kaki={
         <>
           <button type="button" className="kgbm-tombol kgbm-kedua" onClick={onTutup} disabled={sibuk}>
             Batal
           </button>
-          <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk}>
-            {sibuk ? "Menyimpan…" : draf ? "Simpan ke draf" : "Simpan draf"}
+          {/* Menyimpan tanpa mengirim tetap disediakan: pemindai yang sedang antre tidak boleh membuat
+              isian yang sudah diketik hilang. */}
+          <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => void kirim(false)} disabled={sibuk}>
+            Simpan draf
+          </button>
+          <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk || belumAda.length > 0}>
+            {sibuk ? "Mengirim…" : "Kirim ke Kanwil"}
           </button>
         </>
       }
@@ -239,8 +290,8 @@ export default function ModalDasarBaru({
         {jenis === "kp"
           ? "Isi golongan baru beserta SK-nya. Masa kerja golongan dan gaji pokok dihitung Kanwil saat menyetujui — naik jenjang golongan memotong masa kerja — jadi keduanya tidak diketik di sini."
           : "Isi masa kerja golongan sebagaimana tertulis pada SK PMK. Kanwil menghitung ulang gaji pokok dan jadwal KGB berikutnya dari angka itu saat menyetujui."}{" "}
-        Tersimpan sebagai draf usulan perbaikan; pengirimannya tetap lewat Usulan kolektif, satu surat untuk
-        beberapa pegawai.
+        Laporan SK tidak menumpang surat usulan: SK-nya sudah terbit dan pindaiannya ikut terkirim, jadi
+        begitu berkasnya lengkap, kartu ini langsung mengirimkannya ke Kanwil.
       </Catatan>
 
       {drafSebabLain && (
@@ -344,32 +395,55 @@ export default function ModalDasarBaru({
         )
       )}
 
-      <KolomBerkas
-        label={labelBerkas}
-        wajib
-        bantuan={
-          berkasBawaan && !berkasTersimpan
-            ? "Yang terlampir masih SK dari usulan sebelumnya. Bila SK yang Anda laporkan berbeda, ganti berkasnya."
-            : "Pindai sebagai dokumen, bukan foto. Boleh menyusul, tetapi ditagih saat usulan diajukan ke Kanwil."
-        }
-        dipilih={berkas}
-        urlTersimpan={
-          draf && berkasTersimpan
-            ? `/api/usulan/${draf.id}/berkas?berkas=${medanBerkas}`
-            : berkasBawaan
-              ? `/api/usulan/${berkasBawaan.usulanId}/berkas?berkas=${medanBerkas}`
-              : null
-        }
-        namaTersimpan={
-          berkasTersimpan?.nama ??
-          (berkasBawaan ? `${berkasBawaan.nama ?? labelBerkas} · dari usulan yang disetujui` : null)
-        }
-        ditandaiHapus={false}
-        onPilih={setBerkas}
-        onHapusTersimpan={() => {}}
-        onBatalHapus={() => {}}
-        onPratinjau={(judul, url, lokal) => setPratinjauBerkas({ judul, url, lokal })}
-      />
+      <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
+        <div className="kgbm-bagian-kepala">
+          <p className="kgbm-bagian-judul">Berkas yang menyertai</p>
+          <p className="kgbm-bagian-ket">
+            Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 500 KB
+          </p>
+        </div>
+        <div className="kgbm-bagian-isi">
+          {berkasDiminta.map((b) => {
+            const ada = tersedia(b.medan);
+            const iniSkDilaporkan = b.medan === medanBerkas;
+            return (
+              <KolomBerkas
+                key={b.medan}
+                label={b.label}
+                wajib={b.wajib}
+                bantuan={
+                  iniSkDilaporkan && ada.bawaan && !ada.draf
+                    ? "Yang terlampir masih SK dari usulan sebelumnya. Bila SK yang Anda laporkan berbeda, ganti berkasnya."
+                    : b.keterangan
+                }
+                dipilih={berkas[b.medan] ?? null}
+                urlTersimpan={
+                  draf && ada.draf
+                    ? `/api/usulan/${draf.id}/berkas?berkas=${b.medan}`
+                    : ada.bawaan
+                      ? `/api/usulan/${ada.bawaan.usulanId}/berkas?berkas=${b.medan}`
+                      : null
+                }
+                namaTersimpan={
+                  ada.draf?.nama ??
+                  (ada.bawaan ? `${ada.bawaan.nama ?? b.label} · dari usulan yang disetujui` : null)
+                }
+                ditandaiHapus={false}
+                onPilih={(f) => setBerkas((lama) => ({ ...lama, [b.medan]: f }))}
+                onHapusTersimpan={() => {}}
+                onBatalHapus={() => {}}
+                onPratinjau={(judul, url, lokal) => setPratinjauBerkas({ judul, url, lokal })}
+              />
+            );
+          })}
+          {belumAda.length > 0 && (
+            <p className="kgbm-bantuan">
+              Belum dapat dikirim ke Kanwil sebelum {belumAda.map((b) => b.label).join(" dan ")} dilampirkan.
+              Isiannya tetap dapat disimpan sebagai draf.
+            </p>
+          )}
+        </div>
+      </div>
 
       {pratinjauBerkas && (
         <ModalPratinjauBerkas

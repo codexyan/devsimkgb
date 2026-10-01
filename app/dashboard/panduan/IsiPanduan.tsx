@@ -1053,8 +1053,17 @@ export default async function IsiPanduan({
                     penetapnya, dan <strong>pindaian SK-nya</strong>. Akibat SK itu langsung terlihat di kotak
                     <em> Dihitung sistem</em> sebelum disimpan. Masa kerja golongan dan gaji pokoknya dihitung Kanwil
                     saat menyetujui — naik dari golongan II ke III tetap memotong masa kerja 5 tahun — sehingga angka
-                    yang Anda ketik tidak pernah diam-diam menggeser uang. Isinya tersimpan sebagai draf usulan
-                    perbaikan; pindaian SK boleh menyusul, tetapi ditagih saat usulan diajukan. SK
+                    yang Anda ketik tidak pernah diam-diam menggeser uang.
+                  </p>
+                  <p>
+                    Laporan SK <strong>tidak menumpang surat usulan Srikandi</strong>: SK-nya sudah terbit dan
+                    pindaiannya ikut terkirim, jadi yang disampaikan adalah kejadian yang sudah selesai — sama
+                    seperti laporan mutasi dan laporan hukuman disiplin. Kartunya meminta sekalian berkas lain yang
+                    akan ditagih (SK KGB terakhir dan SK kenaikan pangkat terakhir), dan begitu semuanya terlampir,
+                    tombol <strong>Kirim ke Kanwil</strong> menyalakan dirinya: satu jendela, selesai, tanpa mampir
+                    ke Usulan kolektif. Berkas yang pemindaiannya belum selesai tidak membuat isian hilang — simpan
+                    sebagai draf, lalu kirim setelah lengkap. Usulan yang sekalian mengubah jabatan atau kolom lain
+                    tetap berangkat bersurat lewat Usulan kolektif seperti biasa. SK
                     yang sudah dicatat Kanwil terlihat di <strong>Riwayat KGB</strong>, pada baris pegawai yang
                     dibuka, dan pada kolom <em>Dasar KGB berikutnya</em> baris itu bertanda <em>Dari KP/PI</em> atau{" "}
                     <em>Dari PMK</em>.

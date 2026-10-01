@@ -33,6 +33,34 @@ export function isJenisDasarBaru(nilai: unknown): nilai is JenisDasarBaru {
 /** Kolom yang hanya berubah karena kenaikan pangkat, PMK, atau pembetulan salah ketik. */
 export const KOLOM_PERLU_DASAR = ["golonganRuang", "mkgTahun", "mkgBulan"] as const;
 
+/**
+ * Kolom yang memang ditetapkan SK kenaikan pangkat atau SK PMK, beserta kolom yang dihitung sistem dari
+ * ketiganya. Dipakai mengenali usulan yang isinya semata-mata melaporkan SK itu.
+ */
+const KOLOM_DARI_SK_DASAR: readonly string[] = [
+  ...KOLOM_PERLU_DASAR,
+  "tmtGolongan",
+  "pangkat",
+  "gajiPokok",
+  "tmtKgbBerikutnya",
+];
+
+/**
+ * true bila usulan ini semata-mata melaporkan SK kenaikan pangkat atau SK PMK: sebabnya salah satu dari
+ * keduanya, dan tidak ada kolom lain yang ikut diusulkan berubah.
+ *
+ * Laporan seperti itu tidak menumpang surat usulan Srikandi (ADR-046). SK-nya sudah terbit dan pindaiannya
+ * ikut terkirim, jadi yang disampaikan adalah kejadian yang sudah selesai — sama watak dengan laporan
+ * mutasi dan laporan hukuman disiplin, yang memang berangkat tanpa surat. Usulan yang sekalian mengubah
+ * jabatan, nama, atau kolom lain tetap bersurat, sebab di situ UPT memang sedang meminta sesuatu.
+ */
+export function laporanSkDasar(isian: IsianDasarBaru, perubahan: readonly { kunci: string }[]): boolean {
+  const jenis = isian.dasarBaruJenis?.trim() ?? "";
+  if (jenis !== "kp" && jenis !== "pmk") return false;
+  if (perubahan.length === 0) return false;
+  return perubahan.every((p) => KOLOM_DARI_SK_DASAR.includes(p.kunci));
+}
+
 /** true bila perubahan yang diusulkan menyentuh golongan atau masa kerja golongan. */
 export function perluDasarBaru(perubahan: readonly { kunci: string }[]): boolean {
   return perubahan.some((p) => (KOLOM_PERLU_DASAR as readonly string[]).includes(p.kunci));

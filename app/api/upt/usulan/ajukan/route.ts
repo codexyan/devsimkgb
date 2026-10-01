@@ -5,7 +5,8 @@ import { newId } from "@/lib/sheets/id";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { TIPE_NOTIFIKASI, notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
-import { DIPEGANG_UPT, kekuranganUsulan, pernahKgb } from "@/lib/usulanPegawai";
+import { DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgb } from "@/lib/usulanPegawai";
+import { laporanSkDasar } from "@/lib/dasarBaruUsulan";
 import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan, type BawaanUsulan } from "@/lib/bawaanUsulan";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
@@ -44,10 +45,12 @@ export async function POST(req: Request) {
   }
   const teks = (kunci: string) => (form.get(kunci) as string | null)?.trim() || "";
 
-  const nomorSurat = teks("nomorSurat");
-  if (!nomorSurat) return NextResponse.json({ error: "Nomor surat usulan wajib diisi" }, { status: 400 });
+  // Suratnya diperiksa belakangan, sesudah ketahuan apa isi yang diajukan: laporan SK kenaikan pangkat
+  // atau PMK berangkat tanpa surat usulan Srikandi (ADR-046).
+  const nomorSurat = teks("nomorSurat") || null;
   const tanggalSurat = teks("tanggalSurat") ? bacaTanggalInput(teks("tanggalSurat")) : null;
-  if (!tanggalSurat) return NextResponse.json({ error: "Tanggal surat usulan wajib diisi dan harus valid" }, { status: 400 });
+  if (teks("tanggalSurat") && !tanggalSurat)
+    return NextResponse.json({ error: "Tanggal surat usulan tidak valid" }, { status: 400 });
 
   const idTerpilih = form.getAll("id").map((v) => String(v)).filter(Boolean);
   if (idTerpilih.length === 0) return NextResponse.json({ error: "Pilih dulu data pegawai yang akan diajukan" }, { status: 400 });
@@ -77,6 +80,25 @@ export async function POST(req: Request) {
     const pegawai = u.pegawaiId ? pegawaiPerId.get(u.pegawaiId) : null;
     if (pegawai && u.jenis === "perubahan") bawaanPerUsulan.set(u.id, bawaanPegawai(pegawai, disetujui));
   }
+  // Satu pengajuan hanya membawa satu surat untuk seluruh barisnya, jadi suratnya baru boleh ditiadakan
+  // bila tidak ada satu pun baris yang meminta sesuatu di luar SK yang dilaporkan.
+  const semuaLaporanSk = draf.every((u) => {
+    const pegawai = u.pegawaiId ? pegawaiPerId.get(u.pegawaiId) : null;
+    return u.jenis === "perubahan" && !!pegawai && laporanSkDasar(u, bandingkanUsulan(pegawai, u));
+  });
+  if (!semuaLaporanSk) {
+    if (!nomorSurat)
+      return NextResponse.json(
+        {
+          error:
+            "Nomor surat usulan wajib diisi, kecuali seluruh yang diajukan hanya melaporkan SK kenaikan pangkat atau SK PMK.",
+        },
+        { status: 400 },
+      );
+    if (!tanggalSurat)
+      return NextResponse.json({ error: "Tanggal surat usulan wajib diisi dan harus valid" }, { status: 400 });
+  }
+
   const belumLengkap: { nama: string; kurang: string[] }[] = [];
   for (const u of draf) {
     const pegawai = u.pegawaiId ? pegawaiPerId.get(u.pegawaiId) : null;
@@ -144,7 +166,9 @@ export async function POST(req: Request) {
   logAudit({
     userId: pengguna.id,
     aksi: "usul_data_pegawai",
-    detail: `Usulan ${terkirim.length} pegawai dari ${satker.nama} dengan surat ${nomorSurat}: ${terkirim.join(", ")}`,
+    detail:
+      `Usulan ${terkirim.length} pegawai dari ${satker.nama} ` +
+      `${nomorSurat ? `dengan surat ${nomorSurat}` : "sebagai laporan SK, tanpa surat usulan"}: ${terkirim.join(", ")}`,
     targetNama: satker.nama,
   });
 

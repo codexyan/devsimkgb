@@ -141,11 +141,14 @@ export function notifikasiUsulanUpt(
   const nama = pegawai?.nama?.trim() || "-";
   const nip = pegawai?.nip?.trim() || "-";
   const pegawaiBaru = usulan.jenis === "baru";
+  const lewat = usulan.nomorSurat?.trim() ? `lewat surat ${usulan.nomorSurat.trim()}` : "sebagai laporan SK, tanpa surat usulan";
   return {
     judul: `${pegawaiBaru ? "Usulan Pegawai Baru" : "Usulan Data UPT"}: ${nama}`,
+    // Laporan SK kenaikan pangkat atau PMK berangkat tanpa surat usulan (ADR-046); menyebut "surat -"
+    // di situ hanya membuat peninjau mencari surat yang memang tidak pernah ada.
     pesan: pegawaiBaru
-      ? `UPT mengusulkan pegawai baru ${nama} (${nip}) lewat surat ${usulan.nomorSurat ?? "-"}. Tinjau sebelum pegawainya ditambahkan ke data induk.`
-      : `UPT mengusulkan perbaikan data ${nama} (${nip}) lewat surat ${usulan.nomorSurat ?? "-"}. Tinjau sebelum KGB pegawai ini diproses.`,
+      ? `UPT mengusulkan pegawai baru ${nama} (${nip}) ${lewat}. Tinjau sebelum pegawainya ditambahkan ke data induk.`
+      : `UPT mengusulkan perbaikan data ${nama} (${nip}) ${lewat}. Tinjau sebelum KGB pegawai ini diproses.`,
     tipe: T.USULAN_UPT,
     referenceId: usulan.id,
     prioritas: "warning",
