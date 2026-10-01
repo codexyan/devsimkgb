@@ -1,21 +1,34 @@
 import type { Metadata } from "next";
-import { Inter, Inter_Tight } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { SKRIP_GERAK_AWAL } from "@/lib/ui/gerakAwal";
 
+/*
+ * Berkas fontnya ikut di repo, bukan diunduh dari Google saat build (ADR-048).
+ *
+ * Dengan next/font/google, setiap build mengambil berkas font dari jaringan. Satu kali gagal, dan
+ * penggelaran ikut gagal dengan 28 galat "Can't resolve @vercel/turbopack-next/internal/font/google/font"
+ * walaupun tidak ada satu baris pun yang berubah; itu terjadi pada 1 Oktober 2026. Berkas yang disimpan
+ * sendiri menghapus ketergantungan itu.
+ *
+ * Keduanya font variabel subset latin, satu berkas untuk seluruh bobot: Inter 48 KB dan Inter Tight 44 KB,
+ * lebih kecil daripada empat berkas bobot tetap yang dipakai sebelumnya. Lisensinya SIL OFL 1.1, disalin
+ * apa adanya di app/fonts/OFL.txt.
+ */
+
 // Teks isi seluruh aplikasi (dashboard dan halaman publik)
-const inter = Inter({
-  subsets: ["latin"],
+const inter = localFont({
+  src: "./fonts/inter-latin-var.woff2",
   variable: "--font-inter",
-  weight: ["400", "500", "600", "700"],
+  weight: "100 900",
   display: "swap",
 });
 
 // Judul dan angka besar: sans rapat berbobot ringan, sepasang dengan Inter (ADR-002, ADR-003)
-const hurufJudul = Inter_Tight({
-  subsets: ["latin"],
+const hurufJudul = localFont({
+  src: "./fonts/inter-tight-latin-var.woff2",
   variable: "--font-judul",
-  weight: ["300", "400", "500", "600"],
+  weight: "100 900",
   display: "swap",
 });
 
