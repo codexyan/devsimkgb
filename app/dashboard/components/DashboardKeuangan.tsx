@@ -7,6 +7,7 @@ import { useDashUser } from "@/app/dashboard/components/RoleContext";
 import { PanelBulanRekon } from "@/app/dashboard/components/DaftarBulanRekon";
 import PanelGajiWebUpt from "@/app/dashboard/components/PanelGajiWebUpt";
 import { PanelNavy, PanelTindakan, Stat, StripStat, namaSapaan, sapaanWita, tanggalPanjangWita, type Tindakan } from "@/app/dashboard/components/PanelNavy";
+import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
 
 interface KGBKeuangan {
   id: string;
@@ -37,6 +38,59 @@ export default function DashboardKeuangan() {
   const [stats, setStats]         = useState<Stats | null>(null);
   const [loading, setLoading]     = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  /* Dua tindakan yang menuntaskan satu baris antrean, tanpa pindah halaman (ADR-047): konfirmasi yang
+     memindahkan kartunya ke kolom Selesai pada papan Tim SDM, dan pengembalian ke kolom Diproses bila
+     ada yang perlu dibetulkan lebih dulu. */
+  const [tinjau, setTinjau] = useState<{ k: KGBKeuangan; jenis: "konfirmasi" | "kembalikan" } | null>(null);
+  const [rapelan, setRapelan] = useState(false);
+  const [alasan, setAlasan] = useState("");
+  const [sibuk, setSibuk] = useState(false);
+  const [galat, setGalat] = useState<string | null>(null);
+  const [kabar, setKabar] = useState<string | null>(null);
+
+  function buka(k: KGBKeuangan, jenis: "konfirmasi" | "kembalikan") {
+    setTinjau({ k, jenis });
+    setRapelan(k.flagRapelan);
+    setAlasan("");
+    setGalat(null);
+  }
+
+  async function jalankan() {
+    if (!tinjau) return;
+    const { k, jenis } = tinjau;
+    if (jenis === "kembalikan" && !alasan.trim()) {
+      setGalat("Alasan pengembalian wajib diisi, sebab itulah yang dibaca Tim SDM.");
+      return;
+    }
+    setSibuk(true);
+    setGalat(null);
+    try {
+      const res = await fetch(`/api/kgb/${k.id}/${jenis === "konfirmasi" ? "konfirmasi-keuangan" : "kembalikan"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(jenis === "konfirmasi" ? { isRapelan: rapelan } : { alasan: alasan.trim() }),
+      });
+      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setGalat(d.error ?? "Tindakan gagal dijalankan.");
+        return;
+      }
+      const nama = k.pegawai?.nama ?? "-";
+      setKabar(
+        jenis === "konfirmasi"
+          ? `KGB ${nama} dikonfirmasi${rapelan ? " sebagai rapelan" : ""} dan berpindah ke Selesai.`
+          : `SK ${nama} dikembalikan ke Tim SDM untuk diperbaiki.`,
+      );
+      setTimeout(() => setKabar(null), 8000);
+      setTinjau(null);
+      fetchData();
+    } catch {
+      setGalat("Gagal menghubungi server. Coba lagi.");
+    } finally {
+      setSibuk(false);
+    }
+  }
 
   function fetchData() {
     setLoading(true);
@@ -77,6 +131,7 @@ export default function DashboardKeuangan() {
     });
 
   return (
+    <>
     <div className="dsb-halaman" data-muat-layar="">
 
       <PanelNavy
@@ -178,22 +233,45 @@ export default function DashboardKeuangan() {
                       </dl>
                     </div>
                   </div>
-                  {k.surat?.pathFile && (
-                    // Membuka SK yang sudah ditandatangani dan diunggah, bukan SK yang dibuat ulang.
-                    <a
-                      href={`/api/blob/download?url=${encodeURIComponent(k.surat.pathFile)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Lihat SK yang sudah ditandatangani, ${namaPegawai}`}
-                      className="dsb-tombol dsb-tombol-kecil shrink-0 self-start sm:self-center"
+                  {/* Tiga tindakan yang menuntaskan baris ini di tempat: memeriksa SK-nya, mengkonfirmasi,
+                      atau mengembalikannya kepada Tim SDM. Sebelumnya baris ini hanya dapat dibaca, dan
+                      satu-satunya jalan menuntaskannya adalah pindah ke halaman Keuangan (ADR-047). */}
+                  <div className="dsb-aksi shrink-0 self-start sm:self-center" style={{ flexWrap: "wrap" }}>
+                    {k.surat?.pathFile && (
+                      // Membuka SK yang sudah ditandatangani dan diunggah, bukan SK yang dibuat ulang.
+                      <a
+                        href={`/api/blob/download?url=${encodeURIComponent(k.surat.pathFile)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Lihat SK yang sudah ditandatangani, ${namaPegawai}`}
+                        className="dsb-tombol dsb-tombol-kecil"
+                        data-jenis="garis"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        Lihat SK
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      className="dsb-tombol dsb-tombol-kecil"
                       data-jenis="garis"
+                      data-nada="merah"
+                      onClick={() => buka(k, "kembalikan")}
+                      aria-label={`Kembalikan SK ${namaPegawai} kepada Tim SDM`}
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-                      </svg>
-                      Lihat SK
-                    </a>
-                  )}
+                      Kembalikan
+                    </button>
+                    <button
+                      type="button"
+                      className="dsb-tombol dsb-tombol-kecil"
+                      onClick={() => buka(k, "konfirmasi")}
+                      aria-label={`Konfirmasi KGB ${namaPegawai}`}
+                    >
+                      Konfirmasi
+                    </button>
+                  </div>
                 </li>
               );
             })}
@@ -208,6 +286,88 @@ export default function DashboardKeuangan() {
         <PanelGajiWebUpt versi={lastRefresh?.getTime()} />
       </aside>
       </div>
+
+      {kabar && (
+        <div role="status" className="dsb-pesan" data-nada="hijau">
+          <span className="dsb-pesan-ikon" aria-hidden="true">✓</span>
+          <p>{kabar}</p>
+        </div>
+      )}
     </div>
+
+    {tinjau && (
+      <KerangkaModal
+        judul={tinjau.jenis === "konfirmasi" ? "Konfirmasi KGB" : "Kembalikan SK ke Tim SDM"}
+        subjudul={`${tinjau.k.pegawai?.nama ?? "-"} · TMT ${formatTanggalId(tinjau.k.tmtKgbBaru)}`}
+        ukuran="md"
+        nada={tinjau.jenis === "kembalikan" ? "amber" : undefined}
+        sibuk={sibuk}
+        onTutup={() => setTinjau(null)}
+        onKirim={() => void jalankan()}
+        kaki={
+          <>
+            <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setTinjau(null)} disabled={sibuk}>
+              Batal
+            </button>
+            <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk}>
+              {sibuk ? "Menyimpan…" : tinjau.jenis === "konfirmasi" ? "Konfirmasi" : "Kembalikan"}
+            </button>
+          </>
+        }
+      >
+        <PesanGalat pesan={galat} />
+        {tinjau.jenis === "konfirmasi" ? (
+          <>
+            <Catatan>
+              Gaji pokok, masa kerja golongan, dan jadwal KGB berikutnya pegawai ini diperbarui sekarang juga, lalu
+              kartunya berpindah ke kolom Selesai pada papan Tim SDM. Tindakan ini tidak dapat dibatalkan.
+            </Catatan>
+            <dl className="kgbm-hitungan">
+              <p className="kgbm-hitungan-judul">Yang akan tercatat</p>
+              <div>
+                <dt>Gaji pokok</dt>
+                <dd>
+                  Rp {tinjau.k.gajiPokokLama.toLocaleString("id-ID")} menjadi{" "}
+                  <b>Rp {tinjau.k.gajiPokokBaru.toLocaleString("id-ID")}</b>
+                </dd>
+              </div>
+              {tinjau.k.surat && (
+                <div>
+                  <dt>Nomor SK</dt>
+                  <dd>{tinjau.k.surat.nomorSurat}</dd>
+                </div>
+              )}
+            </dl>
+            <label className="kgbm-label" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <input type="checkbox" checked={rapelan} onChange={(e) => setRapelan(e.target.checked)} />
+              <span>
+                Dibayarkan sebagai rapelan
+                {tinjau.k.flagRapelan ? " (SK ini berpotensi rapelan)" : ""}
+              </span>
+            </label>
+          </>
+        ) : (
+          <>
+            <Catatan nada="amber">
+              SK kembali ke kolom <strong>Diproses</strong> milik Tim SDM beserta alasan Anda. Data pegawai belum
+              berubah sama sekali, jadi tidak ada yang perlu dipulihkan; dari kolom itu Tim SDM dapat mengganti
+              SK-nya, atau membatalkan prosesnya bila yang keliru justru angkanya.
+            </Catatan>
+            <label className="kgbm-label">
+              <span className="kgbm-wajib">Alasan pengembalian</span>
+              <textarea
+                className="kgbm-input"
+                rows={3}
+                value={alasan}
+                onChange={(e) => setAlasan(e.target.value)}
+                placeholder="Misalnya: gaji pokok pada SK tidak cocok dengan tabel PP 5/2024 untuk masa kerja 12 tahun."
+              />
+              <span className="kgbm-bantuan">Dibaca Tim SDM pada panel tindakan dasbornya, dan tercatat di log aktivitas.</span>
+            </label>
+          </>
+        )}
+      </KerangkaModal>
+    )}
+    </>
   );
 }

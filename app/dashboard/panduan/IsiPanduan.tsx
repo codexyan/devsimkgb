@@ -754,14 +754,14 @@ export default async function IsiPanduan({
                   <li>Setelah SK terbit: unduh, rekam di Gaji Web satker, lalu tandai di SIM-KGB.</li>
                 </ol>
 
-                <h3 className="pub-h3">Langkah 1 — Kenali menu Anda</h3>
+                <h3 className="pub-h3">Langkah 1: Kenali menu Anda</h3>
                 <p>
                   Sesudah masuk, menu di sisi kiri layar hanya berisi enam pilihan. Seluruhnya terbatas pada satker
                   Anda: pegawai satker lain tidak pernah tampil, dan tidak ada menu Kanwil di sana.
                 </p>
                 <LayarMenu />
 
-                <h3 className="pub-h3">Langkah 2 — Kapan usulan harus dikirim</h3>
+                <h3 className="pub-h3">Langkah 2: Kapan usulan harus dikirim</h3>
                 <p>
                   Surat usulan dikirim ke Kanwil pada <strong>tanggal 1 sampai {KIRIM_SURAT_BATAS}</strong>, di{" "}
                   <strong>bulan kedua sebelum TMT</strong> KGB pegawainya. Untuk KGB yang TMT-nya{" "}
@@ -779,7 +779,7 @@ export default async function IsiPanduan({
                   pekerjaan tambahan bagi keuangan satker Anda sendiri.
                 </p>
 
-                <h3 className="pub-h3">Langkah 3 — Pastikan data pegawai sudah benar</h3>
+                <h3 className="pub-h3">Langkah 3: Pastikan data pegawai sudah benar</h3>
                 <p>
                   Dokumen aslinya ada di UPT, sedangkan yang mengetik datanya selama ini Kanwil. Pengetikan ganda itulah
                   sumber salah masa kerja golongan. Karena itu UPT mendata sendiri pegawainya. Ada empat jalan masuk,
@@ -820,7 +820,7 @@ export default async function IsiPanduan({
                 <p>
                   Yang membuatnya berbahaya: NIP rusak itu <strong>tetap 18 angka</strong>, jadi sekilas terlihat
                   wajar. Karena itu SIM-KGB tidak hanya menghitung panjangnya, melainkan memeriksa{" "}
-                  <strong>susunannya</strong> — delapan angka pertama harus berupa tanggal lahir yang ada, enam
+                  <strong>susunannya</strong>: delapan angka pertama harus berupa tanggal lahir yang ada, enam
                   berikutnya bulan dan tahun TMT CPNS, lalu angka jenis kelamin (1 atau 2) dan nomor urut. Pada NIP
                   yang rusak, tanggal lahirnya menjadi 00 dan angka jenis kelaminnya 0, sehingga barisnya ditolak
                   dengan keterangan bahwa NIP-nya kemungkinan dirusak Excel, bukan diam-diam tersimpan sebagai
@@ -835,17 +835,17 @@ export default async function IsiPanduan({
                 <p>
                   <strong>Bila sudah telanjur.</strong> Selama berkasnya <em>belum</em> disimpan, NIP aslinya masih
                   utuh: tutup tanpa menyimpan, lalu buka ulang dengan cara di atas. Bila sudah telanjur disimpan,
-                  berkas itu tidak dapat diperbaiki — ambil salinan aslinya, atau ketik ulang NIP yang rusak dari SK
+                  berkas itu tidak dapat diperbaiki; ambil salinan aslinya, atau ketik ulang NIP yang rusak dari SK
                   pegawai yang bersangkutan.
                 </p>
                 <p>
                   Satu hal lagi yang sering menyulitkan: <strong>tanggal</strong>. Excel berbahasa Indonesia
-                  menyimpannya sebagai dd/mm/yyyy, dan itu terbaca benar — tetapi periksalah tetap pada layar
+                  menyimpannya sebagai dd/mm/yyyy, dan itu terbaca benar, tetapi periksalah tetap pada layar
                   pratinjau, sebab tanggal yang tertukar hari dan bulannya tidak dapat dikenali sistem sebagai
                   kekeliruan.
                 </p>
 
-                <h3 className="pub-h3">Langkah 4 — Siapkan usulan di Usulan kolektif</h3>
+                <h3 className="pub-h3">Langkah 4: Siapkan usulan di Usulan kolektif</h3>
                 <p>
                   Inilah tempat kerja utama Anda tiap periode. <strong>Usulan kolektif</strong> menyiapkan banyak
                   pegawai untuk satu surat, dalam tiga langkah. Draf pegawai baru hasil Unggah daftar ikut otomatis.
@@ -894,8 +894,8 @@ export default async function IsiPanduan({
                   Berkas yang diminta mengikuti keadaan pegawai. Yang <strong>sudah pernah KGB</strong>:{" "}
                   <strong>SK KGB terakhir</strong> dan <strong>SK kenaikan pangkat terakhir</strong>, keduanya wajib.
                   Yang <strong>belum pernah KGB</strong>: <strong>SK CPNS</strong>, wajib karena SK inilah acuan
-                  pertamanya — TMT CPNS menjadi awal masa kerja golongan, dan nomor serta tanggalnya tercetak sebagai SK
-                  dasar pada surat KGB pertama — dan <strong>SK pengangkatan PNS</strong> bila sudah terbit, boleh
+                  pertamanya, sebab TMT CPNS menjadi awal masa kerja golongan, dan nomor serta tanggalnya tercetak sebagai SK
+                  dasar pada surat KGB pertama, dan <strong>SK pengangkatan PNS</strong> bila sudah terbit, boleh
                   digabung dengan SPMT. Berkas ini diminta tim keuangan agar masa kerja golongan dapat dicocokkan dengan
                   dokumen aslinya, bukan dengan ingatan.
                 </p>
@@ -919,7 +919,7 @@ export default async function IsiPanduan({
                   disetujui Kanwil.
                 </p>
 
-                <h3 className="pub-h3">Langkah 5 — Kirim surat lewat Srikandi, lalu ajukan</h3>
+                <h3 className="pub-h3">Langkah 5: Kirim surat lewat Srikandi, lalu ajukan</h3>
                 <p>
                   Urutannya penting: <strong>kirim suratnya dulu lewat Srikandi</strong>, baru ajukan di SIM-KGB dengan
                   nomor surat yang sama. Nomor, tanggal, dan PDF suratnya diisi sekali dan berlaku untuk semua pegawai
@@ -956,7 +956,7 @@ export default async function IsiPanduan({
                   dibaca sebagai &ldquo;sudah beres sampai Gaji Web&rdquo;.
                 </p>
 
-                <h3 className="pub-h3">Langkah 6 — Setelah SK terbit: unduh dan rekam di Gaji Web</h3>
+                <h3 className="pub-h3">Langkah 6: Setelah SK terbit, unduh dan rekam di Gaji Web</h3>
                 <p>
                   Tiap UPT adalah satuan kerja tersendiri dengan daftar isian pelaksanaan anggaran, bagian keuangan, dan
                   akun Gaji Web sendiri. Karena itu keuangan Kanwil hanya menindaklanjuti <strong>pegawai Kanwil</strong>.
@@ -1014,7 +1014,7 @@ export default async function IsiPanduan({
                 <p>
                   Tombol <strong>Usulan dan laporan</strong> di kanan atas membuka catatan yang lain: semua usulan
                   data dan laporan mutasi atau pemberhentian yang pernah Anda kirim ke Kanwil beserta hasil
-                  tinjauannya. Dua hal ini sengaja dipisah karena menjawab pertanyaan yang berbeda — yang satu tentang
+                  tinjauannya. Dua hal ini sengaja dipisah karena menjawab pertanyaan yang berbeda, yang satu tentang
                   perjalanan gaji pegawai, yang lain tentang kiriman Anda sudah ditinjau atau belum.
                 </p>
 
@@ -1052,16 +1052,16 @@ export default async function IsiPanduan({
                     tertulis di SK itu: golongan baru atau masa kerja menurut SK, nomor, tanggal, TMT, pejabat
                     penetapnya, dan <strong>pindaian SK-nya</strong>. Akibat SK itu langsung terlihat di kotak
                     <em> Dihitung sistem</em> sebelum disimpan. Masa kerja golongan dan gaji pokoknya dihitung Kanwil
-                    saat menyetujui — naik dari golongan II ke III tetap memotong masa kerja 5 tahun — sehingga angka
+                    saat menyetujui; naik dari golongan II ke III tetap memotong masa kerja 5 tahun, sehingga angka
                     yang Anda ketik tidak pernah diam-diam menggeser uang.
                   </p>
                   <p>
                     Laporan SK <strong>tidak menumpang surat usulan Srikandi</strong>: SK-nya sudah terbit dan
-                    pindaiannya ikut terkirim, jadi yang disampaikan adalah kejadian yang sudah selesai — sama
+                    pindaiannya ikut terkirim, jadi yang disampaikan adalah kejadian yang sudah selesai, sama
                     seperti laporan mutasi dan laporan hukuman disiplin. Kartunya meminta sekalian berkas lain yang
                     akan ditagih (SK KGB terakhir dan SK kenaikan pangkat terakhir), dan begitu semuanya terlampir,
                     tombol <strong>Kirim ke Kanwil</strong> menyalakan dirinya: satu jendela, selesai, tanpa mampir
-                    ke Usulan kolektif. Berkas yang pemindaiannya belum selesai tidak membuat isian hilang — simpan
+                    ke Usulan kolektif. Berkas yang pemindaiannya belum selesai tidak membuat isian hilang; simpan
                     sebagai draf, lalu kirim setelah lengkap. Usulan yang sekalian mengubah jabatan atau kolom lain
                     tetap berangkat bersurat lewat Usulan kolektif seperti biasa. SK
                     yang sudah dicatat Kanwil terlihat di <strong>Riwayat KGB</strong>, pada baris pegawai yang
@@ -1069,8 +1069,8 @@ export default async function IsiPanduan({
                     <em>Dari PMK</em>.
                   </p>
                   <p>
-                    Untuk baris yang <strong>seharusnya tidak pernah tercatat</strong> — entri ganda, NIP salah
-                    ketik, atau orang yang tidak pernah bertugas di satker Anda — pakai tautan{" "}
+                    Untuk baris yang <strong>seharusnya tidak pernah tercatat</strong>, yaitu entri ganda, NIP salah
+                    ketik, atau orang yang tidak pernah bertugas di satker Anda; pakai tautan{" "}
                     <strong>Seharusnya tidak tercatat?</strong> di bawah tombol Laporkan mutasi. Isinya alasan dan
                     keterangan, tanpa SK dan tanpa TMT. Admin UPT memang tidak dapat menghapus data pegawai: Kanwil
                     yang meninjau lalu menonaktifkannya, sehingga riwayat KGB dan berkas SK-nya tetap utuh dan masih
@@ -1357,7 +1357,7 @@ export default async function IsiPanduan({
                       Usulan yang mengubah golongan ruang atau masa kerja golongan wajib menyebut sebabnya, dan panel
                       tinjauan menampilkan SK yang disebut UPT beserta akibat persetujuannya. Bila sebabnya SK kenaikan
                       pangkat, penyesuaian ijazah, atau PMK, Setujui membentuk riwayat pangkat atau PMK-nya, sehingga SK
-                      itu menjadi Atas dasar SK KGB berikutnya — sama seperti Catat kenaikan pangkat dan Catat PMK di
+                      itu menjadi Atas dasar SK KGB berikutnya, sama seperti Catat kenaikan pangkat dan Catat PMK di
                       halaman pegawai. Masa kerja golongan dan gaji pokoknya dihitung sistem, bukan diambil apa adanya
                       dari angka yang diketik UPT: naik dari golongan II ke III tetap memotong masa kerja 5 tahun, dan
                       PMK tetap menghitung pergeseran jadwal KGB-nya. Bila sebabnya koreksi salah ketik, nilainya
@@ -1530,7 +1530,16 @@ export default async function IsiPanduan({
                       untuk status Belum Diproses maupun Sedang Diproses, lalu tulis alasannya. Alasan wajib diisi, lalu
                       pilih Batalkan KGB pada jendela konfirmasi. Status menjadi{" "}
                       <Status status="ditolak" />. Perbaiki data pegawai, lalu pilih Input Ulang KGB pada kartu di kolom
-                      Belum Diproses atau di Detail KGB. KGB yang sudah Menunggu Keuangan tidak dapat dibatalkan.
+                      Belum Diproses atau di Detail KGB. KGB yang sudah Menunggu Keuangan tidak dapat dibatalkan langsung;
+                      Keuangan yang mengembalikannya lebih dulu.
+                    </p>
+                    <p>
+                      <strong>Dikembalikan Keuangan.</strong> Bila Keuangan menemukan kekeliruan pada SK yang menunggu
+                      konfirmasi, ia memilih <strong>Kembalikan</strong> pada baris antreannya beserta alasannya. Status
+                      kembali ke <Status status="sedang_diproses" />, kartunya kembali ke kolom Sedang Diproses, dan
+                      alasannya muncul di panel tindakan dasbor Tim SDM. Data pegawai belum berubah sama sekali, sebab
+                      gaji pokok dan jadwal KGB berikutnya baru ditulis saat konfirmasi. Dari kolom itu, SK-nya dapat
+                      diganti dengan Unggah SK TTE, atau prosesnya dibatalkan sekalian bila yang keliru justru angkanya.
                     </p>
                     <p>
                       Bila selama KGB berjalan tercatat hukuman disiplin yang menunda KGB berikutnya, pembatalan ditolak.
@@ -1568,7 +1577,7 @@ export default async function IsiPanduan({
                     tidak disimpan: yang tersimpan tetap hasil hitungan dari tabel PP 5/2024. Gunanya memastikan arsip
                     ini sama dengan SK-nya, dan selama keduanya berbeda tombol Simpan Arsip tidak aktif. Ketidakcocokan
                     hampir selalu berarti <strong>golongan atau masa kerja golongan pegawai di Data Pegawai belum sesuai
-                    SK dasarnya</strong> — perbaiki data pegawainya lebih dulu, jangan memaksakan arsipnya, sebab angka
+                    SK dasarnya</strong>; perbaiki data pegawainya lebih dulu, jangan memaksakan arsipnya, sebab angka
                     yang keliru akan terkunci menjadi dasar KGB berikutnya. KGB yang terlambat bertahun-tahun tidak perlu
                     perlakuan khusus: masa kerja golongan dihitung sebesar jarak nyata dari TMT terakhir, bukan dua tahun
                     tetap, sehingga hasilnya sudah sama dengan SK selama data dasarnya benar.
@@ -2153,7 +2162,7 @@ export default async function IsiPanduan({
                       dilampirkan di panel Dokumen rujukan dan langsung masuk arsip pegawai. Mutasi definitif memperbarui
                       Unit Kerja, sehingga SK ditujukan ke KPPN mitra satker baru; BKO tidak mengubah Unit Kerja maupun
                       KPPN. Karena itu tanggung jawab KGB pegawai BKO tetap pada satker asal, dan penugasannya hanya
-                      menjadi keterangan tambahan pada barisnya — di daftar pegawai Admin UPT maupun di Data Pegawai
+                      menjadi keterangan tambahan pada barisnya, di daftar pegawai Admin UPT maupun di Data Pegawai
                       Kanwil. Selesainya dicatat dengan <em>Selesai BKO, kembali ke satker asal</em>.
                     </p>
                   </details>
