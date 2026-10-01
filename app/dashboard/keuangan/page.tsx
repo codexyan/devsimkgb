@@ -8,6 +8,7 @@ import { formatTanggalId, hariIniWita, isoTanggalLokal, tanggalKalender } from "
 import { kunciBulanTmt, rekapPerBulanTmt, satuPerSiklus, type RekapBulanTmt } from "@/lib/rekapKgb";
 import { bulanFokusRekon, jendelaRekonGaji, statusRekonGaji, type StatusRekon } from "@/lib/rekonGaji";
 import { cariSatker } from "@/lib/satker";
+import { keBerkasCsv } from "@/lib/csv";
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { KerangkaModal } from "@/app/dashboard/components/kgb";
@@ -113,16 +114,9 @@ async function pesanGalat(res: Response, bawaan: string) {
   }
 }
 
-function selCsv(v: string | number | null | undefined): string {
-  if (v === null || v === undefined) return "";
-  const s = String(v);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-/** Unduh berkas CSV (UTF-8 dengan BOM agar nama pegawai terbaca benar di Excel). */
+/** Unduh berkas CSV. Kepala berkasnya dari lib/csv: BOM agar nama pegawai terbaca benar di Excel, dan petunjuk `sep=;` agar kolomnya terbagi. */
 function unduhCsv(namaBerkas: string, kepala: string[], baris: (string | number | null | undefined)[][]) {
-  const isi = [kepala, ...baris].map((b) => b.map(selCsv).join(",")).join("\r\n");
-  const url = URL.createObjectURL(new Blob(["\uFEFF" + isi], { type: "text/csv;charset=utf-8" }));
+  const url = URL.createObjectURL(new Blob([keBerkasCsv([kepala, ...baris])], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url;
   a.download = namaBerkas;

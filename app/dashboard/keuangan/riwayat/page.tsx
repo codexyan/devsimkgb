@@ -8,6 +8,7 @@ import { formatTanggalId, hariIniWita, isoTanggalLokal, tanggalKalender } from "
 import { kunciTanggal, tahunTmt } from "@/lib/rekapKgb";
 import { bulanFokusRekon, jendelaRekonGaji, statusRekonGaji, type StatusRekon } from "@/lib/rekonGaji";
 import { cariSatker } from "@/lib/satker";
+import { keBerkasCsv } from "@/lib/csv";
 import { namaBulan, namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 
 /* Riwayat Aktivitas Keuangan: jejak konfirmasi (siapa, kapan, rapelan atau tidak), rekap dasar Gaji Web per
@@ -102,15 +103,9 @@ function labelHari(kunci: string, hariIni: Date): string {
   return selisih === 0 ? `Hari ini, ${tanggal}` : selisih === 1 ? `Kemarin, ${tanggal}` : tanggal;
 }
 
-function selCsv(v: string | number | null | undefined): string {
-  if (v === null || v === undefined) return "";
-  const s = String(v);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
+/** Sama dengan unduhan di halaman Keuangan: kepala berkas dari lib/csv agar Excel membaca UTF-8 dan membagi kolomnya. */
 function unduhCsv(namaBerkas: string, kepala: string[], baris: (string | number | null | undefined)[][]) {
-  const isi = [kepala, ...baris].map((b) => b.map(selCsv).join(",")).join("\r\n");
-  const url = URL.createObjectURL(new Blob(["\uFEFF" + isi], { type: "text/csv;charset=utf-8" }));
+  const url = URL.createObjectURL(new Blob([keBerkasCsv([kepala, ...baris])], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url;
   a.download = namaBerkas;

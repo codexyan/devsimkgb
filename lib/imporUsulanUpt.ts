@@ -13,6 +13,7 @@
 // Excel lebih dulu, padahal dokumennya sering baru terkumpul belakangan.
 
 import { BIDANG_DIISI, bacaIsianBaris } from "./usulanFormulir";
+import { keBerkasCsv } from "./csv";
 import { bandingkanUsulan, kekuranganUsulan, type PerubahanUsulan } from "./usulanPegawai";
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "./dataPegawai";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR } from "./pilihanPegawai";
@@ -87,13 +88,12 @@ export const KOLOM_TEMPLAT_UPT: readonly {
 ];
 
 /**
- * Isi berkas templat: baris kepala dan satu baris contoh. Diawali BOM agar Excel membacanya sebagai
- * UTF-8; PapaParse membuang BOM itu saat berkasnya diunggah kembali.
+ * Isi berkas templat: baris kepala dan satu baris contoh. Kepala berkasnya dari lib/csv — BOM agar Excel
+ * membaca UTF-8, lalu petunjuk `sep=;` agar kolomnya terbagi saat berkasnya dibuka dengan klik ganda.
+ * Keduanya dibuang lagi saat berkas yang sama diunggah kembali.
  */
 export function templatCsvUpt(): string {
-  const sel = (nilai: string) => (/[",;\n]/.test(nilai) ? `"${nilai.replace(/"/g, '""')}"` : nilai);
-  const baris = [KOLOM_TEMPLAT_UPT.map((k) => k.kolom), KOLOM_TEMPLAT_UPT.map((k) => k.contoh)];
-  return "﻿" + baris.map((b) => b.map(sel).join(",")).join("\r\n") + "\r\n";
+  return keBerkasCsv([KOLOM_TEMPLAT_UPT.map((k) => k.kolom), KOLOM_TEMPLAT_UPT.map((k) => k.contoh)]);
 }
 
 const KOLOM_TANGGAL = BIDANG_DIISI.filter((b) => b.jenis === "tanggal");

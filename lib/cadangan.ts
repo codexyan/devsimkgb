@@ -8,6 +8,7 @@
 // menuliskannya sebagai CSV. Murni agar dapat dipakai server maupun peramban dan diuji tanpa lapisan data.
 
 import { ROLES } from "./auth/roles";
+import { KEPALA_BERKAS_CSV, PEMISAH_CSV, selCsv } from "./csv";
 
 /** Cadangan wajib diunduh paling lambat sekian hari sejak cadangan terakhir. */
 export const BATAS_HARI_CADANGAN = 30;
@@ -129,20 +130,13 @@ export function denganPdfSk(role: string): boolean {
 
 type Sel = string | number | boolean | Date | null | undefined;
 
-function selCsv(nilai: Sel): string {
-  if (nilai === null || nilai === undefined) return "";
-  let s: string;
-  if (nilai instanceof Date) s = Number.isNaN(nilai.getTime()) ? "" : nilai.toISOString();
-  else s = String(nilai);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
 /** Kolom yang berisi NIP ditulis sebagai teks Excel, agar 18 digitnya tidak berubah menjadi notasi ilmiah. */
 const KOLOM_NIP = /^nip/i;
 
 /**
- * Baris data menjadi CSV. Diawali BOM agar Excel membaca UTF-8 dengan benar; kolom mengikuti urutan
- * kunci baris pertama ditambah kunci baru dari baris berikutnya.
+ * Baris data menjadi CSV. Diawali kepala berkas dari lib/csv — BOM agar Excel membaca UTF-8, dan
+ * petunjuk `sep=;` agar kolomnya terbagi; kolom mengikuti urutan kunci baris pertama ditambah kunci
+ * baru dari baris berikutnya.
  */
 export function keCsv(baris: readonly Record<string, Sel>[]): string {
   const kolom: string[] = [];
@@ -153,9 +147,9 @@ export function keCsv(baris: readonly Record<string, Sel>[]): string {
         const v = b[k];
         return KOLOM_NIP.test(k) && typeof v === "string" && /^\d{10,}$/.test(v) ? `="${v}"` : selCsv(v);
       })
-      .join(","),
+      .join(PEMISAH_CSV),
   );
-  return "﻿" + [kolom.join(","), ...isi].join("\r\n");
+  return KEPALA_BERKAS_CSV + [kolom.join(PEMISAH_CSV), ...isi].join("\r\n");
 }
 
 /** Nama berkas cadangan: peran, NIP akun, dan tanggalnya, agar cadangan bulan-bulan berbeda tidak tertukar. */

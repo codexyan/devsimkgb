@@ -1,13 +1,14 @@
-﻿nip,nama,jabatan,jenisJabatan,eselon,golonganRuang,tmtGolongan,mkgTahun,mkgBulan,tmtKgbTerakhir,tempatLahir,tanggalLahir,jenisKelamin,pendidikanTerakhir
-199604122022031901,AHMAD FAUZAN NUGROHO,Penjaga Tahanan,Jabatan Fungsional Umum/Pelaksana,Non Eselon,II/a,2023-08-01,1,0,2024-08-01,Rantau,1996-04-12,Laki-laki,SMA/SMK
-199011032015042902,SITI RAHMAWATI,Pengadministrasi Umum,Jabatan Fungsional Umum/Pelaksana,Non Eselon,II/c,2021-09-01,7,0,2024-09-01,Kandangan,1990-11-03,Perempuan,D3
-199306212017111903,MUHAMMAD RIZALDI,Penjaga Tahanan,Jabatan Fungsional Umum/Pelaksana,Non Eselon,II/b,2022-11-01,5,0,2024-11-01,Barabai,1993-06-21,Laki-laki,SMA/SMK
-198902172014012904,NOVITA SARI ANGGRAINI,Perawat Terampil,Jabatan Fungsional Tertentu,Non Eselon,II/d,2020-11-01,9,0,2024-11-01,Banjarmasin,1989-02-17,Perempuan,D3
-198108092006121905,BAMBANG SETIAWAN,Kepala Subseksi Pelayanan Tahanan,Struktural,IV.b,III/c,2019-12-01,18,0,2024-12-01,Amuntai,1981-08-09,Laki-laki,S1
-199512252021012906,DEWI LESTARI HANDAYANI,Analis Kepegawaian Ahli Pertama,Jabatan Fungsional Tertentu,Non Eselon,III/a,2022-12-01,4,0,2024-12-01,Martapura,1995-12-25,Perempuan,S1
-199409302019021907,HENDRIK PRASETYO,Penjaga Tahanan,Jabatan Fungsional Umum/Pelaksana,Non Eselon,II/a,2021-01-01,3,0,2025-01-01,Pelaihari,1994-09-30,Laki-laki,SMA/SMK
-198705142012102908,RATNA JUWITA SARI,Pengelola Keuangan,Jabatan Fungsional Umum/Pelaksana,Non Eselon,II/c,2018-01-01,11,0,2025-01-01,Marabahan,1987-05-14,Perempuan,D3
-197803072003061909,YUDI KURNIAWAN SAPUTRA,Pembimbing Kemasyarakatan Ahli Muda,Jabatan Fungsional Tertentu,Non Eselon,III/d,2017-02-01,22,0,2025-02-01,Tanjung,1978-03-07,Laki-laki,S1
-199107192016052910,INDAH PERMATA WULANDARI,Pengelola Data Pembinaan,Jabatan Fungsional Umum/Pelaksana,Non Eselon,II/b,2020-02-01,7,0,2025-02-01,Kotabaru,1991-07-19,Perempuan,SMA/SMK
-198410022009081911,AGUS SALIM RIDHO,Penjaga Tahanan,Jabatan Fungsional Umum/Pelaksana,Non Eselon,I/c,2016-03-01,13,0,2025-03-01,Batulicin,1984-10-02,Laki-laki,SMP
-200001232025032912,FITRIANI NURHALIZA,Pengadministrasi Keamanan,Jabatan Fungsional Umum/Pelaksana,Non Eselon,II/a,2025-03-01,0,0,2026-03-01,Banjarbaru,2000-01-23,Perempuan,SMA/SMK
+﻿sep=;
+nip;nama;jabatan;jenisJabatan;eselon;golonganRuang;tmtGolongan;mkgTahun;mkgBulan;tmtKgbTerakhir;tempatLahir;tanggalLahir;jenisKelamin;pendidikanTerakhir
+199604122022031901;AHMAD FAUZAN NUGROHO;Penjaga Tahanan;Jabatan Fungsional Umum/Pelaksana;Non Eselon;II/a;2023-08-01;1;0;2024-08-01;Rantau;1996-04-12;Laki-laki;SMA/SMK
+199011032015042902;SITI RAHMAWATI;Pengadministrasi Umum;Jabatan Fungsional Umum/Pelaksana;Non Eselon;II/c;2021-09-01;7;0;2024-09-01;Kandangan;1990-11-03;Perempuan;D3
+199306212017111903;MUHAMMAD RIZALDI;Penjaga Tahanan;Jabatan Fungsional Umum/Pelaksana;Non Eselon;II/b;2022-11-01;5;0;2024-11-01;Barabai;1993-06-21;Laki-laki;SMA/SMK
+198902172014012904;NOVITA SARI ANGGRAINI;Perawat Terampil;Jabatan Fungsional Tertentu;Non Eselon;II/d;2020-11-01;9;0;2024-11-01;Banjarmasin;1989-02-17;Perempuan;D3
+198108092006121905;BAMBANG SETIAWAN;Kepala Subseksi Pelayanan Tahanan;Struktural;IV.b;III/c;2019-12-01;18;0;2024-12-01;Amuntai;1981-08-09;Laki-laki;S1
+199512252021012906;DEWI LESTARI HANDAYANI;Analis Kepegawaian Ahli Pertama;Jabatan Fungsional Tertentu;Non Eselon;III/a;2022-12-01;4;0;2024-12-01;Martapura;1995-12-25;Perempuan;S1
+199409302019021907;HENDRIK PRASETYO;Penjaga Tahanan;Jabatan Fungsional Umum/Pelaksana;Non Eselon;II/a;2021-01-01;3;0;2025-01-01;Pelaihari;1994-09-30;Laki-laki;SMA/SMK
+198705142012102908;RATNA JUWITA SARI;Pengelola Keuangan;Jabatan Fungsional Umum/Pelaksana;Non Eselon;II/c;2018-01-01;11;0;2025-01-01;Marabahan;1987-05-14;Perempuan;D3
+197803072003061909;YUDI KURNIAWAN SAPUTRA;Pembimbing Kemasyarakatan Ahli Muda;Jabatan Fungsional Tertentu;Non Eselon;III/d;2017-02-01;22;0;2025-02-01;Tanjung;1978-03-07;Laki-laki;S1
+199107192016052910;INDAH PERMATA WULANDARI;Pengelola Data Pembinaan;Jabatan Fungsional Umum/Pelaksana;Non Eselon;II/b;2020-02-01;7;0;2025-02-01;Kotabaru;1991-07-19;Perempuan;SMA/SMK
+198410022009081911;AGUS SALIM RIDHO;Penjaga Tahanan;Jabatan Fungsional Umum/Pelaksana;Non Eselon;I/c;2016-03-01;13;0;2025-03-01;Batulicin;1984-10-02;Laki-laki;SMP
+200001232025032912;FITRIANI NURHALIZA;Pengadministrasi Keamanan;Jabatan Fungsional Umum/Pelaksana;Non Eselon;II/a;2025-03-01;0;0;2026-03-01;Banjarbaru;2000-01-23;Perempuan;SMA/SMK

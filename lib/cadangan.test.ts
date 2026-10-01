@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CADANGAN_BERLAKU, cakupanPeran, denganPdfSk, keCsv, namaBerkasCadangan, statusCadangan, terbaru } from "./cadangan";
+import { KEPALA_BERKAS_CSV } from "./csv";
 
 const hari = (n: number, dari = new Date("2026-10-01T09:00:00+08:00")) => new Date(dari.getTime() + n * 86400000);
 
@@ -43,15 +44,17 @@ test("cakupan mengikuti hak akses peran", () => {
   assert.deepEqual(cakupanPeran("tidak_dikenal"), []);
 });
 
-test("CSV: BOM, kutip, NIP sebagai teks, dan kolom gabungan", () => {
+test("CSV: BOM dan petunjuk pemisah, kutip, NIP sebagai teks, dan kolom gabungan", () => {
   const csv = keCsv([
     { nip: "198804012023011027", nama: 'Putri "Dayang", S.H.' },
     { nip: "199001012015031001", nama: "Budi", catatan: "baris\nkedua" },
   ]);
-  assert.ok(csv.startsWith("﻿"));
-  const baris = csv.slice(1).split("\r\n");
-  assert.equal(baris[0], "nip,nama,catatan");
-  assert.equal(baris[1], '="198804012023011027","Putri ""Dayang"", S.H.",');
+  // BOM agar Excel membaca UTF-8, lalu `sep=;` agar kolomnya terbagi, bukan menumpuk di kolom A.
+  assert.ok(csv.startsWith(KEPALA_BERKAS_CSV));
+  const baris = csv.slice(KEPALA_BERKAS_CSV.length).split("\r\n");
+  assert.equal(baris[0], "nip;nama;catatan");
+  // Nama berkoma tetap dikutip walau koma bukan lagi pemisah, agar berkasnya utuh di pengurai mana pun.
+  assert.equal(baris[1], '="198804012023011027";"Putri ""Dayang"", S.H.";');
   assert.ok(baris[2].endsWith('"baris\nkedua"') || csv.includes('"baris\nkedua"'));
 });
 

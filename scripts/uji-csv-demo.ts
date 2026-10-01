@@ -9,11 +9,12 @@ import Papa from "papaparse";
 import { periksaImporUpt, ringkasImpor } from "@/lib/imporUsulanUpt";
 import { bacaIsianPegawai } from "@/lib/dataPegawai";
 import { formatTanggalId } from "@/lib/waktu";
+import { buangPetunjukPemisah } from "@/lib/csv";
 
 const AKAR = join(__dirname, "..", "docs", "demo");
 
 function urai(nama: string): Record<string, string>[] {
-  const isi = readFileSync(join(AKAR, nama), "utf8");
+  const isi = buangPetunjukPemisah(readFileSync(join(AKAR, nama), "utf8"));
   const hasil = Papa.parse<Record<string, string>>(isi, { header: true, skipEmptyLines: true });
   if (hasil.errors.length) throw new Error(`${nama}: ${JSON.stringify(hasil.errors[0])}`);
   return hasil.data;

@@ -14,6 +14,7 @@ import {
   type PeranKolomTemplat,
 } from "@/lib/imporUsulanUpt";
 import { FORMAT_TANGGAL_DITERIMA } from "@/lib/dataPegawai";
+import { buangPetunjukPemisah } from "@/lib/csv";
 
 /* Unggah daftar pegawai sekaligus, tiga langkah: pilih berkas, periksa, selesai.
  *
@@ -138,6 +139,9 @@ export default function UnggahDaftar() {
     Papa.parse<Record<string, unknown>>(file, {
       header: true,
       skipEmptyLines: true,
+      // Baris `sep=;` pada templat yang diunduh bukan data, jadi dibuang sebelum diurai. Pemisahnya
+      // sendiri ditebak PapaParse, sehingga berkas simpanan Excel berkoma pun tetap terbaca.
+      beforeFirstChunk: buangPetunjukPemisah,
       complete: (hasil) => {
         const data = hasil.data.filter((r) => Object.values(r).some((v) => String(v ?? "").trim() !== ""));
         if (data.length === 0) {
@@ -339,7 +343,9 @@ export default function UnggahDaftar() {
               <br />
               Cara amannya: buka berkas lewat <strong>Data → From Text/CSV</strong>, setel kolom{" "}
               <code>nip</code> sebagai <strong>Text</strong> sebelum ditarik masuk. Bila mengetik manual,
-              awali dengan tanda petik satu: <code>&apos;197112051998031004</code>.
+              awali dengan tanda petik satu: <code>&apos;197112051998031004</code>. Templat ini memang sudah
+              terbagi rapi per kolom saat diklik ganda, tetapi klik ganda tetap merusak NIP — jalannya tetap
+              lewat Data → From Text/CSV.
               <br />
               Bila NIP sudah telanjur tampil <code>1,97E+17</code>,{" "}
               <strong>tutup berkasnya tanpa menyimpan</strong> lalu buka ulang dengan cara di atas. NIP
@@ -379,7 +385,8 @@ export default function UnggahDaftar() {
                 <p className="kgbm-bantuan">
                   Tanggal ditulis {FORMAT_TANGGAL_DITERIMA}. Baris contoh di templat fiktif: hapus sebelum mengunggah.
                   Nomor SK dan pindaian berkas tidak lewat CSV; keduanya dilengkapi per pegawai sebelum diajukan.
-                  Berkas yang disimpan Excel dengan pemisah titik koma tetap terbaca.
+                  Templat memakai pemisah titik koma, seperti yang diharapkan Excel di sini, jadi kolomnya
+                  langsung terbagi; berkas yang disimpan Excel dengan pemisah koma pun tetap terbaca.
                 </p>
               </details>
             </div>

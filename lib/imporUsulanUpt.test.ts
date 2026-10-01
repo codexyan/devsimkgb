@@ -5,6 +5,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { KEPALA_BERKAS_CSV, PEMISAH_CSV, buangPetunjukPemisah } from "./csv";
 import {
   KOLOM_IMPOR_UPT,
   dapatDisimpan,
@@ -236,8 +237,18 @@ test("ringkasan memisahkan pegawai baru, perbaikan, yang sama, dan yang ditolak"
   assert.deepEqual(dapatDisimpan(hasil).map((h) => h.baris), [1, 2, 3]);
 });
 
+test("templat diawali BOM dan petunjuk sep=; agar Excel membagi kolomnya, bukan menumpuk di kolom A", () => {
+  // Excel memisah kolom menurut "List separator" Region Windows — titik koma pada perangkat berlokal
+  // Indonesia. Baris sep= menimpa setelan itu, sehingga templatnya terbagi benar di lokal mana pun.
+  assert.ok(templatCsvUpt().startsWith(KEPALA_BERKAS_CSV));
+});
+
 test("templat yang diunduh terbaca kembali: kepalanya lengkap dan yang kurang dari baris contohnya hanya berkas", () => {
-  const [kepala, contoh] = templatCsvUpt().replace(/^﻿/, "").trim().split("\r\n").map((b) => b.split(","));
+  const [kepala, contoh] = buangPetunjukPemisah(templatCsvUpt())
+    .replace(/^﻿/, "")
+    .trim()
+    .split("\r\n")
+    .map((b) => b.split(PEMISAH_CSV));
   for (const k of KOLOM_IMPOR_UPT) assert.ok(kepala.includes(k), `kolom ${k} ada di templat`);
   const row = Object.fromEntries(kepala.map((k, i) => [k, contoh[i]]));
   const [h] = periksaImporUpt([row], kosong);

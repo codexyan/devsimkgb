@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { canEditPegawai, canManageHukdis } from "@/lib/auth";
 import { penandaHukdisBerlaku } from "@/lib/hukdisKedaluwarsa";
 import { hariIniWita, isoTanggalLokal, tanggalKalender, type NilaiTanggal } from "@/lib/waktu";
+import { KEPALA_BERKAS_CSV, PEMISAH_CSV, selCsv } from "@/lib/csv";
 
 export const runtime = "nodejs";
 
@@ -18,15 +19,6 @@ const HEADERS = [
 function keTanggal(val: NilaiTanggal): string {
   const tanggal = tanggalKalender(val);
   return tanggal ? isoTanggalLokal(tanggal) : "";
-}
-
-function esc(val: string | number | boolean | null | undefined): string {
-  if (val === null || val === undefined) return "";
-  const s = String(val);
-  if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
 }
 
 export async function GET() {
@@ -49,28 +41,29 @@ export async function GET() {
   const rows = pegawai.map((p) =>
     [
       `="${p.nip}"`,
-      esc(p.nama),
-      esc(p.jabatan),
-      esc(p.pangkat),
-      esc(p.golonganRuang),
-      esc(p.unitKerja),
-      esc(keTanggal(p.tmtGolongan)),
-      esc(p.mkgTahun),
-      esc(p.mkgBulan),
-      esc(p.gajiPokok),
-      esc(keTanggal(p.tmtKgbTerakhir)),
-      esc(keTanggal(p.tmtKgbBerikutnya)),
-      esc(p.tempatLahir),
-      esc(keTanggal(p.tanggalLahir)),
-      esc(p.jenisKelamin),
-      esc(p.pendidikanTerakhir),
-      esc(p.eselon),
-      esc(p.statusHukdis),
-      esc(bolehLihatHukdis ? p.keteranganHukdis : null),
-    ].join(","),
+      selCsv(p.nama),
+      selCsv(p.jabatan),
+      selCsv(p.pangkat),
+      selCsv(p.golonganRuang),
+      selCsv(p.unitKerja),
+      selCsv(keTanggal(p.tmtGolongan)),
+      selCsv(p.mkgTahun),
+      selCsv(p.mkgBulan),
+      selCsv(p.gajiPokok),
+      selCsv(keTanggal(p.tmtKgbTerakhir)),
+      selCsv(keTanggal(p.tmtKgbBerikutnya)),
+      selCsv(p.tempatLahir),
+      selCsv(keTanggal(p.tanggalLahir)),
+      selCsv(p.jenisKelamin),
+      selCsv(p.pendidikanTerakhir),
+      selCsv(p.eselon),
+      selCsv(p.statusHukdis),
+      selCsv(bolehLihatHukdis ? p.keteranganHukdis : null),
+    ].join(PEMISAH_CSV),
   );
 
-  const csv = [HEADERS.join(","), ...rows].join("\n");
+  // Kepala berkas dari lib/csv: BOM agar Excel membaca UTF-8, dan petunjuk `sep=;` agar kolomnya terbagi.
+  const csv = KEPALA_BERKAS_CSV + [HEADERS.join(PEMISAH_CSV), ...rows].join("\r\n");
   const date = isoTanggalLokal(hariIni);
 
   return new NextResponse(csv, {

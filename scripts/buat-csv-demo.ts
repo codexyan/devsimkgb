@@ -22,6 +22,7 @@ import {
 import { periksaNip } from "@/lib/nipPns";
 import { SATKER } from "@/lib/satker";
 import { formatTanggalId } from "@/lib/waktu";
+import { keBerkasCsv } from "@/lib/csv";
 
 /** Hari peragaan. Seluruh keadaan di bawah dihitung terhadap tanggal ini. */
 const HARI_PERAGAAN = new Date(2026, 8, 30); // 30 September 2026
@@ -113,15 +114,10 @@ function nipDari(b: Baris): string {
   return `${lahir}${tmt}${kelamin}${String(b.urut).padStart(3, "0")}`;
 }
 
-const sel = (v: string | number | null | undefined) => {
-  const s = v === null || v === undefined ? "" : String(v);
-  return /[",;\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
-
 function tulisCsv(jalur: string, kepala: string[], baris: (string | number | null)[][]) {
-  // BOM agar Excel membacanya sebagai UTF-8; CRLF karena itu yang ditulis Excel sendiri.
-  const isi = "﻿" + [kepala, ...baris].map((b) => b.map(sel).join(",")).join("\r\n") + "\r\n";
-  writeFileSync(jalur, isi, "utf8");
+  // Bentuknya sama persis dengan berkas yang diunduh dari aplikasi (lib/csv): BOM, petunjuk `sep=;`,
+  // dan akhiran CRLF — supaya berkas peragaan dibuka di Excel seperti berkas sungguhan.
+  writeFileSync(jalur, keBerkasCsv([kepala, ...baris]), "utf8");
 }
 
 /* ── penyusunan dan pemeriksaan ── */

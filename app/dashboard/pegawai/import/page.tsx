@@ -7,6 +7,7 @@ import { canEditPegawai } from "@/lib/auth";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "@/lib/dataPegawai";
 import { ESELON, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR } from "@/lib/pilihanPegawai";
+import { buangPetunjukPemisah, keBerkasCsv } from "@/lib/csv";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 
 // Kolom yang harus ada pada baris header CSV.
@@ -85,11 +86,6 @@ const TEMPLATE_EXAMPLE = [
   "Menteri Hukum dan HAM",
 ];
 
-/* Nilai CSV diberi tanda kutip bila berisi koma, kutip, atau baris baru. */
-function selCsv(nilai: string): string {
-  return /[",\n]/.test(nilai) ? `"${nilai.replace(/"/g, '""')}"` : nilai;
-}
-
 interface RowData {
   [key: string]: string;
 }
@@ -105,10 +101,10 @@ interface HasilImpor {
   errors: string[];
 }
 
+/* Kepala berkas dari lib/csv: BOM agar Excel membaca UTF-8, dan petunjuk `sep=;` agar kolomnya terbagi
+   saat templatnya dibuka dengan klik ganda, bukan menumpuk di kolom A. */
 function downloadTemplate() {
-  const rows = [TEMPLATE_HEADER, TEMPLATE_EXAMPLE];
-  const csv = rows.map((r) => r.map(selCsv).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob([keBerkasCsv([TEMPLATE_HEADER, TEMPLATE_EXAMPLE])], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -257,6 +253,9 @@ export default function ImportPage() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      // Baris `sep=;` dari templat bukan data; pemisahnya sendiri ditebak PapaParse, jadi berkas
+      // berkoma maupun bertitik koma sama-sama terbaca.
+      beforeFirstChunk: buangPetunjukPemisah,
       complete: (result) => {
         const rows = result.data as RowData[];
 
