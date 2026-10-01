@@ -53,7 +53,7 @@ interface PegawaiUpt {
   konfirmasiOleh: string | null;
   /**
    * Satker tempat pegawai ini sedang bertugas sebagai BKO; kosong berarti bertugas di satkernya sendiri.
-   * BKO tidak memindahkan unit kerja, jadi KGB-nya tetap diusulkan dan direkam satker asal — satker yang
+   * BKO tidak memindahkan unit kerja, jadi KGB-nya tetap diusulkan dan direkam satker asal; satker yang
    * membuka layar ini. Karena itu ia keterangan, bukan tugas (ADR-041).
    */
   satkerTugas?: string | null;
@@ -384,8 +384,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   }
 
   /**
-   * Kartu SK tersendiri: satu SK, satu jendela. Jalurnya tetap usulan perbaikan yang sama — Kanwil yang
-   * mencatat riwayat KP atau PMK saat menyetujui (ADR-030) — hanya isiannya dibatasi pada apa yang
+   * Kartu SK tersendiri: satu SK, satu jendela. Jalurnya tetap usulan perbaikan yang sama; Kanwil yang
+   * mencatat riwayat KP atau PMK saat menyetujui (ADR-030), hanya isiannya dibatasi pada apa yang
    * tertulis di SK itu, lengkap dengan pindaiannya.
    */
   function bukaDasarBaru(p: PegawaiUpt, jenis: "kp" | "pmk") {

@@ -116,7 +116,7 @@ function nipDari(b: Baris): string {
 
 function tulisCsv(jalur: string, kepala: string[], baris: (string | number | null)[][]) {
   // Bentuknya sama persis dengan berkas yang diunduh dari aplikasi (lib/csv): BOM, petunjuk `sep=;`,
-  // dan akhiran CRLF — supaya berkas peragaan dibuka di Excel seperti berkas sungguhan.
+  // dan akhiran CRLF, supaya berkas peragaan dibuka di Excel seperti berkas sungguhan.
   writeFileSync(jalur, keBerkasCsv([kepala, ...baris]), "utf8");
 }
 

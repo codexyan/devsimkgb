@@ -415,7 +415,7 @@ function DashboardMain() {
   }
   /**
    * Kartu satker (ADR-036): pekerjaan tiap satker dipecah per bulan TMT. Sumbernya sama dengan papan
-   * antrian — pegawaiJatuhTempo beserta posisinya — jadi angka di kartu dan isi papan tidak bisa berbeda.
+   * antrian, yaitu pegawaiJatuhTempo beserta posisinya, jadi angka di kartu dan isi papan tidak bisa berbeda.
    * Tidak disaring satker maupun bulan, sebab kartunya justru yang memilih keduanya.
    */
   const kartuSatker = susunKartuSatker(

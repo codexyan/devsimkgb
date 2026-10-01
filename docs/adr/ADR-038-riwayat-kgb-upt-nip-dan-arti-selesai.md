@@ -18,7 +18,7 @@ berapa siklus. UPT tidak punya layar itu sama sekali.
 
 Satu penghalang data ditemukan lebih dulu. Daftar `sk` pada `GET /api/upt` **bukan** riwayat: ia antrian
 kerja, disaring `(status === "menunggu_keuangan" || status === "selesai") && !isArsip` lalu dipotong 60
-baris. Riwayat yang dibangun dari sana akan kehilangan seluruh siklus **arsip** — SK lama yang direkam
+baris. Riwayat yang dibangun dari sana akan kehilangan seluruh siklus **arsip**; SK lama yang direkam
 Kanwil sebagai dasar KGB berikutnya, persis seperti kasus NOOR AZMI SYAHBUDIN yang baru dibereskan.
 
 ### Keputusan (pemilik, 30 September 2026)
@@ -37,7 +37,7 @@ Kanwil sebagai dasar KGB berikutnya, persis seperti kasus NOOR AZMI SYAHBUDIN ya
 
 Butir 4 adalah pelengkap yang tidak diminta secara eksplisit namun diperlukan: bersama keputusan nomor 3
 di bawah, hasil tinjauan usulan kehilangan tempat di dasbor *dan* di Riwayat sekaligus. Yang tersisa
-hanyalah notifikasi, dan itu tidak cukup untuk usulan yang **ditolak** — UPT harus dapat membaca ulang
+hanyalah notifikasi, dan itu tidak cukup untuk usulan yang **ditolak**; UPT harus dapat membaca ulang
 alasannya kapan saja.
 
 ### Akibat
@@ -76,24 +76,24 @@ digit". `lib/nipPns.ts` memeriksa susunan baku NIP PNS:
 ```
 
 Pada NIP yang rusak, tanggal lahirnya `00`, bulan dan tahun TMT-nya `000000`, dan angka jenis kelaminnya
-`0` — tiga hal yang tidak mungkin ada. Pemeriksaannya karena itu **membuktikan** kerusakan, tidak menebak.
+`0`, tiga hal yang tidak mungkin ada. Pemeriksaannya karena itu **membuktikan** kerusakan, tidak menebak.
 
 Dua penanda tambahan dibedakan agar pesannya tepat:
 
-- **`notasiIlmiah`** — isinya masih `1,97E+17`; berarti Excel menuliskannya apa adanya.
-- **`presisiHilang`** — 18 digit, susunannya mustahil, *dan* berakhir tiga nol atau lebih. NIP yang sah
+- **`notasiIlmiah`**; isinya masih `1,97E+17`; berarti Excel menuliskannya apa adanya.
+- **`presisiHilang`**; 18 digit, susunannya mustahil, *dan* berakhir tiga nol atau lebih. NIP yang sah
   paling banyak berakhir dua nol (nomor urut 100–900; angka jenis kelamin di depannya selalu 1 atau 2,
   dan nomor urut tidak pernah 000), sehingga tiga nol beruntun di ujung pasti sisa pembulatan.
 
 Setiap pesan tolak memuat jalan keluarnya: buka lewat **Data → From Text/CSV** dengan kolom `nip` disetel
 **Text**, atau ketik dengan awalan tanda petik satu. Petunjuk yang sama ditampilkan di layar Unggah
-daftar **sebelum** berkas dipilih, dan diuraikan di Panduan Admin UPT — termasuk satu hal yang menentukan:
+daftar **sebelum** berkas dipilih, dan diuraikan di Panduan Admin UPT, termasuk satu hal yang menentukan:
 selama berkasnya **belum disimpan**, NIP aslinya masih utuh, jadi tutup tanpa menyimpan.
 
 ### Akibat
 
 - Berlaku pada unggahan kolektif UPT (`lib/imporUsulanUpt.ts`). Jalur lain yang masih memakai
-  `/^\d{18}$/` — impor Kanwil (`lib/dataPegawai.ts`), formulir usulan, pembuatan akun — sengaja belum
+  `/^\d{18}$/`; impor Kanwil (`lib/dataPegawai.ts`), formulir usulan, pembuatan akun; sengaja belum
   disentuh agar perubahannya dapat dinilai lebih dulu di jalur yang memang bermasalah.
 - Pemeriksaan ini menolak NIP yang *mustahil*, bukan NIP yang *salah orang*. NIP yang tertukar antar
   pegawai tetap lolos, dan itu memang bukan yang dapat dibuktikan dari angkanya saja.
@@ -108,13 +108,13 @@ Kolom **Selesai** pada papan Alur KGB menerima kartu dari dua sumber: SK yang su
 (`skSelesai.filter((sk) => sk.gajiWebAt)`), dan usulan perubahan data yang baru ditinjau Kanwil
 (`terkirim.filter((u) => u.status === "disetujui" || u.status === "ditolak")`).
 
-Sumber kedua keliru. Usulan yang disetujui hanya mengubah data pegawai — gajinya belum tentu bergerak.
+Sumber kedua keliru. Usulan yang disetujui hanya mengubah data pegawai; gajinya belum tentu bergerak.
 Dan usulan yang **ditolak** justru belum selesai sama sekali, sehingga kartu merah "ditolak" mendarat di
 kolom hijau "Selesai".
 
 ### Keputusan (pemilik, 30 September 2026)
 
-"Selesai" berarti satu hal: **KGB-nya sudah direkam di Gaji Web satker oleh Admin UPT** — langkah
+"Selesai" berarti satu hal: **KGB-nya sudah direkam di Gaji Web satker oleh Admin UPT**; langkah
 terakhir yang memang dipegang UPT. Kartu usulan yang sudah ditinjau dikeluarkan dari papan; tempatnya
 notifikasi dan Riwayat usulan dan laporan.
 

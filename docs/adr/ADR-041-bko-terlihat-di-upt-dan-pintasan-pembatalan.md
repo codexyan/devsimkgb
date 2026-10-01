@@ -11,7 +11,7 @@ ada adalah **jalannya masuk** dan **terlihatnya**.
 
 ### BKO
 
-Penugasan BKO sudah terpasang utuh dan sudah berperilaku persis seperti yang dikehendaki pemilik —
+Penugasan BKO sudah terpasang utuh dan sudah berperilaku persis seperti yang dikehendaki pemilik,
 tanggung jawab KGB tetap pada satker asal, BKO hanya keterangan. `lib/mutasiPegawai.ts`:
 
 ```ts
@@ -28,7 +28,7 @@ Yang kurang:
 | | Sebelum |
 |---|---|
 | Penanda "BKO di …" di Data Pegawai Kanwil | ada (`ringkasKeadaanPegawai`) |
-| Penanda BKO di daftar pegawai Admin UPT | **tidak ada** — `GET /api/upt` bahkan tidak mengirim `satkerTugas` |
+| Penanda BKO di daftar pegawai Admin UPT | **tidak ada**; `GET /api/upt` bahkan tidak mengirim `satkerTugas` |
 | Mencatat BKO dari baris daftar Kanwil | tidak ada; harus membuka halaman pegawai |
 | Menyaring siapa saja yang sedang BKO | tidak ada |
 
@@ -40,7 +40,7 @@ tidak ada di kantor dapat menyangka usulannya bukan lagi urusannya.
 
 Sudah diputuskan **ADR-033** sehari sebelumnya: UPT tetap tidak menghapus maupun menonaktifkan, dan
 sebagai gantinya ada jenis laporan **"Pembatalan pencatatan"** untuk baris yang seharusnya tidak pernah
-ada. Itu sudah terpasang — `ModalLaporMutasi` memuatnya, `POST /api/upt/mutasi` menerimanya, Kanwil
+ada. Itu sudah terpasang; `ModalLaporMutasi` memuatnya, `POST /api/upt/mutasi` menerimanya, Kanwil
 menetapkan `aktif: false`.
 
 Masalahnya penamaan. Kemampuan itu bersembunyi di balik tombol **Laporkan mutasi**, tempat yang tidak
@@ -58,7 +58,7 @@ adalah buktinya.
    sama dengan jenis *Pembatalan pencatatan* sudah terpilih. `ModalLaporMutasi` menerima `jenisAwal`;
    jenisnya tetap dapat diganti di dalam jendela.
 4. Panduan Admin UPT menyatakan keduanya: bahwa pegawai BKO tetap menjadi tanggung jawab KGB satker asal,
-   dan bahwa pembatalan pencatatan adalah laporan — bukan penghapusan — beserta alasannya.
+   dan bahwa pembatalan pencatatan adalah laporan, bukan penghapusan; beserta alasannya.
 
 Yang **tidak** diambil, dan sebabnya: pemilik tidak memilih tombol Catat mutasi pada baris Data Pegawai
 Kanwil, saringan "Sedang BKO", maupun tampilan bagi satker tempat pegawai ditugaskan. Ketiganya tetap

@@ -134,7 +134,7 @@ type Sel = string | number | boolean | Date | null | undefined;
 const KOLOM_NIP = /^nip/i;
 
 /**
- * Baris data menjadi CSV. Diawali kepala berkas dari lib/csv — BOM agar Excel membaca UTF-8, dan
+ * Baris data menjadi CSV. Diawali kepala berkas dari lib/csv: BOM agar Excel membaca UTF-8, dan
  * petunjuk `sep=;` agar kolomnya terbagi; kolom mengikuti urutan kunci baris pertama ditambah kunci
  * baru dari baris berikutnya.
  */

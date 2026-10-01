@@ -8,7 +8,7 @@ import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
 
 /* Modul Riwayat Admin UPT: riwayat KGB setiap pegawai satker, sebangun dengan panel yang dipakai
    Keuangan Kanwil. Sumbernya GET /api/upt/riwayat-kgb, yang memuat seluruh siklus termasuk arsip
-   (SK yang terbit di luar SIM-KGB) dan yang dibatalkan — berbeda dari daftar SK di dasbor, yang hanya
+   (SK yang terbit di luar SIM-KGB) dan yang dibatalkan, berbeda dari daftar SK di dasbor, yang hanya
    berisi antrian kerja. Halaman ini hanya membaca; tindakannya tetap di dasbor.
 
    Jejak usulan dan laporan yang pernah dikirim ke Kanwil bukan riwayat KGB, melainkan riwayat
@@ -375,7 +375,7 @@ export default function RiwayatKgbUpt() {
                           <tr>
                             <td colSpan={5} style={{ padding: "0 16px 14px", background: "var(--sub)" }}>
                               {/* SK di luar KGB lebih dulu: saat UPT memastikan dasar gaji pokok sudah benar,
-                                  SK inilah yang paling sering terlewat — KGB-nya sendiri sudah terlihat di
+                                  SK inilah yang paling sering terlewat; KGB-nya sendiri sudah terlihat di
                                   baris ringkasan. Baca-saja; pelaporannya lewat tindakan di Data Pegawai. */}
                               {(skDasarPegawai.get(e.pegawaiId) ?? []).length > 0 && (
                                 <table className="dsb-tabel dsb-tabel-sisip" style={{ marginBottom: 10 }}>

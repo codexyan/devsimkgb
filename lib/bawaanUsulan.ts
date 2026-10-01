@@ -15,7 +15,7 @@ import { BERKAS_USULAN, berkasUntukKeadaan } from "./usulanPegawai";
 type BerkasUsulan = (typeof BERKAS_USULAN)[number];
 /**
  * Berkas yang menempel pada pegawainya, jadi terbawa ke usulan berikutnya. Dua yang dikecualikan menempel
- * pada peristiwanya: surat usulan Srikandi milik satu pengajuan, dan pindaian SK PMK milik satu SK PMK —
+ * pada peristiwanya: surat usulan Srikandi milik satu pengajuan, dan pindaian SK PMK milik satu SK PMK,
  * membawanya ke usulan berikutnya akan membuat PMK kedua tampak sudah berberkas padahal yang terlampir SK
  * yang lama (ADR-045).
  */

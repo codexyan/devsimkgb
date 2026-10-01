@@ -218,8 +218,8 @@ export default function UsulanKolektif() {
 
   /**
    * Pencentangan awal saat halaman dibuka dari dashboard:
-   *   "periode"   — ?bulan=yyyy-mm, pegawai jatuh tempo bulan itu;
-   *   "terlambat" — ?terlambat=1, seluruh pegawai yang TMT-nya sudah lewat bulan usulan dan belum selesai.
+   *   "periode": ?bulan=yyyy-mm, pegawai jatuh tempo bulan itu;
+   *   "terlambat": ?terlambat=1, seluruh pegawai yang TMT-nya sudah lewat bulan usulan dan belum selesai.
    * Keduanya melewatkan pegawai yang usulannya sedang ditinjau Kanwil, sebab datanya memang terkunci.
    */
   async function muat(pilihAwal: "periode" | "terlambat" | null = null) {

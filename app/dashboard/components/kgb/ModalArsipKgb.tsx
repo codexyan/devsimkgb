@@ -300,7 +300,7 @@ export default function ModalArsipKgb({ pegawai: ringkas, onTutup, onBerhasil }:
             <ul style={{ margin: "6px 0", paddingLeft: 18 }}>
               {bedaSk.map((b) => (
                 <li key={b.label}>
-                  {b.label} — sistem <b>{b.sistem}</b>, SK <b>{b.sk}</b>
+                  {b.label}: sistem <b>{b.sistem}</b>, SK <b>{b.sk}</b>
                 </li>
               ))}
             </ul>

@@ -128,7 +128,7 @@ export async function GET() {
         gajiPokok: p.gajiPokok,
         // Satker tempat pegawai ini sedang bertugas sebagai BKO; kosong berarti bertugas di satkernya
         // sendiri. Unit kerjanya sengaja tidak ikut berpindah saat BKO (lib/mutasiPegawai.ts), sehingga
-        // KGB, SK, dan KPPN-nya tetap urusan satker asal — dan satker asal itulah yang membuka layar ini,
+        // KGB, SK, dan KPPN-nya tetap urusan satker asal, dan satker asal itulah yang membuka layar ini,
         // jadi ia perlu tahu orangnya sedang di mana (ADR-041).
         satkerTugas: p.satkerTugas ?? null,
         tmtKgb: isoTanggalKalender(tmt),

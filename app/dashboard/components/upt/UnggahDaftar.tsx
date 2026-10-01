@@ -275,7 +275,7 @@ export default function UnggahDaftar() {
   return (
     <div className="dsb-halaman">
       {/* Halaman ini memakai komponen tampilan modal KGB (Catatan, kgbm-data, kgbm-panduan) di luar modal,
-          sehingga gayanya tidak ikut termuat oleh KerangkaModal dan seluruh kotaknya tampil polos —
+          sehingga gayanya tidak ikut termuat oleh KerangkaModal dan seluruh kotaknya tampil polos,
           termasuk peringatan NIP yang justru harus menonjol. href dan precedence-nya sama dengan yang
           dipasang KerangkaModal, jadi React menggabungkannya menjadi satu bila keduanya tampil. */}
       <style href="sim-kgb-modal-kgb" precedence="default">
@@ -340,13 +340,13 @@ export default function UnggahDaftar() {
             <Catatan nada="amber">
               <strong>Jaga kolom NIP sebelum menyimpan di Excel.</strong> Excel memperlakukan NIP sebagai
               angka biasa, menampilkannya <code>1,97E+17</code>, lalu menyimpan yang tampil itu ke CSV.
-              NIP <code>197112051998031004</code> berubah menjadi <code>197112000000000000</code> —
+              NIP <code>197112051998031004</code> berubah menjadi <code>197112000000000000</code>,
               tetap 18 angka, tetapi bukan lagi NIP siapa pun.
               <br />
               Cara amannya: buka berkas lewat <strong>Data → From Text/CSV</strong>, setel kolom{" "}
               <code>nip</code> sebagai <strong>Text</strong> sebelum ditarik masuk. Bila mengetik manual,
               awali dengan tanda petik satu: <code>&apos;197112051998031004</code>. Templat ini memang sudah
-              terbagi rapi per kolom saat diklik ganda, tetapi klik ganda tetap merusak NIP — jalannya tetap
+              terbagi rapi per kolom saat diklik ganda, tetapi klik ganda tetap merusak NIP; jalannya tetap
               lewat Data → From Text/CSV.
               <br />
               Bila NIP sudah telanjur tampil <code>1,97E+17</code>,{" "}
@@ -631,7 +631,7 @@ export default function UnggahDaftar() {
             {hasilSimpan.berubahSejakPratinjau > 0 && (
               <Catatan nada="amber">
                 {hasilSimpan.berubahSejakPratinjau} baris yang Anda centang tidak jadi tersimpan, sebab keadaannya
-                sudah berubah sejak pemeriksaan tadi — biasanya karena pegawainya baru saja diusulkan dari perangkat
+                sudah berubah sejak pemeriksaan tadi, biasanya karena pegawainya baru saja diusulkan dari perangkat
                 lain. Unggah ulang bagian itu untuk melihat keadaan terbarunya.
               </Catatan>
             )}

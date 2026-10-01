@@ -135,7 +135,7 @@ export const KOLOM_TEMPLAT_UPT: readonly {
 const PILIHAN_DASAR_BARU = "kp · pmk · koreksi";
 
 /**
- * Isi berkas templat: baris kepala dan satu baris contoh. Kepala berkasnya dari lib/csv — BOM agar Excel
+ * Isi berkas templat: baris kepala dan satu baris contoh. Kepala berkasnya dari lib/csv: BOM agar Excel
  * membaca UTF-8, lalu petunjuk `sep=;` agar kolomnya terbagi saat berkasnya dibuka dengan klik ganda.
  * Keduanya dibuang lagi saat berkas yang sama diunggah kembali.
  */
@@ -271,7 +271,7 @@ export function periksaImporUpt(
 
     // Susunan NIP diperiksa, bukan hanya panjangnya. NIP yang dirusak Excel tetap 18 digit
     // (197112000000000000), jadi pemeriksaan panjang saja meloloskannya sebagai pegawai baru ber-NIP
-    // palsu — kejadian nyata 30 September 2026. Lihat lib/nipPns.ts.
+    // palsu; kejadian nyata 30 September 2026. Lihat lib/nipPns.ts.
     const periksa = periksaNip(nip);
     if (!periksa.ok) return tolak(periksa.galat.pesan);
     if (!nama) return tolak("Nama lengkap wajib diisi");

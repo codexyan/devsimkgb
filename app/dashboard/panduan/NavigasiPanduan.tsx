@@ -6,7 +6,7 @@ import { kurangiGerak as kurangiGerakPengguna } from "@/lib/ui/gerak";
 
 /* Navigasi panduan dashboard. Peran yang boleh dibaca ditentukan server (peran.ts, peranBolehUntukRole) dan
    diteruskan lewat `boleh`: bagian di luar itu tidak pernah dirender. Bagi akun yang hanya membaca satu peran
-   — semua peran kecuali Super Admin — pemilih peran tidak ditampilkan sama sekali, ?peran= di URL diabaikan,
+   semua peran kecuali Super Admin; pemilih peran tidak ditampilkan sama sekali, ?peran= di URL diabaikan,
    dan tautan ke bagian yang tidak ada tidak lagi membuka seluruh panduan. Pilihan dipasang pada atribut
    data-peran pembungkus .pg-dasbor, dan panduan.css menyembunyikan bagian peran lain saat Super Admin
    berpindah peran. Daftar isi mengikuti posisi baca di area gulir dashboard (<main>). */

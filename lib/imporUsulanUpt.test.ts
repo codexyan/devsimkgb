@@ -319,7 +319,7 @@ test("templat memuat keenam kolom sebab perubahan, sehingga peremajaan massal da
 });
 
 test("templat diawali BOM dan petunjuk sep=; agar Excel membagi kolomnya, bukan menumpuk di kolom A", () => {
-  // Excel memisah kolom menurut "List separator" Region Windows — titik koma pada perangkat berlokal
+  // Excel memisah kolom menurut "List separator" Region Windows; titik koma pada perangkat berlokal
   // Indonesia. Baris sep= menimpa setelan itu, sehingga templatnya terbagi benar di lokal mana pun.
   assert.ok(templatCsvUpt().startsWith(KEPALA_BERKAS_CSV));
 });

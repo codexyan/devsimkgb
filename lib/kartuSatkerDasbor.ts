@@ -1,7 +1,7 @@
 // Kartu satker di dasbor Kanwil: pekerjaan tiap satker dipecah per bulan TMT (ADR-036).
 //
-// Panel Pantau satker sebelumnya hanya memberi lima angka gabungan per satker — lewat batas, perlu input,
-// diproses, di keuangan, usulan — tanpa menyebut bulan TMT sama sekali. Akibatnya "Rutan Rantau 5" tidak
+// Panel Pantau satker sebelumnya hanya memberi lima angka gabungan per satker: lewat batas, perlu input,
+// diproses, di keuangan, usulan, tanpa menyebut bulan TMT sama sekali. Akibatnya "Rutan Rantau 5" tidak
 // dapat ditindaklanjuti: lima itu jatuh di bulan yang mana, dan mana yang mendesak, tidak terbaca. Panel
 // Jadwal input memang memecah per bulan TMT, tetapi se-Kanwil, sehingga tidak menjawab satker mana.
 //

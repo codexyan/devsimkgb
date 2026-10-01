@@ -75,7 +75,7 @@ test("sumber tanpa pegawaiId dan tanpa NIP tidak pernah tergabung satu sama lain
  * Penjaga arti kolom "Selesai" (keputusan pemilik, 30 September 2026).
  *
  * Kolom Selesai pernah menampung dua hal sekaligus: SK yang sudah direkam di Gaji Web, dan usulan
- * perubahan data yang baru ditinjau Kanwil. Yang kedua keliru — usulan yang disetujui hanya mengubah
+ * perubahan data yang baru ditinjau Kanwil. Yang kedua keliru; usulan yang disetujui hanya mengubah
  * data pegawai, dan yang ditolak justru belum selesai sama sekali, sehingga kartu merah "ditolak"
  * ikut mendarat di kolom hijau. Sejak itu "Selesai" berarti satu hal saja: KGB-nya sudah direkam di
  * Gaji Web oleh Admin UPT. Uji ini membaca sumbernya agar aturan itu tidak pelan-pelan kembali.

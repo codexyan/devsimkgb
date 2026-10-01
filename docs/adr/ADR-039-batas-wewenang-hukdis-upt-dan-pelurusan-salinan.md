@@ -8,7 +8,7 @@ Status: berlaku
 ### Konteks
 
 ADR-016 sudah menetapkan pembagiannya: UPT melaporkan SK hukuman disiplin, SDM Hukdis Kanwil yang
-mencatatnya dan menggeser jadwal KGB. **Kodenya memang sudah begitu** — diperiksa ulang hari ini:
+mencatatnya dan menggeser jadwal KGB. **Kodenya memang sudah begitu**; diperiksa ulang hari ini:
 
 - `app/api/upt/hukdis/route.ts` hanya memanggil `db.laporanHukdis.create` dan `db.laporanHukdis.delete`;
 - `app/api/upt/hukdis/[id]/route.ts` menolak pembatalan laporan yang statusnya di luar
@@ -17,7 +17,7 @@ mencatatnya dan menggeser jadwal KGB. **Kodenya memang sudah begitu** — diperi
 
 Yang tidak selaras adalah **namanya**. Menu Admin UPT dan modul SDM Hukdis Kanwil sama-sama bernama
 **"Hukuman Disiplin"**. Bagi operator UPT yang hanya melihat sidebar-nya, nama itu terbaca sebagai
-kewenangan atas hukuman disiplin — padahal wewenangnya berhenti pada melaporkan. Nama yang sama untuk
+kewenangan atas hukuman disiplin, padahal wewenangnya berhenti pada melaporkan. Nama yang sama untuk
 dua kewenangan yang berbeda adalah salinan yang keliru, sekalipun kodenya benar.
 
 ### Keputusan (pemilik, 30 September 2026)

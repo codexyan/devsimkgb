@@ -114,7 +114,7 @@ export default function UsulanPage() {
    * Menandai hasil tinjauan pada salinan lokal. Butirnya langsung pindah tab dan angka tab ikut benar,
    * tanpa memanggil muat() yang menarik seluruh usulan, seluruh pegawai, riwayat KGB, dan surat. Beberapa
    * medan hasil hitungan server (mis. nilaiDiusulkan) baru menyusul saat data segar ditarik, dan itu
-   * terjadi begitu pengguna membuka tab lain — tepat di tempat medan itu dipakai.
+   * terjadi begitu pengguna membuka tab lain; tepat di tempat medan itu dipakai.
    */
   function tandaiUsulan(id: string, ubah: Partial<UsulanKanwil>) {
     setDaftar((lama) => lama.map((u) => (u.id === id ? { ...u, ...ubah } : u)));

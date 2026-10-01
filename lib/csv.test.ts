@@ -32,7 +32,7 @@ test("sel dikutip bila memuat titik koma, koma, petik, atau pindah baris", () =>
 test("petunjuk pemisah dibuang saat berkas diunggah kembali, BOM-nya dibiarkan", () => {
   assert.equal(buangPetunjukPemisah("﻿sep=;\r\nnip;nama\r\n"), "﻿nip;nama\r\n");
   assert.equal(buangPetunjukPemisah("sep=,\nnip,nama\n"), "nip,nama\n");
-  // Berkas tanpa petunjuk — misalnya simpanan ulang Excel — tidak berubah sama sekali.
+  // Berkas tanpa petunjuk, misalnya simpanan ulang Excel, tidak berubah sama sekali.
   assert.equal(buangPetunjukPemisah("﻿nip;nama\r\n"), "﻿nip;nama\r\n");
   assert.equal(buangPetunjukPemisah("nip,nama\n"), "nip,nama\n");
   // "separator" bukan petunjuk; yang dibuang hanya sep= dengan satu huruf pemisah.

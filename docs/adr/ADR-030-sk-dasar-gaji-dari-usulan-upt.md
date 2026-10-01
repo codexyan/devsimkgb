@@ -26,9 +26,9 @@ halaman pegawai, sebab dari situlah riwayatnya terbentuk. Padahal pegawai UPT di
 
 1. **Usulan UPT menyebut sebab perubahannya.** Bila golongan atau masa kerja golongan berubah, usulan wajib
    memilih salah satu (`lib/dasarBaruUsulan.ts`):
-   - **SK kenaikan pangkat atau penyesuaian ijazah** — dengan jenis KP, nomor, tanggal, TMT pangkat, dan penetap;
-   - **SK peninjauan masa kerja (PMK)** — dengan nomor, tanggal, TMT PMK, dan penetap;
-   - **Koreksi data, bukan SK baru** — pembetulan salah ketik; dasar KGB berikutnya tidak berpindah.
+   - **SK kenaikan pangkat atau penyesuaian ijazah**, dengan jenis KP, nomor, tanggal, TMT pangkat, dan penetap;
+   - **SK peninjauan masa kerja (PMK)**, dengan nomor, tanggal, TMT PMK, dan penetap;
+   - **Koreksi data, bukan SK baru**; pembetulan salah ketik; dasar KGB berikutnya tidak berpindah.
 
    Usulan yang mengubah keduanya tanpa menyebut sebabnya ditolak saat diajukan. Pegawai baru dikecualikan,
    sebab belum ada data tercatat yang berubah.

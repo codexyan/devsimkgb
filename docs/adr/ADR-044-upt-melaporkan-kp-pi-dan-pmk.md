@@ -5,8 +5,8 @@ Status: berlaku; melengkapi ADR-030 pada sisi pintu masuk
 
 ## Konteks
 
-Dasar perhitungan gaji pokok memang SK KGB terakhir. Tetapi sesudah SK itu terbit — bahkan sesudah SK KGB
-yang baru saja diterbitkan — masih mungkin terbit **SK kenaikan pangkat, SK penyesuaian ijazah, atau SK
+Dasar perhitungan gaji pokok memang SK KGB terakhir. Tetapi sesudah SK itu terbit, bahkan sesudah SK KGB
+yang baru saja diterbitkan, masih mungkin terbit **SK kenaikan pangkat, SK penyesuaian ijazah, atau SK
 PMK**. SK seperti itu menggeser masa kerja golongan pegawai sekaligus menjadi "Atas dasar" SK KGB
 berikutnya (ADR-020, ADR-021).
 
@@ -22,7 +22,7 @@ Perbandingan tindakan per pegawai sebelum keputusan ini:
 
 | Kanwil (kartu Dasar KGB) | Admin UPT (menu Tindakan) |
 |---|---|
-| Ubah SK dasar | — |
+| Ubah SK dasar |; |
 | Catat kenaikan pangkat | tersembunyi di dalam formulir usulan |
 | Catat PMK | tersembunyi di dalam formulir usulan |
 | Mutasi atau pemberhentian | Laporkan mutasi ✓ |
@@ -46,15 +46,15 @@ Tiga celah yang menyertainya:
    yang sudah ada dengan sebabnya terpilih dan bagian SK-nya langsung terlihat. Dipilih di atas jalur
    laporan tersendiri seperti mutasi: jalur persetujuannya sudah dibangun ADR-030, dan menggandakannya
    berarti satu tabel, satu rute, dan satu panel tinjauan baru untuk hasil akhir yang sama.
-2. **Enam kolom SK pada templat unggah daftar** — `dasarBaruJenis`, `dasarBaruJenisKp`, `dasarBaruNomorSk`,
-   `dasarBaruTanggalSk`, `dasarBaruTmt`, `dasarBaruPenetap` — sehingga peremajaan massal sesudah kenaikan
+2. **Enam kolom SK pada templat unggah daftar**; `dasarBaruJenis`, `dasarBaruJenisKp`, `dasarBaruNomorSk`,
+   `dasarBaruTanggalSk`, `dasarBaruTmt`, `dasarBaruPenetap`, sehingga peremajaan massal sesudah kenaikan
    pangkat periode selesai sekali unggah.
 3. **Riwayat KP dan PMK terlihat UPT**, baca-saja, di dalam baris pegawai pada Riwayat KGB.
-4. **Lencana pada kolom Dasar KGB berikutnya** — *Dari KP/PI* atau *Dari PMK* — bila dasarnya bukan SK KGB.
+4. **Lencana pada kolom Dasar KGB berikutnya**, *Dari KP/PI* atau *Dari PMK*, bila dasarnya bukan SK KGB.
 
 Yang **tidak** berubah: data induk tetap diubah Kanwil. Tindakan baru ini tetap menghasilkan usulan yang
 ditinjau Kanwil, dan Kanwil yang mencatat riwayatnya saat menyetujui, sehingga masa kerja golongan dan gaji
-pokok tetap dihitung sistem — naik dari golongan II ke III tetap memotong masa kerja 5 tahun.
+pokok tetap dihitung sistem; naik dari golongan II ke III tetap memotong masa kerja 5 tahun.
 
 ## Akibat
 
@@ -69,13 +69,13 @@ pokok tetap dihitung sistem — naik dari golongan II ke III tetap memotong masa
   tersimpan sebagai usulan tanpa sebab lalu tertahan saat diajukan tanpa petunjuk apa pun. Kedua tanggal
   SK-nya ikut diseragamkan dari dd/mm/yyyy, sama seperti tanggal lain pada berkas.
 - Layar pratinjau unggahan menampilkan satu baris *Sebab:* berisi ringkasan SK-nya, agar yang akan
-  tersimpan terlihat sebelum disimpan — sejalan dengan ADR-031.
+  tersimpan terlihat sebelum disimpan; sejalan dengan ADR-031.
 - `GET /api/upt/riwayat-kgb` menyertakan `skDasar`: riwayat KP dan PMK pegawai satker itu, dibatasi satker
   akun seperti seluruh rute UPT. Jalur berkas SK-nya tidak ikut, sebab SK KP dan PMK memang tidak diunggah
   ke SIM-KGB.
 - **Batas yang disadari:** daftar SK itu muncul di dalam baris pegawai pada Riwayat KGB, dan halaman itu
   disusun dari riwayat KGB. Pegawai yang belum punya satu pun baris riwayat KGB karena itu belum terlihat
-  di sana — keadaan yang sama dengan sebelum keputusan ini.
+  di sana; keadaan yang sama dengan sebelum keputusan ini.
 - Diperiksa pada data lokal dengan Chrome headless, sebagai Admin UPT Rutan Rantau:
   - menu Tindakan memuat empat butir, dua yang baru di urutan atas;
   - *Laporkan kenaikan pangkat* membuka formulir dengan pilihan SK kenaikan pangkat sudah terpilih dan

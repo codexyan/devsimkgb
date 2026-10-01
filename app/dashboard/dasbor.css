@@ -2569,7 +2569,7 @@ html[data-gerak="kurangi"] .dsb-putar {
 .pgw-ringkas-dl dt { color: var(--dt5); }
 .pgw-ringkas-dl dd { margin: 1px 0 0; font-size: 13px; font-weight: 600; color: var(--dtn); }
 
-/* Koreksi dasar gaji: tiga lajur — nama isian, nilai yang tercatat, nilai yang akan disimpan. Dua lajur
+/* Koreksi dasar gaji: tiga lajur; nama isian, nilai yang tercatat, nilai yang akan disimpan. Dua lajur
    terakhir sengaja sejajar supaya perubahannya terbaca sebagai perbandingan, bukan sebagai isian lepas. */
 .pgw-koreksi-tabel { display: grid; gap: 2px; border: 1px solid var(--ln1); border-radius: 12px; overflow: hidden; }
 .pgw-koreksi-kepala,

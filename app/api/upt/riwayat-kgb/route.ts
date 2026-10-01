@@ -15,8 +15,8 @@ export const runtime = "nodejs";
  *
  * Dipisah dari GET /api/upt dengan sengaja. Daftar `sk` di sana adalah antrian kerja: hanya KGB yang
  * berstatus menunggu_keuangan atau selesai, tanpa arsip, dan dipotong 60 baris. Riwayat justru butuh
- * yang sebaliknya — seluruh siklus setiap pegawai, termasuk arsip (SK yang terbit di luar SIM-KGB) dan
- * yang dibatalkan — sehingga menumpangkannya di rute dasbor hanya akan memperberat muatan yang dibaca
+ * yang sebaliknya, seluruh siklus setiap pegawai, termasuk arsip (SK yang terbit di luar SIM-KGB) dan
+ * yang dibatalkan, sehingga menumpangkannya di rute dasbor hanya akan memperberat muatan yang dibaca
  * setiap kali dasbor dibuka.
  *
  * Batas aksesnya sama dengan rute UPT lain (lib/aksesUpt.ts): satker dibaca dari baris pengguna di basis
@@ -83,7 +83,7 @@ export async function GET() {
     // Terbaru lebih dulu; pengelompokan per pegawai dikerjakan di layar.
     .sort((a, b) => (b.tmtKgbBaru ?? "").localeCompare(a.tmtKgbBaru ?? ""));
 
-  // Kenaikan pangkat dan PMK dalam satu daftar: keduanya menjawab pertanyaan yang sama bagi UPT — SK apa
+  // Kenaikan pangkat dan PMK dalam satu daftar: keduanya menjawab pertanyaan yang sama bagi UPT; SK apa
   // yang mengubah golongan atau masa kerja golongan pegawai ini, dan kapan. Baca-saja; pelaporannya lewat
   // tindakan di Data Pegawai, dan yang mencatat tetap Kanwil (ADR-030).
   const skDasar = [
@@ -121,7 +121,7 @@ export async function GET() {
         tmt: isoTanggalKalender(r.tmtPmk),
         golonganLama: r.golonganRuang,
         golonganBaru: r.golonganRuang,
-        // MKG yang ditampilkan adalah yang tersimpan pada data pegawai, yaitu MKG pada TMT KGB terakhir —
+        // MKG yang ditampilkan adalah yang tersimpan pada data pegawai, yaitu MKG pada TMT KGB terakhir,
         // angka yang sama dengan yang dilihat UPT di Data Pegawai, bukan MKG pada TMT PMK.
         mkgTahunLama: r.mkgTahunDasarLama,
         mkgBulanLama: r.mkgBulanDasarLama,

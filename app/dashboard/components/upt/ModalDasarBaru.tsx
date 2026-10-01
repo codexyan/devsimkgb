@@ -14,8 +14,8 @@ import { LABEL_DASAR_BARU } from "@/lib/dasarBaruUsulan";
 
 /* Kartu "Laporkan kenaikan pangkat" dan "Laporkan peninjauan masa kerja" untuk Admin UPT (ADR-045).
  *
- * Satu SK, satu kartu. Sebelumnya kedua tindakan membuka formulir perbaikan data yang utuh — identitas,
- * jabatan, pangkat, berkas — padahal operator yang memegang satu SK hanya perlu memindahkan apa yang
+ * Satu SK, satu kartu. Sebelumnya kedua tindakan membuka formulir perbaikan data yang utuh, lengkap
+ * dengan identitas, jabatan, pangkat, dan berkas, padahal operator yang memegang satu SK hanya perlu memindahkan apa yang
  * tertulis di SK itu. Kartu ini hanya memuat isian SK-nya, pratayang hitungannya, dan pindaian SK-nya.
  *
  * Yang disimpan tetap usulan perbaikan yang sama (POST /api/upt/usulan atau PATCH bila drafnya sudah ada),
@@ -62,7 +62,7 @@ export default function ModalDasarBaru({
   const tmtKgbTerakhir = sekarang.tmtKgbTerakhir ?? "";
 
   // Draf yang sudah menyebut sebab yang sama isinya dipakai kembali; yang menyebut sebab lain dibiarkan
-  // apa adanya sampai operator benar-benar menyimpan, lalu diganti — dengan peringatan di layar.
+  // apa adanya sampai operator benar-benar menyimpan, lalu diganti, dengan peringatan di layar.
   const drafSama = draf?.dasarBaru?.jenis === jenis ? draf.dasarBaru : null;
   const drafSebabLain = draf?.dasarBaru?.jenis && draf.dasarBaru.jenis !== jenis ? draf.dasarBaru.jenis : null;
 
@@ -86,7 +86,7 @@ export default function ModalDasarBaru({
   /**
    * Seluruh berkas yang akan ditagih saat usulan ini diajukan, bukan hanya SK yang sedang dilaporkan:
    * perubahan yang menyentuh golongan atau masa kerja golongan selalu disertai SK KGB terakhir dan SK
-   * kenaikan pangkat terakhir (ADR-030). Dikumpulkan di kartu ini supaya satu jendela cukup — tanpa itu,
+   * kenaikan pangkat terakhir (ADR-030). Dikumpulkan di kartu ini supaya satu jendela cukup, tanpa itu,
    * kartu selalu berakhir sebagai draf yang masih harus dilengkapi di tempat lain.
    */
   const berkasDiminta = [
@@ -288,7 +288,7 @@ export default function ModalDasarBaru({
 
       <Catatan>
         {jenis === "kp"
-          ? "Isi golongan baru beserta SK-nya. Masa kerja golongan dan gaji pokok dihitung Kanwil saat menyetujui — naik jenjang golongan memotong masa kerja — jadi keduanya tidak diketik di sini."
+          ? "Isi golongan baru beserta SK-nya. Masa kerja golongan dan gaji pokok dihitung Kanwil saat menyetujui; naik jenjang golongan memotong masa kerja, jadi keduanya tidak diketik di sini."
           : "Isi masa kerja golongan sebagaimana tertulis pada SK PMK. Kanwil menghitung ulang gaji pokok dan jadwal KGB berikutnya dari angka itu saat menyetujui."}{" "}
         Laporan SK tidak menumpang surat usulan: SK-nya sudah terbit dan pindaiannya ikut terkirim, jadi
         begitu berkasnya lengkap, kartu ini langsung mengirimkannya ke Kanwil.

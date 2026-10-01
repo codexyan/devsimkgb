@@ -12,7 +12,7 @@ masa kerja golongan, TMT golongan, TMT KGB terakhir, dan TMT KGB berikutnya. Pem
 Pemeriksaan kodenya menemukan empat hal.
 
 1. **Label kembar tanpa penanda.** Blok ringkasan abu-abu (`pgw-ringkas-dl`) tetap tampil di atas, memuat
-   Golongan, Masa kerja golongan, TMT KGB terakhir, dan TMT KGB berikutnya — lalu persis di bawahnya lima
+   Golongan, Masa kerja golongan, TMT KGB terakhir, dan TMT KGB berikutnya, lalu persis di bawahnya lima
    isian dengan label yang hampir sama. Tidak ada yang menyatakan mana nilai tercatat dan mana nilai yang
    akan disimpan. Ringkasannya berisi empat hal, isiannya lima; TMT golongan tidak punya pembanding.
 
@@ -22,7 +22,7 @@ Pemeriksaan kodenya menemukan empat hal.
    bukan sekadar soal tampilan.
 
 3. **Akibatnya tidak terlihat.** Yang benar-benar berubah adalah **gaji pokok**, dan tidak ada satu baris
-   pun yang menyebutnya. Padahal justru angka itu yang menentukan koreksinya benar atau keliru — kasus
+   pun yang menyebutnya. Padahal justru angka itu yang menentukan koreksinya benar atau keliru; kasus
    NOOR AZMI SYAHBUDIN bulan ini berpangkal persis dari satu angka masa kerja yang salah salin.
 
 4. **TMT KGB berikutnya diketik tangan.** Di impor Data Pegawai maupun formulir UPT, jadwal itu dihitung
@@ -36,7 +36,7 @@ Pemeriksaan kodenya menemukan empat hal.
 2. **Akibat koreksi ditampilkan hidup** sebagai dua baris terakhir: gaji pokok dan TMT KGB berikutnya,
    keduanya lama berdampingan dengan baru. Angka yang benar-benar bergerak diberi warna, sehingga koreksi
    yang ternyata tidak mengubah apa pun juga terbaca.
-3. **Mengganti golongan mempertahankan masa kerja** bila langkah itu ada pada golongan baru — keadaan yang
+3. **Mengganti golongan mempertahankan masa kerja** bila langkah itu ada pada golongan baru; keadaan yang
    paling lazim, sebab tabel PP 5/2024 memakai langkah masa kerja yang sama untuk hampir semua golongan.
    Bila tidak ada, diambil langkah terdekat dan **dikatakan di layar**, bukan diubah diam-diam.
 4. **TMT KGB berikutnya dihitung sistem**, dengan tautan *Tulis sendiri* untuk menimpanya bila jadwalnya
@@ -57,7 +57,7 @@ yang menggeser jadwal.
 
 ## Akibat
 
-- Hitungannya dipindah ke `lib/koreksiDasarGaji.ts` — modul murni, sehingga dapat diuji tanpa tampilan
+- Hitungannya dipindah ke `lib/koreksiDasarGaji.ts`; modul murni, sehingga dapat diuji tanpa tampilan
   (`lib/koreksiDasarGaji.test.ts`). Cacat nomor 2 di atas kini punya uji yang menjaganya.
 - Kenaikan pangkat yang sah tetap lewat **Catat kenaikan pangkat**; peringatan kuning di layar koreksi
   menyebutkannya secara tegas, bukan sekadar mengatakan "pakai untuk salah ketik".

@@ -154,7 +154,7 @@ export function LayarPengingat({ namaBulan, batas }: { namaBulan: string; batas:
         "Nama pegawai yang belum diajukan, supaya Anda tahu persis siapa yang tertinggal.",
         "Tombol ini membuka Usulan kolektif dengan pegawai tersebut sudah tercentang.",
       ]}
-      catatan="Jendela ini muncul sekali saja di tiap perangkat. Setelah Anda tutup, ia tidak muncul lagi pada periode yang sama — jadwalnya tetap dapat dilihat di pita jadwal dashboard."
+      catatan="Jendela ini muncul sekali saja di tiap perangkat. Setelah Anda tutup, ia tidak muncul lagi pada periode yang sama; jadwalnya tetap dapat dilihat di pita jadwal dashboard."
       anak={
         <div className="lyr-modal">
           <p className="lyr-modal-judul">
@@ -217,7 +217,7 @@ export function LayarPapan() {
   return (
     <Layar
       jalur="Dashboard"
-      judul="Alur KGB — tiap pegawai berada di kolom tahapnya"
+      judul="Alur KGB: tiap pegawai berada di kolom tahapnya"
       keterangan={[
         "Perlu dikerjakan: draf yang belum Anda ajukan, dan usulan yang dikembalikan Kanwil beserta catatannya.",
         "Di Kanwil: sudah Anda ajukan. Datanya terkunci di sini, sebab peninjau harus melihat persis apa yang dikirim.",
@@ -264,7 +264,7 @@ export function LayarDataPegawai() {
         "Unggah daftar: satu berkas CSV berisi banyak pegawai sekaligus. Dipakai saat mengisi data pertama kali atau meremajakan banyak data.",
         "Tambah pegawai: untuk satu orang yang belum tercatat, misalnya CPNS yang baru dilantik.",
         "Usulkan perbaikan: membetulkan data satu pegawai yang sudah tercatat, termasuk NIP yang salah ketik.",
-        "Titik tiga: tindakan lain untuk pegawai itu — Laporkan kenaikan pangkat, Laporkan peninjauan masa kerja, Laporkan mutasi, dan Seharusnya tidak tercatat? untuk baris yang keliru sejak awal.",
+        "Titik tiga: tindakan lain untuk pegawai itu, yaitu Laporkan kenaikan pangkat, Laporkan peninjauan masa kerja, Laporkan mutasi, dan Seharusnya tidak tercatat? untuk baris yang keliru sejak awal.",
       ]}
       anak={
         <>
@@ -316,7 +316,7 @@ export function LayarUnggah() {
   return (
     <Layar
       jalur="Data Pegawai › Unggah daftar"
-      judul="Langkah 2 — Periksa & konfirmasi"
+      judul="Langkah 2: Periksa & konfirmasi"
       keterangan={[
         "Ringkasan empat kelompok: pegawai baru, perbaikan data, yang sama persis sehingga dilewati, dan yang ditolak.",
         "Angka yang tampil adalah hasil bacaan sistem, bukan tulisan mentah di berkas. Periksa terutama tanggalnya, sebab Excel kerap menukar hari dengan bulan.",
@@ -418,7 +418,7 @@ export function LayarKolektif1({ namaBulan }: { namaBulan: string }) {
   return (
     <Layar
       jalur="Usulan kolektif"
-      judul="Langkah 1 — Pilih pegawai"
+      judul="Langkah 1: Pilih pegawai"
       keterangan={[
         `Saringan Jatuh tempo TMT ${namaBulan} sudah terpilih: inilah pegawai yang harus diusulkan periode ini.`,
         "Pegawai dikelompokkan per bulan TMT. Tombol Pilih semua mencentang satu kelompok sekaligus.",
@@ -501,7 +501,7 @@ export function LayarKolektif2() {
   return (
     <Layar
       jalur="Usulan kolektif"
-      judul="Langkah 2 — Lengkapi data & berkas"
+      judul="Langkah 2: Lengkapi data & berkas"
       keterangan={[
         "Daftar pegawai yang Anda pilih. Lingkaran di sebelah nama menunjukkan seberapa lengkap isiannya; kerjakan satu per satu sampai penuh.",
         "Pilih dulu keadaannya. Belum pernah KGB hanya meminta TMT CPNS dan masa kerjanya 0 tahun 0 bulan.",
@@ -651,7 +651,7 @@ export function LayarKolektif3() {
   return (
     <Layar
       jalur="Usulan kolektif"
-      judul="Langkah 3 — Ajukan dengan surat"
+      judul="Langkah 3: Ajukan dengan surat"
       keterangan={[
         "Centang pegawai yang ikut pada surat ini. Yang belum lengkap tidak dapat dicentang, dan kekurangannya disebutkan.",
         "Nomor dan tanggal surat usulan yang sudah Anda kirim lewat Srikandi. Satu surat berlaku untuk semua pegawai di daftar ini.",

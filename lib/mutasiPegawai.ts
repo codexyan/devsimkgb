@@ -18,7 +18,7 @@ import { tanggalKalender, type NilaiTanggal } from "./waktu";
 /**
  * "pembatalan" bukan perpindahan, melainkan pembetulan administratif: pegawai yang seharusnya tidak
  * pernah tercatat, misalnya entri ganda atau NIP salah ketik yang melahirkan orang yang tidak ada.
- * Jenis ini menumpang jalur laporan mutasi karena bentuknya sama persis — UPT melapor, Kanwil menetapkan —
+ * Jenis ini menumpang jalur laporan mutasi karena bentuknya sama persis; UPT melapor, Kanwil menetapkan,
  * dan memberinya tabel sendiri berarti menyalin seluruh antrian tinjauan, notifikasi, dan jejak auditnya.
  * UPT tetap tidak pernah menghapus apa pun sendiri (ADR-004); yang dilakukan Kanwil pun menonaktifkan,
  * bukan menghapus, supaya keliru lapor masih dapat dipulihkan.
@@ -43,7 +43,7 @@ export const KETERANGAN_JENIS_MUTASI: Record<JenisMutasi, string> = {
   pemberhentian:
     "Pegawai berhenti sebagai PNS pada satker ini. Datanya tetap tersimpan sebagai riwayat, dan KGB yang TMT-nya sebelum tanggal berhenti tetap sah diproses.",
   pembatalan:
-    "Pegawai ini seharusnya tidak pernah tercatat, misalnya entri ganda atau NIP salah ketik. Bukan untuk pegawai yang pindah, pensiun, atau meninggal — pakai Pemberhentian untuk itu. Bila Kanwil menerima, datanya dinonaktifkan, bukan dihapus.",
+    "Pegawai ini seharusnya tidak pernah tercatat, misalnya entri ganda atau NIP salah ketik. Bukan untuk pegawai yang pindah, pensiun, atau meninggal; pakai Pemberhentian untuk itu. Bila Kanwil menerima, datanya dinonaktifkan, bukan dihapus.",
 };
 
 /** Sebab sebuah pencatatan dibatalkan; menentukan apa yang diperiksa Kanwil sebelum menetapkannya. */
@@ -86,7 +86,7 @@ export function kekuranganMutasi(isian: IsianMutasi): string[] {
   if (isian.jenis === "pembatalan") {
     if (!String(isian.alasan ?? "").trim()) kurang.push("alasan pembatalan");
     // Keterangan wajib di sini, tidak seperti jenis lain: pembatalan tidak membawa SK yang dapat
-    // dicocokkan, jadi buktinya hanya ada pada kalimat UPT — NIP kembarannya, atau NIP yang benar.
+    // dicocokkan, jadi buktinya hanya ada pada kalimat UPT: NIP kembarannya, atau NIP yang benar.
     if (!String(isian.keterangan ?? "").trim()) kurang.push("keterangan beserta buktinya");
     return kurang;
   }

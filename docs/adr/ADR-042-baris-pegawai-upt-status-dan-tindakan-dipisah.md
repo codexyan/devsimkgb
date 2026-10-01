@@ -1,4 +1,4 @@
-# ADR-042: Baris pegawai Admin UPT — status dan tindakan dipisah
+# ADR-042: Baris pegawai Admin UPT; status dan tindakan dipisah
 
 Tanggal: 30 September 2026
 Status: berlaku
@@ -8,7 +8,7 @@ Status: berlaku
 Pemilik meminta baris pada Data Pegawai Admin UPT dirapikan, dari label BKO sampai tombol tindakannya.
 
 Kolom terakhir berjudul **"Status di Kanwil"**, tetapi memuat empat hal sekaligus: lencana status,
-penanda "KGB ditunda", keterangan konfirmasi atau usulan berjalan, lalu **tiga kendali bertumpuk** —
+penanda "KGB ditunda", keterangan konfirmasi atau usulan berjalan, lalu **tiga kendali bertumpuk**,
 `.upt-aksi { display: block }` membuat masing-masing turun ke barisnya sendiri.
 
 Yang terukur sebelum perubahan, pada 1440 × 1000 dengan tujuh pegawai:
@@ -40,7 +40,7 @@ Cacat nomor 2 dan 3 baru saja diperparah ADR-041, yang menambahkan tautan ketiga
 
 Tambahan yang diputuskan saat mengerjakan, di luar pertanyaan:
 
-4. **Tombol utama hanya pekat bila ada yang menunggu dikerjakan** — draf yang belum diajukan atau usulan
+4. **Tombol utama hanya pekat bila ada yang menunggu dikerjakan**; draf yang belum diajukan atau usulan
    yang dikembalikan Kanwil. Tujuh tombol pekat berjajar ke bawah berarti tidak ada yang menonjol, dan
    kolomnya berubah menjadi dinding tinta. Baris yang tidak menuntut apa pun memakai tombol bergaris.
 
@@ -49,7 +49,7 @@ Tambahan yang diputuskan saat mengerjakan, di luar pertanyaan:
 Pilihan yang diambil pemilik berbunyi "nama satker singkat". Itu **tidak** dijalankan apa adanya, sebab
 bertentangan dengan aturan tetap: nama Lapas, Rutan, dan Bapas selalu ditulis resmi lengkap di seluruh
 tampilan. Yang dilakukan: nama lengkapnya tetap dicetak, dipotong oleh CSS dengan elipsis bila sel terlalu
-sempit, dan nama utuhnya ada di `title`. Pemotongan oleh lebar kolom bukan penyingkatan — yang terbaca
+sempit, dan nama utuhnya ada di `title`. Pemotongan oleh lebar kolom bukan penyingkatan, yang terbaca
 tidak pernah berupa nama yang salah.
 
 ## Akibat

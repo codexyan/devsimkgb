@@ -14,7 +14,7 @@ memusnahkan riwayat KGB, surat KGB, serah terima, riwayat hukdis, berkas SK di R
 Kebutuhan sah UPT sudah tertutup: pegawai pindah, pensiun, atau meninggal lewat **laporan mutasi dan
 pemberhentian**; data keliru lewat **Usulkan perbaikan data**; draf yang belum dikirim memang sudah boleh
 dihapus UPT sendiri. Yang belum tertutup hanya satu: pegawai yang **sudah disetujui padahal seharusnya
-tidak pernah tercatat** — entri ganda, atau orang yang lahir dari NIP salah ketik. Untuk itu UPT terpaksa
+tidak pernah tercatat**; entri ganda, atau orang yang lahir dari NIP salah ketik. Untuk itu UPT terpaksa
 melaporkan "pemberhentian" (yang membuat riwayatnya bohong, sebab orangnya tidak berhenti jadi PNS) atau
 menghubungi Kanwil di luar sistem.
 
@@ -27,8 +27,8 @@ timpang. Angka `terlambat` per satker sudah dikirim API tetapi tidak pernah dita
 
 1. **UPT tetap tidak dapat menghapus maupun menonaktifkan data pegawai.** ADR-004 tidak diubah.
 2. **Jenis laporan baru: "Pembatalan pencatatan"**, menumpang jalur laporan mutasi yang sudah ada
-   (`laporan_mutasi`, `lib/mutasiPegawai.ts`), sebab bentuknya sama persis — UPT melapor, Kanwil menetapkan
-   — dan tabel tersendiri berarti menyalin seluruh antrian tinjauan, notifikasi, dan jejak auditnya.
+   (`laporan_mutasi`, `lib/mutasiPegawai.ts`), sebab bentuknya sama persis; UPT melapor, Kanwil menetapkan
+   dan tabel tersendiri berarti menyalin seluruh antrian tinjauan, notifikasi, dan jejak auditnya.
    - **Isiannya berbeda dari jenis lain:** tidak ada SK dan tidak ada TMT berlaku, sebab barisnya keliru
      sejak awal. Yang wajib justru **alasan** (entri ganda, NIP salah ketik, tidak pernah bertugas di satker
      ini) dan **keterangan beserta buktinya**, karena tanpa SK hanya kalimat UPT yang dapat diperiksa Kanwil.

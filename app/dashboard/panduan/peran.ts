@@ -86,7 +86,7 @@ const ROLE_SEMUA_PERAN = "superAdminCore";
  *
  * Hanya Super Admin membaca seluruh peran; peran lain membaca panduannya sendiri saja. Sebelumnya
  * seluruh bagian dirender untuk semua orang dan yang tidak relevan hanya disembunyikan CSS, sehingga
- * Admin UPT tinggal menekan "Semua" — atau membaca sumber halaman — untuk melihat isi kerja Kanwil.
+ * Admin UPT tinggal menekan "Semua", atau membaca sumber halaman, untuk melihat isi kerja Kanwil.
  *
  * Role yang tidak dikenal mendapat panduan lengkap. Itu tidak terjadi setelah authGuard, yang hanya
  * meloloskan lima role di lib/auth/roles.ts; pilihan ini sekadar menjaga halaman tidak pernah kosong.

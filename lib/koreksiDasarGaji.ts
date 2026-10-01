@@ -6,7 +6,7 @@
 //
 // Yang diperbaiki modul ini, selain dapat diuji: dulu mengganti golongan memanggil `ubah("mkg")("0_0")`,
 // sehingga membetulkan salah ketik golongan diam-diam menjatuhkan masa kerja ke nol dan gaji pokok ke
-// angka terendah golongan itu — tanpa pesan apa pun.
+// angka terendah golongan itu, tanpa pesan apa pun.
 
 import { bulanKeKgbBerikutnya, getMKGOptions, tambahBulan } from "./tabelGaji";
 import { tanggalKalender, type NilaiTanggal } from "./waktu";
@@ -38,7 +38,7 @@ export function mkgTerdekat(golongan: string, tahun: number, bulan: number): Lan
 /**
  * Masa kerja golongan yang dipakai setelah golongan diganti.
  *
- * Langkah yang sedang dipakai dipertahankan bila golongan baru memilikinya — itu keadaan yang paling
+ * Langkah yang sedang dipakai dipertahankan bila golongan baru memilikinya; itu keadaan yang paling
  * lazim, sebab tabel gaji PP 5/2024 memakai langkah masa kerja yang sama untuk hampir semua golongan.
  * Bila tidak ada, diambil yang terdekat dan ditandai `disesuaikan` supaya layar dapat mengatakannya,
  * bukan mengubahnya diam-diam. Null hanya bila golongan barunya tidak dikenal tabel gaji.

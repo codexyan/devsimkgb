@@ -50,7 +50,7 @@ const KOLOM_DARI_SK_DASAR: readonly string[] = [
  * keduanya, dan tidak ada kolom lain yang ikut diusulkan berubah.
  *
  * Laporan seperti itu tidak menumpang surat usulan Srikandi (ADR-046). SK-nya sudah terbit dan pindaiannya
- * ikut terkirim, jadi yang disampaikan adalah kejadian yang sudah selesai — sama watak dengan laporan
+ * ikut terkirim, jadi yang disampaikan adalah kejadian yang sudah selesai, sama watak dengan laporan
  * mutasi dan laporan hukuman disiplin, yang memang berangkat tanpa surat. Usulan yang sekalian mengubah
  * jabatan, nama, atau kolom lain tetap bersurat, sebab di situ UPT memang sedang meminta sesuatu.
  */

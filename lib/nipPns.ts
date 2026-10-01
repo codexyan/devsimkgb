@@ -12,7 +12,7 @@
 //    yyyymmdd     yyyymm   1/2  001-999
 //
 // Pada NIP yang rusak, tanggal lahirnya menjadi 00, bulan dan tahun TMT-nya 000000, dan angka jenis
-// kelaminnya 0 — tiga hal yang tidak mungkin ada pada NIP mana pun. Memeriksa susunannya karena itu
+// kelaminnya 0, tiga hal yang tidak mungkin ada pada NIP mana pun. Memeriksa susunannya karena itu
 // menangkap kerusakan Excel dengan pasti, bukan menebak-nebak.
 //
 // Modul ini murni: tidak menyentuh basis data dan tidak membaca jam sistem kecuali lewat `tahunKini`
@@ -55,7 +55,7 @@ export type HasilNip = { ok: true; nip: string; isi: NipTerbaca } | { ok: false;
 export const SARAN_NIP_EXCEL =
   "Buka berkasnya lewat Data → From Text/CSV, lalu setel kolom nip sebagai Text sebelum ditarik masuk. " +
   "Bila mengetik manual, awali dengan tanda petik satu ('197112051998031004). Berkas yang NIP-nya telanjur " +
-  "tampil 1,97E+17 jangan disimpan — tutup tanpa menyimpan, lalu buka ulang dengan cara di atas.";
+  "tampil 1,97E+17 jangan disimpan; tutup tanpa menyimpan, lalu buka ulang dengan cara di atas.";
 
 /** Tahun lahir paling tua yang masih masuk akal untuk seorang PNS aktif maupun arsipnya. */
 const TAHUN_LAHIR_PALING_TUA = 1930;

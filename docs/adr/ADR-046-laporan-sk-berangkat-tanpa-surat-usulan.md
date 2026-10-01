@@ -9,7 +9,7 @@ Pemilik bertanya mengapa sesudah kartu SK disimpan masih harus ada langkah "usul
 dua hal, dan hanya satu di antaranya yang memang perlu.
 
 **Pertama, suratnya.** `POST /api/upt/usulan/ajukan` menolak tanpa nomor dan tanggal surat usulan
-Srikandi — aturan dari ADR-015 dan ADR-024, satu surat untuk beberapa pegawai, satu pintu ke Kanwil.
+Srikandi; aturan dari ADR-015 dan ADR-024, satu surat untuk beberapa pegawai, satu pintu ke Kanwil.
 Padahal SK kenaikan pangkat dan SK PMK **sudah terbit**: yang disampaikan UPT adalah kejadian yang sudah
 selesai, bukan permohonan. Watak itu sama persis dengan laporan mutasi dan laporan hukuman disiplin, yang
 sejak ADR-016 memang berangkat tanpa surat sama sekali.
@@ -25,7 +25,7 @@ Draf dari kartu PMK → kekurangan: SK KGB terakhir, SK kenaikan pangkat terakhi
                                   SK peninjauan masa kerja
 ```
 
-Yang kedua itu bukan birokrasi yang menempel tanpa guna — di situlah buktinya dikumpulkan. Yang memang
+Yang kedua itu bukan birokrasi yang menempel tanpa guna, di situlah buktinya dikumpulkan. Yang memang
 cacat adalah kartunya tidak pernah bisa menuntaskan pekerjaannya walau tidak ada lagi yang kurang.
 
 ## Keputusan (pemilik, 1 Oktober 2026)
@@ -49,12 +49,12 @@ cacat adalah kartunya tidak pernah bisa menuntaskan pekerjaannya walau tidak ada
   draf PMK tanpa pindaian ditolak karena berkasnya, draf KP tanpa pindaian ditolak karena berkasnya, dan
   draf pegawai baru tanpa surat ditolak karena suratnya.
 - Tombol **Kirim ke Kanwil** pada kartu baru menyala setelah seluruh berkas wajib terlampir; selama belum,
-  kartunya menyebutkan apa yang kurang dan tetap menyediakan **Simpan draf** — pemindai yang sedang antre
+  kartunya menyebutkan apa yang kurang dan tetap menyediakan **Simpan draf**; pemindai yang sedang antre
   tidak boleh membuat isian yang sudah diketik hilang. Bila pengirimannya ditolak, drafnya tetap tersimpan
   dan pesan tolaknya disampaikan apa adanya.
 - **Panel tinjauan Kanwil tidak diubah.** Nomor surat memang sudah ditampilkan hanya bila ada
   (`u.nomorSurat ? ...` di `app/dashboard/usulan/page.tsx`), dan tombol "setujui satu surat" hanya
-  mengelompokkan usulan yang bernomor surat — sehingga laporan tanpa surat ditinjau satu per satu, yang
+  mengelompokkan usulan yang bernomor surat, sehingga laporan tanpa surat ditinjau satu per satu, yang
   memang semestinya.
 - Notifikasi untuk Kanwil tidak lagi berbunyi "lewat surat -", melainkan "sebagai laporan SK, tanpa surat
   usulan". Catatan audit pun begitu.

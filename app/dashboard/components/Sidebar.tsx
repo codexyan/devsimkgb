@@ -422,7 +422,7 @@ export default function Sidebar({ role, nama, nip }: SidebarProps) {
 
   /* Usulan yang menunggu giliran pemakai, untuk lencana menu. Kanwil: usulan UPT yang belum ditinjau.
      UPT: usulan yang dikembalikan Kanwil untuk diperbaiki. Keduanya pekerjaan yang datang dari pihak
-     seberang, bukan yang dibuat sendiri, jadi draf UPT sengaja tidak ikut dihitung — draf sudah punya
+     seberang, bukan yang dibuat sendiri, jadi draf UPT sengaja tidak ikut dihitung; draf sudah punya
      pengingat masa kirim sendiri di dasbor UPT (ADR-029). Mode ringkas dipakai agar sidebar, yang ikut
      pada setiap halaman, tidak menarik seluruh data pegawai hanya untuk sebuah angka. */
   useEffect(() => {

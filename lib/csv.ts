@@ -3,7 +3,7 @@
  *
  * Excel tidak memisah kolom berdasar koma, melainkan berdasar "List separator" pada Region Windows.
  * Perangkat berlokal Indonesia menyetelnya titik koma, sehingga berkas berpemisah koma yang dibuka
- * dengan klik ganda tampil menumpuk di kolom A — berkasnya sendiri sah, pembacanya yang berbeda.
+ * dengan klik ganda tampil menumpuk di kolom A; berkasnya sendiri sah, pembacanya yang berbeda.
  *
  * Baris petunjuk `sep=;` di awal berkas menimpa setelan itu, jadi kolomnya terbagi benar di lokal
  * mana pun tanpa operator perlu menyentuh Region Windows. Petunjuk itu hanya dikenal Excel dan
@@ -20,7 +20,7 @@ export const PEMISAH_CSV = ";";
 export const KEPALA_BERKAS_CSV = `﻿sep=${PEMISAH_CSV}\r\n`;
 
 /**
- * Satu nilai menjadi sel CSV. Dikutip bila memuat pemisah, koma, petik, atau pindah baris — koma ikut
+ * Satu nilai menjadi sel CSV. Dikutip bila memuat pemisah, koma, petik, atau pindah baris; koma ikut
  * dikutip meski bukan pemisah, agar berkasnya tetap utuh bila dibuka pengurai yang menebak pemisah.
  */
 export function selCsv(nilai: unknown): string {

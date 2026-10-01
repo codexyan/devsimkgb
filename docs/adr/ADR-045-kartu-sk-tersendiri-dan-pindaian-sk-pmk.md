@@ -11,13 +11,13 @@ sekaligus. Yang dikerjakan tindakan itu hanya menggulirkannya ke bagian yang tep
 memegang satu SK kenaikan pangkat tetap disodori seluruh formulir perbaikan data.
 
 Pola kartu sendiri-sendiri sudah ada di modul yang sama: `ModalLaporMutasi` (191 baris) dan
-`ModalLaporHukdis` (297 baris) — satu urusan satu jendela, dan yang hukdis sudah memakai `KolomBerkas`
+`ModalLaporHukdis` (297 baris), satu urusan satu jendela, dan yang hukdis sudah memakai `KolomBerkas`
 untuk pindaian SK-nya.
 
 Celah kedua lebih serius. Berkas usulan ditentukan `BERKAS_USULAN`, dan slotnya hanya lima: surat usulan
 Srikandi, SK KGB terakhir, SK kenaikan pangkat terakhir, SK CPNS, dan SK pengangkatan PNS. Untuk kenaikan
 pangkat slotnya sudah ada dan malah sudah wajib; **untuk PMK tidak ada sama sekali**. SK peninjauan masa
-kerja — dokumen yang menggeser masa kerja golongan dan memajukan jadwal KGB — tidak punya tempat untuk
+kerja; dokumen yang menggeser masa kerja golongan dan memajukan jadwal KGB; tidak punya tempat untuk
 diunggah, sehingga laporan PMK dari UPT sampai ke Kanwil tanpa satu pun dokumen pendukung dan disetujui
 berdasar angka yang diketik saja.
 
@@ -30,7 +30,7 @@ berdasar angka yang diketik saja.
 2. **Kolom `path_sk_pmk` pada `usulan_pegawai`**, dengan slot berkas "SK peninjauan masa kerja" yang hanya
    diminta bila sebab perubahannya PMK. Dipilih di atas menumpangkan pindaian PMK pada slot SK kenaikan
    pangkat, yang akan membuat satu kolom memuat dua jenis SK yang berbeda.
-3. **Berkas wajib ditagih saat diajukan, bukan saat kartu disimpan** — sama dengan perlakuan berkas wajib
+3. **Berkas wajib ditagih saat diajukan, bukan saat kartu disimpan**, sama dengan perlakuan berkas wajib
    lain (ADR-030), supaya operator yang pemindainya sedang antre tidak kehilangan apa yang sudah diketik.
 
 ## Akibat
@@ -38,8 +38,8 @@ berdasar angka yang diketik saja.
 - **Migrasi `20261001060000_usulan_sk_pmk.sql` dijalankan di Supabase produksi sebelum kodenya di-push**,
   bukan sesudah: `alter table public.usulan_pegawai add column if not exists path_sk_pmk text`. Kolomnya
   nullable dan tidak menyentuh baris yang ada.
-- Pratayang pada kartu memakai fungsi yang **sama persis** dengan yang dipakai Kanwil saat menyetujui —
-  `hitungKenaikanPangkat` dan `hitungPmk` — sehingga yang terlihat operator bukan taksiran. Kartu PMK pun
+- Pratayang pada kartu memakai fungsi yang **sama persis** dengan yang dipakai Kanwil saat menyetujui,
+  `hitungKenaikanPangkat` dan `hitungPmk`, sehingga yang terlihat operator bukan taksiran. Kartu PMK pun
   menolak angka yang mustahil dengan kalimat yang sama dengan yang akan diucapkan Kanwil, misalnya "Masa
   kerja golongan pada SK PMK harus lebih besar dari masa kerja pegawai pada TMT PMK (9 tahun 3 bulan)".
 - Kartu menyimpan lewat rute usulan yang sudah ada, jadi tidak ada tabel, rute, maupun panel tinjauan

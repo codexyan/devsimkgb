@@ -12,7 +12,7 @@ tinjauan di tempat (ADR-011), dan angka usulan per satker pada Pantau satker.
 
 Yang belum ada: **tempat mengerjakannya tanpa berpindah halaman**. Pita *Perlu tindakan* hanya menyebut
 jumlah lalu melempar ke modul; penanda pada antrian hanya muncul bagi pegawai yang sudah tercatat,
-sehingga usulan pegawai baru — yang menjadi jalur utama sejak Unggah daftar (ADR-031) — tidak punya titik
+sehingga usulan pegawai baru, yang menjadi jalur utama sejak Unggah daftar (ADR-031); tidak punya titik
 sentuh di dasbor sama sekali.
 
 ## Keputusan (pemilik, 30 September 2026)

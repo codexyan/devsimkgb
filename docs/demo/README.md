@@ -17,7 +17,7 @@ ulang; seluruh TMT dihitung mundur dari sana, jadi keadaannya tetap sama.
 | Keadaan | UPT | Kanwil | Yang dapat diperagakan |
 |---|---|---|---|
 | TMT sudah lewat | 2 | 2 | kartu **Terlambat**, jalur Arsip KGB |
-| TMT 1 Nov 2026, batas 20 Sep sudah lewat | 2 | 2 | **berpotensi rapelan** — masih dapat diinput, dan inilah satu-satunya kelompok yang jalur penuhnya dapat diperagakan hari ini |
+| TMT 1 Nov 2026, batas 20 Sep sudah lewat | 2 | 2 | **berpotensi rapelan**, masih dapat diinput, dan inilah satu-satunya kelompok yang jalur penuhnya dapat diperagakan hari ini |
 | TMT Des 2026 sampai Mar 2027 | 8 | 10 | kartu jadwal ke depan; input Desember terbuka 1 Oktober |
 
 Jendela input Tim SDM adalah tanggal 1–20 pada bulan kedua sebelum TMT. Pada 30 September, jendela
