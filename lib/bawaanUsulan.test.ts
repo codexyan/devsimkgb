@@ -25,6 +25,18 @@ test("berkas dan SK CPNS dari usulan pegawai baru yang disetujui ikut terbawa", 
   assert.equal("pathBerkas" in b.berkas, false);
 });
 
+test("pindaian SK PMK tidak terbawa, sebab milik satu SK PMK dan bukan milik pegawainya", () => {
+  // Terbawa, PMK kedua akan tampak sudah berberkas padahal yang terlampir SK PMK yang pertama (ADR-045).
+  const pmk = usulan({
+    id: "u9", pegawaiId: "p1", status: "disetujui", jenis: "perubahan",
+    dasarBaruJenis: "pmk", pathSkPmk: "usulan/7_skPmk_1.pdf",
+    pathSkTerakhir: "usulan/7_skTerakhir_1.pdf", ditinjauAt: new Date(2026, 1, 1),
+  });
+  const b = bawaanPegawai({ id: "p1" }, [pmk]);
+  assert.deepEqual(b.berkas.pathSkTerakhir, { jalur: "usulan/7_skTerakhir_1.pdf", usulanId: "u9" });
+  assert.equal("pathSkPmk" in b.berkas, false);
+});
+
 test("SK dasar pada data pegawai didahulukan daripada usulan lama", () => {
   const b = bawaanPegawai({ id: "p1", nomorSkDasar: "SK-KGB-2027", tanggalSkDasar: new Date(2027, 0, 5) }, [baru]);
   assert.equal(b.nomorSkTerakhir, "SK-KGB-2027");

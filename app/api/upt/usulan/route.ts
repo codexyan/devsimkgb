@@ -277,6 +277,7 @@ export async function POST(req: Request) {
     pathSyaratCpns: berkas.jalur.pathSyaratCpns ?? null,
     pathSkPangkat: berkas.jalur.pathSkPangkat ?? null,
     pathSkCpns: berkas.jalur.pathSkCpns ?? null,
+    pathSkPmk: berkas.jalur.pathSkPmk ?? null,
     nama: null, tempatLahir: null, tanggalLahir: null, jenisKelamin: null,
     pendidikanTerakhir: null, jabatan: null, pangkat: null, golonganRuang: null,
     eselon: null, jenisJabatan: null, tmtGolongan: null,

@@ -1048,10 +1048,13 @@ export default async function IsiPanduan({
                     KGB terakhir pun masih mungkin terbit SK kenaikan pangkat atau SK PMK, dan SK itulah yang
                     menggeser masa kerja golongan sekaligus menjadi dasar SK KGB berikutnya. Laporkan lewat{" "}
                     <strong>Laporkan kenaikan pangkat</strong> atau <strong>Laporkan peninjauan masa kerja</strong>{" "}
-                    pada baris pegawainya: formulirnya terbuka dengan sebabnya sudah terpilih, Anda tinggal mengisi
-                    golongan baru atau masa kerja menurut SK beserta nomor, tanggal, dan TMT-nya. Masa kerja golongan
-                    dan gaji pokoknya dihitung Kanwil saat menyetujui — naik dari golongan II ke III tetap memotong
-                    masa kerja 5 tahun — sehingga angka yang Anda ketik tidak pernah diam-diam menggeser uang. SK
+                    pada baris pegawainya. Masing-masing membuka jendelanya sendiri yang hanya memuat apa yang
+                    tertulis di SK itu: golongan baru atau masa kerja menurut SK, nomor, tanggal, TMT, pejabat
+                    penetapnya, dan <strong>pindaian SK-nya</strong>. Akibat SK itu langsung terlihat di kotak
+                    <em> Dihitung sistem</em> sebelum disimpan. Masa kerja golongan dan gaji pokoknya dihitung Kanwil
+                    saat menyetujui — naik dari golongan II ke III tetap memotong masa kerja 5 tahun — sehingga angka
+                    yang Anda ketik tidak pernah diam-diam menggeser uang. Isinya tersimpan sebagai draf usulan
+                    perbaikan; pindaian SK boleh menyusul, tetapi ditagih saat usulan diajukan. SK
                     yang sudah dicatat Kanwil terlihat di <strong>Riwayat KGB</strong>, pada baris pegawai yang
                     dibuka, dan pada kolom <em>Dasar KGB berikutnya</em> baris itu bertanda <em>Dari KP/PI</em> atau{" "}
                     <em>Dari PMK</em>.

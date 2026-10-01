@@ -148,6 +148,8 @@ export async function POST(req: Request) {
       pathSyaratCpns: null,
       pathSkPangkat: null,
       pathSkCpns: null,
+      // Pindaian SK tidak lewat CSV; slotnya diisi saat draf dilengkapi (ADR-045).
+      pathSkPmk: null,
       ...kosong,
       nomorSkTerakhir: null,
       tanggalSkTerakhir: null,

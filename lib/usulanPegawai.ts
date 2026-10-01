@@ -93,7 +93,7 @@ export const PESAN_BERKAS_TERLALU_BESAR = pesanBerkasTerlaluBesar("tiap berkas")
  * dan SK kenaikan pangkat terakhirnya; yang belum pernah dengan SK CPNS dan SK pengangkatan PNS-nya.
  * "pengajuan" adalah surat usulan Srikandi, yang diunggah sekali untuk satu surat pada langkah Ajukan.
  */
-export type KeadaanBerkas = "pernah_kgb" | "belum_pernah_kgb" | "pengajuan";
+export type KeadaanBerkas = "pernah_kgb" | "belum_pernah_kgb" | "pengajuan" | "pmk";
 
 /**
  * Berkas dasar yang menyertai usulan. Tim keuangan memintanya agar masa kerja golongan dan gaji pokok
@@ -136,6 +136,18 @@ export const BERKAS_USULAN = [
     wajib: true,
   },
   {
+    // Diminta hanya bila sebab perubahannya PMK (ADR-045), karena itu keadaannya tersendiri: usulan
+    // perbaikan biasa tidak menyertakan SK PMK, dan menagihnya pada setiap usulan hanya akan menahan
+    // perbaikan yang tidak ada hubungannya dengan masa kerja.
+    medan: "skPmk",
+    kunci: "pathSkPmk",
+    label: "SK peninjauan masa kerja",
+    keterangan:
+      "SK peninjauan masa kerja yang menambah masa kerja golongan. Kanwil mencocokkan masa kerja yang tertulis pada SK ini sebelum menyetujui, sebab dari situlah jadwal KGB berikutnya dihitung ulang.",
+    keadaan: "pmk",
+    wajib: true,
+  },
+  {
     medan: "syaratCpns",
     kunci: "pathSyaratCpns",
     label: "SK pengangkatan PNS",
@@ -146,7 +158,7 @@ export const BERKAS_USULAN = [
   },
 ] as const satisfies readonly {
   medan: string;
-  kunci: "pathBerkas" | "pathSkTerakhir" | "pathSkCpns" | "pathSyaratCpns" | "pathSkPangkat";
+  kunci: "pathBerkas" | "pathSkTerakhir" | "pathSkCpns" | "pathSyaratCpns" | "pathSkPangkat" | "pathSkPmk";
   label: string;
   /** Penjelasan singkat: dokumen apa yang dimaksud dan kapan diperlukan. */
   keterangan: string;
@@ -166,6 +178,15 @@ export function pernahKgb(mkgTahun: unknown, mkgBulan: unknown): boolean {
 export function berkasUntukKeadaan(pernah: boolean) {
   const keadaan: KeadaanBerkas = pernah ? "pernah_kgb" : "belum_pernah_kgb";
   return BERKAS_USULAN.filter((b) => b.keadaan === keadaan);
+}
+
+/**
+ * Berkas yang diminta karena sebab perubahannya, di luar berkas dasar. Hanya PMK yang punya: kenaikan
+ * pangkat sudah terwakili "SK kenaikan pangkat terakhir" pada berkas dasar, dan koreksi salah ketik tidak
+ * membawa SK sama sekali.
+ */
+export function berkasDasarBaru(jenis: string | null | undefined) {
+  return jenis === "pmk" ? BERKAS_USULAN.filter((b) => b.keadaan === "pmk") : [];
 }
 
 /**
@@ -386,6 +407,8 @@ export function kekuranganUsulan(
   // Golongan dan masa kerja golongan hanya berubah karena kenaikan pangkat, PMK, atau salah ketik; usulan
   // perbaikan wajib menyebut sebabnya beserta SK-nya (ADR-030). Pegawai baru belum punya pembanding.
   kurang.push(...kekuranganDasarBaru(usulan, jenis !== "baru" && perluDasarBaru(perubahan)));
+  // Pindaian SK PMK ditagih bersama berkas dasar lainnya: saat diajukan, bukan saat draf disimpan (ADR-045).
+  for (const b of berkasDasarBaru(usulan.dasarBaruJenis)) if (b.wajib && !usulan[b.kunci]) kurang.push(b.label);
   return kurang;
 }
 

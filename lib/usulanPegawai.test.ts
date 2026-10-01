@@ -132,6 +132,42 @@ test("hitungUsulan: angka dalam bentuk teks dari formulir tetap terbaca", () => 
   assert.equal(h.tmtKgbBerikutnya?.getFullYear(), 2026);
 });
 
+test("kekuranganUsulan: usulan ber-SK PMK menagih pindaian SK PMK-nya sendiri", () => {
+  // Pindaian itu yang dicocokkan Kanwil dengan masa kerja yang diketik UPT; tanpanya, jadwal KGB digeser
+  // hanya berdasar angka (ADR-045).
+  const tercatat = { golonganRuang: "II/d", mkgTahun: 17, mkgBulan: 0, tmtKgbTerakhir: new Date(Date.UTC(2024, 8, 1)) };
+  const skPmk = {
+    mkgTahun: 18,
+    mkgBulan: 0,
+    dasarBaruJenis: "pmk",
+    dasarBaruNomorSk: "W.17-KP.04.03-7",
+    dasarBaruTanggalSk: new Date(Date.UTC(2026, 1, 2)),
+    dasarBaruTmt: new Date(Date.UTC(2026, 1, 1)),
+    pathSkTerakhir: "usulan/rutan-rantau_skTerakhir_1.pdf",
+    pathSkPangkat: "usulan/rutan-rantau_skPangkat_1.pdf",
+  };
+  assert.ok(kekuranganUsulan(skPmk, "perubahan", tercatat).includes("SK peninjauan masa kerja"));
+  assert.deepEqual(
+    kekuranganUsulan({ ...skPmk, pathSkPmk: "usulan/rutan-rantau_skPmk_1.pdf" }, "perubahan", tercatat),
+    [],
+  );
+});
+
+test("kekuranganUsulan: usulan yang sebabnya bukan PMK tidak pernah ditagih pindaian SK PMK", () => {
+  const tercatat = { golonganRuang: "III/c", mkgTahun: 12, mkgBulan: 0, tmtKgbTerakhir: new Date(Date.UTC(2026, 7, 1)) };
+  const skKp = {
+    golonganRuang: "III/d",
+    dasarBaruJenis: "kp",
+    dasarBaruJenisKp: "reguler",
+    dasarBaruNomorSk: "W.17-KP.03.01-401",
+    dasarBaruTanggalSk: new Date(Date.UTC(2026, 8, 2)),
+    dasarBaruTmt: new Date(Date.UTC(2026, 8, 1)),
+    pathSkTerakhir: "usulan/rutan-rantau_skTerakhir_1.pdf",
+    pathSkPangkat: "usulan/rutan-rantau_skPangkat_1.pdf",
+  };
+  assert.deepEqual(kekuranganUsulan(skKp, "perubahan", tercatat), []);
+});
+
 test("kekuranganUsulan: draf pegawai baru yang lengkap boleh diajukan", () => {
   const siap = {
     nama: "NOORHIKMAH", nip: "198809042025062014", jabatan: "Penjaga Tahanan",

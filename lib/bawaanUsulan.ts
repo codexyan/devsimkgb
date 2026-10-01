@@ -13,7 +13,13 @@ import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { BERKAS_USULAN, berkasUntukKeadaan } from "./usulanPegawai";
 
 type BerkasUsulan = (typeof BERKAS_USULAN)[number];
-export type KunciBerkasPegawai = Exclude<BerkasUsulan["kunci"], "pathBerkas">;
+/**
+ * Berkas yang menempel pada pegawainya, jadi terbawa ke usulan berikutnya. Dua yang dikecualikan menempel
+ * pada peristiwanya: surat usulan Srikandi milik satu pengajuan, dan pindaian SK PMK milik satu SK PMK —
+ * membawanya ke usulan berikutnya akan membuat PMK kedua tampak sudah berberkas padahal yang terlampir SK
+ * yang lama (ADR-045).
+ */
+export type KunciBerkasPegawai = Exclude<BerkasUsulan["kunci"], "pathBerkas" | "pathSkPmk">;
 
 export interface BerkasBawaan {
   jalur: string;
@@ -44,7 +50,7 @@ export function bawaanPegawai(
 
   const berkas: BawaanUsulan["berkas"] = {};
   for (const b of BERKAS_USULAN) {
-    if (b.kunci === "pathBerkas") continue;
+    if (b.kunci === "pathBerkas" || b.kunci === "pathSkPmk") continue;
     const asal = disetujui.find((u) => u[b.kunci]);
     if (asal) berkas[b.kunci] = { jalur: asal[b.kunci] as string, usulanId: asal.id };
   }

@@ -159,9 +159,12 @@ export interface UsulanPegawaiRow {
   nip: string | null; unitKerja: string | null;
   /** Nomor surat usulan; kosong selama masih draf, diisi sekali saat pengajuan. */
   nomorSurat: string | null; tanggalSurat: Date | null;
-  /** Berkas dasar: surat usulan Srikandi, SK KGB terakhir, syarat pengangkatan PNS, SK kenaikan pangkat. */
+  /**
+   * Berkas dasar: surat usulan Srikandi, SK KGB terakhir, syarat pengangkatan PNS, SK kenaikan pangkat,
+   * dan SK peninjauan masa kerja. Yang terakhir hanya terisi pada usulan yang sebabnya PMK (ADR-045).
+   */
   pathBerkas: string | null; pathSkTerakhir: string | null;
-  pathSyaratCpns: string | null; pathSkPangkat: string | null;
+  pathSyaratCpns: string | null; pathSkPangkat: string | null; pathSkPmk: string | null;
   nama: string | null; tempatLahir: string | null; tanggalLahir: Date | null; jenisKelamin: string | null;
   pendidikanTerakhir: string | null; jabatan: string | null; pangkat: string | null; golonganRuang: string | null;
   eselon: string | null; jenisJabatan: string | null; tmtGolongan: Date | null;
@@ -243,6 +246,7 @@ export const defs = {
       s("pathSkCpns"),
       s("dasarBaruJenis"), s("dasarBaruJenisKp"), s("dasarBaruNomorSk"),
       d("dasarBaruTanggalSk"), d("dasarBaruTmt"), s("dasarBaruPenetap"),
+      s("pathSkPmk"),
     ],
   },
   RiwayatKGB: {

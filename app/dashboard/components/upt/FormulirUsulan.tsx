@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import KolomBerkas from "./KolomBerkas";
-import { BERKAS_USULAN, berkasUntukKeadaan, hitungUsulan, pernahKgb as sudahPernahKgb } from "@/lib/usulanPegawai";
+import { BERKAS_USULAN, berkasDasarBaru, berkasUntukKeadaan, hitungUsulan, pernahKgb as sudahPernahKgb } from "@/lib/usulanPegawai";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiSaatIni } from "@/lib/pilihanPegawai";
@@ -130,19 +130,12 @@ export default function FormulirUsulan({
   jenis,
   pegawai,
   draf,
-  sebabAwal,
   onTutup,
   onSelesai,
 }: {
   jenis: "perubahan" | "baru";
   pegawai: PegawaiUntukUsulan | null;
   draf: DrafUsulanUpt | null;
-  /**
-   * Sebab perubahan yang sudah terpilih saat formulir dibuka, dari tindakan "Laporkan kenaikan pangkat"
-   * atau "Laporkan peninjauan masa kerja" di Data Pegawai. Draf yang sudah menyebut sebabnya tidak
-   * ditimpa: yang tersimpan selalu menang atas yang baru dipilih dari menu.
-   */
-  sebabAwal?: JenisDasarBaru;
   onTutup: () => void;
   onSelesai: (pesan: string) => void;
 }) {
@@ -167,7 +160,7 @@ export default function FormulirUsulan({
   });
   // Sebab perubahan golongan atau masa kerja golongan beserta SK-nya (ADR-030).
   const [dasar, setDasar] = useState({
-    jenis: draf?.dasarBaru?.jenis || sebabAwal || "",
+    jenis: draf?.dasarBaru?.jenis ?? "",
     jenisKp: draf?.dasarBaru?.jenisKp || "reguler",
     nomorSk: draf?.dasarBaru?.nomorSk ?? "",
     tanggalSk: draf?.dasarBaru?.tanggalSk ?? "",
@@ -193,13 +186,6 @@ export default function FormulirUsulan({
   /** Berkas tersimpan yang sedang dibuka, agar operator dapat memastikan yang diunggah memang benar. */
   const [pratinjau, setPratinjau] = useState<{ judul: string; url: string; lokal: boolean } | null>(null);
 
-  // Formulir yang dibuka dari tindakan KP atau PMK langsung memperlihatkan bagian SK-nya. Tanpa ini
-  // operator mendarat di bagian identitas dan tidak melihat tanda bahwa tindakannya mengerjakan sesuatu,
-  // sebab bagian sebab berada jauh di bawah golongan dan masa kerja.
-  const bagianSebab = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (sebabAwal) bagianSebab.current?.scrollIntoView({ block: "center" });
-  }, [sebabAwal]);
 
   const ubah = (kunci: string, nilai: string) => setIsian((f) => ({ ...f, [kunci]: nilai }));
   /** Usulan yang dilempar kembali Kanwil; isinya utuh, yang berubah hanya kalimat pemandunya. */
@@ -579,7 +565,7 @@ export default function FormulirUsulan({
 
       {/* ── Sebab perubahan golongan atau masa kerja golongan (ADR-030) ───── */}
       {(perluSebab || !!dasar.jenis) && (
-        <div className="kgbm-bagian" style={{ flexShrink: 0 }} ref={bagianSebab}>
+        <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
           <div className="kgbm-bagian-kepala">
             <p className="kgbm-bagian-judul">Sebab golongan atau masa kerja berubah</p>
             <p className="kgbm-bagian-ket">SK inilah yang menjadi dasar SK KGB berikutnya</p>
@@ -659,7 +645,9 @@ export default function FormulirUsulan({
           <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 500 KB</p>
         </div>
         <div className="kgbm-bagian-isi">
-          {berkasUntukKeadaan(pernahKgb).map((b) => {
+          {/* Pindaian SK PMK hanya diminta bila sebabnya memang PMK (ADR-045); usulan perbaikan biasa
+              tidak menyertakannya. Kenaikan pangkat sudah terwakili "SK kenaikan pangkat terakhir". */}
+          {[...berkasUntukKeadaan(pernahKgb), ...berkasDasarBaru(dasar.jenis)].map((b) => {
             const wajib = b.wajib;
             const simpanan = draf?.berkas.find((x) => x.medan === b.medan) ?? null;
             // Tanpa berkas sendiri, berkas terakhir yang disetujui Kanwil ikut terbawa saat disimpan.

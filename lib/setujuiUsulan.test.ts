@@ -57,7 +57,7 @@ async function siapkan(statusKgb: "sedang_diproses" | "menunggu_keuangan", denga
   const usulan = {
     id: "u1", pegawaiId: "p1", satker: "rutan-rantau", status: "menunggu", jenis: "perubahan", nip: null,
     unitKerja: null, nomorSurat: "W.1", tanggalSurat: tgl(2026, 4, 5), pathBerkas: null, pathSkTerakhir: null,
-    pathSyaratCpns: null, pathSkPangkat: null, pathSkCpns: null, nama: null, tempatLahir: null, tanggalLahir: null,
+    pathSyaratCpns: null, pathSkPangkat: null, pathSkCpns: null, pathSkPmk: null, nama: null, tempatLahir: null, tanggalLahir: null,
     jenisKelamin: null, pendidikanTerakhir: null, jabatan: null, pangkat: null, golonganRuang: "II/a", eselon: null,
     jenisJabatan: null, tmtGolongan: null, mkgTahun: 2, mkgBulan: 0, gajiPokok: null, tmtKgbTerakhir: tgl(2025, 6),
     tmtKgbBerikutnya: tgl(2027, 6), nomorSkTerakhir: null, tanggalSkTerakhir: null, hukdisAda: false,
