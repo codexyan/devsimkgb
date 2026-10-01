@@ -1044,6 +1044,19 @@ export default async function IsiPanduan({
                     usulkan dan Anda rekam di Gaji Web satker ini.
                   </p>
                   <p>
+                    <strong>Kenaikan pangkat, penyesuaian ijazah, dan peninjauan masa kerja.</strong> Sesudah SK
+                    KGB terakhir pun masih mungkin terbit SK kenaikan pangkat atau SK PMK, dan SK itulah yang
+                    menggeser masa kerja golongan sekaligus menjadi dasar SK KGB berikutnya. Laporkan lewat{" "}
+                    <strong>Laporkan kenaikan pangkat</strong> atau <strong>Laporkan peninjauan masa kerja</strong>{" "}
+                    pada baris pegawainya: formulirnya terbuka dengan sebabnya sudah terpilih, Anda tinggal mengisi
+                    golongan baru atau masa kerja menurut SK beserta nomor, tanggal, dan TMT-nya. Masa kerja golongan
+                    dan gaji pokoknya dihitung Kanwil saat menyetujui — naik dari golongan II ke III tetap memotong
+                    masa kerja 5 tahun — sehingga angka yang Anda ketik tidak pernah diam-diam menggeser uang. SK
+                    yang sudah dicatat Kanwil terlihat di <strong>Riwayat KGB</strong>, pada baris pegawai yang
+                    dibuka, dan pada kolom <em>Dasar KGB berikutnya</em> baris itu bertanda <em>Dari KP/PI</em> atau{" "}
+                    <em>Dari PMK</em>.
+                  </p>
+                  <p>
                     Untuk baris yang <strong>seharusnya tidak pernah tercatat</strong> — entri ganda, NIP salah
                     ketik, atau orang yang tidak pernah bertugas di satker Anda — pakai tautan{" "}
                     <strong>Seharusnya tidak tercatat?</strong> di bawah tombol Laporkan mutasi. Isinya alasan dan

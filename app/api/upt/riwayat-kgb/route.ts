@@ -4,7 +4,9 @@ import { auth } from "@/auth";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
 import { bolehUnduhSkUpt, pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
 import { SATKER } from "@/lib/satker";
+import { JENIS_KP, isJenisKp } from "@/lib/kenaikanPangkat";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
+import type { RiwayatPangkatRow, RiwayatPmkRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
 
@@ -34,10 +36,16 @@ export async function GET() {
     );
   const satker = SATKER.find((s) => s.kode === kode)!;
 
-  const [semuaPegawai, semuaKgb, semuaSurat] = await Promise.all([
+  const [semuaPegawai, semuaKgb, semuaSurat, semuaPangkat, semuaPmk] = await Promise.all([
     db.pegawai.findMany(),
     db.riwayatKGB.findMany(),
     db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
+    // SK yang menetapkan gaji pokok di luar KGB. Sesudah SK KGB terakhir pun masih mungkin terbit SK
+    // kenaikan pangkat atau PMK, dan SK itulah yang menggeser masa kerja golongan sekaligus menjadi dasar
+    // SK KGB berikutnya (ADR-020, ADR-021). UPT diminta mengonfirmasi dasar itu, jadi ia perlu melihat
+    // daftarnya, bukan hanya satu barisnya yang terakhir.
+    db.riwayatPangkat.findMany() as Promise<RiwayatPangkatRow[]>,
+    db.riwayatPmk.findMany() as Promise<RiwayatPmkRow[]>,
   ]);
 
   const milikSatker = pegawaiSatker(semuaPegawai, kode);
@@ -75,5 +83,57 @@ export async function GET() {
     // Terbaru lebih dulu; pengelompokan per pegawai dikerjakan di layar.
     .sort((a, b) => (b.tmtKgbBaru ?? "").localeCompare(a.tmtKgbBaru ?? ""));
 
-  return NextResponse.json({ satker, pegawaiAktif: milikSatker.filter((p) => p.aktif).length, kgb });
+  // Kenaikan pangkat dan PMK dalam satu daftar: keduanya menjawab pertanyaan yang sama bagi UPT — SK apa
+  // yang mengubah golongan atau masa kerja golongan pegawai ini, dan kapan. Baca-saja; pelaporannya lewat
+  // tindakan di Data Pegawai, dan yang mencatat tetap Kanwil (ADR-030).
+  const skDasar = [
+    ...semuaPangkat
+      .filter((r) => pegawaiById.has(r.pegawaiId))
+      .map((r) => ({
+        id: r.id,
+        pegawaiId: r.pegawaiId,
+        jenis: "kp" as const,
+        label: isJenisKp(r.jenisKp) ? `Kenaikan pangkat ${JENIS_KP[r.jenisKp]}` : "Kenaikan pangkat",
+        nomorSK: r.nomorSK || null,
+        tanggalSK: isoTanggalKalender(r.tanggalSK),
+        tmt: isoTanggalKalender(r.tmtPangkat),
+        golonganLama: r.golonganLama,
+        golonganBaru: r.golonganBaru,
+        mkgTahunLama: r.mkgTahunLama,
+        mkgBulanLama: r.mkgBulanLama,
+        mkgTahunBaru: r.mkgTahunBaru,
+        mkgBulanBaru: r.mkgBulanBaru,
+        gajiPokokLama: r.gajiPokokLama,
+        gajiPokokBaru: r.gajiPokokBaru,
+        penetapSK: r.penetapSK ?? null,
+        tmtKgbBerikutnyaLama: null,
+        tmtKgbBerikutnyaBaru: null,
+      })),
+    ...semuaPmk
+      .filter((r) => pegawaiById.has(r.pegawaiId))
+      .map((r) => ({
+        id: r.id,
+        pegawaiId: r.pegawaiId,
+        jenis: "pmk" as const,
+        label: "Peninjauan masa kerja",
+        nomorSK: r.nomorSK || null,
+        tanggalSK: isoTanggalKalender(r.tanggalSK),
+        tmt: isoTanggalKalender(r.tmtPmk),
+        golonganLama: r.golonganRuang,
+        golonganBaru: r.golonganRuang,
+        // MKG yang ditampilkan adalah yang tersimpan pada data pegawai, yaitu MKG pada TMT KGB terakhir —
+        // angka yang sama dengan yang dilihat UPT di Data Pegawai, bukan MKG pada TMT PMK.
+        mkgTahunLama: r.mkgTahunDasarLama,
+        mkgBulanLama: r.mkgBulanDasarLama,
+        mkgTahunBaru: r.mkgTahunDasarBaru,
+        mkgBulanBaru: r.mkgBulanDasarBaru,
+        gajiPokokLama: r.gajiPokokLama,
+        gajiPokokBaru: r.gajiPokokBaru,
+        penetapSK: r.penetapSK ?? null,
+        tmtKgbBerikutnyaLama: isoTanggalKalender(r.tmtKgbBerikutnyaLama),
+        tmtKgbBerikutnyaBaru: isoTanggalKalender(r.tmtKgbBerikutnyaBaru),
+      })),
+  ].sort((a, b) => (b.tmt ?? "").localeCompare(a.tmt ?? ""));
+
+  return NextResponse.json({ satker, pegawaiAktif: milikSatker.filter((p) => p.aktif).length, kgb, skDasar });
 }

@@ -264,7 +264,7 @@ export function LayarDataPegawai() {
         "Unggah daftar: satu berkas CSV berisi banyak pegawai sekaligus. Dipakai saat mengisi data pertama kali atau meremajakan banyak data.",
         "Tambah pegawai: untuk satu orang yang belum tercatat, misalnya CPNS yang baru dilantik.",
         "Usulkan perbaikan: membetulkan data satu pegawai yang sudah tercatat, termasuk NIP yang salah ketik.",
-        "Titik tiga: tindakan lain untuk pegawai itu — Laporkan mutasi, dan Seharusnya tidak tercatat? untuk baris yang keliru sejak awal.",
+        "Titik tiga: tindakan lain untuk pegawai itu — Laporkan kenaikan pangkat, Laporkan peninjauan masa kerja, Laporkan mutasi, dan Seharusnya tidak tercatat? untuk baris yang keliru sejak awal.",
       ]}
       anak={
         <>

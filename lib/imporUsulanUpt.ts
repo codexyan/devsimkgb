@@ -12,8 +12,10 @@
 // ditagih saat diajukan; menolaknya di sini berarti memaksa operator menyempurnakan seluruh berkas di
 // Excel lebih dulu, padahal dokumennya sering baru terkumpul belakangan.
 
-import { BIDANG_DIISI, bacaIsianBaris } from "./usulanFormulir";
+import { BIDANG_DIISI, bacaDasarBaru, bacaIsianBaris, type DasarBaruUsulan } from "./usulanFormulir";
 import { keBerkasCsv } from "./csv";
+import { isJenisDasarBaru } from "./dasarBaruUsulan";
+import { JENIS_KP, isJenisKp } from "./kenaikanPangkat";
 import { bandingkanUsulan, kekuranganUsulan, type PerubahanUsulan } from "./usulanPegawai";
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "./dataPegawai";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR } from "./pilihanPegawai";
@@ -85,7 +87,52 @@ export const KOLOM_TEMPLAT_UPT: readonly {
     keterangan: `Salah satu: ${PENDIDIKAN_TERAKHIR.join(" · ")}.`,
     contoh: "SMA/SMK",
   },
+  // Sebab golongan atau masa kerja golongan berubah, beserta SK-nya (ADR-030). Enam kolom ini kosong
+  // pada baris yang hanya meremajakan jabatan atau alamat; terisi pada baris pegawai yang baru naik
+  // pangkat atau baru menerima SK PMK, sehingga peremajaan sesudah kenaikan pangkat periode selesai
+  // sekali unggah, bukan dibuka satu per satu di Usulan kolektif.
+  {
+    kolom: "dasarBaruJenis",
+    peran: "diajukan",
+    keterangan:
+      "Sebab golongan atau masa kerja golongan pada baris ini berbeda dari yang tercatat. Isi kp untuk SK kenaikan pangkat atau penyesuaian ijazah, pmk untuk SK peninjauan masa kerja, atau koreksi untuk salah ketik tanpa SK baru. Kosongkan bila keduanya tidak berubah; pegawai baru tidak perlu mengisinya.",
+    contoh: "",
+  },
+  {
+    kolom: "dasarBaruJenisKp",
+    peran: "diajukan",
+    keterangan: `Hanya untuk dasarBaruJenis kp. Salah satu: ${Object.keys(JENIS_KP).join(" · ")}.`,
+    contoh: "",
+  },
+  {
+    kolom: "dasarBaruNomorSk",
+    peran: "diajukan",
+    keterangan: "Nomor SK kenaikan pangkat atau SK PMK tersebut. Wajib bila dasarBaruJenis diisi kp atau pmk.",
+    contoh: "",
+  },
+  {
+    kolom: "dasarBaruTanggalSk",
+    peran: "diajukan",
+    keterangan: "Tanggal SK tersebut.",
+    contoh: "",
+  },
+  {
+    kolom: "dasarBaruTmt",
+    peran: "diajukan",
+    keterangan:
+      "TMT pangkat untuk kp, atau TMT PMK untuk pmk. Tanggal inilah yang menentukan SK mana yang menjadi dasar SK KGB berikutnya: yang TMT-nya paling baru.",
+    contoh: "",
+  },
+  {
+    kolom: "dasarBaruPenetap",
+    peran: "opsional",
+    keterangan: "Pejabat yang menandatangani SK tersebut.",
+    contoh: "",
+  },
 ];
+
+/** Pilihan kolom dasarBaruJenis, untuk pesan tolak yang menyebutkan apa yang diterima. */
+const PILIHAN_DASAR_BARU = "kp · pmk · koreksi";
 
 /**
  * Isi berkas templat: baris kepala dan satu baris contoh. Kepala berkasnya dari lib/csv — BOM agar Excel
@@ -96,7 +143,15 @@ export function templatCsvUpt(): string {
   return keBerkasCsv([KOLOM_TEMPLAT_UPT.map((k) => k.kolom), KOLOM_TEMPLAT_UPT.map((k) => k.contoh)]);
 }
 
-const KOLOM_TANGGAL = BIDANG_DIISI.filter((b) => b.jenis === "tanggal");
+/**
+ * Kolom bertanggal pada berkas: isian pegawai, ditambah dua tanggal SK sebab perubahan yang bukan kolom
+ * data pegawai sehingga tidak terjaring BIDANG_DIISI, padahal ditulis Excel dengan kebiasaan yang sama.
+ */
+const KOLOM_TANGGAL: readonly { kunci: string; label: string }[] = [
+  ...BIDANG_DIISI.filter((b) => b.jenis === "tanggal").map((b) => ({ kunci: b.kunci as string, label: b.label })),
+  { kunci: "dasarBaruTanggalSk", label: "Tanggal SK sebab perubahan" },
+  { kunci: "dasarBaruTmt", label: "TMT SK sebab perubahan" },
+];
 
 /**
  * Tanggal pada baris berkas diseragamkan ke yyyy-mm-dd. Excel berlokal Indonesia menyimpan ulang tanggal
@@ -149,6 +204,8 @@ export interface HasilBarisImpor {
   namaTercatat: string | null;
   /** Kolom yang berbeda dari data tercatat, lama berdampingan dengan baru; hanya untuk "perubahan". */
   beda: PerubahanUsulan[];
+  /** SK sebab perubahan golongan atau masa kerja golongan yang disebut baris ini (ADR-030). */
+  dasarBaru: DasarBaruUsulan | null;
 }
 
 function teks(baris: Record<string, unknown>, kunci: string): string {
@@ -208,6 +265,7 @@ export function periksaImporUpt(
       pegawaiId: null,
       namaTercatat: null,
       beda: [] as PerubahanUsulan[],
+      dasarBaru: null,
     };
     const tolak = (galat: string): HasilBarisImpor => ({ ...dasar, hasil: "ditolak", galat });
 
@@ -234,13 +292,25 @@ export function periksaImporUpt(
     const dibaca = bacaIsianBaris(seragam.row);
     if ("galat" in dibaca) return tolak(dibaca.galat);
 
+    // Sebab golongan atau masa kerja berubah (ADR-030). Nilai yang tidak dikenal ditolak di sini alih-alih
+    // didiamkan: "KP" atau "naik pangkat" pada kolom ini akan tersimpan sebagai usulan tanpa sebab, lalu
+    // tertahan saat diajukan tanpa petunjuk apa pun tentang apa yang salah.
+    const sebab = teks(seragam.row, "dasarBaruJenis");
+    if (sebab && !isJenisDasarBaru(sebab))
+      return tolak(`Kolom dasarBaruJenis hanya menerima ${PILIHAN_DASAR_BARU}; tertulis "${sebab}"`);
+    const jenisKp = teks(seragam.row, "dasarBaruJenisKp");
+    if (sebab === "kp" && jenisKp && !isJenisKp(jenisKp))
+      return tolak(`Kolom dasarBaruJenisKp hanya menerima ${Object.keys(JENIS_KP).join(" · ")}; tertulis "${jenisKp}"`);
+    const dasarBaru = bacaDasarBaru((kunci) => teks(seragam.row, kunci));
+
     if (!tercatat) {
       return {
         ...dasar,
         hasil: "baru",
         galat: null,
         isian: dibaca.isian,
-        kurang: kekuranganUsulan({ ...dibaca.isian, nip, nama }, "baru"),
+        dasarBaru,
+        kurang: kekuranganUsulan({ ...dibaca.isian, ...dasarBaru, nip, nama }, "baru"),
       };
     }
 
@@ -255,10 +325,11 @@ export function periksaImporUpt(
       hasil: "perubahan",
       galat: null,
       isian: { ...dibaca.isian, nama },
+      dasarBaru,
       pegawaiId: tercatat.id,
       namaTercatat: tercatat.nama,
       beda,
-      kurang: kekuranganUsulan({ ...dibaca.isian, nama }, "perubahan", tercatat),
+      kurang: kekuranganUsulan({ ...dibaca.isian, ...dasarBaru, nama }, "perubahan", tercatat),
     };
   });
 }

@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { KEPALA_BERKAS_CSV, PEMISAH_CSV, buangPetunjukPemisah } from "./csv";
 import {
   KOLOM_IMPOR_UPT,
+  KOLOM_TEMPLAT_UPT,
   dapatDisimpan,
   periksaImporUpt,
   ringkasImpor,
@@ -235,6 +236,86 @@ test("ringkasan memisahkan pegawai baru, perbaikan, yang sama, dan yang ditolak"
   assert.deepEqual(hasil.map((h) => h.hasil), ["baru", "baru", "perubahan", "sama", "ditolak"]);
   assert.deepEqual(ringkasImpor(hasil), { baru: 2, perubahan: 1, sama: 1, ditolak: 1, belumLengkap: 2 });
   assert.deepEqual(dapatDisimpan(hasil).map((h) => h.baris), [1, 2, 3]);
+});
+
+/* ── Sebab golongan atau masa kerja berubah, lewat berkas (ADR-030) ─────────────────────────────── */
+
+/** Pegawai tercatat golongan II/a, dan baris berkas yang menaikkannya ke II/b karena kenaikan pangkat. */
+const naikPangkat = (p: Record<string, unknown> = {}) =>
+  baris({ golonganRuang: "II/b", mkgTahun: "3", mkgBulan: "0", ...p });
+const satkerIni = konteks({ pegawaiSatker: new Map([["200509182025062002", pegawai()]]) });
+
+test("baris yang menaikkan golongan tanpa menyebut SK tetap tersimpan, hanya kurang sebabnya", () => {
+  const [h] = periksaImporUpt([naikPangkat()], satkerIni);
+  assert.equal(h.hasil, "perubahan");
+  assert.ok(h.kurang.includes("sebab perubahan golongan atau masa kerja golongan"));
+  assert.equal(h.dasarBaru?.dasarBaruJenis ?? null, null);
+});
+
+test("SK kenaikan pangkat yang disebut berkas melengkapi sebabnya dan ikut tersimpan", () => {
+  const [h] = periksaImporUpt(
+    [
+      naikPangkat({
+        dasarBaruJenis: "kp",
+        dasarBaruJenisKp: "reguler",
+        dasarBaruNomorSk: "W.17-KP.03.01-401",
+        dasarBaruTanggalSk: "2026-04-02",
+        dasarBaruTmt: "2026-04-01",
+        dasarBaruPenetap: "Kepala Kantor Wilayah",
+      }),
+    ],
+    satkerIni,
+  );
+  assert.equal(h.hasil, "perubahan");
+  assert.ok(!h.kurang.includes("sebab perubahan golongan atau masa kerja golongan"));
+  assert.equal(h.dasarBaru?.dasarBaruJenis, "kp");
+  assert.equal(h.dasarBaru?.dasarBaruJenisKp, "reguler");
+  assert.equal(h.dasarBaru?.dasarBaruNomorSk, "W.17-KP.03.01-401");
+  assert.equal(h.dasarBaru?.dasarBaruPenetap, "Kepala Kantor Wilayah");
+  assert.deepEqual(h.dasarBaru?.dasarBaruTmt, new Date(2026, 3, 1));
+});
+
+test("tanggal SK sebab perubahan dibaca dari dd/mm/yyyy yang ditulis Excel berlokal Indonesia", () => {
+  const [h] = periksaImporUpt(
+    [
+      naikPangkat({
+        dasarBaruJenis: "pmk",
+        dasarBaruNomorSk: "W.17-KP.04.03-7",
+        dasarBaruTanggalSk: "02/04/2026",
+        dasarBaruTmt: "1/4/2026",
+      }),
+    ],
+    satkerIni,
+  );
+  assert.equal(h.hasil, "perubahan");
+  assert.deepEqual(h.dasarBaru?.dasarBaruTanggalSk, new Date(2026, 3, 2));
+  assert.deepEqual(h.dasarBaru?.dasarBaruTmt, new Date(2026, 3, 1));
+  assert.ok(!h.kurang.includes("sebab perubahan golongan atau masa kerja golongan"));
+});
+
+test("sebab yang tidak dikenal menolak barisnya dan menyebut pilihan yang diterima", () => {
+  // Didiamkan, baris ini akan tersimpan sebagai usulan tanpa sebab lalu tertahan saat diajukan tanpa
+  // petunjuk apa pun tentang apa yang salah pada berkasnya.
+  const [h] = periksaImporUpt([naikPangkat({ dasarBaruJenis: "naik pangkat" })], satkerIni);
+  assert.equal(h.hasil, "ditolak");
+  assert.match(h.galat ?? "", /kp · pmk · koreksi/);
+
+  const [j] = periksaImporUpt([naikPangkat({ dasarBaruJenis: "kp", dasarBaruJenisKp: "pilihan" })], satkerIni);
+  assert.equal(j.hasil, "ditolak");
+  assert.match(j.galat ?? "", /penyesuaian_ijazah/);
+});
+
+test("templat memuat keenam kolom sebab perubahan, sehingga peremajaan massal dapat membawa SK-nya", () => {
+  const kolom = KOLOM_TEMPLAT_UPT.map((k) => k.kolom);
+  for (const k of [
+    "dasarBaruJenis",
+    "dasarBaruJenisKp",
+    "dasarBaruNomorSk",
+    "dasarBaruTanggalSk",
+    "dasarBaruTmt",
+    "dasarBaruPenetap",
+  ])
+    assert.ok(kolom.includes(k), `kolom ${k} ada di templat`);
 });
 
 test("templat diawali BOM dan petunjuk sep=; agar Excel membagi kolomnya, bukan menumpuk di kolom A", () => {

@@ -35,10 +35,37 @@ interface KgbApi {
   pegawai: { nama: string; nip: string; jabatan: string };
 }
 
+/**
+ * SK yang mengubah golongan atau masa kerja golongan di luar KGB: kenaikan pangkat (termasuk penyesuaian
+ * ijazah) dan peninjauan masa kerja. Sesudah SK KGB terakhir pun SK seperti ini masih mungkin terbit, dan
+ * sejak itu dialah dasar SK KGB berikutnya (ADR-020, ADR-021).
+ */
+interface SkDasarApi {
+  id: string;
+  pegawaiId: string;
+  jenis: "kp" | "pmk";
+  label: string;
+  nomorSK: string | null;
+  tanggalSK: string | null;
+  tmt: string | null;
+  golonganLama: string;
+  golonganBaru: string;
+  mkgTahunLama: number;
+  mkgBulanLama: number;
+  mkgTahunBaru: number;
+  mkgBulanBaru: number;
+  gajiPokokLama: number;
+  gajiPokokBaru: number;
+  penetapSK: string | null;
+  tmtKgbBerikutnyaLama: string | null;
+  tmtKgbBerikutnyaBaru: string | null;
+}
+
 interface DataApi {
   satker: { kode: string; nama: string; jenis: string };
   pegawaiAktif: number;
   kgb: KgbApi[];
+  skDasar?: SkDasarApi[];
 }
 
 type Saring = "semua" | "tahunIni" | "belumDirekam" | "rapelan";
@@ -46,6 +73,8 @@ type Saring = "semua" | "tahunIni" | "belumDirekam" | "rapelan";
 const fmtTgl = (s: string | null | undefined) =>
   s ? formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" }) : "-";
 const fmtRp = (n: number | null | undefined) => (typeof n === "number" ? "Rp " + n.toLocaleString("id-ID") : "-");
+const fmtMkg = (tahun: number | null, bulan: number | null) =>
+  tahun === null || tahun === undefined ? "-" : `${tahun} thn ${bulan ?? 0} bln`;
 const tahunDari = (s: string | null) => tanggalKalender(s)?.getFullYear() ?? null;
 
 function StatusKgb({ k }: { k: KgbApi }) {
@@ -93,6 +122,13 @@ export default function RiwayatKgbUpt() {
     const t = setTimeout(() => void muat(), 0);
     return () => clearTimeout(t);
   }, [muat]);
+
+  /* SK kenaikan pangkat dan PMK pegawai ini, terbaru lebih dulu; dipakai saat barisnya dibuka. */
+  const skDasarPegawai = useMemo(() => {
+    const peta = new Map<string, SkDasarApi[]>();
+    for (const s of data?.skDasar ?? []) peta.set(s.pegawaiId, [...(peta.get(s.pegawaiId) ?? []), s]);
+    return peta;
+  }, [data]);
 
   /* Satu baris per pegawai, berisi seluruh siklusnya; yang terbaru menjadi ringkasan barisnya. */
   const pegawaiList = useMemo(() => {
@@ -338,6 +374,62 @@ export default function RiwayatKgbUpt() {
                         {buka && (
                           <tr>
                             <td colSpan={5} style={{ padding: "0 16px 14px", background: "var(--sub)" }}>
+                              {/* SK di luar KGB lebih dulu: saat UPT memastikan dasar gaji pokok sudah benar,
+                                  SK inilah yang paling sering terlewat — KGB-nya sendiri sudah terlihat di
+                                  baris ringkasan. Baca-saja; pelaporannya lewat tindakan di Data Pegawai. */}
+                              {(skDasarPegawai.get(e.pegawaiId) ?? []).length > 0 && (
+                                <table className="dsb-tabel dsb-tabel-sisip" style={{ marginBottom: 10 }}>
+                                  <caption>SK kenaikan pangkat dan peninjauan masa kerja, dicatat Kanwil</caption>
+                                  <thead>
+                                    <tr>
+                                      <th scope="col">TMT</th>
+                                      <th scope="col">SK</th>
+                                      <th scope="col">Golongan</th>
+                                      <th scope="col">Masa kerja golongan</th>
+                                      <th scope="col">Gaji pokok</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(skDasarPegawai.get(e.pegawaiId) ?? []).map((s) => (
+                                      <tr key={s.id}>
+                                        <td className="whitespace-nowrap">{fmtTgl(s.tmt)}</td>
+                                        <td>
+                                          <span className="dsb-tag" data-garis="" data-nada="ungu">
+                                            {s.jenis === "kp" ? "KP/PI" : "PMK"}
+                                          </span>{" "}
+                                          {s.nomorSK ?? "tanpa nomor"}
+                                          <span className="dsb-kecil" style={{ display: "block" }}>
+                                            {s.label}
+                                            {s.tanggalSK ? ` · ${fmtTgl(s.tanggalSK)}` : ""}
+                                          </span>
+                                        </td>
+                                        <td className="whitespace-nowrap">
+                                          {s.golonganLama !== s.golonganBaru
+                                            ? `${s.golonganLama} → ${s.golonganBaru}`
+                                            : s.golonganBaru}
+                                        </td>
+                                        <td className="whitespace-nowrap">
+                                          {fmtMkg(s.mkgTahunLama, s.mkgBulanLama)} →{" "}
+                                          <span style={{ color: "var(--dtn)", fontWeight: 500 }}>
+                                            {fmtMkg(s.mkgTahunBaru, s.mkgBulanBaru)}
+                                          </span>
+                                          {s.tmtKgbBerikutnyaBaru && (
+                                            <span className="dsb-kecil" style={{ display: "block" }}>
+                                              KGB berikutnya menjadi {fmtTgl(s.tmtKgbBerikutnyaBaru)}
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="whitespace-nowrap" style={{ fontVariantNumeric: "tabular-nums" }}>
+                                          {fmtRp(s.gajiPokokLama)} →{" "}
+                                          <span style={{ color: "var(--dtn)", fontWeight: 500 }}>
+                                            {fmtRp(s.gajiPokokBaru)}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
                               <table className="dsb-tabel dsb-tabel-sisip">
                                 <thead>
                                   <tr>

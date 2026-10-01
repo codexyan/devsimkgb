@@ -5,6 +5,7 @@ import { newId } from "@/lib/sheets/id";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { BELUM_SELESAI, nilaiUsulan } from "@/lib/usulanPegawai";
+import { ringkasDasarBaru } from "@/lib/dasarBaruUsulan";
 import { isiHitungan } from "@/lib/usulanFormulir";
 import {
   BATAS_BARIS_IMPOR,
@@ -95,6 +96,8 @@ export async function POST(req: Request) {
         kurang: h.kurang,
         namaTercatat: h.namaTercatat,
         beda: h.beda.map((b) => ({ label: b.label, sekarang: b.sekarang, diusulkan: b.diusulkan })),
+        // SK sebab perubahan yang disebut baris ini, satu kalimat siap tampil; null bila tidak disebut.
+        dasarBaru: ringkasDasarBaru(h.dasarBaru ?? {}),
         // Nilai yang benar-benar akan tersimpan, sudah lewat pembacaan tanggal dan hitungan sistem.
         // Inilah yang diperiksa operator: tanggal yang salah tafsir terlihat di sini, bukan setelah tersimpan.
         nilai: h.isian
@@ -148,14 +151,15 @@ export async function POST(req: Request) {
       ...kosong,
       nomorSkTerakhir: null,
       tanggalSkTerakhir: null,
-      // Sebab golongan atau masa kerja berubah (ADR-030) tidak dapat dibaca dari berkas: SK-nya tidak
-      // lewat CSV. Kolomnya dibiarkan kosong dan ditagih saat draf ini dilengkapi di Usulan kolektif.
-      dasarBaruJenis: null,
-      dasarBaruJenisKp: null,
-      dasarBaruNomorSk: null,
-      dasarBaruTanggalSk: null,
-      dasarBaruTmt: null,
-      dasarBaruPenetap: null,
+      // Sebab golongan atau masa kerja berubah beserta SK-nya (ADR-030), bila berkasnya menyebutkan.
+      // Baris yang mengosongkannya tetap tersimpan sebagai draf, dan kekurangannya ditagih saat draf itu
+      // dilengkapi di Usulan kolektif.
+      dasarBaruJenis: h.dasarBaru?.dasarBaruJenis ?? null,
+      dasarBaruJenisKp: h.dasarBaru?.dasarBaruJenisKp ?? null,
+      dasarBaruNomorSk: h.dasarBaru?.dasarBaruNomorSk ?? null,
+      dasarBaruTanggalSk: h.dasarBaru?.dasarBaruTanggalSk ?? null,
+      dasarBaruTmt: h.dasarBaru?.dasarBaruTmt ?? null,
+      dasarBaruPenetap: h.dasarBaru?.dasarBaruPenetap ?? null,
       hukdisAda: false,
       hukdisJenis: null,
       hukdisNomorSk: null,

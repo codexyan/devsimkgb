@@ -45,6 +45,8 @@ interface BarisPratinjau {
   namaTercatat: string | null;
   beda: { label: string; sekarang: string; diusulkan: string }[];
   nilai: { label: string; nilai: string }[];
+  /** SK sebab perubahan golongan atau masa kerja yang disebut baris ini; null bila tidak disebut. */
+  dasarBaru: string | null;
 }
 
 interface Pratinjau {
@@ -383,7 +385,10 @@ export default function UnggahDaftar() {
                   ))}
                 </dl>
                 <p className="kgbm-bantuan">
-                  Tanggal ditulis {FORMAT_TANGGAL_DITERIMA}. Baris contoh di templat fiktif: hapus sebelum mengunggah.
+                  Pegawai yang baru naik pangkat, menerima penyesuaian ijazah, atau menerima SK PMK dapat sekalian
+                  menyebut SK-nya pada kolom <code>dasarBaruJenis</code> dan kawan-kawannya, sehingga tidak perlu
+                  dilengkapi satu per satu di Usulan kolektif sesudahnya. Tanggal ditulis {FORMAT_TANGGAL_DITERIMA}.
+                  Baris contoh di templat fiktif: hapus sebelum mengunggah.
                   Nomor SK dan pindaian berkas tidak lewat CSV; keduanya dilengkapi per pegawai sebelum diajukan.
                   Templat memakai pemisah titik koma, seperti yang diharapkan Excel di sini, jadi kolomnya
                   langsung terbagi; berkas yang disimpan Excel dengan pemisah koma pun tetap terbaca.
@@ -518,6 +523,7 @@ export default function UnggahDaftar() {
                             {b.beda.length} isian berubah: {b.beda.map((x) => x.label).join(", ")}
                           </span>
                         )}
+                        {b.dasarBaru && <span className="ung-dasar">Sebab: {b.dasarBaru}</span>}
                         {b.kurang.length > 0 && (
                           <span className="ung-kurang">Perlu dilengkapi nanti: {b.kurang.join(", ")}</span>
                         )}
