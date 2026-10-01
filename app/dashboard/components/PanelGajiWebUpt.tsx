@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
+import { TombolCiut, usePanelCiut } from "@/app/dashboard/components/PanelCiut";
 
 /* Pemantauan Kanwil atas SK pegawai UPT yang belum direkam di Gaji Web satkernya (ADR-009). Sejak SK diunggah
    Tim SDM, keuangan UPT yang menindaklanjutinya; panel ini hanya memperlihatkan satker mana yang punya SK
@@ -42,12 +43,16 @@ export default function PanelGajiWebUpt({ versi, className = "dsb-susut" }: { ve
 
   const jumlah = (daftar ?? []).reduce((n, r) => n + r.sk.length, 0);
 
+  // Bawaannya diciutkan: panel ini penanda, bukan antrian kerja harian, dan rail hanya setinggi papan
+  // (ADR-050). Sekali dibuka, pilihannya diingat.
+  const [ciut, alihCiut] = usePanelCiut("gaji-web-upt", true);
   return (
-    <section className={`dsb-panel ${className}`} aria-labelledby="judul-gaji-web-upt">
+    <section className={`dsb-panel ${className}`} aria-labelledby="judul-gaji-web-upt" data-ciut={ciut ? "" : undefined}>
       <div className="dsb-panel-kepala">
         <h2 id="judul-gaji-web-upt" className="dsb-panel-judul">
           SK UPT belum direkam {daftar && <small>{jumlah}</small>}
         </h2>
+        <TombolCiut ciut={ciut} alih={alihCiut} judul="SK UPT belum direkam" />
       </div>
 
       {galat ? (

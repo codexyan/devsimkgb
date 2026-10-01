@@ -1,6 +1,7 @@
 "use client";
 
 import { LABEL_POSISI, ringkasBulan, type KartuSatker, type PosisiKartu } from "@/lib/kartuSatkerDasbor";
+import { TombolCiut, usePanelCiut } from "@/app/dashboard/components/PanelCiut";
 
 /* Kartu satker di dasbor Kanwil (ADR-036). Menggantikan panel Pantau satker yang hanya memberi lima angka
    gabungan, dan sekaligus menyerap panel Jadwal input: rincian per bulan TMT kini melekat pada satkernya,
@@ -41,17 +42,21 @@ export default function PanelKartuSatker({
   /** bulanTmt null berarti seluruh bulan satker itu. */
   onPilih: (kode: string | null, bulanTmt: string | null) => void;
 }) {
+  const [ciut, alihCiut] = usePanelCiut("kartu-satker");
   return (
-    <section className="dsb-panel" aria-labelledby="judul-kartu-satker">
+    // dsb-penuh: panel ini yang mengambil sisa tinggi rail, dan daftarnya yang bergulir di dalam. Sebelumnya
+    // tanpa peran sama sekali, sehingga tingginya hanya dibatasi angka mati di .ksk-daftar (ADR-050).
+    <section className="dsb-panel dsb-penuh" aria-labelledby="judul-kartu-satker" data-ciut={ciut ? "" : undefined}>
       <div className="dsb-panel-kepala">
         <h2 id="judul-kartu-satker" className="dsb-panel-judul">
-          Pekerjaan per satker <small>rincian bulan TMT</small>
+          Pekerjaan per satker <small>{kartu.length} satker</small>
         </h2>
         {(satkerTerpilih || bulanTerpilih) && (
           <button type="button" className="dsb-tautan" onClick={() => onPilih(null, null)}>
             Semua satker
           </button>
         )}
+        <TombolCiut ciut={ciut} alih={alihCiut} judul="Pekerjaan per satker" />
       </div>
 
       {kartu.length === 0 ? (
@@ -59,7 +64,7 @@ export default function PanelKartuSatker({
           Tidak ada satker yang sedang punya pekerjaan KGB.
         </p>
       ) : (
-        <div className="ksk-daftar">
+        <div className="ksk-daftar dsb-gulir">
           {kartu.map((k) => {
             const nama = namaSatker(k.kode);
             const aktif = satkerTerpilih === k.kode;

@@ -916,7 +916,7 @@ function DashboardMain() {
 
         {/* -- Rail: tindakan, jadwal input, dan pantau satker -- */}
         <aside className="dsb-samping dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-label="Ringkasan pendamping">
-          <PanelTindakan className="" daftar={tindakan} kosong="Tidak ada KGB yang perlu ditindaklanjuti saat ini." lainnyaHref="/dashboard/notifikasi" />
+          <PanelTindakan daftar={tindakan} kosong="Tidak ada KGB yang perlu ditindaklanjuti saat ini." lainnyaHref="/dashboard/notifikasi" />
 
           {/* Panel Jadwal input dilepas (ADR-036): rincian per bulan TMT kini melekat pada satkernya di
               kartu di bawah, sehingga tidak lagi perlu lini masa se-Kanwil yang berdiri sendiri. */}

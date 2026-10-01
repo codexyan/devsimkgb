@@ -451,6 +451,28 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 
 .dsb-kartu-isi { padding: 16px 18px; }
 
+/* Panel rail yang diciutkan (ADR-050): tinggal kepalanya, sehingga angkanya tetap terbaca sebagai penanda
+   tanpa memakan tinggi yang dibutuhkan panel lain. */
+.dsb-panel[data-ciut] > :not(.dsb-panel-kepala) { display: none; }
+.dsb-panel[data-ciut] .dsb-panel-kepala { border-bottom: 0; }
+
+.dsb-ciut-tombol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dt5);
+  cursor: pointer;
+}
+.dsb-ciut-tombol:hover { background: var(--sub); color: var(--dtn); }
+.dsb-ciut-tombol:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.dsb-ciut-tombol svg { transition: transform 0.2s; }
+.dsb-ciut-tombol[aria-expanded="false"] svg { transform: rotate(-90deg); }
 .dsb-panel-kepala {
   display: flex;
   flex-wrap: wrap;
@@ -780,6 +802,9 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
     overscroll-behavior: contain;
     scrollbar-width: thin;
   }
+
+  /* Panel yang diciutkan tidak lagi menuntut ruang: tingginya sekepala saja (ADR-050). */
+  .dsb-halaman[data-muat-layar] :is(.dsb-penuh, .dsb-susut).dsb-panel[data-ciut] { flex: 0 0 auto; min-height: 0; }
 
   /* Pengisi dan penyusut */
   .dsb-halaman[data-muat-layar] .dsb-penuh { flex: 1 1 0; min-height: 0; }
@@ -2989,6 +3014,12 @@ html[data-gerak="kurangi"] .dsb-putar {
    tidak memanjang tanpa akhir saat banyak satker sedang punya pekerjaan. */
 .ksk-daftar {
   display: grid;
+  /* Barisnya setinggi isinya, bukan dibagi rata. Sebagai bagian bergulir panel pengisi, tinggi daftar ini
+     pasti, dan grid dengan baris auto akan membagi tinggi itu rata ke seluruh kartu: enam kartu menjadi
+     garis setinggi 8 px. Diuji di peramban: max-content mengembalikan kartunya ke 381 px dan daftarnya
+     bergulir sebagaimana mestinya (ADR-050). */
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: 8px;
   padding: 12px 14px;
   max-height: min(520px, 48vh);

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import LatarNavy from "@/app/_bersama/LatarNavy";
+import { TombolCiut, usePanelCiut } from "@/app/dashboard/components/PanelCiut";
 
 /* Komponen bersama ketiga varian dashboard: pita navy (sapaan dan strip angka), panel "Perlu tindakan",
    kepala kartu, dan kerangka muat. Kelas dan token ada di app/dashboard/dasbor.css. */
@@ -209,12 +210,14 @@ export function PanelTindakan({
 }) {
   const tampil = daftar.slice(0, BATAS_TINDAKAN);
   const sisa = daftar.length - tampil.length;
+  const [ciut, alihCiut] = usePanelCiut("tindakan");
   return (
-    <section className={`dsb-panel ${className}`} aria-labelledby="judul-perlu-tindakan">
+    <section className={`dsb-panel ${className}`} aria-labelledby="judul-perlu-tindakan" data-ciut={ciut ? "" : undefined}>
       <div className="dsb-panel-kepala">
         <h2 id="judul-perlu-tindakan" className="dsb-panel-judul">
           Perlu tindakan {daftar.length > 0 && <small>{daftar.length}</small>}
         </h2>
+        <TombolCiut ciut={ciut} alih={alihCiut} judul="Perlu tindakan" />
       </div>
       {daftar.length === 0 ? (
         <p className="dsb-kosong" style={{ padding: "18px 16px", flexDirection: "row" }}>
