@@ -17,6 +17,7 @@ const DashboardUpt = dynamic(() => import("@/app/dashboard/components/DashboardU
 const ModalUsulanUpt = dynamic(() => import("@/app/dashboard/components/ModalUsulanUpt"), { ssr: false });
 const PapanAntrian = dynamic(() => import("@/app/dashboard/components/PapanAntrian"), { ssr: false });
 const PanelKartuSatker = dynamic(() => import("@/app/dashboard/components/PanelKartuSatker"), { ssr: false });
+const PanelGajiWebUpt = dynamic(() => import("@/app/dashboard/components/PanelGajiWebUpt"), { ssr: false });
 import {
   KerangkaDashboard,
   PanelNavy,
@@ -332,6 +333,19 @@ function DashboardMain() {
 
   /* -- Antrian kerja: satu daftar untuk semua tahap, disaring satker lalu bulan TMT -- */
   const dalamSatker = pegawaiJatuhTempo.filter((p) => cocokSatker(p, saringSatker));
+
+  /*
+   * Kolom papan mengikuti satker yang disaring (ADR-049). Sesudah SK diunggah, pegawai Kanwil menunggu
+   * keuangan Kanwil dan pegawai UPT menunggu satkernya merekam di Gaji Web (ADR-009); keduanya tidak
+   * pernah terjadi pada orang yang sama. Menampilkan kolom yang tidak mungkin terisi hanya membuat alur
+   * tampak lebih panjang daripada yang sebenarnya dijalani.
+   */
+  const kolomPapanTampil: KolomPapan[] = (() => {
+    const semuaKolom: KolomPapan[] = ["terkunci", "input", "proses", "keuangan", "rekam_upt", "selesai"];
+    if (saringSatker === "semua") return semuaKolom;
+    const kanwil = saringSatker === SATKER_KANWIL.kode;
+    return semuaKolom.filter((k) => (k === "rekam_upt" ? !kanwil : k === "keuangan" ? kanwil : true));
+  })();
   // Lini masa dihitung dari daftar yang sama dengan antrian, sehingga angkanya selalu cocok.
   const qAntrian = cariAntrian.trim().toLowerCase();
   const dalamBulan = dalamSatker
@@ -701,9 +715,24 @@ function DashboardMain() {
             <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
           {p.skSudahDibuat ? (
-            <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" onClick={() => setModal({ jenis: "unggah_sk", kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) })}>
-              Unggah TTE
-            </button>
+            <>
+              {/* SK yang sudah dibuat masih mungkin keliru isinya, misalnya ketika Keuangan
+                  mengembalikannya (ADR-047). Buat SK dapat mencatat ulang nomor, tanggal, dan isinya, tetapi
+                  sebelum ini pintunya tertutup begitu SK pertama jadi: satu-satunya tombol yang tersisa
+                  justru mengunggah SK yang salah itu (ADR-049). */}
+              <button
+                type="button"
+                className="dsb-tombol dsb-tombol-kecil"
+                data-jenis="garis"
+                onClick={() => bukaBuatSk(p)}
+                title="Buat ulang SK: nomor, tanggal, dan isinya dicatat ulang"
+              >
+                Perbaiki SK
+              </button>
+              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" onClick={() => setModal({ jenis: "unggah_sk", kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) })}>
+                Unggah TTE
+              </button>
+            </>
           ) : (
             <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => bukaBuatSk(p)}>
               Buat SK
@@ -868,6 +897,7 @@ function DashboardMain() {
             <PapanAntrian
               className="dsb-antrian-gulir"
               kartu={antrian.map(kartuPapan)}
+              kolom={kolomPapanTampil}
               keterangan={{
                 input: (() => { const n = antrian.filter((p) => posisiAntrian(p) === "lewat").length; return n > 0 ? `${n} lewat batas` : undefined; })(),
                 proses: (() => { const n = antrian.filter((p) => posisiAntrian(p) === "diproses" && p.skSudahDibuat).length; return n > 0 ? `${n} tunggu TTE` : undefined; })(),
@@ -902,6 +932,11 @@ function DashboardMain() {
               setTahap("semua");
             }}
           />
+
+          {/* Pemantauan SK pegawai UPT yang belum direkam di Gaji Web satkernya. Dipindah dari dasbor
+              Keuangan (ADR-049): keuangan Kanwil tidak menindaklanjutinya, sedangkan Tim SDM-lah yang
+              menagih UPT-nya. */}
+          <PanelGajiWebUpt versi={lastRefresh?.getTime()} />
         </aside>
       </div>
 

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
 import { useDashUser } from "@/app/dashboard/components/RoleContext";
 import { PanelBulanRekon } from "@/app/dashboard/components/DaftarBulanRekon";
-import PanelGajiWebUpt from "@/app/dashboard/components/PanelGajiWebUpt";
 import { PanelNavy, PanelTindakan, Stat, StripStat, namaSapaan, sapaanWita, tanggalPanjangWita, type Tindakan } from "@/app/dashboard/components/PanelNavy";
 import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
 
@@ -282,8 +281,6 @@ export default function DashboardKeuangan() {
       <aside className="dsb-samping dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-label="Ringkasan pendamping">
         <PanelTindakan daftar={loading && !stats ? [] : tindakan} kosong="Tidak ada SK yang menunggu konfirmasi." />
         <PanelBulanRekon versi={lastRefresh?.getTime()} />
-        {/* Pegawai UPT bukan antrian keuangan Kanwil (ADR-009); yang tampil hanya pemantauannya. */}
-        <PanelGajiWebUpt versi={lastRefresh?.getTime()} />
       </aside>
       </div>
 

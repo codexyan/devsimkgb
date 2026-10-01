@@ -53,15 +53,24 @@ const BATAS_SELESAI = 40;
 export default function PapanAntrian({
   kartu,
   keterangan,
+  kolom,
   onPindah,
   className = "",
 }: {
   kartu: KartuPapan[];
   /** Keterangan kecil di kepala kolom, mis. "3 lewat batas". */
   keterangan?: Partial<Record<KolomPapan, string>>;
+  /**
+   * Kolom yang ditampilkan; kosong berarti seluruhnya. Dipakai menyesuaikan papan dengan satker yang
+   * sedang disaring (ADR-049): pegawai Kanwil berakhir di keuangan Kanwil, pegawai UPT di rekam UPT, dan
+   * memperlihatkan kolom yang tidak mungkin terisi hanya membuat alurnya tampak lebih panjang dari
+   * yang sebenarnya.
+   */
+  kolom?: readonly KolomPapan[];
   onPindah: (id: string, ke: KolomPapan) => void;
   className?: string;
 }) {
+  const kolomTampil = kolom ? KOLOM.filter((k) => kolom.includes(k.k)) : KOLOM;
   const [ciut, setCiut] = useState<Set<KolomPapan>>(new Set(CIUT_BAWAAN));
   const [seret, setSeret] = useState<KartuPapan | null>(null);
   const [atas, setAtas] = useState<KolomPapan | null>(null);
@@ -106,7 +115,7 @@ export default function PapanAntrian({
 
   return (
     <div className={`dsb-papan ${className}`} role="list" aria-label="Papan antrian kerja KGB">
-      {KOLOM.map(({ k, judul, nada }) => {
+      {kolomTampil.map(({ k, judul, nada }) => {
         const isi = kartu.filter((x) => x.kolom === k);
         const tampil = k === "selesai" ? isi.slice(0, BATAS_SELESAI) : isi;
         const diciut = ciut.has(k) && !seret;
