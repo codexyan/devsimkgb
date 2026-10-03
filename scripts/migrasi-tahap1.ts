@@ -91,7 +91,7 @@ async function main() {
       urutan += 1;
       if (terapkan) {
         await sheets.hukdisJenis.create({
-          id: newId(), ...seed, urutan, regulasiId: null, berdampakKGB: false, durasiTunda: null,
+          id: newId(), ...seed, urutan, regulasiId: null,
           aktif: true, updatedAt: new Date(), updatedBy: oleh,
         });
       }

@@ -162,8 +162,6 @@ function terapkanTahap1() {
         id: `pp94-${seed.kode}`,
         urutan,
         regulasiId: null,
-        berdampakKGB: false,
-        durasiTunda: null,
         aktif: true,
         updatedAt: WAKTU,
         updatedBy: OLEH,
