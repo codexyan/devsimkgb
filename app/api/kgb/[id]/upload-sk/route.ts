@@ -93,10 +93,12 @@ export async function POST(
   const pathFile = `sk/${pegawai?.nip ?? "unknown"}_${Date.now()}.pdf`;
   try {
     const { env } = await getCloudflareContext({ async: true });
-    // Isi berkas dialirkan ke R2, bukan disalin dulu lewat file.arrayBuffer(). Permintaan unggah sudah
-    // memegang satu salinan dari req.formData(); menambah salinan kedua menggandakan puncak memori Worker
-    // tanpa perlu, dan itulah yang paling mungkin memicu "Worker exceeded resource limits" (ADR-037).
-    await env.SK_BUCKET.put(pathFile, file.stream(), {
+    // Berkasnya (Blob) diserahkan langsung ke R2, bukan disalin dulu lewat file.arrayBuffer(). Permintaan
+    // unggah sudah memegang satu salinan dari req.formData(); salinan kedua menggandakan puncak memori Worker
+    // tanpa perlu (ADR-037). Bukan file.stream(): R2 menolak aliran yang panjangnya tidak diketahui, dan di
+    // `next dev` (proksi binding dari Node) aliran itu memang tidak membawa panjang, sehingga unggah SK selalu
+    // gagal secara lokal. Blob membawa ukurannya di workerd maupun di proksi dev (ADR-051).
+    await env.SK_BUCKET.put(pathFile, file, {
       httpMetadata: { contentType: "application/pdf" },
     });
   } catch {
