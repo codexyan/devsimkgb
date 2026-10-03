@@ -16,17 +16,12 @@ import { SATKER } from "./satker";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { rencanakanPenyesuaianKgb } from "./sesuaikanKgbUsulan";
 import { catatKenaikanPangkat, catatPmk } from "./catatDasarGaji";
-import { hitungKenaikanPangkat } from "./kenaikanPangkat";
-import { hitungPmk } from "./pmk";
-import { isJenisDasarBaru, ringkasDasarBaru } from "./dasarBaruUsulan";
+import { ringkasDasarBaru } from "./dasarBaruUsulan";
+// Kolom dasar gaji yang ditentukan SK kenaikan pangkat atau PMK (ADR-030) tidak ditulis dari usulan: nilainya
+// berasal dari hitungan SK di lib/catatDasarGaji.ts, sama persis dengan Catat KP/PMK di halaman pegawai.
+import { KOLOM_DITENTUKAN_SK, hitungDasarSkUsulan } from "./dasarSkUsulan";
 import { tanggalKalender } from "./waktu";
 
-/**
- * Kolom dasar gaji yang tidak ditulis langsung dari usulan bila usulannya menyertakan SK kenaikan pangkat
- * atau PMK (ADR-030): nilainya ditentukan hitungan SK itu di lib/catatDasarGaji.ts, bukan angka yang diketik
- * UPT, supaya hasilnya sama persis dengan Catat KP/PMK di halaman pegawai.
- */
-const KOLOM_DITENTUKAN_SK = ["golonganRuang", "pangkat", "mkgTahun", "mkgBulan", "gajiPokok", "tmtGolongan", "tmtKgbBerikutnya"] as const;
 
 export interface HasilSetujui {
   ok: true;
@@ -143,54 +138,21 @@ export async function setujuiUsulan(
     // SK kenaikan pangkat atau PMK pada usulan ini menentukan sendiri golongan, masa kerja, dan gaji pokok
     // (ADR-030). Hitungannya dijalankan lebih dulu tanpa menulis apa pun, supaya penyesuaian KGB berjalan
     // dinilai terhadap keadaan pegawai yang benar-benar akan terjadi.
-    const jenisSk = usulan.dasarBaruJenis?.trim() ?? "";
+    // Hitungan SK yang sama dipakai daftar perubahan yang dilihat peninjau (lib/dasarSkUsulan.ts).
+    const sk = hitungDasarSkUsulan(pegawaiLama, usulan, nilaiBaru as Partial<PegawaiRow>);
+    if (sk.berlaku && !sk.ok) return { ok: false, pesan: sk.pesan };
+    const catatSk = sk.berlaku;
+    const jenisSk = sk.berlaku ? sk.jenis : "";
     const tanggalSkBaru = tanggalKalender(usulan.dasarBaruTanggalSk);
     const tmtSkBaru = tanggalKalender(usulan.dasarBaruTmt);
-    const catatSk = isJenisDasarBaru(jenisSk) && jenisSk !== "koreksi" && !!tanggalSkBaru && !!tmtSkBaru;
     const golonganDiusulkan = String(nilaiBaru.golonganRuang ?? pegawaiLama.golonganRuang);
     const mkgTahunSk = Number(nilaiBaru.mkgTahun ?? pegawaiLama.mkgTahun ?? 0);
     const mkgBulanSk = Number(nilaiBaru.mkgBulan ?? pegawaiLama.mkgBulan ?? 0);
-    let perkiraan: PegawaiRow = { ...pegawaiLama, ...(nilaiBaru as Partial<PegawaiRow>) };
-
-    if (catatSk && jenisSk === "kp") {
-      const h = hitungKenaikanPangkat({
-        golonganLama: pegawaiLama.golonganRuang,
-        mkgTahunLama: pegawaiLama.mkgTahun ?? 0,
-        mkgBulanLama: pegawaiLama.mkgBulan ?? 0,
-        golonganBaru: golonganDiusulkan,
-      });
-      if (!h.ok) return { ok: false, pesan: h.pesan };
-      perkiraan = {
-        ...perkiraan,
-        golonganRuang: h.hasil.golonganBaru,
-        pangkat: h.hasil.pangkatBaru,
-        mkgTahun: h.hasil.mkgTahunBaru,
-        mkgBulan: h.hasil.mkgBulanBaru,
-        gajiPokok: h.hasil.gajiPokokBaru,
-        tmtGolongan: tmtSkBaru,
-        // Kenaikan pangkat tidak menggeser jadwal KGB (Buku Saku KP 2026).
-        tmtKgbBerikutnya: pegawaiLama.tmtKgbBerikutnya,
-      };
-    } else if (catatSk && tmtSkBaru) {
-      const h = hitungPmk({
-        golonganRuang: pegawaiLama.golonganRuang,
-        mkgTahun: pegawaiLama.mkgTahun ?? 0,
-        mkgBulan: pegawaiLama.mkgBulan ?? 0,
-        tmtKgbTerakhir: pegawaiLama.tmtKgbTerakhir,
-        tmtPmk: tmtSkBaru,
-        mkgTahunSk,
-        mkgBulanSk,
-      });
-      if (!h.ok) return { ok: false, pesan: h.pesan };
-      perkiraan = {
-        ...perkiraan,
-        golonganRuang: pegawaiLama.golonganRuang,
-        mkgTahun: h.hasil.mkgTahunDasar,
-        mkgBulan: h.hasil.mkgBulanDasar,
-        gajiPokok: h.hasil.gajiPokokBaru,
-        tmtKgbBerikutnya: h.hasil.tmtKgbBerikutnyaUsulan,
-      };
-    }
+    const perkiraan: PegawaiRow = {
+      ...pegawaiLama,
+      ...(nilaiBaru as Partial<PegawaiRow>),
+      ...(sk.berlaku && sk.ok ? sk.nilai : {}),
+    };
 
     // KGB yang sedang berjalan disesuaikan selama SK-nya belum diunggah; sesudahnya perubahan dasar gaji
     // ditolak. Penolakan diperiksa sebelum apa pun ditulis (ADR-011).

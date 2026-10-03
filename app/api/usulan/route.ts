@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { canProcessKGB } from "@/lib/auth";
-import { BERKAS_USULAN, bandingkanUsulan, nilaiUsulan, ringkasHukdisUsulan, namaAsliBerkas } from "@/lib/usulanPegawai";
+import { BERKAS_USULAN, bandingkanUsulan, nilaiUsulan, perubahanPegawai, ringkasHukdisUsulan, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { ringkasDasarBaru } from "@/lib/dasarBaruUsulan";
+import { usulanMenurutSk } from "@/lib/dasarSkUsulan";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
 import type { RiwayatKGBRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
@@ -78,7 +79,9 @@ export async function GET(req: Request) {
         // Usulan yang menunggu dibandingkan dengan data induk; yang sudah ditinjau menampilkan nilai
         // yang diusulkan, karena data induk mungkin sudah menyamainya.
         // Usulan pegawai baru belum punya pembanding, jadi selalu menampilkan nilai yang diusulkan.
-        perubahan: u.status === "menunggu" && p ? bandingkanUsulan(p, u) : [],
+        // Kolom dasar gaji pada laporan SK kenaikan pangkat atau PMK ditampilkan menurut hitungan SK-nya,
+        // yang sama dengan yang diterapkan saat disetujui, bukan angka mentah usulan (ADR-052).
+        perubahan: u.status === "menunggu" && p ? bandingkanUsulan(p, usulanMenurutSk(p, u, perubahanPegawai(u))) : [],
         nilaiDiusulkan: u.status === "menunggu" && p ? [] : nilaiUsulan(u),
         hukdis: ringkasHukdisUsulan(u),
         // SK kenaikan pangkat atau PMK yang disebut UPT sebagai sebab perubahan dasar gaji (ADR-030).
