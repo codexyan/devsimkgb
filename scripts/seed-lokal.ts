@@ -76,7 +76,7 @@ async function main() {
   } as never);
   for (const j of JENIS_HUKDIS_PP94) {
     await db.hukdisJenis.create({
-      id: newId(), ...j, regulasiId: null, berdampakKGB: false, durasiTunda: null, aktif: true,
+      id: newId(), ...j, regulasiId: null, aktif: true,
       updatedAt: new Date(), updatedBy: null,
     } as never);
   }
@@ -154,7 +154,7 @@ async function main() {
         await db.riwayatHukdis.create({
           id: newId(), pegawaiId, jenisHukdis: "pemotongan_tukin_6_bulan", nomorSK: `W.17-KP.05-${100 + urut}`,
           tanggalSK: geser(bulanIni, -6), tmtMulai: geser(bulanIni, -6), tmtBerakhir: urut === 5 ? geser(bulanIni, -1) : geser(bulanIni, 1),
-          berdampakKGB: false, durasiTunda: null, dasarHukum: "PP 94/2021 Pasal 8 ayat (3) huruf a",
+          berdampakKGB: true, durasiTunda: 12, dasarHukum: "PP 94/2021 Pasal 8 ayat (3) huruf a",
           keterangan: "Contoh data lokal", createdAt: new Date(), createdBy: idPengguna.sdm_hukdis,
         } as never);
       }

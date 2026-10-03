@@ -201,6 +201,11 @@ function kolomPapan(pos: PosisiAntrian): KolomPapan {
   return pos;
 }
 
+/** Tab tahap yang memuat tiap kolom papan; dipakai menunjuk tab saat isi sebuah kolom tersaring (ADR-052). */
+const TAB_KOLOM: Record<KolomPapan, Tahap> = {
+  terkunci: "semua", input: "perlu", proses: "perlu", keuangan: "keuangan", rekam_upt: "keuangan", selesai: "selesai",
+};
+
 /** Saringan satker antrian: semua, Kanwil, seluruh UPT, atau kode satu satker. */
 function cocokSatker(p: PegawaiJatuhTempo, saring: string): boolean {
   if (saring === "semua") return true;
@@ -898,6 +903,12 @@ function DashboardMain() {
               className="dsb-antrian-gulir"
               kartu={antrian.map(kartuPapan)}
               kolom={kolomPapanTampil}
+              tersaring={Object.fromEntries(kolomPapanTampil.map((k) => {
+                const tab = TAB_KOLOM[k];
+                const jumlah = dalamBulan.filter((p) => kolomPapan(posisiAntrian(p)) === k).length
+                  - antrian.filter((p) => kolomPapan(posisiAntrian(p)) === k).length;
+                return [k, { jumlah, tab: tabTahap.find((x) => x.nilai === tab)?.label ?? "Semua", buka: () => setTahap(tab) }];
+              }))}
               keterangan={{
                 input: (() => { const n = antrian.filter((p) => posisiAntrian(p) === "lewat").length; return n > 0 ? `${n} lewat batas` : undefined; })(),
                 proses: (() => { const n = antrian.filter((p) => posisiAntrian(p) === "diproses" && p.skSudahDibuat).length; return n > 0 ? `${n} tunggu TTE` : undefined; })(),

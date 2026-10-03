@@ -33,7 +33,7 @@ async function main() {
     const exist = await sheets.hukdisJenis.findUnique({ kode: j.kode });
     if (exist) continue;
     await sheets.hukdisJenis.create({
-      id: newId(), ...j, regulasiId: null, berdampakKGB: false, durasiTunda: null,
+      id: newId(), ...j, regulasiId: null,
       aktif: true, updatedAt: new Date(), updatedBy: null,
     } as any);
     created++;

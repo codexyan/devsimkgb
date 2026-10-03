@@ -54,6 +54,7 @@ export default function PapanAntrian({
   kartu,
   keterangan,
   kolom,
+  tersaring,
   onPindah,
   className = "",
 }: {
@@ -67,6 +68,11 @@ export default function PapanAntrian({
    * yang sebenarnya.
    */
   kolom?: readonly KolomPapan[];
+  /**
+   * Kartu yang tersembunyi oleh tab tahap yang sedang aktif, per kolom. Tanpa ini kolom yang isinya tersaring
+   * tertulis "Tidak ada", padahal tab lain menghitung pegawai di sana (ADR-052).
+   */
+  tersaring?: Partial<Record<KolomPapan, { jumlah: number; tab: string; buka: () => void }>>;
   onPindah: (id: string, ke: KolomPapan) => void;
   className?: string;
 }) {
@@ -150,7 +156,16 @@ export default function PapanAntrian({
             {!diciut && (
               <div className="dsb-papan-isi">
                 {label && <p className="dsb-papan-lepas">Lepas di sini: {label}</p>}
-                {tampil.length === 0 && !label && <p className="dsb-papan-kosong">Tidak ada</p>}
+                {tampil.length === 0 && !label && (() => {
+                  const sembunyi = tersaring?.[k];
+                  if (!sembunyi || sembunyi.jumlah <= 0) return <p className="dsb-papan-kosong">Tidak ada</p>;
+                  return (
+                    <p className="dsb-papan-kosong">
+                      {sembunyi.jumlah} pegawai di tab {sembunyi.tab}.{" "}
+                      <button type="button" className="dsb-tautan" onClick={sembunyi.buka}>Tampilkan</button>
+                    </p>
+                  );
+                })()}
                 {tampil.map((x) => (
                   <article
                     key={x.id}
