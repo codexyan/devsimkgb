@@ -1611,6 +1611,11 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 
 .upt-papan-ket { flex-basis: 100%; font-size: 11.5px; font-weight: 400; color: var(--dt5); }
 .upt-papan-kaki { flex: none; padding: 8px; border-top: 1px solid var(--ln2); }
+/* Pencarian di Perlu dikerjakan; menempel di atas saat kolomnya digulir (ADR-060). */
+.upt-papan-cari { position: sticky; top: 0; z-index: 2; display: grid; gap: 4px; margin: 0 -8px; padding: 0 8px 6px;
+  background: var(--sub); }
+.upt-papan-cari .dsb-cari { width: 100%; }
+.upt-papan-cari .pgw-tautan { justify-self: start; font-size: 12px; }
 /* Draf yang masa usul KGB-nya belum dibuka, terlipat di bawah Perlu dikerjakan (ADR-059). */
 .upt-terkunci { margin-top: 2px; padding-top: 8px; border-top: 1px dashed var(--ln1); }
 .upt-terkunci > summary { display: flex; align-items: center; gap: 6px; padding: 4px; list-style: none; cursor: pointer;
@@ -2757,7 +2762,10 @@ html[data-gerak="kurangi"] .dsb-putar {
 
 /* Langkah 2: daftar pegawai di kiri, detail di kanan. Di layar sempit daftar menjadi baris geser di atas. */
 .kol-md { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); min-height: 420px; }
-.kol-md-daftar { margin: 0; padding: 8px; list-style: none; border-right: 1px solid var(--ln2); background: var(--sub); }
+/* Kolom kiri langkah Lengkapi: kotak cari (bila banyak) dan daftar pegawai (ADR-060). */
+.kol-md-kiri { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--ln2); background: var(--sub); }
+.kol-md-cari { flex: none; margin: 8px 8px 0; position: sticky; top: 0; z-index: 1; }
+.kol-md-daftar { margin: 0; padding: 8px; list-style: none; }
 .kol-md-daftar button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px;
   background: none; font: inherit; text-align: left; cursor: pointer; }
 .kol-md-daftar button:hover { background: var(--card); }
@@ -2769,7 +2777,8 @@ html[data-gerak="kurangi"] .dsb-putar {
 .kol-md-daftar .dsb-tag { margin-left: auto; font-size: 10px; }
 @media (max-width: 900px) {
   .kol-md { grid-template-columns: minmax(0, 1fr); }
-  .kol-md-daftar { display: flex; gap: 6px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--ln2); scrollbar-width: thin; }
+  .kol-md-kiri { border-right: 0; border-bottom: 1px solid var(--ln2); }
+  .kol-md-daftar { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
   .kol-md-daftar li { flex: 0 0 auto; }
   .kol-md-daftar button { width: auto; max-width: 220px; background: var(--card); border-color: var(--ln1); }
 }
