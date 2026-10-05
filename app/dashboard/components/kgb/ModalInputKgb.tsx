@@ -40,6 +40,8 @@ import {
 } from "./format";
 import { IkonTambah } from "./ikon";
 import { usePegawaiKgb } from "./usePegawaiKgb";
+import { muatLinimasaDasar, type DataLinimasa } from "./linimasa";
+import ModalLinimasaDasar from "./ModalLinimasaDasar";
 
 interface PropsModalInputKgb {
   pegawai: RingkasPegawai & { id: string };
@@ -91,6 +93,8 @@ export default function ModalInputKgb({
   const [dariDataPegawai, setDariDataPegawai] = useState(false);
   // SK kenaikan pangkat/PI yang lebih baru dari SK dasar di atas, dan karena itu menjadi Atas dasar (ADR-020).
   const [dasarKp, setDasarKp] = useState<ReturnType<typeof dasarDariKenaikanPangkat>>(null);
+  // Jendela Linimasa SK penetap gaji (ADR-062); null selama tertutup, data null selama dimuat.
+  const [linimasa, setLinimasa] = useState<{ data: DataLinimasa | null; galat: string | null } | null>(null);
 
   // Berjalan setelah SK dasar dari riwayat KGB, data pegawai, atau usulan UPT diketahui. Isian hanya diganti
   // selama belum disunting: masih kosong atau masih sama dengan SK dasar yang ditemukan.
@@ -208,6 +212,18 @@ export default function ModalInputKgb({
     disunting.current = true;
     setForm((f) => ({ ...f, [kolom]: nilai }));
   };
+
+  /**
+   * Buka Linimasa SK penetap gaji (ADR-062). Dimuat saat diminta saja: isian Atas dasar di atas sudah dicari dengan
+   * aturan yang sama, dan linimasa menunjukkan alasannya beserta SK lain milik pegawai.
+   */
+  function bukaLinimasa() {
+    setLinimasa({ data: null, galat: null });
+    void muatLinimasaDasar(ringkas.id, { jenis: "input", tmtKgbBaru: hasil?.tmtKgbBaru ?? pegawai?.tmtKgbBerikutnya ?? null }).then((h) =>
+      // Jendela yang sudah ditutup selama memuat tidak dibuka lagi.
+      setLinimasa((l) => (l ? (h.ok ? { data: h.data, galat: null } : { data: null, galat: h.error }) : l)),
+    );
+  }
 
   async function kirim() {
     if (!bisaKirim) return;
@@ -338,6 +354,11 @@ export default function ModalInputKgb({
               ? "Pegawai ini belum pernah KGB, jadi KGB pertamanya berdasar SK pengangkatan CPNS; tercetak pada bagian Atas dasar di SK KGB."
               : "SK KGB yang terakhir diterima pegawai, dasar KGB ini; tercetak pada bagian Atas dasar di SK KGB."
         }
+        aksi={
+          <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" onClick={bukaLinimasa} disabled={sibuk}>
+            Lihat linimasa
+          </button>
+        }
       >
         {riwayatDimuat && <Memuat teks="Mencari SK dasar di riwayat KGB dan usulan UPT..." />}
         {dasarKp && (
@@ -442,6 +463,22 @@ export default function ModalInputKgb({
         />
       </BagianForm>
       <PesanGalat pesan={galat} />
+      {linimasa && (
+        <ModalLinimasaDasar
+          pegawai={ringkas}
+          data={linimasa.data}
+          galat={linimasa.galat}
+          isian={form}
+          onPakai={(isian) => {
+            // Pilihan operator: tidak ditimpa lagi oleh pencarian otomatis.
+            disunting.current = true;
+            setForm(isian);
+            setLinimasa(null);
+          }}
+          onMuatUlang={bukaLinimasa}
+          onTutup={() => setLinimasa(null)}
+        />
+      )}
     </KerangkaModal>
   );
 }

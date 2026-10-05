@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { periksaUlangKgb } from "./pemeriksaanUlangKgb";
+import { periksaUlangKgb, pesanKgbBasi } from "./pemeriksaanUlangKgb";
 
 const tgl = (tahun: number, bulan: number, hari = 1) => new Date(tahun, bulan - 1, hari);
 
@@ -56,4 +56,26 @@ test("hukuman disiplin yang mulai setelah TMT KGB ini tidak menahannya", () => {
 test("hukuman disiplin yang tidak berdampak KGB tidak menahan", () => {
   const hasil = periksa({ riwayatHukdis: [{ berdampakKGB: false, tmtBerakhir: tgl(2027, 6), tmtMulai: tgl(2026, 8, 1) }] });
   assert.equal(hasil.tolak, null);
+});
+
+/* ── KGB yang dihitung sebelum SK kenaikan pangkat atau PMK dicatat (ADR-062) ── */
+
+const lama = { golonganLama: "III/a", mkgTahunLama: 13, mkgBulanLama: 0 };
+
+test("golongan dan masa kerja yang masih sama dengan saat Input KGB tidak menahan Buat SK", () => {
+  assert.equal(pesanKgbBasi(lama, { nama: "Rahman", golonganRuang: "III/a", mkgTahun: 13, mkgBulan: 0 }), null);
+});
+
+test("kenaikan pangkat yang dicatat sesudah Input KGB menahan Buat SK dan menyuruh Input Ulang", () => {
+  const pesan = pesanKgbBasi(lama, { nama: "Rahman", golonganRuang: "III/b", mkgTahun: 8, mkgBulan: 0 });
+  assert.match(pesan ?? "", /^Golongan atau masa kerja golongan Rahman berubah sesudah KGB ini diinput: kini III\/b, 8 tahun 0 bulan, sedangkan KGB ini dihitung dari III\/a, 13 tahun 0 bulan\./);
+  assert.match(pesan ?? "", /Batalkan KGB ini, lalu Input Ulang/);
+});
+
+test("PMK yang menambah masa kerja golongan sesudah Input KGB juga menahan", () => {
+  assert.notEqual(pesanKgbBasi(lama, { nama: "Rahman", golonganRuang: "III/a", mkgTahun: 14, mkgBulan: 6 }), null);
+});
+
+test("record lama tanpa golongan tidak dibandingkan", () => {
+  assert.equal(pesanKgbBasi({ golonganLama: "", mkgTahunLama: 0, mkgBulanLama: 0 }, { nama: "Rahman", golonganRuang: "III/b", mkgTahun: 8 }), null);
 });

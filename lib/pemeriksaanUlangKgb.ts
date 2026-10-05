@@ -63,3 +63,42 @@ export function periksaUlangKgb(input: {
 
   return { tolak: null };
 }
+
+/** Golongan dan masa kerja golongan yang disalin KGB dari data pegawai saat Input KGB (data lama di SK). */
+export interface DataLamaKgb {
+  golonganLama?: string | null;
+  mkgTahunLama?: number | null;
+  mkgBulanLama?: number | null;
+}
+
+/**
+ * Pesan bila golongan atau masa kerja golongan pegawai berubah sesudah KGB ini diinput; null bila masih sama
+ * (ADR-062).
+ *
+ * Selama KGB berjalan, golongan, masa kerja golongan, dan gaji pokok pegawai dikunci (ADR-056). Yang masih dapat
+ * mengubahnya hanya SK kenaikan pangkat (termasuk penyesuaian ijazah) atau PMK yang dicatat belakangan. KGB yang
+ * dihitung sebelum itu masih memakai golongan dan gaji lama, sehingga mengganti baris Atas dasarnya saja akan mencetak
+ * SK yang bertentangan dengan dasarnya sendiri. Jalan keluarnya membatalkan KGB lalu Input Ulang, yang menghitung
+ * gaji dan Atas dasarnya dari SK terbaru.
+ */
+export function pesanKgbBasi(
+  kgb: DataLamaKgb,
+  pegawai: { nama: string; golonganRuang?: string | null; mkgTahun?: number | null; mkgBulan?: number | null },
+): string | null {
+  const golonganKgb = kgb.golonganLama?.trim() ?? "";
+  // Record lama tanpa golongan tidak dapat dibandingkan.
+  if (!golonganKgb) return null;
+  const golonganPegawai = pegawai.golonganRuang?.trim() ?? "";
+  const bulanKgb = (kgb.mkgTahunLama ?? 0) * 12 + (kgb.mkgBulanLama ?? 0);
+  const bulanPegawai = (pegawai.mkgTahun ?? 0) * 12 + (pegawai.mkgBulan ?? 0);
+  if (golonganKgb === golonganPegawai && bulanKgb === bulanPegawai) return null;
+  const keadaan = (golongan: string, tahun: number | null | undefined, bulan: number | null | undefined) =>
+    `${golongan || "-"}, ${tahun ?? 0} tahun ${bulan ?? 0} bulan`;
+  return (
+    `Golongan atau masa kerja golongan ${pegawai.nama} berubah sesudah KGB ini diinput: kini ` +
+    `${keadaan(golonganPegawai, pegawai.mkgTahun, pegawai.mkgBulan)}, sedangkan KGB ini dihitung dari ` +
+    `${keadaan(golonganKgb, kgb.mkgTahunLama, kgb.mkgBulanLama)}. Biasanya karena SK kenaikan pangkat atau PMK dicatat ` +
+    "sesudah Input KGB. Gaji pokok pada KGB ini masih memakai data lama, sehingga SK-nya tidak dapat dibuat. " +
+    "Batalkan KGB ini, lalu Input Ulang agar gaji dan Atas dasarnya dihitung dari SK terbaru."
+  );
+}

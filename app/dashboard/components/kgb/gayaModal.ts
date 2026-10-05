@@ -62,7 +62,10 @@ export const GAYA_MODAL_KGB = `
 textarea.kgbm-input { resize: vertical; min-height: 72px; }
 @media (max-width: 639px) { .kgbm-input { font-size: 16px; } }
 .kgbm-bagian { border: 1px solid var(--ln1); border-radius: 12px; overflow: hidden; }
-.kgbm-bagian-kepala { padding: 8px 12px; background: var(--tint-navy); border-bottom: .5px solid var(--ln1); }
+.kgbm-bagian-kepala { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 8px 12px;
+  background: var(--tint-navy); border-bottom: .5px solid var(--ln1); }
+.kgbm-bagian-kepala-teks { flex: 1; min-width: 0; }
+.kgbm-bagian-aksi { flex: none; }
 .kgbm-bagian[data-nada="hijau"] .kgbm-bagian-kepala { background: var(--tint-green-bg); }
 .kgbm-bagian[data-nada="amber"] .kgbm-bagian-kepala { background: var(--tint-amber-bg); }
 .kgbm-bagian-judul { font-size: 12px; font-weight: 600; color: var(--dtn); }
@@ -186,6 +189,26 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
 .kgbm-item-data div { display: flex; gap: 6px; min-width: 0; }
 .kgbm-item-data dt { color: var(--dt5); flex-shrink: 0; }
 .kgbm-item-data dd { margin: 0; color: var(--dtn); font-weight: 500; overflow-wrap: anywhere; }
+/* Linimasa SK penetap gaji pokok (ADR-062): garis tegak dengan titik per SK. SK yang menjadi dasar KGB ini bertitik dan
+   berbingkai navy, KGB yang sedang dibuat bertitik hijau putus-putus, SK yang tergantikan atau berlaku sesudahnya pudar. */
+.kgbm-linimasa { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.kgbm-linimasa > li { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; padding-bottom: 10px; }
+.kgbm-linimasa > li::before { content: ""; position: absolute; left: 7px; top: 18px; bottom: 0; width: 2px; background: var(--ln1); }
+.kgbm-linimasa > li:last-child { padding-bottom: 0; }
+.kgbm-linimasa > li:last-child::before { display: none; }
+.kgbm-linimasa-titik { position: relative; z-index: 1; width: 16px; height: 16px; margin-top: 10px; box-sizing: border-box; border-radius: 50%;
+  border: 2px solid var(--ln0); background: var(--card); }
+.kgbm-linimasa-isi { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 8px 10px; border: 1px solid var(--ln1);
+  border-radius: 10px; background: var(--card); }
+.kgbm-linimasa-kepala { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--dtn); }
+.kgbm-linimasa li[data-peran="dasar"] .kgbm-linimasa-titik { border-color: var(--navy-solid); background: var(--navy-solid);
+  box-shadow: 0 0 0 3px var(--tint-navy); }
+.kgbm-linimasa li[data-peran="dasar"] .kgbm-linimasa-isi { border-color: var(--navy-solid); background: var(--tint-navy); }
+.kgbm-linimasa li[data-peran="tergantikan"] .kgbm-linimasa-isi { opacity: .8; }
+.kgbm-linimasa li[data-peran="sesudah"] .kgbm-linimasa-isi { opacity: .65; border-style: dashed; }
+.kgbm-linimasa-kgb .kgbm-linimasa-titik { border-style: dashed; border-color: var(--st-green); }
+.kgbm-linimasa-kgb .kgbm-linimasa-isi { padding: 6px 10px; border-color: var(--tint-green-ln); background: var(--tint-green-bg);
+  font-size: 12px; font-weight: 600; color: var(--st-green); }
 @media (prefers-reduced-motion: reduce) { html:not([data-gerak]) .kgbm-latar, html:not([data-gerak]) .kgbm-panel { animation: none; } html:not([data-gerak]) .kgbm-putar { animation-duration: 2.4s; } }
 html[data-gerak="kurangi"] .kgbm-latar, html[data-gerak="kurangi"] .kgbm-panel { animation: none; } html[data-gerak="kurangi"] .kgbm-putar { animation-duration: 2.4s; }
 `;

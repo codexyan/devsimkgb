@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { ambilDrafSk, ambilPegawaiKgb, buatPdfSk, namaFileSk, simpanDasarSk, simpanDrafSkServer, unduhBlob, type DataDasarSk } from "@/lib/kgbAksi";
+import { ambilDrafSk, buatPdfSk, namaFileSk, simpanDasarSk, simpanDrafSkServer, unduhBlob, type DataDasarSk } from "@/lib/kgbAksi";
+import type { SkGaji } from "@/lib/linimasaDasarSk";
 import { alasanTolakBuatSk } from "@/lib/prosesKgb";
 import { formatTanggalId, hariIniWita, isoTanggalLokal, type NilaiTanggal } from "@/lib/waktu";
 import { AWALAN_NOMOR_SK, bagianNomorSk, nomorSkLengkap } from "@/lib/nomorSurat";
@@ -18,19 +19,21 @@ import {
   PesanGalat,
 } from "./BidangForm";
 import {
+  bandingkanDasarSk,
   formatMkg,
   formatRupiah,
   isianDasarSk,
   nilaiInputTanggal,
   nomorSkTerisi,
   pesanBidangWajib,
-  selaraskanDasarPegawai,
   subjudulPegawai,
   tahunTanggalInput,
   type DasarSkAwal,
   type RingkasPegawai,
 } from "./format";
 import { IkonDokumen } from "./ikon";
+import { muatLinimasaDasar, type DataLinimasa } from "./linimasa";
+import ModalLinimasaDasar from "./ModalLinimasaDasar";
 
 type Versi = "biasa" | "srikandi";
 const DAFTAR_VERSI: readonly Versi[] = ["biasa", "srikandi"];
@@ -51,7 +54,7 @@ interface PropsModalBuatSk {
   kgbId: string;
   /** Status KGB; selain sedang_diproses modal hanya menampilkan alasan penolakan. */
   status?: string;
-  /** id dipakai membaca SK dasar pada Data Pegawai untuk saran isian Atas Dasar (ADR-058). */
+  /** id dipakai menyusun linimasa SK penetap gaji untuk isian Atas Dasar (ADR-058, ADR-062). */
   pegawai: RingkasPegawai & { id?: string };
   ringkasan?: RingkasanSk | null;
   dasarAwal?: DasarSkAwal | null;
@@ -76,10 +79,19 @@ export default function ModalBuatSk({
   const idNomorSk = useId();
   const idNomorSkPetunjuk = useId();
   const [dasar, setDasar] = useState<DataDasarSk>(() => isianDasarSk(dasarAwal));
-  // Isian Atas Dasar menurut Data Pegawai bila berbeda dengan yang tersimpan pada KGB ini (ADR-058). KGB yang diinput
-  // sebelum ADR-056 menyimpan salinan lama, misalnya penetap dengan nama kementerian lama. Ditawarkan, bukan ditimpa:
-  // isian Buat SK bisa sengaja disunting Tim SDM, dan menimpanya setiap modal dibuka akan menghapus suntingan itu.
-  const [saranPegawai, setSaranPegawai] = useState<DataDasarSk | null>(null);
+  // Linimasa SK penetap gaji pegawai (ADR-062): SK terbaru yang menetapkan gaji pokok sebelum TMT KGB ini. Isian dari
+  // Input KGB adalah salinan, dan tidak ikut berubah bila sesudahnya SK kenaikan pangkat, PMK, atau SK dasar Data
+  // Pegawai dicatat.
+  const [linimasa, setLinimasa] = useState<DataLinimasa | null>(null);
+  const [galatLinimasa, setGalatLinimasa] = useState<string | null>(null);
+  const [bukaLinimasa, setBukaLinimasa] = useState(false);
+  // Isian dari Input KGB yang diganti otomatis dengan SK yang lebih baru, untuk tombol Kembalikan.
+  const [dasarDiganti, setDasarDiganti] = useState<{ sebelum: DataDasarSk; sk: SkGaji } | null>(null);
+  // Isian Atas dasar yang sudah disunting di modal ini tidak lagi diganti otomatis.
+  const dasarDisunting = useRef(false);
+  // KGB yang golongan atau masa kerjanya berubah sesudah diinput tidak boleh dibuat SK-nya (ADR-062); server juga
+  // menolaknya, tetapi tombolnya ditahan lebih dulu supaya alasannya terbaca sebelum mencoba.
+  const ditahan = !!linimasa?.basi;
   // Draf nomor SK baru tersimpan di SIM-KGB (ADR-011) dan hanya dipakai selama SK belum pernah dibuat.
   // Draf lama yang sempat disimpan di peramban dipakai sampai draf server termuat, lalu dibersihkan.
   const skSudahDibuat = !!nomorSkTerisi(skBaruAwal?.nomorSurat);
@@ -150,35 +162,80 @@ export default function ModalBuatSk({
     setPratinjau((p) => ({ ...p, [versi]: url }));
   }
 
-  useEffect(() => {
-    if (!pegawai.id || alasanTolak) return;
-    let batal = false;
-    ambilPegawaiKgb(pegawai.id).then((hasil) => {
-      if (batal || !hasil.ok) return;
-      setSaranPegawai(selaraskanDasarPegawai(isianDasarSk(dasarAwal), hasil.data));
-    });
-    return () => {
-      batal = true;
-    };
-    // Dibaca sekali saat modal dibuka; isian awal tidak berubah selama modal terbuka.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pegawai.id]);
-
-  function pakaiSaranPegawai() {
-    if (!saranPegawai) return;
-    setDasar(saranPegawai);
-    isianBerubah();
-  }
-
-  function isianBerubah() {
+  /** Pratinjau yang sudah ada atau sedang dibuat tidak lagi sesuai isian. */
+  function segarkanPratinjau() {
     putaranIsian.current += 1;
-    belumTersimpan.current = true;
     if (urlPratinjau.current.biasa) gantiPratinjau("biasa", null);
     if (urlPratinjau.current.srikandi) gantiPratinjau("srikandi", null);
     setMemuatVersi(null);
   }
 
+  function isianBerubah() {
+    belumTersimpan.current = true;
+    segarkanPratinjau();
+  }
+
+  /**
+   * Muat linimasa SK penetap gaji (ADR-062). Saat modal dibuka, SK yang lebih baru daripada isian dari Input KGB
+   * langsung dipakai, dengan catatan dan tombol Kembalikan, selama isiannya belum disunting di sini. KGB yang basi
+   * tidak diganti dasarnya: gajinya juga dihitung dari data lama, jadi jalannya Input Ulang.
+   */
+  function muatLinimasa(gantiOtomatis: boolean): () => void {
+    if (!pegawai.id) return () => {};
+    let batal = false;
+    muatLinimasaDasar(pegawai.id, { jenis: "buat-sk", kgbId }).then((hasil) => {
+      if (batal) return;
+      if (!hasil.ok) {
+        setGalatLinimasa(hasil.error);
+        return;
+      }
+      setLinimasa(hasil.data);
+      const dasarTerbaru = hasil.data.linimasa.dasar;
+      if (!gantiOtomatis || hasil.data.basi || dasarDisunting.current || !dasarTerbaru) return;
+      const awal = isianDasarSk(dasarAwal);
+      const banding = bandingkanDasarSk(awal, hasil.data.linimasa);
+      if (banding.jenis !== "lebih-baru") return;
+      setDasarDiganti({ sebelum: awal, sk: dasarTerbaru });
+      setDasar(banding.isian);
+      segarkanPratinjau();
+    });
+    return () => {
+      batal = true;
+    };
+  }
+
+  useEffect(() => {
+    if (alasanTolak) return;
+    return muatLinimasa(true);
+    // Dimuat sekali saat modal dibuka; isian awal tidak berubah selama modal terbuka.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pegawai.id, kgbId]);
+
+  function muatUlangLinimasa() {
+    setGalatLinimasa(null);
+    setLinimasa(null);
+    muatLinimasa(false);
+  }
+
+  /** Isi Atas dasar dengan isian dari linimasa: tawaran di bawah judul bagian, atau Pakai SK ini di jendela linimasa. */
+  function pakaiIsian(isian: DataDasarSk) {
+    dasarDisunting.current = true;
+    setDasar(isian);
+    setDasarDiganti(null);
+    isianBerubah();
+  }
+
+  /** Kembali ke isian dari Input KGB yang tadi diganti otomatis; isian itu yang tersimpan, jadi tidak perlu disimpan. */
+  function kembalikanDasar() {
+    if (!dasarDiganti) return;
+    dasarDisunting.current = true;
+    setDasar(dasarDiganti.sebelum);
+    setDasarDiganti(null);
+    segarkanPratinjau();
+  }
+
   function ubahDasar(kolom: keyof DataDasarSk, nilai: string) {
+    dasarDisunting.current = true;
     setDasar((d) => ({ ...d, [kolom]: nilai }));
     isianBerubah();
   }
@@ -229,7 +286,7 @@ export default function ModalBuatSk({
   const isiSkBaru = () => ({ nomorSurat: skBaru.nomorSurat.trim(), tanggalSurat: skBaru.tanggalSurat });
 
   async function muatPratinjau(versi: Versi) {
-    if (sibuk || memuatVersi || alasanTolak) return;
+    if (sibuk || memuatVersi || alasanTolak || ditahan) return;
     const kurang = periksaIsian();
     if (kurang) {
       setGalat(`${kurang} Pratinjau memerlukan semua isian.`);
@@ -258,7 +315,7 @@ export default function ModalBuatSk({
 
   function pilihTab(versi: Versi) {
     setTab(versi);
-    if (!pratinjau[versi] && !memuatVersi && !sibuk && !periksaIsian()) void muatPratinjau(versi);
+    if (!pratinjau[versi] && !memuatVersi && !sibuk && !ditahan && !periksaIsian()) void muatPratinjau(versi);
   }
 
   function tombolTab(e: KeyboardEvent<HTMLButtonElement>) {
@@ -270,7 +327,7 @@ export default function ModalBuatSk({
   }
 
   async function buatDanUnduh() {
-    if (sibuk || memuatVersi || alasanTolak) return;
+    if (sibuk || memuatVersi || alasanTolak || ditahan) return;
     const kurang = periksaIsian();
     if (kurang) {
       setGalat(kurang);
@@ -358,6 +415,9 @@ export default function ModalBuatSk({
 
   const urlTab = pratinjau[tab];
   const kurangIsian = alasanTolak ? null : periksaIsian();
+  // Isian sekarang dibandingkan dengan SK terbaru menurut linimasa (ADR-062).
+  const banding = linimasa && !ditahan ? bandingkanDasarSk(dasar, linimasa.linimasa) : null;
+  const dasarLinimasa = linimasa?.linimasa.dasar ?? null;
 
   return (
     <KerangkaModal
@@ -389,7 +449,7 @@ export default function ModalBuatSk({
                 Simpan draf
               </button>
             )}
-            <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk || !!memuatVersi}>
+            <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk || !!memuatVersi || ditahan}>
               {sibuk ? "Membuat SK..." : "Buat dan Unduh SK"}
             </button>
           </>
@@ -401,6 +461,11 @@ export default function ModalBuatSk({
       ) : (
         <div className="kgbm-sk-grid">
           <div className="kgbm-kolom" ref={refKolomForm}>
+            {linimasa?.basi && (
+              <Catatan nada="merah">
+                <strong>SK belum dapat dibuat.</strong> {linimasa.basi}
+              </Catatan>
+            )}
             {ringkasan && (
               <DaftarData
                 judul="Data yang Tercetak di SK"
@@ -414,24 +479,55 @@ export default function ModalBuatSk({
                 ]}
               />
             )}
-            <BagianForm judul="Atas Dasar SK Terakhir" keterangan="SK terakhir pegawai yang menjadi dasar KGB ini.">
-              {saranPegawai && JSON.stringify(saranPegawai) !== JSON.stringify(dasar) && (
+            <BagianForm
+              judul="Atas Dasar SK Terakhir"
+              keterangan="SK terbaru yang menetapkan gaji pokok sebelum TMT KGB ini: SK KGB, SK kenaikan pangkat, atau SK PMK."
+              aksi={
+                pegawai.id ? (
+                  <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" onClick={() => setBukaLinimasa(true)} disabled={sibuk}>
+                    Lihat linimasa
+                  </button>
+                ) : undefined
+              }
+            >
+              {dasarDiganti && (
+                <Catatan nada="navy">
+                  Atas dasar diperbarui ke SK terbaru yang menetapkan gaji pokok: {dasarDiganti.sk.label}
+                  {dasarDiganti.sk.nomorSK ? ` ${dasarDiganti.sk.nomorSK}` : ""}
+                  {dasarDiganti.sk.tmt ? `, TMT ${formatTanggalId(dasarDiganti.sk.tmt)}` : ""}. Isian dari Input KGB menyebut{" "}
+                  {dasarDiganti.sebelum.nomorSK ? `SK ${dasarDiganti.sebelum.nomorSK}` : "SK lain"}
+                  {dasarDiganti.sebelum.tmtSK ? ` (TMT ${formatTanggalId(dasarDiganti.sebelum.tmtSK)})` : ""}.
+                  {!dasarDiganti.sk.penetap && " Pejabat penetapnya belum tercatat; isi baris Ditetapkan oleh."}{" "}
+                  <button type="button" className="kgbm-tautan" onClick={kembalikanDasar} disabled={sibuk}>
+                    Kembalikan isian Input KGB
+                  </button>
+                </Catatan>
+              )}
+              {banding?.jenis === "lebih-baru" && !dasarDiganti && dasarLinimasa && (
                 <Catatan nada="amber">
-                  Data Pegawai mencatat SK dasar ini dengan isian yang lebih baru:{" "}
-                  {(
-                    [
-                      ["Nomor", dasar.nomorSK, saranPegawai.nomorSK],
-                      ["Tanggal", dasar.tanggalSK ? formatTanggalId(dasar.tanggalSK) : "", saranPegawai.tanggalSK ? formatTanggalId(saranPegawai.tanggalSK) : ""],
-                      ["TMT", dasar.tmtSK ? formatTanggalId(dasar.tmtSK) : "", saranPegawai.tmtSK ? formatTanggalId(saranPegawai.tmtSK) : ""],
-                      ["Oleh", dasar.penetapSkDasar, saranPegawai.penetapSkDasar],
-                    ] as const
-                  )
-                    .filter(([, sekarang, saran]) => sekarang.trim() !== saran.trim())
-                    .map(([label, , saran]) => `${label} “${saran || "(kosong)"}”`)
-                    .join(", ")}
-                  . Isian di bawah berasal dari Input KGB.{" "}
-                  <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" disabled={sibuk} onClick={pakaiSaranPegawai}>
-                    Pakai isian Data Pegawai
+                  Ada SK yang lebih baru menetapkan gaji pokok: {dasarLinimasa.label}
+                  {dasarLinimasa.nomorSK ? ` ${dasarLinimasa.nomorSK}` : ""}
+                  {dasarLinimasa.tmt ? `, TMT ${formatTanggalId(dasarLinimasa.tmt)}` : ""}.{" "}
+                  <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" disabled={sibuk} onClick={() => pakaiIsian(banding.isian)}>
+                    Pakai SK ini
+                  </button>
+                </Catatan>
+              )}
+              {banding?.jenis === "isian-berbeda" && (
+                <Catatan nada="amber">
+                  {dasarLinimasa?.dataPegawai ? "Data Pegawai" : "Riwayat"} mencatat SK dasar ini dengan isian yang lebih
+                  baru: {banding.beda.map((b) => `${b.label} “${/^\d{4}-\d{2}-\d{2}$/.test(b.baru) ? formatTanggalId(b.baru) : b.baru}”`).join(", ")}. Isian di
+                  bawah berasal dari Input KGB.{" "}
+                  <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" disabled={sibuk} onClick={() => pakaiIsian(banding.isian)}>
+                    {dasarLinimasa?.dataPegawai ? "Pakai isian Data Pegawai" : "Pakai isian riwayat"}
+                  </button>
+                </Catatan>
+              )}
+              {galatLinimasa && (
+                <Catatan>
+                  Linimasa SK dasar belum dapat dimuat ({galatLinimasa}); isian di bawah berasal dari Input KGB.{" "}
+                  <button type="button" className="kgbm-tautan" onClick={muatUlangLinimasa}>
+                    Muat ulang
                   </button>
                 </Catatan>
               )}
@@ -466,7 +562,7 @@ export default function ModalBuatSk({
                 wajib
                 nilai={dasar.penetapSkDasar}
                 onUbah={(nilai) => ubahDasar("penetapSkDasar", nilai)}
-                petunjuk="Tercetak pada baris Oleh di surat. Untuk KGB pertama SK terakhirnya SK CPNS; untuk KGB berikutnya SK KGB sebelumnya. Isi dengan pejabat yang menetapkan SK itu."
+                petunjuk="Tercetak pada baris Oleh di surat: pejabat yang menetapkan SK di atas, yaitu SK KGB sebelumnya, SK kenaikan pangkat, SK PMK, atau SK CPNS untuk KGB pertama."
                 nonaktif={sibuk}
               />
             </BagianForm>
@@ -547,7 +643,7 @@ export default function ModalBuatSk({
                   tabIndex={tab === versi ? 0 : -1}
                   onClick={() => pilihTab(versi)}
                   onKeyDown={tombolTab}
-                  disabled={sibuk}
+                  disabled={sibuk || ditahan}
                 >
                   {LABEL_VERSI[versi]}
                 </button>
@@ -574,7 +670,7 @@ export default function ModalBuatSk({
                     type="button"
                     className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil"
                     onClick={() => void muatPratinjau(tab)}
-                    disabled={sibuk || !!memuatVersi}
+                    disabled={sibuk || !!memuatVersi || ditahan}
                   >
                     Muat pratinjau
                   </button>
@@ -599,6 +695,24 @@ export default function ModalBuatSk({
             </p>
           </div>
         </div>
+      )}
+      {bukaLinimasa && (
+        <ModalLinimasaDasar
+          pegawai={pegawai}
+          data={linimasa}
+          galat={galatLinimasa}
+          isian={dasar}
+          onPakai={
+            ditahan
+              ? undefined
+              : (isian) => {
+                  pakaiIsian(isian);
+                  setBukaLinimasa(false);
+                }
+          }
+          onMuatUlang={muatUlangLinimasa}
+          onTutup={() => setBukaLinimasa(false)}
+        />
       )}
     </KerangkaModal>
   );

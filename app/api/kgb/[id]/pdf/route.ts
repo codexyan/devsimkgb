@@ -14,7 +14,7 @@ import { tanggalKalender } from "@/lib/waktu";
 import { getPangkat } from "@/lib/tabelGaji";
 import { alasanTolakBuatSk, bacaTanggalInput, type SuratKgbTersimpan } from "@/lib/prosesKgb";
 import type { HukdisUntukKgb } from "@/lib/prosesKgb";
-import { periksaUlangKgb } from "@/lib/pemeriksaanUlangKgb";
+import { periksaUlangKgb, pesanKgbBasi } from "@/lib/pemeriksaanUlangKgb";
 import { hariIniWita, type NilaiTanggal } from "@/lib/waktu";
 import { nomorSkBentrok } from "@/lib/nomorSkBentrok";
 import { templateUntuk } from "@/lib/templateSurat";
@@ -107,6 +107,12 @@ export async function POST(
   ]);
   if (!pegawai)
     return NextResponse.json({ error: "Data pegawai tidak ditemukan" }, { status: 404 });
+  // KGB yang dihitung sebelum SK kenaikan pangkat atau PMK dicatat masih memakai golongan dan gaji lama (ADR-062).
+  // Pratinjau ikut ditolak karena isinya akan mencetak angka yang keliru; unduh ulang SK yang sudah ada tetap boleh.
+  if (!unduhUlang) {
+    const basi = pesanKgbBasi(kgb, pegawai);
+    if (basi) return NextResponse.json({ error: basi }, { status: 409 });
+  }
   // SK tidak dibuat selama usulan UPT pegawai ini belum ditinjau; pratinjau tetap boleh (ADR-014).
   if (!isPreview && (await usulanMenahan(pegawai.id)))
     return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama) }, { status: 409 });
