@@ -326,12 +326,28 @@ export const ATURAN_DASAR_BARU: readonly string[] = [
 /** Huruf dan angka saja, huruf kecil: "Golongan ruang*" dan "golonganRuang" menjadi sama. */
 const ringkasJudul = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-const KUNCI_JUDUL = new Map<string, string>(
-  KOLOM_TEMPLAT_UPT.flatMap((k) => [
+/**
+ * Judul singkat yang lazim pada daftar pegawai buatan UPT sendiri, misalnya daftar Lapas Banjarmasin
+ * ("Tgl Lahir", "T.Lahir", "TMT Gol"). Hanya yang maknanya tidak mungkin tertukar; "TMT KGB" misalnya tidak,
+ * sebab dapat berarti TMT terakhir maupun berikutnya.
+ */
+const JUDUL_SINGKAT: Record<string, string> = {
+  tgllahir: "tanggalLahir",
+  tglahir: "tanggalLahir",
+  tlahir: "tempatLahir",
+  tmtgol: "tmtGolongan",
+  golongan: "golonganRuang",
+  golru: "golonganRuang",
+  pendidikan: "pendidikanTerakhir",
+};
+
+const KUNCI_JUDUL = new Map<string, string>([
+  ...KOLOM_TEMPLAT_UPT.flatMap((k): [string, string][] => [
     [ringkasJudul(k.kolom), k.kolom],
     [ringkasJudul(k.label), k.kolom],
   ]),
-);
+  ...Object.entries(JUDUL_SINGKAT),
+]);
 
 /**
  * Judul kolom pada berkas menjadi kunci templat. Judul yang ditulis sedikit berbeda (huruf besar, spasi,
@@ -342,6 +358,119 @@ export function kunciKolomTemplat(judul: string): string {
   // trim() ikut membuang BOM yang menempel pada judul kolom pertama berkas CSV.
   const bersih = judul.trim();
   return KUNCI_JUDUL.get(ringkasJudul(bersih)) ?? bersih;
+}
+
+/** Satu kolom pada berkas unggahan beserta bacaannya, untuk pratinjau berkas. */
+export interface KolomBerkas {
+  /** Judul kolom apa adanya di berkas. */
+  judul: string;
+  /** Kunci templat yang dikenali; null bila kolomnya diabaikan. */
+  kunci: string | null;
+  /** Mengapa diabaikan: judulnya tidak dikenal, atau kolom yang sama sudah ada di sebelah kirinya. */
+  sebab: "tidak dikenal" | "ganda" | null;
+}
+
+/** Isi berkas unggahan sebagaimana akan dikirim untuk diperiksa. */
+export interface BerkasUpt {
+  /** Kolom berkas menurut urutannya. */
+  kolom: KolomBerkas[];
+  /** Baris berisi, berkunci kunci templat; kolom yang diabaikan tidak ikut. */
+  baris: Record<string, string>[];
+  /** Banyaknya baris berisi di atas baris judul (judul laporan dan sebagainya) yang dilewati. */
+  dilewatiDiAtas: number;
+  /** Kolom wajib (nip, nama) yang tidak ada pada berkas; selama ada, berkasnya tidak dapat diperiksa. */
+  wajibHilang: string[];
+  /** Kolom templat lain yang tidak ada pada berkas; isiannya dianggap kosong. */
+  tidakAda: string[];
+}
+
+/** Berapa baris teratas yang dicari baris judulnya. */
+const BATAS_CARI_JUDUL = 20;
+
+/**
+ * Tabel berkas (baris pertama berisi judul kolom) menjadi isi yang siap diperiksa, sekaligus bahan pratinjau:
+ * kolom mana yang dibaca, mana yang diabaikan, dan kolom wajib mana yang hilang. Baris judulnya dicari pada
+ * 20 baris teratas, yaitu baris pertama yang memuat kolom nip dan nama, sebab daftar buatan UPT sering diawali
+ * judul laporan; bila tidak ketemu, baris pertama yang berisi. Isian tidak diubah sama sekali: menilai isinya
+ * tetap tugas server (periksaImporUpt), pratinjau hanya memperlihatkan apa yang akan dikirim.
+ */
+export function bacaBerkasUpt(tabel: readonly (readonly string[])[]): BerkasUpt {
+  const berisi = tabel.filter((b) => b.some((v) => String(v ?? "").trim() !== ""));
+  const memuatWajib = (b: readonly string[]) => {
+    const kunci = b.map((j) => kunciKolomTemplat(String(j ?? "")));
+    return KOLOM_IMPOR_UPT.every((k) => kunci.includes(k));
+  };
+  const cari = berisi.slice(0, BATAS_CARI_JUDUL).findIndex(memuatWajib);
+  const iJudul = cari >= 0 ? cari : 0;
+  const judul = (berisi[iJudul] ?? []).map((j) => String(j ?? ""));
+
+  const dikenal = new Set(KOLOM_TEMPLAT_UPT.map((k) => k.kolom));
+  const terpakai = new Set<string>();
+  const kolom = judul.map((j): KolomBerkas => {
+    const kunci = kunciKolomTemplat(j);
+    if (!dikenal.has(kunci)) return { judul: j.trim(), kunci: null, sebab: "tidak dikenal" };
+    if (terpakai.has(kunci)) return { judul: j.trim(), kunci: null, sebab: "ganda" };
+    terpakai.add(kunci);
+    return { judul: j.trim(), kunci, sebab: null };
+  });
+
+  const baris = berisi.slice(iJudul + 1).flatMap((b) => {
+    const rekaman: Record<string, string> = {};
+    kolom.forEach((k, i) => {
+      if (k.kunci) rekaman[k.kunci] = String(b[i] ?? "");
+    });
+    return Object.values(rekaman).some((v) => v.trim() !== "") ? [rekaman] : [];
+  });
+
+  return {
+    kolom,
+    baris,
+    dilewatiDiAtas: iJudul,
+    wajibHilang: KOLOM_IMPOR_UPT.filter((k) => !terpakai.has(k)),
+    tidakAda: KOLOM_TEMPLAT_UPT.map((k) => k.kolom).filter((k) => !terpakai.has(k) && !(KOLOM_IMPOR_UPT as readonly string[]).includes(k)),
+  };
+}
+
+/** Isian satu kolom berpilihan yang tidak sama dengan pilihan templat mana pun. */
+export interface IsianDiLuarPilihan {
+  kolom: string;
+  /** Banyaknya baris yang isiannya di luar pilihan. */
+  jumlah: number;
+  /** Paling banyak tiga bentuk isian berbeda, untuk contoh di pratinjau. */
+  contoh: string[];
+}
+
+const PILIHAN_KOLOM = new Map(
+  KOLOM_TEMPLAT_UPT.filter((k) => k.pilihan).map((k) => [k.kolom, new Set(k.pilihan)] as const),
+);
+
+/** true bila isian kolom ini berpilihan dan tidak sama dengan satu pun pilihannya; isian kosong tidak dihitung. */
+export function diLuarPilihan(kolom: string, nilai: string): boolean {
+  const pilihan = PILIHAN_KOLOM.get(kolom);
+  const v = nilai.trim();
+  return !!pilihan && v !== "" && !pilihan.has(v);
+}
+
+/**
+ * Kolom berpilihan (eselon, jenis kelamin, pendidikan, dan sebagainya) yang isiannya di luar pilihan templat,
+ * misalnya "Eselon III A", "L", atau "S-1" pada daftar buatan UPT. Untuk pratinjau berkas: isian seperti ini
+ * tidak ditolak pemeriksaan unggahan dan tersimpan apa adanya, jadi operator perlu melihatnya sebelum lanjut.
+ */
+export function isianDiLuarPilihan(baris: readonly Record<string, string>[]): IsianDiLuarPilihan[] {
+  const hasil = new Map<string, { jumlah: number; contoh: Set<string> }>();
+  for (const r of baris)
+    for (const [kolom, nilai] of Object.entries(r)) {
+      if (!diLuarPilihan(kolom, nilai)) continue;
+      const h = hasil.get(kolom) ?? { jumlah: 0, contoh: new Set<string>() };
+      h.jumlah++;
+      if (h.contoh.size < 3) h.contoh.add(nilai.trim());
+      hasil.set(kolom, h);
+    }
+  return KOLOM_TEMPLAT_UPT.filter((k) => hasil.has(k.kolom)).map((k) => ({
+    kolom: k.kolom,
+    jumlah: hasil.get(k.kolom)!.jumlah,
+    contoh: [...hasil.get(k.kolom)!.contoh],
+  }));
 }
 
 /** Pilihan kolom dasarBaruJenis, untuk pesan tolak yang menyebutkan apa yang diterima. */

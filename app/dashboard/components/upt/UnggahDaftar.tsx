@@ -5,17 +5,18 @@ import Link from "next/link";
 import Papa from "papaparse";
 import { Catatan } from "@/app/dashboard/components/kgb";
 import { GAYA_MODAL_KGB } from "@/app/dashboard/components/kgb/gayaModal";
+import PratinjauBerkas from "./PratinjauBerkas";
 import {
   ATURAN_DASAR_BARU,
   BATAS_BARIS_IMPOR,
   KOLOM_DASAR_BARU,
-  KOLOM_IMPOR_UPT,
   KOLOM_TEMPLAT_UPT,
   LABEL_PERAN_KOLOM,
   LEMBAR_DATA_UPT,
   PANDUAN_DASAR_BARU,
-  kunciKolomTemplat,
+  bacaBerkasUpt,
   templatCsvUpt,
+  type BerkasUpt,
   type HasilImpor,
 } from "@/lib/imporUsulanUpt";
 import { FORMAT_TANGGAL_DITERIMA } from "@/lib/dataPegawai";
@@ -129,6 +130,8 @@ function ringkasIsianDasar(isian: Readonly<Record<string, string>>): string {
 export default function UnggahDaftar() {
   const [langkah, setLangkah] = useState<1 | 2 | 3>(1);
   const [namaBerkas, setNamaBerkas] = useState("");
+  // Isi berkas apa adanya, ditampilkan di Pratinjau berkas sebelum dikirim untuk diperiksa.
+  const [berkas, setBerkas] = useState<{ isi: BerkasUpt; lembar: string | null } | null>(null);
   const [baris, setBaris] = useState<Record<string, unknown>[] | null>(null);
   const [pratinjau, setPratinjau] = useState<Pratinjau | null>(null);
   const [pilih, setPilih] = useState<Set<number>>(new Set());
@@ -141,6 +144,7 @@ export default function UnggahDaftar() {
   function ulangDariAwal() {
     setLangkah(1);
     setNamaBerkas("");
+    setBerkas(null);
     setBaris(null);
     setPratinjau(null);
     setPilih(new Set());
@@ -150,35 +154,28 @@ export default function UnggahDaftar() {
     setHasilSimpan(null);
   }
 
-  /** Baris hasil urai berkas, Excel maupun CSV, diperiksa bentuknya lalu dikirim ke server. */
-  function terima(semua: Record<string, unknown>[]) {
-    const data = semua.filter((r) => Object.values(r).some((v) => String(v ?? "").trim() !== ""));
-    if (data.length === 0) {
-      setGalat("Berkas tidak berisi satu baris data pun.");
-      return;
-    }
-    const kepala = Object.keys(data[0] ?? {});
-    const hilang = KOLOM_IMPOR_UPT.filter((k) => !kepala.includes(k));
-    if (hilang.length > 0) {
-      setGalat(`Baris kepala berkas tidak memuat kolom: ${hilang.join(", ")}. Unduh templatnya di langkah ini.`);
-      return;
-    }
-    if (data.length > BATAS_BARIS_IMPOR) {
-      setGalat(`Sekali unggah paling banyak ${BATAS_BARIS_IMPOR} baris; berkas ini ${data.length} baris.`);
-      return;
-    }
-    setBaris(data);
-    void periksa(data);
+  /**
+   * Tabel hasil urai berkas, Excel maupun CSV, menjadi pratinjau. Belum ada yang dikirim: operator melihat
+   * dulu kolom yang dibaca dan isinya, lalu menekan Lanjut (PratinjauBerkas).
+   */
+  function terima(tabel: string[][], lembar: string | null) {
+    setBerkas({ isi: bacaBerkasUpt(tabel), lembar });
+  }
+
+  function lanjutPeriksa() {
+    if (!berkas) return;
+    setBaris(berkas.isi.baris);
+    void periksa(berkas.isi.baris);
   }
 
   async function bacaExcel(file: File) {
     setSibuk(true);
     try {
-      const { bacaXlsx, keRekaman } = await import("@/lib/xlsx");
+      const { bacaLembarXlsx } = await import("@/lib/xlsx");
       // Lembar "Data Pegawai" pada templat; berkas buatan sendiri dibaca dari lembar pertamanya.
-      const lembar = bacaXlsx(new Uint8Array(await file.arrayBuffer()), { lembar: LEMBAR_DATA_UPT });
+      const lembar = bacaLembarXlsx(new Uint8Array(await file.arrayBuffer()), { lembar: LEMBAR_DATA_UPT });
       setSibuk(false);
-      terima(keRekaman(lembar, kunciKolomTemplat));
+      terima(lembar.baris, lembar.nama);
     } catch (e) {
       setSibuk(false);
       setGalat(e instanceof Error && e.name === "GalatXlsx" ? e.message : "Berkas Excel tidak dapat dibaca. Simpan ulang sebagai Excel Workbook (.xlsx), lalu unggah lagi.");
@@ -186,6 +183,7 @@ export default function UnggahDaftar() {
   }
 
   function pilihBerkas(file: File | null) {
+    setBerkas(null);
     setPratinjau(null);
     setBaris(null);
     setGalat(null);
@@ -200,14 +198,14 @@ export default function UnggahDaftar() {
       void bacaExcel(file);
       return;
     }
-    Papa.parse<Record<string, unknown>>(file, {
-      header: true,
+    // Diurai sebagai tabel, bukan rekaman berjudul: judul kolomnya dikenali bacaBerkasUpt, sama dengan berkas
+    // Excel, termasuk baris judul yang tidak berada di baris pertama.
+    Papa.parse<string[]>(file, {
       skipEmptyLines: true,
       // Baris `sep=;` pada templat yang diunduh bukan data, jadi dibuang sebelum diurai. Pemisahnya
       // sendiri ditebak PapaParse, sehingga berkas simpanan Excel berkoma pun tetap terbaca.
       beforeFirstChunk: buangPetunjukPemisah,
-      transformHeader: kunciKolomTemplat,
-      complete: (hasil) => terima(hasil.data),
+      complete: (hasil) => terima(hasil.data, null),
       error: () => setGalat("Berkas tidak dapat dibaca. Pastikan berformat Excel (.xlsx) atau CSV."),
     });
   }
@@ -307,7 +305,12 @@ export default function UnggahDaftar() {
   }
 
   const LANGKAH: { n: 1 | 2 | 3; judul: string; ket: string; bisa: boolean }[] = [
-    { n: 1, judul: "Pilih berkas", ket: namaBerkas || "belum dipilih", bisa: true },
+    {
+      n: 1,
+      judul: "Pilih berkas",
+      ket: berkas ? `${namaBerkas} · ${berkas.isi.baris.length} baris` : namaBerkas || "belum dipilih",
+      bisa: true,
+    },
     {
       n: 2,
       judul: "Periksa & konfirmasi",
@@ -370,7 +373,22 @@ export default function UnggahDaftar() {
       )}
 
       {/* ── Langkah 1: pilih berkas ──────────────────────────────── */}
-      {langkah === 1 && (
+      {langkah === 1 && berkas && (
+        <section className="dsb-panel kol-panel ung-panel" aria-label="Pratinjau berkas">
+          <div className="ung-isi">
+            <PratinjauBerkas
+              berkas={berkas.isi}
+              namaBerkas={namaBerkas}
+              lembar={berkas.lembar}
+              sibuk={sibuk}
+              onLanjut={lanjutPeriksa}
+              onGanti={ulangDariAwal}
+            />
+          </div>
+        </section>
+      )}
+
+      {langkah === 1 && !berkas && (
         <section className="dsb-panel kol-panel ung-panel" aria-label="Pilih berkas">
           <div className="ung-isi">
             <Catatan>
@@ -491,7 +509,7 @@ export default function UnggahDaftar() {
 
             {sibuk && (
               <p className="dsb-kosong" role="status">
-                Memeriksa {namaBerkas}…
+                Membaca {namaBerkas}…
               </p>
             )}
           </div>
@@ -661,9 +679,9 @@ export default function UnggahDaftar() {
                 className="dsb-tombol kol-kaki-kembali"
                 data-jenis="garis"
                 disabled={sibuk}
-                onClick={ulangDariAwal}
+                onClick={() => setLangkah(1)}
               >
-                ← Ganti berkas
+                ← Pratinjau berkas
               </button>
               <button type="button" className="dsb-tombol" disabled={sibuk || pilih.size === 0} onClick={() => void simpan()}>
                 {sibuk ? "Menyimpan…" : `Simpan ${pilih.size} baris`}

@@ -803,6 +803,12 @@ export default async function IsiPanduan({
                   menekan Simpan.
                 </p>
                 <p>
+                  Begitu berkas dipilih, isinya tampil apa adanya di <strong>Pratinjau berkas</strong>: kolom mana yang
+                  dibaca, kolom mana yang diabaikan karena judulnya tidak dikenal, dan baris-barisnya. Bila ada kolom
+                  yang diabaikan padahal isinya diperlukan, ganti judulnya dengan nama kolom templat lalu pilih berkasnya
+                  lagi. Bila sudah benar, tekan <strong>Lanjut periksa</strong>; barulah isinya dinilai per pegawai.
+                </p>
+                <p>
                   Templat Excel sudah menyiapkan tiga hal yang dulu paling sering salah: kolom <code>nip</code> berformat
                   Text sehingga NIP tidak berubah menjadi <code>1,97E+17</code>, kolom tanggal berformat tanggal, dan
                   kolom berpilihan (golongan, jenis jabatan, eselon, jenis kelamin, pendidikan, dan sebab perubahan)

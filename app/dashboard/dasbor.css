@@ -2865,6 +2865,35 @@ html[data-gerak="kurangi"] .dsb-putar {
   color: var(--dt2); border-bottom: .5px solid var(--ln2); }
 .ung-isi .kgbm-panduan dt strong { font-weight: 600; color: var(--dtn); }
 
+/* Pratinjau berkas: isi berkas apa adanya sebelum diperiksa. Tabelnya memang digulir mendatar di dalam
+   kotaknya sendiri: pratinjau adalah salinan lembar kerja, dan kolom nomor baris tetap menempel di kiri. */
+.ung-pratinjau { display: grid; gap: 12px; }
+.ung-pratinjau-kepala h2 { margin: 0; font-size: 15px; font-weight: 650; color: var(--dtn); }
+.ung-pratinjau-kepala p { margin: 2px 0 0; font-size: 12.5px; color: var(--dt3); overflow-wrap: anywhere; }
+.ung-pratinjau-kepala strong { color: var(--dtn); }
+.ung-peta-kolom { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ung-peta-kolom li { padding: 3px 9px; border: 1px solid var(--ln1); border-radius: 999px; font-size: 11.5px; line-height: 1.5;
+  color: var(--dt2); background: var(--card); }
+.ung-peta-kolom li[data-nada="dibaca"] { border-color: var(--ln0); background: var(--tint-navy); color: var(--dtn); }
+.ung-peta-kolom li[data-nada="abaikan"] { background: var(--sub); color: var(--dt5); }
+.ung-peta-kolom li span { color: var(--dt4); }
+.ung-tabel-berkas-bungkus { max-height: min(60vh, 520px); overflow: auto; overscroll-behavior: contain;
+  border: 1px solid var(--ln1); border-radius: 12px; background: var(--card); }
+.ung-tabel-berkas-bungkus:focus-visible { box-shadow: var(--focus-ring); outline: none; }
+.ung-tabel-berkas { min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.ung-tabel-berkas th, .ung-tabel-berkas td { padding: 6px 10px; border-bottom: 1px solid var(--ln2); text-align: left;
+  vertical-align: top; white-space: nowrap; }
+.ung-tabel-berkas thead th { position: sticky; top: 0; z-index: 1; background: var(--sub); font-weight: 600; color: var(--dt2); }
+.ung-tabel-berkas thead th small { display: block; font-weight: 400; color: var(--dt5); }
+.ung-tabel-berkas thead th:first-child { left: 0; z-index: 2; }
+.ung-tabel-berkas tbody th { position: sticky; left: 0; background: var(--card); font-weight: 500; color: var(--dt5);
+  font-variant-numeric: tabular-nums; }
+.ung-tabel-berkas td { color: var(--dtn); }
+.ung-tabel-berkas td[data-kosong] { color: var(--dt5); }
+.ung-tabel-berkas td[data-kosong="wajib"] { background: var(--tint-red-bg); color: var(--st-red); }
+.ung-tabel-berkas td[data-luar-pilihan] { background: var(--tint-amber-bg); color: var(--st-amber); }
+.ung-tampil-semua { justify-self: start; font-size: 12.5px; }
+
 .ung-ringkas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 8px;
   padding: 14px 16px; border-bottom: 1px solid var(--ln2); }
 .ung-ringkas-butir { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--ln1); border-radius: 12px; background: var(--card); }

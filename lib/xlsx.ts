@@ -338,6 +338,11 @@ export class GalatXlsx extends Error {
  * nilai terakhirnya. Baris dan sel kosong di tengah dipertahankan sebagai teks kosong.
  */
 export function bacaXlsx(data: Uint8Array, opsi: { lembar?: string } = {}): string[][] {
+  return bacaLembarXlsx(data, opsi).baris;
+}
+
+/** Sama dengan bacaXlsx, ditambah nama lembar yang benar-benar dibaca, untuk pratinjau berkas. */
+export function bacaLembarXlsx(data: Uint8Array, opsi: { lembar?: string } = {}): { nama: string; baris: string[][] } {
   let berkas: Record<string, Uint8Array>;
   try {
     berkas = unzipSync(data, {
@@ -418,7 +423,7 @@ export function bacaXlsx(data: Uint8Array, opsi: { lembar?: string } = {}): stri
     while (hasil.length < idx) hasil.push([]);
     hasil[idx] = baris;
   }
-  return hasil;
+  return { nama: dipilih.nama, baris: hasil };
 }
 
 /**
