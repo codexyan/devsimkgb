@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { ambilDrafSk, buatPdfSk, namaFileSk, simpanDasarSk, simpanDrafSkServer, unduhBlob, type DataDasarSk } from "@/lib/kgbAksi";
+import { ambilDrafSk, ambilPegawaiKgb, buatPdfSk, namaFileSk, simpanDasarSk, simpanDrafSkServer, unduhBlob, type DataDasarSk } from "@/lib/kgbAksi";
 import { alasanTolakBuatSk } from "@/lib/prosesKgb";
 import { formatTanggalId, hariIniWita, isoTanggalLokal, type NilaiTanggal } from "@/lib/waktu";
 import { AWALAN_NOMOR_SK, bagianNomorSk, nomorSkLengkap } from "@/lib/nomorSurat";
@@ -24,6 +24,7 @@ import {
   nilaiInputTanggal,
   nomorSkTerisi,
   pesanBidangWajib,
+  selaraskanDasarPegawai,
   subjudulPegawai,
   tahunTanggalInput,
   type DasarSkAwal,
@@ -50,7 +51,8 @@ interface PropsModalBuatSk {
   kgbId: string;
   /** Status KGB; selain sedang_diproses modal hanya menampilkan alasan penolakan. */
   status?: string;
-  pegawai: RingkasPegawai;
+  /** id dipakai membaca SK dasar pada Data Pegawai untuk saran isian Atas Dasar (ADR-058). */
+  pegawai: RingkasPegawai & { id?: string };
   ringkasan?: RingkasanSk | null;
   dasarAwal?: DasarSkAwal | null;
   /** Nomor dan tanggal SK baru yang sudah pernah dibuat; tanggal bawaan hari ini (WITA). */
@@ -74,6 +76,10 @@ export default function ModalBuatSk({
   const idNomorSk = useId();
   const idNomorSkPetunjuk = useId();
   const [dasar, setDasar] = useState<DataDasarSk>(() => isianDasarSk(dasarAwal));
+  // Isian Atas Dasar menurut Data Pegawai bila berbeda dengan yang tersimpan pada KGB ini (ADR-058). KGB yang diinput
+  // sebelum ADR-056 menyimpan salinan lama, misalnya penetap dengan nama kementerian lama. Ditawarkan, bukan ditimpa:
+  // isian Buat SK bisa sengaja disunting Tim SDM, dan menimpanya setiap modal dibuka akan menghapus suntingan itu.
+  const [saranPegawai, setSaranPegawai] = useState<DataDasarSk | null>(null);
   // Draf nomor SK baru tersimpan di SIM-KGB (ADR-011) dan hanya dipakai selama SK belum pernah dibuat.
   // Draf lama yang sempat disimpan di peramban dipakai sampai draf server termuat, lalu dibersihkan.
   const skSudahDibuat = !!nomorSkTerisi(skBaruAwal?.nomorSurat);
@@ -142,6 +148,26 @@ export default function ModalBuatSk({
     if (lama && lama !== url) URL.revokeObjectURL(lama);
     urlPratinjau.current[versi] = url;
     setPratinjau((p) => ({ ...p, [versi]: url }));
+  }
+
+  useEffect(() => {
+    if (!pegawai.id || alasanTolak) return;
+    let batal = false;
+    ambilPegawaiKgb(pegawai.id).then((hasil) => {
+      if (batal || !hasil.ok) return;
+      setSaranPegawai(selaraskanDasarPegawai(isianDasarSk(dasarAwal), hasil.data));
+    });
+    return () => {
+      batal = true;
+    };
+    // Dibaca sekali saat modal dibuka; isian awal tidak berubah selama modal terbuka.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pegawai.id]);
+
+  function pakaiSaranPegawai() {
+    if (!saranPegawai) return;
+    setDasar(saranPegawai);
+    isianBerubah();
   }
 
   function isianBerubah() {
@@ -389,6 +415,26 @@ export default function ModalBuatSk({
               />
             )}
             <BagianForm judul="Atas Dasar SK Terakhir" keterangan="SK terakhir pegawai yang menjadi dasar KGB ini.">
+              {saranPegawai && JSON.stringify(saranPegawai) !== JSON.stringify(dasar) && (
+                <Catatan nada="amber">
+                  Data Pegawai mencatat SK dasar ini dengan isian yang lebih baru:{" "}
+                  {(
+                    [
+                      ["Nomor", dasar.nomorSK, saranPegawai.nomorSK],
+                      ["Tanggal", dasar.tanggalSK ? formatTanggalId(dasar.tanggalSK) : "", saranPegawai.tanggalSK ? formatTanggalId(saranPegawai.tanggalSK) : ""],
+                      ["TMT", dasar.tmtSK ? formatTanggalId(dasar.tmtSK) : "", saranPegawai.tmtSK ? formatTanggalId(saranPegawai.tmtSK) : ""],
+                      ["Oleh", dasar.penetapSkDasar, saranPegawai.penetapSkDasar],
+                    ] as const
+                  )
+                    .filter(([, sekarang, saran]) => sekarang.trim() !== saran.trim())
+                    .map(([label, , saran]) => `${label} “${saran || "(kosong)"}”`)
+                    .join(", ")}
+                  . Isian di bawah berasal dari Input KGB.{" "}
+                  <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" disabled={sibuk} onClick={pakaiSaranPegawai}>
+                    Pakai isian Data Pegawai
+                  </button>
+                </Catatan>
+              )}
               <BidangTeks
                 label="Nomor SK Terakhir"
                 wajib
