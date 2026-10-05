@@ -4,19 +4,35 @@
 // selesai di SIM-KGB, itu SK KGB terakhir; bila sesudahnya terbit SK kenaikan pangkat (termasuk penyesuaian
 // ijazah) atau SK peninjauan masa kerja, SK itulah yang menggantikannya.
 //
+// Bagi pegawai yang belum pernah KGB di SIM-KGB, SK dasarnya yang tercatat di Data Pegawai (ADR-010): SK KGB
+// terakhir yang terbit di luar SIM-KGB, atau SK CPNS bila belum pernah KGB sama sekali. SK itu diisi Kanwil
+// lewat Ubah SK dasar (berikut pindaiannya di arsip pegawai), atau ikut tersalin saat usulan UPT disetujui.
+// Dulu sumber ini tidak dibaca, sehingga SK yang sudah direkam pun tampil "Belum ada SK tercatat" (ADR-057).
+//
 // Modul ini murni supaya dipakai bersama oleh dashboard Admin UPT (yang hanya menampilkannya) dan
 // pemeriksaan di sisi Kanwil, dengan aturan yang sama dengan isian Atas dasar pada Input KGB.
 
 import { JENIS_KP, isJenisKp } from "./kenaikanPangkat";
 import { tanggalKalender, type NilaiTanggal } from "./waktu";
 
-export type JenisDasarKgb = "kgb" | "kp" | "pmk";
+export type JenisDasarKgb = "kgb" | "cpns" | "kp" | "pmk";
 
 export const LABEL_DASAR_KGB: Record<JenisDasarKgb, string> = {
   kgb: "SK KGB terakhir",
+  cpns: "SK CPNS",
   kp: "SK kenaikan pangkat",
   pmk: "SK peninjauan masa kerja",
 };
+
+/** SK dasar pada Data Pegawai beserta keterangan yang menentukan jenis dan TMT-nya. */
+export interface SkDasarPegawaiUntukDasar {
+  nomorSkDasar?: string | null;
+  tanggalSkDasar?: NilaiTanggal;
+  /** TMT KGB terakhir, atau TMT CPNS bagi yang belum pernah KGB: TMT SK dasar itu. */
+  tmtKgbTerakhir?: NilaiTanggal;
+  mkgTahun?: number | null;
+  mkgBulan?: number | null;
+}
 
 export interface DasarKgbBerikutnya {
   jenis: JenisDasarKgb;
@@ -76,17 +92,38 @@ function dariKgb(riwayat: readonly KgbSelesaiUntukDasar[]): DasarKgbBerikutnya |
   };
 }
 
+/** SK dasar pada Data Pegawai; null bila nomor maupun tanggalnya belum diisi. */
+function dariPegawai(p: SkDasarPegawaiUntukDasar): DasarKgbBerikutnya | null {
+  const nomorSK = terisi(p.nomorSkDasar);
+  const tanggalSK = iso(p.tanggalSkDasar);
+  if (!nomorSK && !tanggalSK) return null;
+  // Masa kerja golongan 0 tahun 0 bulan berarti belum pernah KGB: SK dasarnya SK CPNS (lib/usulanPegawai.ts).
+  const jenis: JenisDasarKgb = (p.mkgTahun ?? 0) === 0 && (p.mkgBulan ?? 0) === 0 ? "cpns" : "kgb";
+  return { jenis, label: LABEL_DASAR_KGB[jenis], nomorSK, tanggalSK, tmt: iso(p.tmtKgbTerakhir) };
+}
+
 /**
  * SK yang menjadi dasar KGB berikutnya. SK kenaikan pangkat atau PMK menang bila TMT-nya pada atau sesudah
  * TMT SK KGB terakhir; di antara keduanya, yang TMT-nya paling baru. null bila tidak satu pun diketahui.
+ *
+ * SK KGB terakhir diambil dari riwayat KGB selesai; SK dasar Data Pegawai dipakai bila riwayatnya kosong, atau
+ * bila tanggal SK-nya lebih akhir (Kanwil merekam SK yang terbit di luar SIM-KGB sesudahnya). TMT KGB terakhir
+ * pada data pegawai ikut menjadi batas bawah SK kenaikan pangkat dan PMK.
  */
 export function dasarKgbBerikutnya(input: {
   kgb: readonly KgbSelesaiUntukDasar[];
   pangkat?: readonly SkPenetapGaji[];
   pmk?: readonly SkPenetapGaji[];
+  pegawai?: SkDasarPegawaiUntukDasar | null;
 }): DasarKgbBerikutnya | null {
-  const dasarKgb = dariKgb(input.kgb);
-  const batas = tanggalKalender(dasarKgb?.tmt);
+  const dariRiwayat = dariKgb(input.kgb);
+  const dariData = input.pegawai ? dariPegawai(input.pegawai) : null;
+  const dataLebihBaru =
+    !!dariRiwayat && !!dariData?.tanggalSK && !!dariRiwayat.tanggalSK && dariData.tanggalSK > dariRiwayat.tanggalSK;
+  const dasarKgb = !dariRiwayat || dataLebihBaru ? dariData ?? dariRiwayat : dariRiwayat;
+  const batasDasar = tanggalKalender(dasarKgb?.tmt);
+  const batasPegawai = tanggalKalender(input.pegawai?.tmtKgbTerakhir);
+  const batas = batasDasar && batasPegawai ? (batasDasar > batasPegawai ? batasDasar : batasPegawai) : batasDasar ?? batasPegawai;
 
   let unggul: DasarKgbBerikutnya | null = null;
   let tmtUnggul: Date | null = null;

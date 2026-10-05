@@ -991,7 +991,14 @@ export default async function IsiPanduan({
                   Setelah SK KGB direkam di Gaji Web, SK itulah dasar KGB reguler berikutnya. Kolom{" "}
                   <em>Dasar KGB berikutnya</em> di Data Pegawai menunjukkan SK mana yang berlaku sekarang, dan berpindah
                   sendiri begitu ada SK kenaikan pangkat, penyesuaian ijazah, atau peninjauan masa kerja yang lebih baru
-                  disetujui Kanwil.
+                  disetujui Kanwil. Bagi pegawai yang belum pernah KGB di SIM-KGB, kolom itu menampilkan SK dasar yang
+                  tercatat di data pegawainya: SK KGB terakhir yang terbit di luar SIM-KGB, atau SK CPNS.
+                </p>
+                <p>
+                  SK yang Anda unggah pada draf atau usulan perbaikan <strong>belum</strong> menjadi dasar sebelum Kanwil
+                  menyetujuinya. Sampai saat itu SK tersebut tampil di bawah kolom yang sama dengan penanda{" "}
+                  <em>Di draf, belum diajukan</em> atau <em>Menunggu Kanwil</em>, supaya terlihat bahwa berkasnya sudah
+                  masuk dan sedang menunggu apa.
                 </p>
 
                 <h3 className="pub-h3">Langkah 5: Kirim surat lewat Srikandi, lalu ajukan</h3>
@@ -1110,7 +1117,9 @@ export default async function IsiPanduan({
                   <strong className="pub-note-title">Menindaklanjutinya di SIM-KGB</strong>
                   <p>
                     Pegawai yang KGB-nya masuk bulan usulan muncul di kolom <strong>Perlu dikerjakan</strong> sebagai
-                    pengingat <em>Perlu diperiksa</em>, lengkap dengan batas input Kanwil. Bila ada yang keliru, pilih{" "}
+                    pengingat <em>Perlu diperiksa</em>, lengkap dengan batas input Kanwil. Draf usulan data (perbaikan atau
+                    pegawai baru) juga ada di kolom itu berapa pun TMT KGB-nya, sebab yang diajukan adalah datanya, bukan
+                    KGB-nya: KGB yang belum dibuka tetap terkunci, dan kartunya menyebut kapan KGB itu diusulkan. Bila ada yang keliru, pilih{" "}
                     <strong>Usulkan perbaikan data</strong> sebelum batas itu. Hukuman disiplin yang belum dilaporkan
                     disampaikan lewat menu <strong>Lapor Hukdis</strong>; pegawai yang pindah, BKO, atau berhenti
                     dilaporkan dengan <strong>Laporkan mutasi</strong> pada barisnya. Pegawai yang sedang{" "}

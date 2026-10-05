@@ -70,14 +70,16 @@ export default function ModalInputKgb({
   const { memuat, galat: galatMuat, pegawai, perhitungan, muatUlang } = usePegawaiKgb(ringkas.id);
   const [form, setForm] = useState<DataDasarSk>(() => isianDasarSk(dasarAwal));
   // Isian Atas Dasar yang terakhir diisi otomatis. Sumber berikutnya (riwayat, data pegawai, SK kenaikan pangkat)
-  // boleh menggantinya selama operator belum menyunting; isian yang sudah disunting tidak pernah ditimpa.
+  // boleh menggantinya selama operator belum menyunting; isian yang sudah disunting tidak pernah ditimpa. Penandanya
+  // dipasang saat operator mengetik, bukan dibandingkan di dalam pembaru state: pembaru dijalankan dua kali di mode
+  // pengembangan React, dan pembaru yang mengubah ref membuat panggilan keduanya mengira isian sudah disunting.
   const otomatis = useRef<DataDasarSk>(form);
-  const isiOtomatis = (baru: DataDasarSk) =>
-    setForm((f) => {
-      if (!isianDasarKosong(f) && JSON.stringify(f) !== JSON.stringify(otomatis.current)) return f;
-      otomatis.current = baru;
-      return baru;
-    });
+  const disunting = useRef(false);
+  const isiOtomatis = (baru: DataDasarSk) => {
+    if (disunting.current) return;
+    otomatis.current = baru;
+    setForm(baru);
+  };
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
   const cariDiRiwayat = dasarDariRiwayat && isianDasarKosong(isianDasarSk(dasarAwal));
@@ -156,7 +158,7 @@ export default function ModalInputKgb({
         }
       }
       setDasarRiwayat(dasar ?? undefined);
-      if (dasar && isianDasarKosong(otomatis.current)) isiOtomatis(isianDasarSk(dasar));
+      if (dasar) isiOtomatis(isianDasarSk(dasar));
     });
     return () => {
       batal = true;
@@ -202,7 +204,10 @@ export default function ModalInputKgb({
       ? { nama: "SK CPNS", nomor: "Nomor SK CPNS", tanggal: "Tanggal SK CPNS", tmt: "TMT CPNS" }
       : { nama: "SK KGB terakhir", nomor: "Nomor SK KGB Terakhir", tanggal: "Tanggal SK KGB Terakhir", tmt: "TMT SK KGB Terakhir" };
 
-  const ubah = (kolom: keyof DataDasarSk) => (nilai: string) => setForm((f) => ({ ...f, [kolom]: nilai }));
+  const ubah = (kolom: keyof DataDasarSk) => (nilai: string) => {
+    disunting.current = true;
+    setForm((f) => ({ ...f, [kolom]: nilai }));
+  };
 
   async function kirim() {
     if (!bisaKirim) return;
