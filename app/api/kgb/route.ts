@@ -23,6 +23,7 @@ import {
   type SuratKgbTersimpan,
 } from "@/lib/prosesKgb";
 import { bacaAngkaSk, bedaArsipSk, pesanBedaArsip } from "@/lib/cocokArsipSk";
+import { pesanGajiTurun } from "@/lib/koreksiDasarGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
@@ -268,6 +269,11 @@ export async function POST(req: Request) {
     const pesan = e instanceof Error ? e.message : "Jadwal KGB pegawai tidak dapat dihitung";
     return NextResponse.json({ error: `${pesan}. Perbaiki data pegawai terlebih dahulu.` }, { status: 400 });
   }
+
+  // Gaji pokok lama diambil dari kolom gaji pokok pegawai, gaji baru dari golongan dan masa kerja. Bila yang
+  // baru lebih kecil, gaji tercatatnya keliru dan SK-nya akan mencetak penurunan gaji (ADR-054).
+  const gajiTurun = pesanGajiTurun(rencana, pegawai);
+  if (gajiTurun) return NextResponse.json({ error: gajiTurun }, { status: 400 });
 
   // Hukdis yang ditandai berdampak KGB menahan proses selama masih berlaku. Arsip ikut ditahan:
   // SK yang terbit di luar SIM-KGB pada masa hukdis perlu diperiksa sebelum dicatat. Hukdis yang mulai

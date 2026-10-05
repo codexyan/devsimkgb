@@ -174,7 +174,10 @@ export default function ModalUbahPegawai({
           else if (k === "tmtKgbBerikutnya") badan.tmtKgbBerikutnya = tmtBerikutnyaDipakai;
           else badan[k] = form[k] ?? "";
         }
-        // Gaji pokok dibiarkan dihitung ulang dari golongan dan masa kerja yang dikoreksi.
+        // Gaji pokok dihitung ulang dari golongan dan masa kerja yang dikoreksi, juga bila keduanya tidak berubah:
+        // layar memperlihatkan gaji menurut tabel sebagai "Menjadi", dan gaji tercatat yang salah ketik (tidak
+        // sejalan dengan golongan dan masa kerja yang sudah benar) hanya dapat dibetulkan lewat sini (ADR-054).
+        badan.gajiPokok = "";
       }
       const res = await fetch(`/api/pegawai/${pegawai.id}`, {
         method: "PATCH",

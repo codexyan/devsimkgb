@@ -12,6 +12,7 @@ import {
   type SkDasarUsulan,
 } from "@/lib/kgbAksi";
 import { pernahKgb } from "@/lib/usulanPegawai";
+import { SARAN_GAJI_MENYIMPANG, gajiTercatatMenyimpang, kalimatGajiMenyimpang } from "@/lib/koreksiDasarGaji";
 import { formatTanggalId } from "@/lib/waktu";
 import KerangkaModal from "./KerangkaModal";
 import {
@@ -156,7 +157,12 @@ export default function ModalInputKgb({
     dasarRiwayat?.nomorSK?.trim() ||
     dasarRiwayat?.tanggalSK
   );
-  const bisaKirim = !sibuk && !memuat && !terkunci && perhitungan?.ok !== false;
+  // Gaji pokok tercatat tercetak sebagai Gaji Pokok Lama di SK. Yang tidak sejalan dengan golongan dan masa
+  // kerjanya ditandai; yang bahkan lebih besar dari gaji barunya ditahan, sebab SK-nya akan mencetak
+  // penurunan gaji. Rute yang sama juga menolaknya (ADR-054).
+  const gajiMenyimpang = pegawai ? gajiTercatatMenyimpang(pegawai) : null;
+  const gajiTurun = !!hasil && !!pegawai?.gajiPokok && hasil.gajiPokokBaru < pegawai.gajiPokok;
+  const bisaKirim = !sibuk && !memuat && !terkunci && perhitungan?.ok !== false && !gajiTurun;
   // KGB pertama berdasar SK CPNS; sesudahnya berdasar SK KGB terakhir. Masa kerja golongan 0 berarti
   // pegawai belum pernah KGB, aturan yang sama dengan formulir UPT (lib/usulanPegawai.ts).
   const kgbPertama = !!pegawai && !pernahKgb(pegawai.mkgTahun, pegawai.mkgBulan);
@@ -243,6 +249,18 @@ export default function ModalInputKgb({
             { label: "TMT KGB", nilai: formatTanggalId(pegawai.tmtKgbBerikutnya) },
           ]}
         />
+      )}
+      {(gajiMenyimpang || gajiTurun) && (
+        <Catatan nada={gajiTurun ? "merah" : "amber"}>
+          {gajiTurun && (
+            <>
+              <strong>Gaji pokok baru lebih kecil dari gaji pokok tercatat</strong>, sehingga SK akan mencetak penurunan
+              gaji. Input KGB ditahan sampai gaji tercatatnya dibetulkan.{" "}
+            </>
+          )}
+          {gajiMenyimpang && `${kalimatGajiMenyimpang(gajiMenyimpang)} `}
+          {SARAN_GAJI_MENYIMPANG}
+        </Catatan>
       )}
       {perhitungan && !perhitungan.ok && (
         <Catatan nada="merah">{perhitungan.error}. Perbaiki Data Pegawai terlebih dahulu.</Catatan>

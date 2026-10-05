@@ -7,6 +7,9 @@ import { test } from "node:test";
 import { getMKGOptions } from "./tabelGaji";
 import {
   gajiPokokUntuk,
+  gajiTercatatMenyimpang,
+  kalimatGajiMenyimpang,
+  pesanGajiTurun,
   mkgSetelahGantiGolongan,
   mkgTerdekat,
   tmtKgbBerikutnyaHitung,
@@ -66,4 +69,34 @@ test("KGB pertama golongan II/a dari masa kerja 0 tidak dianggap dua tahun", () 
 test("tanpa TMT KGB terakhir tidak ada jadwal yang dapat dihitung", () => {
   assert.equal(tmtKgbBerikutnyaHitung("III/c", 10, 0, null), null);
   assert.equal(tmtKgbBerikutnyaHitung("III/c", 10, 0, ""), null);
+});
+
+/* ── Gaji pokok tercatat yang tidak sesuai golongan dan masa kerjanya (ADR-054) ── */
+
+/** Kasus nyata 5 Oktober 2026: III/d masa kerja 14 tahun, gaji tercatat Rp 4.186.200 (tidak ada di tabel). */
+const tercatatKeliru = { golonganRuang: "III/d", mkgTahun: 14, mkgBulan: 0, gajiPokok: 4186200 };
+
+test("gaji tercatat yang tidak sesuai tabel untuk golongan dan masa kerjanya dikenali, beserta angka tabelnya", () => {
+  assert.deepEqual(gajiTercatatMenyimpang(tercatatKeliru), {
+    tercatat: 4186200,
+    menurutTabel: 3919100,
+    golongan: "III/d",
+    mkgTahun: 14,
+    mkgBulan: 0,
+  });
+  assert.match(kalimatGajiMenyimpang(gajiTercatatMenyimpang(tercatatKeliru)!), /Rp 4\.186\.200.*III\/d masa kerja 14 tahun 0 bulan.*Rp 3\.919\.100/);
+  // Gaji yang sesuai tabel, atau yang belum terisi, tidak ditandai.
+  assert.equal(gajiTercatatMenyimpang({ ...tercatatKeliru, gajiPokok: 3919100 }), null);
+  assert.equal(gajiTercatatMenyimpang({ ...tercatatKeliru, gajiPokok: 0 }), null);
+});
+
+test("KGB yang menurunkan gaji ditolak dengan sebab dan jalan membetulkannya", () => {
+  const pesan = pesanGajiTurun({ gajiPokokLama: 4186200, gajiPokokBaru: 4042500 }, tercatatKeliru);
+  assert.ok(pesan);
+  assert.match(pesan, /Rp 4\.042\.500 lebih kecil dari gaji pokok tercatat Rp 4\.186\.200/);
+  assert.match(pesan, /Rp 3\.919\.100/);
+  assert.match(pesan, /Koreksi data yang salah ketik/);
+  // Gaji naik, atau tetap di atas langkah terakhir tabel, tidak ditolak.
+  assert.equal(pesanGajiTurun({ gajiPokokLama: 3919100, gajiPokokBaru: 4042500 }, { ...tercatatKeliru, gajiPokok: 3919100 }), null);
+  assert.equal(pesanGajiTurun({ gajiPokokLama: 5180700, gajiPokokBaru: 5180700 }, { ...tercatatKeliru, mkgTahun: 32, gajiPokok: 5180700 }), null);
 });
