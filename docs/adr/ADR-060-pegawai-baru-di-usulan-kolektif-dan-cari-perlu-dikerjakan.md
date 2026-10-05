@@ -1,7 +1,7 @@
 # ADR-060: Pegawai baru di Usulan kolektif dapat dicari dan dipilih; pencarian di Perlu dikerjakan
 
 Tanggal: 5 Oktober 2026
-Status: berlaku
+Status: berlaku; butir 2 dan 3 digantikan ADR-063 (pegawai baru ikut bila dipilih, halaman dibuka pada jatuh tempo)
 
 ## Konteks
 

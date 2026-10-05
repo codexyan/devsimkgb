@@ -17,9 +17,11 @@ import { kunciBulanTmt } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan } from "@/app/dashboard/satker/labelSatker";
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
 
-/* Usulan kolektif Admin UPT (ADR-015, ADR-029). Satu surat Srikandi lazimnya memuat banyak pegawai: pegawai baru,
-   perbaikan data, dan kelengkapan berkas sekaligus. Halaman ini tiga langkah:
-     1. Pilih pegawai: dikelompokkan per bulan TMT, dengan saringan jatuh tempo periode ini, ada draf, dan semua.
+/* Usulan kolektif Admin UPT (ADR-015, ADR-029): usul KGB beberapa pegawai dalam satu surat Srikandi. Halaman dibuka
+   pada pegawai jatuh tempo periode ini; perbaikan data dan draf pegawai baru hasil Unggah daftar hanya ikut bila
+   dipilih (ADR-063). Halaman ini tiga langkah:
+     1. Pilih pegawai: dikelompokkan per bulan TMT, dengan saringan jatuh tempo periode ini, pegawai baru, ada draf,
+        dan semua.
      2. Lengkapi: daftar pegawai terpilih di kiri dengan lingkar kelengkapan, detail satu pegawai di kanan (keadaan
         KGB, dasar gaji dengan gaji pokok hasil hitungan, berkas tarik-lepas, catatan). Tanpa gulir mendatar; daftar
         dan isi detail bergulir sendiri-sendiri (ADR-061).
@@ -193,8 +195,9 @@ export default function UsulanKolektif() {
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
   const [terpilih, setTerpilih] = useState<Set<string>>(() => new Set());
-  // Draf pegawai baru ikut dipilih kecuali dikeluarkan di sini; draf yang baru dimuat ulang tetap ikut (ADR-060).
-  const [baruDikeluarkan, setBaruDikeluarkan] = useState<Set<string>>(() => new Set());
+  // Draf pegawai baru hasil Unggah daftar tidak ikut kecuali dipilih di sini: Usulan kolektif terutama untuk usul KGB
+  // beberapa pegawai dalam satu surat Srikandi (ADR-063). Dulu semuanya ikut otomatis (ADR-060).
+  const [baruTerpilih, setBaruTerpilih] = useState<Set<string>>(() => new Set());
   const [cari, setCari] = useState("");
   // Pencarian dan saringan kelengkapan di langkah Lengkapi: daftar kirinya dapat berisi ratusan pegawai baru hasil
   // Unggah daftar (ADR-060, ADR-061).
@@ -204,13 +207,14 @@ export default function UsulanKolektif() {
   const daftarRef = useRef<HTMLUListElement>(null);
   const mdRef = useRef<HTMLDivElement>(null);
   const kakiRef = useRef<HTMLDivElement>(null);
-  // Dibuka dari kartu Terlambat, saringan periode justru menyembunyikan yang baru saja dicentang:
-  // TMT mereka sudah lewat bulan usulan. Karena itu halaman langsung dibuka pada "Semua".
-  const [saring, setSaring] = useState<Saring>(() =>
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("terlambat") === "1"
-      ? "semua"
-      : "periode",
-  );
+  // Halaman dibuka pada pegawai jatuh tempo periode ini (ADR-063). Dari kartu Terlambat, saringan periode justru
+  // menyembunyikan yang baru saja dicentang (TMT mereka sudah lewat bulan usulan), jadi dibuka pada "Semua". Dari
+  // Unggah daftar (?saring=baru), pada "Pegawai baru".
+  const [saring, setSaring] = useState<Saring>(() => {
+    if (typeof window === "undefined") return "periode";
+    const q = new URLSearchParams(window.location.search);
+    return q.get("terlambat") === "1" ? "semua" : q.get("saring") === "baru" ? "baru" : "periode";
+  });
   const [baris, setBaris] = useState<Baris[] | null>(null);
   const [aktif, setAktif] = useState<string | null>(null);
   const [langkah, setLangkah] = useState<Langkah>(1);
@@ -244,10 +248,6 @@ export default function UsulanKolektif() {
       const semuaDraf = Array.isArray(du) ? du : [];
       setPegawai(daftar);
       setDraf(semuaDraf);
-      // Dibuka tanpa tautan pengingat, tanpa pegawai jatuh tempo, tetapi ada draf pegawai baru (lazimnya sesudah
-      // Unggah daftar): langsung tampilkan pegawai barunya, bukan "Tidak ada pegawai dengan KGB TMT …".
-      if (!pilihAwal && !daftar.some((p) => p.bulanTmt === bulanUsulan) && semuaDraf.some((d) => d.jenis === "baru" && (d.status === "draf" || d.status === "revisi")))
-        setSaring((s) => (s === "periode" ? "baru" : s));
       if (pilihAwal) {
         // Untuk yang terlambat, yang dicentang hanya yang benar-benar masih menunggu tindakan UPT: Kanwil
         // belum memproses KGB-nya sama sekali. Yang SK-nya sudah terbit atau sedang diproses tidak perlu
@@ -356,16 +356,16 @@ export default function UsulanKolektif() {
     return [...peta.entries()].sort(([a], [b]) => (a === "tanpa" ? 1 : b === "tanpa" ? -1 : a.localeCompare(b)));
   })();
 
-  const baruDipilih = drafBaru.filter((d) => !baruDikeluarkan.has(d.id));
+  const baruDipilih = drafBaru.filter((d) => baruTerpilih.has(d.id));
   /** Draf pegawai baru yang tampil: pada saringan "Pegawai baru" dan "Semua", menurut pencarian. */
   const drafBaruTampil =
     saring === "baru" || saring === "semua"
       ? drafBaru.filter((d) => !q || `${d.nama ?? ""} ${d.nip ?? ""}`.toLowerCase().includes(q))
       : [];
-  const semuaBaruTampilDipilih = drafBaruTampil.length > 0 && drafBaruTampil.every((d) => !baruDikeluarkan.has(d.id));
+  const semuaBaruTampilDipilih = drafBaruTampil.length > 0 && drafBaruTampil.every((d) => baruTerpilih.has(d.id));
 
   function alihBaru(id: string) {
-    setBaruDikeluarkan((lama) => {
+    setBaruTerpilih((lama) => {
       const baru = new Set(lama);
       if (baru.has(id)) baru.delete(id);
       else baru.add(id);
@@ -373,13 +373,13 @@ export default function UsulanKolektif() {
     });
   }
 
-  /** Pilih atau keluarkan seluruh draf pegawai baru yang sedang tampil (menurut pencarian). */
+  /** Pilih atau batalkan seluruh draf pegawai baru yang sedang tampil (menurut pencarian). */
   function pilihSemuaBaru(centang: boolean) {
-    setBaruDikeluarkan((lama) => {
+    setBaruTerpilih((lama) => {
       const baru = new Set(lama);
       for (const d of drafBaruTampil) {
-        if (centang) baru.delete(d.id);
-        else baru.add(d.id);
+        if (centang) baru.add(d.id);
+        else baru.delete(d.id);
       }
       return baru;
     });
@@ -590,8 +590,8 @@ export default function UsulanKolektif() {
           <p className="dsb-label">Data Pegawai</p>
           <h1 className="dsb-halaman-judul">Usulan kolektif</h1>
           <p className="dsb-sub">
-            Siapkan banyak pegawai untuk satu surat Srikandi: pilih pegawainya, lengkapi data dan berkas satu per satu,
-            lalu ajukan semuanya dengan satu surat ke Kanwil.
+            Usul KGB beberapa pegawai dalam satu surat Srikandi: pilih pegawai yang jatuh tempo, lengkapi data dan
+            berkasnya satu per satu, lalu ajukan semuanya dengan satu surat ke Kanwil.
           </p>
         </div>
         <Link href="/dashboard/upt/pegawai" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">← Data Pegawai</Link>
@@ -659,11 +659,13 @@ export default function UsulanKolektif() {
             <input type="search" className="dsb-cari" placeholder="Cari nama atau NIP" value={cari} onChange={(e) => setCari(e.target.value)} aria-label="Cari pegawai" />
           </div>
 
-          {/* Pegawai baru di luar saringannya: cukup satu baris ringkas, karena mereka tetap ikut dipilih. Dulu
-              seluruh namanya ditulis sebagai satu paragraf, yang dengan 159 pegawai menjadi dinding teks (ADR-060). */}
+          {/* Pegawai baru di luar saringannya: cukup satu baris ringkas (ADR-060). Mereka tidak ikut surat ini kecuali
+              dipilih di saringan Pegawai baru (ADR-063). */}
           {drafBaru.length > 0 && saring !== "baru" && saring !== "semua" && (
             <p className="kol-info">
-              {baruDipilih.length} dari {drafBaru.length} pegawai baru ikut dipilih.{" "}
+              {baruDipilih.length > 0
+                ? `${baruDipilih.length} dari ${drafBaru.length} pegawai baru ikut dipilih.`
+                : `${drafBaru.length} draf pegawai baru dari Unggah daftar tidak ikut surat ini kecuali dipilih.`}{" "}
               <button type="button" className="pgw-tautan" onClick={() => setSaring("baru")}>
                 Lihat pegawai baru
               </button>
@@ -691,7 +693,7 @@ export default function UsulanKolektif() {
                   </div>
                   <ul className="kol-kartu-daftar">
                     {drafBaruTampil.map((d) => {
-                      const dipilih = !baruDikeluarkan.has(d.id);
+                      const dipilih = baruTerpilih.has(d.id);
                       const golongan = d.nilai?.golonganRuang;
                       return (
                         <li key={d.id}>
@@ -731,7 +733,7 @@ export default function UsulanKolektif() {
               saring === "semua" && drafBaruTampil.length > 0 ? null : (
               <p className="dsb-kosong">
                 {saring === "periode"
-                  ? `Tidak ada pegawai dengan KGB TMT ${namaBulan(bulanUsulan)}. Pilih "Semua" untuk mengusulkan perbaikan data pegawai lain.`
+                  ? `Tidak ada pegawai dengan KGB TMT ${namaBulan(bulanUsulan)}. Pilih "Semua" untuk pegawai dengan TMT bulan lain atau untuk perbaikan data.`
                   : "Tidak ada pegawai yang cocok."}
               </p>
               )
@@ -798,7 +800,7 @@ export default function UsulanKolektif() {
                   className="pgw-tautan"
                   onClick={() => {
                     setTerpilih(new Set());
-                    setBaruDikeluarkan(new Set(drafBaru.map((d) => d.id)));
+                    setBaruTerpilih(new Set());
                   }}
                   style={{ marginLeft: 8 }}
                 >

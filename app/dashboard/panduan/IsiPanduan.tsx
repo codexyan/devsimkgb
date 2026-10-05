@@ -928,8 +928,11 @@ export default async function IsiPanduan({
 
                 <h3 className="pub-h3">Langkah 4: Siapkan usulan di Usulan kolektif</h3>
                 <p>
-                  Inilah tempat kerja utama Anda tiap periode. <strong>Usulan kolektif</strong> menyiapkan banyak
-                  pegawai untuk satu surat, dalam tiga langkah. Draf pegawai baru hasil Unggah daftar ikut otomatis.
+                  Inilah tempat kerja utama Anda tiap periode. <strong>Usulan kolektif</strong> menyiapkan usul KGB
+                  beberapa pegawai untuk satu surat, dalam tiga langkah. Halamannya dibuka pada pegawai yang jatuh tempo
+                  periode ini. Draf pegawai baru hasil Unggah daftar tidak ikut kecuali dipilih di saringan{" "}
+                  <em>Pegawai baru</em>, sehingga pendataan ratusan pegawai dapat dikirim bertahap dan tidak tercampur
+                  dengan usul KGB periode berjalan.
                 </p>
                 <LayarKolektif1 namaBulan={bulanTahun(TMT_KGB)} />
                 <p>
