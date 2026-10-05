@@ -11,7 +11,9 @@ import {
   KOLOM_TEMPLAT_UPT,
   LEMBAR_DATA_UPT,
   PANDUAN_DASAR_BARU,
+  bacaBerkasUpt,
   dapatDisimpan,
+  isianDiLuarPilihan,
   kunciKolomTemplat,
   periksaImporUpt,
   ringkasImpor,
@@ -455,4 +457,77 @@ test("berkas hari/bulan dengan satu salah ketik tidak ikut tertolak seluruhnya",
   );
   assert.deepEqual(hasil.map((h) => h.hasil), ["baru", "ditolak", "baru"]);
   assert.match(hasil[1].galat ?? "", /Tanggal lahir tidak valid/);
+});
+
+/* ── Pratinjau berkas: kolom yang dibaca dan yang diabaikan ─────────────────────────────────────── */
+
+test("pratinjau berkas: judul yang lazim di daftar buatan UPT dikenali, kolom lain diabaikan dan disebutkan", () => {
+  // Bentuk judul daftar Lapas Banjarmasin, termasuk kolom nomor urut dan kolom tanpa judul.
+  const b = bacaBerkasUpt([
+    ["No", "nip*", "nama*", "Jabatan*", "Golongan ruang*", "TMT Gol", "T.Lahir", "Tgl Lahir", "nama_golongan", ""],
+    ["1", "197112161996031001", "AKHMAD", "Kalapas", "IV/b", "2024-04-01", "MARABAHAN", "1971-12-16", "Pembina Tk. I", ""],
+    ["", "", "", "", "", "", "", "", "", ""],
+    ["2", "199004202009011001", "RAHMAN", "Kakpp", "III/c", "2024-04-01", "SAMARINDA", "1990-04-20", "Penata", ""],
+  ]);
+  assert.deepEqual(
+    b.kolom.map((k) => k.kunci),
+    [null, "nip", "nama", "jabatan", "golonganRuang", "tmtGolongan", "tempatLahir", "tanggalLahir", null, null],
+  );
+  assert.deepEqual(b.kolom[0], { judul: "No", kunci: null, sebab: "tidak dikenal" });
+  assert.equal(b.baris.length, 2);
+  assert.deepEqual(b.baris[1], {
+    nip: "199004202009011001",
+    nama: "RAHMAN",
+    jabatan: "Kakpp",
+    golonganRuang: "III/c",
+    tmtGolongan: "2024-04-01",
+    tempatLahir: "SAMARINDA",
+    tanggalLahir: "1990-04-20",
+  });
+  assert.deepEqual(b.wajibHilang, []);
+  assert.ok(b.tidakAda.includes("tmtKgbTerakhir"));
+  assert.ok(!b.tidakAda.includes("nip"));
+});
+
+test("pratinjau berkas: judul laporan di atas baris judul dilewati, kolom ganda dan kolom wajib yang hilang disebutkan", () => {
+  const b = bacaBerkasUpt([
+    ["DAFTAR PEGAWAI LAPAS BANJARMASIN"],
+    [""],
+    ["Per 1 Oktober 2026"],
+    ["nip", "NIP", "nama"],
+    ["199001012025061001", "salah", "PEGAWAI"],
+  ]);
+  assert.equal(b.dilewatiDiAtas, 2);
+  assert.deepEqual(b.kolom.map((k) => k.sebab), [null, "ganda", null]);
+  assert.deepEqual(b.baris, [{ nip: "199001012025061001", nama: "PEGAWAI" }]);
+
+  const tanpaNama = bacaBerkasUpt([["nip", "jabatan"], ["199001012025061001", "Penjaga Tahanan"]]);
+  assert.deepEqual(tanpaNama.wajibHilang, ["nama"]);
+  assert.equal(tanpaNama.dilewatiDiAtas, 0);
+});
+
+test("pratinjau berkas: hasil bacaan templat Excel sama dengan yang diperiksa server", () => {
+  const berkas = templatXlsxUpt();
+  const b = bacaBerkasUpt(bacaXlsx(berkas, { lembar: "Contoh" }));
+  assert.deepEqual(b.wajibHilang, []);
+  assert.deepEqual(b.tidakAda, []);
+  // Kolom keterangan contoh tidak ada di templat, jadi diabaikan.
+  assert.equal(b.kolom.at(-1)?.sebab, "tidak dikenal");
+  assert.deepEqual(b.baris, keRekaman(bacaXlsx(berkas, { lembar: "Contoh" }), kunciKolomTemplat).map((r) => {
+    const { ["keterangan contoh (tidak ada di lembar Data Pegawai)"]: _abaikan, ...sisa } = r;
+    return sisa;
+  }));
+});
+
+test("pratinjau berkas: isian kolom berpilihan yang di luar pilihan templat dihitung beserta contohnya", () => {
+  const hasil = isianDiLuarPilihan([
+    { nip: "1", eselon: "Eselon III A", jenisKelamin: "L", pendidikanTerakhir: "S-1", golonganRuang: "IV/b" },
+    { nip: "2", eselon: "Non Eselon", jenisKelamin: "P", pendidikanTerakhir: "S1", golonganRuang: "III/c" },
+    { nip: "3", eselon: "", jenisKelamin: "L", pendidikanTerakhir: "SMA", golonganRuang: "III/c " },
+  ]);
+  assert.deepEqual(hasil, [
+    { kolom: "eselon", jumlah: 1, contoh: ["Eselon III A"] },
+    { kolom: "jenisKelamin", jumlah: 3, contoh: ["L", "P"] },
+    { kolom: "pendidikanTerakhir", jumlah: 2, contoh: ["S-1", "SMA"] },
+  ]);
 });
