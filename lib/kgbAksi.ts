@@ -48,6 +48,11 @@ export interface RiwayatKgbItem {
   gajiPokokBaru: number | null;
   mkgTahunBaru: number | null;
   mkgBulanBaru: number | null;
+  /** Golongan dan masa kerja yang disalin dari data pegawai saat Input KGB (data lama di SK). */
+  golonganLama?: string | null;
+  golonganBaru?: string | null;
+  mkgTahunLama?: number | null;
+  mkgBulanLama?: number | null;
   /** Kolom Atas Dasar SK Terakhir; pada record arsip berisi data SK yang diarsipkan. */
   tanggalSK?: string | null;
   tmtSK?: string | null;
@@ -127,11 +132,14 @@ export async function ambilRiwayatKgb(pegawaiId: string): Promise<HasilAksi<Riwa
 /** Riwayat kenaikan pangkat pegawai, terbaru dulu (GET /api/pegawai/[id]/pangkat). */
 export interface RiwayatPangkatItem {
   id: string;
+  jenisKp?: string;
   jenisLabel: string;
   nomorSK: string | null;
   tanggalSK: string | null;
   tmtPangkat: string | null;
+  golonganLama?: string;
   golonganBaru: string;
+  gajiPokokBaru?: number | null;
   penetapSK: string | null;
 }
 
@@ -151,6 +159,8 @@ export interface RiwayatPmkItem {
   nomorSK: string | null;
   tanggalSK: string | null;
   tmtPmk: string | null;
+  tambahBulan?: number | null;
+  gajiPokokBaru?: number | null;
   penetapSK: string | null;
 }
 

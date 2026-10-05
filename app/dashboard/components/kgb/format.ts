@@ -4,6 +4,7 @@ import type { DataDasarSk, PegawaiKgb, RiwayatKgbItem } from "@/lib/kgbAksi";
 import { kalkulasiKGB, type HasilKalkulasiKGB } from "@/lib/tabelGaji";
 import { isoTanggalLokal, tanggalKalender, type NilaiTanggal } from "@/lib/waktu";
 import { kunciNomorSk } from "@/lib/nomorSurat";
+import type { SkGaji } from "@/lib/linimasaDasarSk";
 
 /** Identitas pegawai yang ditampilkan di kepala modal. */
 export interface RingkasPegawai {
@@ -133,6 +134,86 @@ export function selaraskanDasarPegawai(isian: DataDasarSk, pegawai: SkDasarPegaw
     return null;
   }
   return JSON.stringify(hasil) === JSON.stringify(isian) ? null : hasil;
+}
+
+/** Isian Atas Dasar SK Terakhir dari SK pada linimasa SK penetap gaji (ADR-062). */
+export function isianDariSkGaji(sk: Pick<SkGaji, "nomorSK" | "tanggalSK" | "tmt" | "penetap">): DataDasarSk {
+  return {
+    nomorSK: nomorSkTerisi(sk.nomorSK),
+    tanggalSK: nilaiInputTanggal(sk.tanggalSK),
+    tmtSK: nilaiInputTanggal(sk.tmt),
+    penetapSkDasar: sk.penetap?.trim() ?? "",
+  };
+}
+
+/** Hasil membandingkan isian Atas dasar dengan SK terbaru menurut linimasa (ADR-062). */
+export type HasilBandingDasar =
+  /** Isian sudah menyebut SK terbaru, dengan isian yang sama. */
+  | { jenis: "sama" }
+  /**
+   * Isian menyebut SK terbaru, tetapi catatannya lebih lengkap atau berbeda (mis. penetap yang dibetulkan di Data
+   * Pegawai). Ditawarkan, tidak ditimpa: isian Buat SK bisa sengaja disunting Tim SDM (ADR-058).
+   */
+  | { jenis: "isian-berbeda"; isian: DataDasarSk; beda: { label: string; lama: string; baru: string }[] }
+  /** Isian menyebut SK yang lebih lama daripada SK terbaru, atau masih kosong. */
+  | { jenis: "lebih-baru"; isian: DataDasarSk }
+  /** Isian menyebut SK yang sama barunya atau lebih baru (mis. SK yang belum tercatat), atau dasarnya tidak diketahui. */
+  | { jenis: "tetap" };
+
+const peringkatSk = (jenis: SkGaji["jenis"] | null | undefined) => (jenis === "kp" || jenis === "pmk" ? 1 : 0);
+
+/**
+ * Bandingkan isian Atas dasar dengan SK terbaru yang menetapkan gaji pokok menurut linimasa. SK yang sama dikenali dari
+ * nomornya (setara walau berbeda spasi atau huruf besar), atau tanggal SK-nya bila salah satunya tidak bernomor. SK lain
+ * dibandingkan menurut TMT-nya; pada TMT yang sama SK kenaikan pangkat dan PMK lebih baru daripada SK KGB (ADR-020).
+ */
+export function bandingkanDasarSk(
+  isian: DataDasarSk,
+  linimasa: { sk: ReadonlyArray<SkGaji>; dasar: SkGaji | null },
+): HasilBandingDasar {
+  const dasar = linimasa.dasar;
+  if (!dasar) return { jenis: "tetap" };
+  const target = isianDariSkGaji(dasar);
+  const nomorI = nomorSkTerisi(isian.nomorSK);
+  const kunciI = nomorI ? kunciNomorSk(nomorI) : null;
+  const samaDengan = (sk: Pick<SkGaji, "nomorSK" | "tanggalSK">) =>
+    (!!kunciI && !!sk.nomorSK && kunciNomorSk(sk.nomorSK) === kunciI) ||
+    (!!isian.tanggalSK && nilaiInputTanggal(sk.tanggalSK) === isian.tanggalSK && (!nomorI || !sk.nomorSK));
+
+  if (samaDengan(dasar)) {
+    // Hanya isian yang tercatat yang ditawarkan; catatan yang kosong tidak mengosongkan isian operator.
+    const beda = (
+      [
+        ["Nomor", isian.nomorSK, target.nomorSK],
+        ["Tanggal", isian.tanggalSK, target.tanggalSK],
+        ["TMT", isian.tmtSK, target.tmtSK],
+        ["Oleh", isian.penetapSkDasar, target.penetapSkDasar],
+      ] as const
+    )
+      .filter(([, lama, baru]) => !!baru.trim() && baru.trim() !== lama.trim())
+      .map(([label, lama, baru]) => ({ label, lama, baru }));
+    if (beda.length === 0) return { jenis: "sama" };
+    return {
+      jenis: "isian-berbeda",
+      isian: {
+        nomorSK: target.nomorSK || isian.nomorSK,
+        tanggalSK: target.tanggalSK || isian.tanggalSK,
+        tmtSK: target.tmtSK || isian.tmtSK,
+        penetapSkDasar: target.penetapSkDasar || isian.penetapSkDasar,
+      },
+      beda,
+    };
+  }
+
+  if (!nomorI && !isian.tanggalSK) return { jenis: "lebih-baru", isian: target };
+  // SK yang disebut isian, bila tercatat di linimasa: TMT dan jenisnya diambil dari sana.
+  const cocok = linimasa.sk.find(samaDengan) ?? null;
+  if (cocok?.peran === "sesudah") return { jenis: "lebih-baru", isian: target };
+  const tmtI = cocok?.tmt ? nilaiInputTanggal(cocok.tmt) : isian.tmtSK;
+  if (!tmtI || !target.tmtSK) return tmtI ? { jenis: "tetap" } : { jenis: "lebih-baru", isian: target };
+  if (target.tmtSK > tmtI) return { jenis: "lebih-baru", isian: target };
+  if (target.tmtSK === tmtI && peringkatSk(dasar.jenis) > peringkatSk(cocok?.jenis)) return { jenis: "lebih-baru", isian: target };
+  return { jenis: "tetap" };
 }
 
 /** true bila keempat isian Atas Dasar SK Terakhir masih kosong. */

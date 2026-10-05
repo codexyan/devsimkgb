@@ -214,21 +214,27 @@ export function BagianForm({
   judul,
   keterangan,
   nada = "navy",
+  aksi,
   children,
 }: {
   judul: string;
   keterangan?: ReactNode;
   nada?: "navy" | "hijau" | "amber";
+  /** Tombol di kepala bagian, mis. Lihat linimasa pada Atas Dasar SK Terakhir (ADR-062). */
+  aksi?: ReactNode;
   children: ReactNode;
 }) {
   const id = useId();
   return (
     <section className="kgbm-bagian" data-nada={nada} aria-labelledby={id}>
       <div className="kgbm-bagian-kepala">
-        <h3 id={id} className="kgbm-bagian-judul">
-          {judul}
-        </h3>
-        {keterangan && <p className="kgbm-bagian-ket">{keterangan}</p>}
+        <div className="kgbm-bagian-kepala-teks">
+          <h3 id={id} className="kgbm-bagian-judul">
+            {judul}
+          </h3>
+          {keterangan && <p className="kgbm-bagian-ket">{keterangan}</p>}
+        </div>
+        {aksi && <div className="kgbm-bagian-aksi">{aksi}</div>}
       </div>
       <div className="kgbm-bagian-isi">{children}</div>
     </section>

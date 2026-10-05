@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { RiwayatKgbItem } from "@/lib/kgbAksi";
+import { susunLinimasaDasar } from "@/lib/linimasaDasarSk";
 import {
+  bandingkanDasarSk,
   berkasPdfSah,
   dasarAwalDariRiwayat,
   dasarAwalInputKgb,
@@ -12,6 +14,7 @@ import {
   formatUkuranBerkas,
   hitungKgbPegawai,
   isianDasarSk,
+  isianDariSkGaji,
   nilaiInputTanggal,
   nomorSkTerisi,
   pesanBidangWajib,
@@ -321,4 +324,70 @@ test("dasarDariKenaikanPangkat: KP yang lebih lama dari KGB terakhir pegawai, at
 test("selaraskanDasarPegawai: dua SK bernomor berbeda pada tanggal yang sama tidak dianggap satu SK", () => {
   const lain = { ...salinanDitolak, nomorSK: "W.19-KP.04.04-6000" };
   assert.equal(selaraskanDasarPegawai(lain, skPegawai), null);
+});
+
+/* ── Atas dasar Buat SK dibandingkan dengan linimasa SK penetap gaji (ADR-062) ── */
+
+const tglLokal = (t: number, b: number, h = 1) => new Date(t, b - 1, h);
+const linimasaKp = susunLinimasaDasar({
+  kgb: [
+    { id: "kgb-2024", status: "selesai", tmtKgbBaru: tglLokal(2024, 12), surat: { nomorSurat: "W.17-KP.04.03-900", tanggalSurat: tglLokal(2024, 11, 20) } },
+  ],
+  pangkat: [{ id: "kp", nomorSK: "KP-2026", tanggalSK: tglLokal(2025, 12, 15), tmt: tglLokal(2026, 1), jenisKp: "reguler", penetapSK: "Kepala BKN" }],
+  pegawai: { tmtKgbTerakhir: tglLokal(2024, 12), mkgTahun: 10 },
+  tmtKgbBaru: tglLokal(2026, 12),
+});
+const isianKgb2024 = { nomorSK: "W.17-KP.04.03-900", tanggalSK: "2024-11-20", tmtSK: "2024-12-01", penetapSkDasar: "Kakanwil" };
+
+test("isianDariSkGaji: SK linimasa menjadi isian Atas dasar", () => {
+  assert.deepEqual(isianDariSkGaji(linimasaKp.dasar!), { nomorSK: "KP-2026", tanggalSK: "2025-12-15", tmtSK: "2026-01-01", penetapSkDasar: "Kepala BKN" });
+});
+
+test("bandingkanDasarSk: isian dari Input KGB menyebut SK KGB lama, padahal sudah ada SK kenaikan pangkat sesudahnya", () => {
+  const hasil = bandingkanDasarSk(isianKgb2024, linimasaKp);
+  assert.equal(hasil.jenis, "lebih-baru");
+  assert.equal(hasil.jenis === "lebih-baru" && hasil.isian.nomorSK, "KP-2026");
+});
+
+test("bandingkanDasarSk: SK yang sama dengan isian yang sama tidak menawarkan apa pun", () => {
+  assert.deepEqual(bandingkanDasarSk(isianDariSkGaji(linimasaKp.dasar!), linimasaKp), { jenis: "sama" });
+});
+
+test("bandingkanDasarSk: SK yang sama dengan penetap yang belum terisi menawarkan penetap dari catatannya", () => {
+  const isian = { ...isianDariSkGaji(linimasaKp.dasar!), nomorSK: "KP - 2026", penetapSkDasar: "" };
+  const hasil = bandingkanDasarSk(isian, linimasaKp);
+  assert.equal(hasil.jenis, "isian-berbeda");
+  if (hasil.jenis !== "isian-berbeda") return;
+  assert.deepEqual(hasil.beda.map((b) => b.label), ["Nomor", "Oleh"]);
+  assert.equal(hasil.isian.penetapSkDasar, "Kepala BKN");
+});
+
+test("bandingkanDasarSk: catatan yang kosong tidak mengosongkan isian operator", () => {
+  const tanpaPenetap = susunLinimasaDasar({
+    kgb: [],
+    pangkat: [{ id: "kp", nomorSK: "KP-2026", tanggalSK: tglLokal(2025, 12, 15), tmt: tglLokal(2026, 1), jenisKp: "reguler" }],
+    tmtKgbBaru: tglLokal(2026, 12),
+  });
+  const isian = { nomorSK: "KP-2026", tanggalSK: "2025-12-15", tmtSK: "2026-01-01", penetapSkDasar: "Kepala BKN" };
+  assert.deepEqual(bandingkanDasarSk(isian, tanpaPenetap), { jenis: "sama" });
+});
+
+test("bandingkanDasarSk: isian yang menyebut SK belum tercatat dan lebih baru dibiarkan", () => {
+  const isian = { nomorSK: "SK-LUAR-SIMKGB", tanggalSK: "2026-02-10", tmtSK: "2026-03-01", penetapSkDasar: "Kakanwil" };
+  assert.deepEqual(bandingkanDasarSk(isian, linimasaKp), { jenis: "tetap" });
+});
+
+test("bandingkanDasarSk: isian kosong diisi, dan tanpa dasar apa pun isian dibiarkan", () => {
+  assert.equal(bandingkanDasarSk({ nomorSK: "", tanggalSK: "", tmtSK: "", penetapSkDasar: "" }, linimasaKp).jenis, "lebih-baru");
+  assert.deepEqual(bandingkanDasarSk(isianKgb2024, { sk: [], dasar: null }), { jenis: "tetap" });
+});
+
+test("bandingkanDasarSk: pada TMT yang sama SK kenaikan pangkat menggantikan SK KGB", () => {
+  const samaTmt = susunLinimasaDasar({
+    kgb: [{ id: "kgb-2024", status: "selesai", tmtKgbBaru: tglLokal(2024, 12), surat: { nomorSurat: "W.17-KP.04.03-900", tanggalSurat: tglLokal(2024, 11, 20) } }],
+    pangkat: [{ id: "kp", nomorSK: "KP-SAMA", tanggalSK: tglLokal(2024, 11, 25), tmt: tglLokal(2024, 12), jenisKp: "reguler" }],
+    pegawai: { tmtKgbTerakhir: tglLokal(2024, 12) },
+    tmtKgbBaru: tglLokal(2026, 12),
+  });
+  assert.equal(bandingkanDasarSk(isianKgb2024, samaTmt).jenis, "lebih-baru");
 });

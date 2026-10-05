@@ -161,6 +161,8 @@ export async function GET() {
           pangkat: pangkatPerPegawai.get(p.id),
           pmk: pmkPerPegawai.get(p.id),
           pegawai: p,
+          // SK yang baru berlaku sesudah TMT KGB berikutnya belum menjadi dasarnya (ADR-062).
+          tmtKgbBaru: p.tmtKgbBerikutnya,
         }),
         skDiUsulan: skDiUsulan.get(p.id) ?? null,
         // Pengingat pemeriksaan hanya selama perbaikan masih berguna: KGB belum diinput Kanwil dan

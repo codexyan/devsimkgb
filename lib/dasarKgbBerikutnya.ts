@@ -9,30 +9,18 @@
 // lewat Ubah SK dasar (berikut pindaiannya di arsip pegawai), atau ikut tersalin saat usulan UPT disetujui.
 // Dulu sumber ini tidak dibaca, sehingga SK yang sudah direkam pun tampil "Belum ada SK tercatat" (ADR-057).
 //
-// Modul ini murni supaya dipakai bersama oleh dashboard Admin UPT (yang hanya menampilkannya) dan
-// pemeriksaan di sisi Kanwil, dengan aturan yang sama dengan isian Atas dasar pada Input KGB.
+// Aturannya kini dipegang lib/linimasaDasarSk.ts, yang juga dipakai Buat SK dan jendela Linimasa SK dasar
+// (ADR-062); modul ini meringkasnya untuk dashboard Admin UPT, yang hanya menampilkan dasarnya.
 
-import { JENIS_KP, isJenisKp } from "./kenaikanPangkat";
-import { tanggalKalender, type NilaiTanggal } from "./waktu";
+import { LABEL_SK_GAJI, susunLinimasaDasar, type JenisSkGaji, type KgbUntukLinimasa } from "./linimasaDasarSk";
+import type { NilaiTanggal } from "./waktu";
 
-export type JenisDasarKgb = "kgb" | "cpns" | "kp" | "pmk";
+export type { SkDasarPegawaiUntukDasar, SkPenetapGaji } from "./linimasaDasarSk";
+import type { SkDasarPegawaiUntukDasar, SkPenetapGaji } from "./linimasaDasarSk";
 
-export const LABEL_DASAR_KGB: Record<JenisDasarKgb, string> = {
-  kgb: "SK KGB terakhir",
-  cpns: "SK CPNS",
-  kp: "SK kenaikan pangkat",
-  pmk: "SK peninjauan masa kerja",
-};
+export type JenisDasarKgb = JenisSkGaji;
 
-/** SK dasar pada Data Pegawai beserta keterangan yang menentukan jenis dan TMT-nya. */
-export interface SkDasarPegawaiUntukDasar {
-  nomorSkDasar?: string | null;
-  tanggalSkDasar?: NilaiTanggal;
-  /** TMT KGB terakhir, atau TMT CPNS bagi yang belum pernah KGB: TMT SK dasar itu. */
-  tmtKgbTerakhir?: NilaiTanggal;
-  mkgTahun?: number | null;
-  mkgBulan?: number | null;
-}
+export const LABEL_DASAR_KGB: Record<JenisDasarKgb, string> = { ...LABEL_SK_GAJI, kgb: "SK KGB terakhir" };
 
 export interface DasarKgbBerikutnya {
   jenis: JenisDasarKgb;
@@ -46,65 +34,12 @@ export interface DasarKgbBerikutnya {
 }
 
 /** KGB yang sudah selesai; nomor suratnya diambil dari surat yang terbit, atau kolom SK untuk record arsip. */
-export interface KgbSelesaiUntukDasar {
-  status: string;
-  isArsip?: boolean | null;
-  tmtKgbBaru: NilaiTanggal;
-  nomorSK?: string | null;
-  tanggalSK?: NilaiTanggal;
-  tmtSK?: NilaiTanggal;
-  surat?: { nomorSurat?: string | null; tanggalSurat?: NilaiTanggal } | null;
-}
-
-export interface SkPenetapGaji {
-  nomorSK?: string | null;
-  tanggalSK?: NilaiTanggal;
-  tmt: NilaiTanggal;
-  /** Hanya untuk kenaikan pangkat; dipakai melengkapi labelnya. */
-  jenisKp?: string | null;
-}
-
-const iso = (nilai: NilaiTanggal): string | null => tanggalKalender(nilai)?.toISOString() ?? null;
-const terisi = (nomor: string | null | undefined) => (nomor?.trim() && nomor.trim() !== "-" ? nomor.trim() : null);
-
-/** SK KGB terakhir yang selesai, menurut TMT-nya; null bila pegawai belum pernah KGB di SIM-KGB. */
-function dariKgb(riwayat: readonly KgbSelesaiUntukDasar[]): DasarKgbBerikutnya | null {
-  let terakhir: KgbSelesaiUntukDasar | null = null;
-  let tmtTerakhir: Date | null = null;
-  for (const k of riwayat) {
-    if (k.status !== "selesai") continue;
-    const tmt = tanggalKalender(k.tmtKgbBaru);
-    if (tmt && (!tmtTerakhir || tmt > tmtTerakhir)) {
-      terakhir = k;
-      tmtTerakhir = tmt;
-    }
-  }
-  if (!terakhir || !tmtTerakhir) return null;
-  const arsip = terakhir.isArsip === true;
-  const nomorSurat = terisi(terakhir.surat?.nomorSurat);
-  const nomorSK = nomorSurat ?? (arsip ? terisi(terakhir.nomorSK) : null);
-  return {
-    jenis: "kgb",
-    label: LABEL_DASAR_KGB.kgb,
-    nomorSK,
-    tanggalSK: nomorSurat ? iso(terakhir.surat?.tanggalSurat) : arsip && nomorSK ? iso(terakhir.tanggalSK) : null,
-    tmt: arsip && tanggalKalender(terakhir.tmtSK) ? iso(terakhir.tmtSK) : tmtTerakhir.toISOString(),
-  };
-}
-
-/** SK dasar pada Data Pegawai; null bila nomor maupun tanggalnya belum diisi. */
-function dariPegawai(p: SkDasarPegawaiUntukDasar): DasarKgbBerikutnya | null {
-  const nomorSK = terisi(p.nomorSkDasar);
-  const tanggalSK = iso(p.tanggalSkDasar);
-  if (!nomorSK && !tanggalSK) return null;
-  // Masa kerja golongan 0 tahun 0 bulan berarti belum pernah KGB: SK dasarnya SK CPNS (lib/usulanPegawai.ts).
-  const jenis: JenisDasarKgb = (p.mkgTahun ?? 0) === 0 && (p.mkgBulan ?? 0) === 0 ? "cpns" : "kgb";
-  return { jenis, label: LABEL_DASAR_KGB[jenis], nomorSK, tanggalSK, tmt: iso(p.tmtKgbTerakhir) };
-}
+export type KgbSelesaiUntukDasar = KgbUntukLinimasa;
 
 /**
  * SK yang menjadi dasar KGB berikutnya. SK kenaikan pangkat atau PMK menang bila TMT-nya pada atau sesudah
- * TMT SK KGB terakhir; di antara keduanya, yang TMT-nya paling baru. null bila tidak satu pun diketahui.
+ * TMT SK KGB terakhir dan tidak sesudah TMT KGB berikutnya; di antara keduanya, yang TMT-nya paling baru. null bila
+ * tidak satu pun diketahui.
  *
  * SK KGB terakhir diambil dari riwayat KGB selesai; SK dasar Data Pegawai dipakai bila riwayatnya kosong, atau
  * bila tanggal SK-nya lebih akhir (Kanwil merekam SK yang terbit di luar SIM-KGB sesudahnya). TMT KGB terakhir
@@ -115,36 +50,19 @@ export function dasarKgbBerikutnya(input: {
   pangkat?: readonly SkPenetapGaji[];
   pmk?: readonly SkPenetapGaji[];
   pegawai?: SkDasarPegawaiUntukDasar | null;
+  /**
+   * TMT KGB berikutnya (ADR-062): SK yang baru berlaku sesudahnya belum menetapkan gaji yang dinaikkan KGB itu,
+   * misalnya SK kenaikan pangkat yang dicatat lebih awal. Tanpa nilai ini tidak ada batas atas.
+   */
+  tmtKgbBaru?: NilaiTanggal;
 }): DasarKgbBerikutnya | null {
-  const dariRiwayat = dariKgb(input.kgb);
-  const dariData = input.pegawai ? dariPegawai(input.pegawai) : null;
-  const dataLebihBaru =
-    !!dariRiwayat && !!dariData?.tanggalSK && !!dariRiwayat.tanggalSK && dariData.tanggalSK > dariRiwayat.tanggalSK;
-  const dasarKgb = !dariRiwayat || dataLebihBaru ? dariData ?? dariRiwayat : dariRiwayat;
-  const batasDasar = tanggalKalender(dasarKgb?.tmt);
-  const batasPegawai = tanggalKalender(input.pegawai?.tmtKgbTerakhir);
-  const batas = batasDasar && batasPegawai ? (batasDasar > batasPegawai ? batasDasar : batasPegawai) : batasDasar ?? batasPegawai;
-
-  let unggul: DasarKgbBerikutnya | null = null;
-  let tmtUnggul: Date | null = null;
-  const timbang = (sk: SkPenetapGaji, jenis: "kp" | "pmk") => {
-    const tmt = tanggalKalender(sk.tmt);
-    if (!tmt) return;
-    // SK yang lebih lama daripada SK KGB terakhir sudah terwakili oleh SK KGB itu.
-    if (batas && tmt < batas) return;
-    if (tmtUnggul && tmt <= tmtUnggul) return;
-    const jenisKp = sk.jenisKp?.trim() ?? "";
-    unggul = {
-      jenis,
-      label: jenis === "kp" && isJenisKp(jenisKp) ? `${LABEL_DASAR_KGB.kp} (${JENIS_KP[jenisKp]})` : LABEL_DASAR_KGB[jenis],
-      nomorSK: terisi(sk.nomorSK),
-      tanggalSK: iso(sk.tanggalSK),
-      tmt: tmt.toISOString(),
-    };
-    tmtUnggul = tmt;
+  const { dasar } = susunLinimasaDasar({ ...input, tmtKgbSebelumnya: input.pegawai?.tmtKgbTerakhir, hanyaDasar: true });
+  if (!dasar) return null;
+  return {
+    jenis: dasar.jenis,
+    label: dasar.jenis === "kgb" ? LABEL_DASAR_KGB.kgb : dasar.label,
+    nomorSK: dasar.nomorSK,
+    tanggalSK: dasar.tanggalSK,
+    tmt: dasar.tmt,
   };
-  for (const sk of input.pangkat ?? []) timbang(sk, "kp");
-  for (const sk of input.pmk ?? []) timbang(sk, "pmk");
-
-  return unggul ?? dasarKgb;
 }

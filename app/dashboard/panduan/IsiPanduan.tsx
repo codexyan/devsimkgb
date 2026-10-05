@@ -1523,7 +1523,12 @@ export default async function IsiPanduan({
                       Bagian <strong>Atas Dasar</strong> berisi SK terbaru yang menetapkan gaji pokok pegawai, dan
                       judul serta nama isiannya menyesuaikan SK itu: Atas Dasar SK KGB Terakhir, SK Kenaikan Pangkat,
                       SK PMK, atau SK CPNS bagi pegawai yang belum pernah KGB. Aturannya: SK KGB terakhir dipakai,
-                      kecuali ada SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang TMT-nya sesudah SK KGB itu.
+                      kecuali ada SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang TMT-nya sesudah SK KGB itu dan
+                      tidak sesudah TMT KGB yang sedang dibuat. Contohnya, KGB terakhir 1 Desember 2024 lalu kenaikan
+                      pangkat 1 Januari 2026: dasar KGB 1 Desember 2026 adalah SK kenaikan pangkat itu, dan dasar KGB
+                      1 Desember 2028 adalah SK KGB 1 Desember 2026 bila sesudahnya tidak ada kenaikan pangkat atau PMK
+                      lagi. Tombol <strong>Lihat linimasa</strong> menampilkan seluruh SK itu menurut TMT-nya beserta SK
+                      yang menjadi dasar KGB ini.
                       Isiannya terisi sendiri dari riwayat KGB, riwayat pangkat dan PMK, atau SK dasar yang tercatat
                       pada data pegawai, misalnya SK CPNS yang diketik UPT pada usulannya. Cocokkan dengan SK yang
                       dilampirkan. Nomor, Tanggal, dan TMT-nya wajib diisi; Oleh wajib dilengkapi paling lambat saat
@@ -1570,6 +1575,15 @@ export default async function IsiPanduan({
                       Periksa bagian Atas Dasar SK Terakhir; keempat isiannya wajib, termasuk Oleh. Lalu isi
                       bagian SK KGB Baru: Nomor SK Baru dari Tata Usaha dan Tanggal SK Baru. Penandatangan dipilih menurut
                       Tanggal SK Baru sesuai data di Pengaturan.
+                    </p>
+                    <p>
+                      Isian Atas Dasar berasal dari Input KGB, dan diperiksa lagi setiap jendela Buat SK atau Perbaiki SK
+                      dibuka. Bila sesudah Input KGB tercatat SK yang lebih baru, misalnya SK kenaikan pangkat yang
+                      direkam belakangan atau SK dasar yang dibetulkan di Data Pegawai, isiannya langsung diganti dengan
+                      SK terbaru. Penggantian itu ditandai catatan dan dapat dibatalkan dengan{" "}
+                      <em>Kembalikan isian Input KGB</em>. Bila golongan atau masa kerja golongan pegawai berubah sesudah
+                      Input KGB, gaji pada KGB itu masih dihitung dari data lama. SK-nya karena itu tidak dapat dibuat:
+                      batalkan KGB tersebut lalu Input Ulang.
                     </p>
                     <p>
                       Periksa pratinjau pada tab SK biasa dan Versi Srikandi, lalu pilih Buat dan Unduh SK. SIM-KGB
