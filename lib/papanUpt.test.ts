@@ -103,3 +103,16 @@ test("kolom Selesai pada papan UPT hanya diisi SK yang sudah direkam di Gaji Web
     'usulan yang sudah ditinjau kembali dijadikan kartu papan; tempatnya di Riwayat usulan dan laporan',
   );
 });
+
+test("draf terkunci kalah dari dokumen lain milik pegawai yang sama, sehingga SK terbit tidak ikut terlipat (ADR-059)", () => {
+  const hasil = gabungKartuUpt([
+    s({ kunci: "usulan:a", kolom: "kunci", pegawaiId: "p1", nip: "1", ringkas: "draf data terkunci" }),
+    s({ kunci: "sk:b", kolom: "sk", pegawaiId: "p1", nip: "1", ringkas: "sk terbit" }),
+  ]);
+  assert.equal(hasil.length, 1);
+  assert.equal(hasil[0].kolom, "sk");
+  assert.deepEqual(hasil[0].lain.map((l) => l.kunci), ["usulan:a"]);
+  const per = kartuPerKolom([s({ kunci: "usulan:c", kolom: "kunci", pegawaiId: "p2", nip: "2", ringkas: "c" })]);
+  assert.deepEqual(per.kunci.map((k) => k.kunci), ["usulan:c"]);
+  assert.deepEqual(per.kerja, []);
+});

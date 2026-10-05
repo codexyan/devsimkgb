@@ -9,14 +9,19 @@
 // Modul ini menggabungkannya: dokumen milik orang yang sama menjadi satu kartu di kolom yang paling perlu
 // dikerjakan, dan dokumen lainnya disebut sebagai keterangan di kartu itu. Murni agar dapat diuji tanpa React.
 
-export type KolomUpt = "kerja" | "kanwil" | "sk" | "selesai";
+/**
+ * "kunci" adalah draf data yang masa usul KGB-nya belum dibuka (ADR-059). Bukan kolom tersendiri di layar: ia tampil
+ * terlipat di bawah Perlu dikerjakan. Dipisah di sini supaya kalah dari dokumen lain milik pegawai yang sama, misalnya
+ * SK terbit yang harus direkam di Gaji Web, alih-alih menyeretnya ikut terlipat.
+ */
+export type KolomUpt = "kerja" | "kanwil" | "sk" | "selesai" | "kunci";
 
 /**
  * Urutan pemilihan kartu utama, bukan urutan kolom di layar. Yang menunggu tindakan UPT didahulukan: "kerja"
  * (melengkapi atau memperbaiki usulan) lalu "sk" (merekam di Gaji Web). "kanwil" sedang ditunggu orang lain, dan
  * "selesai" tidak menuntut apa pun.
  */
-const URUTAN_KOLOM: Record<KolomUpt, number> = { kerja: 0, sk: 1, kanwil: 2, selesai: 3 };
+const URUTAN_KOLOM: Record<KolomUpt, number> = { kerja: 0, sk: 1, kanwil: 2, selesai: 3, kunci: 4 };
 
 export interface SumberKartu {
   /** Kunci unik sumbernya, mis. "usulan:<id>", "sk:<id>", "proses:<id>". */
@@ -106,7 +111,7 @@ export function kartuPerKolom<T extends SumberKartu>(
 ): Record<KolomUpt, KartuGabung<T>[]> {
   const gabung = gabungKartuUpt(sumber);
   const urutanKunci = new Map(sumber.map((s, i) => [s.kunci, i]));
-  const hasil: Record<KolomUpt, KartuGabung<T>[]> = { kerja: [], kanwil: [], sk: [], selesai: [] };
+  const hasil: Record<KolomUpt, KartuGabung<T>[]> = { kerja: [], kanwil: [], sk: [], selesai: [], kunci: [] };
   for (const g of gabung) hasil[g.kolom].push(g);
   for (const kolom of Object.keys(hasil) as KolomUpt[]) {
     hasil[kolom].sort((a, b) => (urutanKunci.get(a.kunci) ?? 0) - (urutanKunci.get(b.kunci) ?? 0));

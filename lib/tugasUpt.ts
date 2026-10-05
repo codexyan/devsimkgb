@@ -36,6 +36,8 @@ export interface UsulanTugas {
   id: string;
   pegawaiId: string | null;
   status: string;
+  /** "perubahan" atau "baru"; draf pegawai baru tidak pernah dikunci (lihat drafTerkunci). */
+  jenis?: string;
   nama: string;
   nip: string;
   /** Yang masih kurang sebelum draf boleh diajukan; kosong berarti siap. */
@@ -71,6 +73,40 @@ export interface TugasUpt {
   usulanId: string | null;
   pegawaiId: string | null;
   tmt: string | null;
+  /** Draf yang masa usul KGB-nya belum dibuka; null bila dapat diajukan sekarang (ADR-059). */
+  terkunci: DrafTerkunci | null;
+}
+
+/** Bulan TMT KGB pegawai dan bulan dibukanya draf itu di dasbor, keduanya "yyyy-mm". */
+export interface DrafTerkunci {
+  bulanTmt: string;
+  bulanKirim: string;
+}
+
+/** Kunci bulan "yyyy-mm" digeser n bulan. */
+function geserBulanKunci(bulan: string, n: number): string {
+  const [tahun, b] = bulan.split("-").map(Number);
+  const d = new Date(Date.UTC(tahun, b - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Draf usulan data yang dikunci di dasbor sampai masa usul KGB pegawainya dibuka (ADR-059). Surat usulan KGB
+ * dikirim tanggal 1 sampai 10 bulan kedua sebelum TMT; `bulanUsulan` adalah bulan TMT yang suratnya dikirim bulan
+ * ini, jadi draf terbuka sejak bulanTmt <= bulanUsulan, dan yang sudah lewat pun tetap terbuka.
+ *
+ * Tidak dikunci: draf pegawai baru (datanya belum ada di Kanwil sama sekali, sehingga pendataan tidak boleh menunggu
+ * jadwal KGB) dan usulan yang dikembalikan Kanwil (sudah pernah dikirim dan sedang ditunggu perbaikannya). Kuncinya
+ * hanya di dasbor: Usulan kolektif dan Data Pegawai tetap dapat mengajukannya bila mendesak.
+ */
+export function drafTerkunci(
+  usulan: { status: string; jenis?: string },
+  bulanTmt: string | null | undefined,
+  bulanUsulan: string | null,
+): DrafTerkunci | null {
+  if (usulan.status !== "draf" || usulan.jenis === "baru" || !bulanTmt || !bulanUsulan) return null;
+  if (bulanTmt <= bulanUsulan) return null;
+  return { bulanTmt, bulanKirim: geserBulanKunci(bulanTmt, -2) };
 }
 
 /**
@@ -87,6 +123,7 @@ export function daftarTugasUpt(
 ): TugasUpt[] {
   const tugas: TugasUpt[] = [];
   const tmtPegawai = new Map(pegawai.map((p) => [p.id, p.tmtKgb]));
+  const bulanPegawai = new Map(pegawai.map((p) => [p.id, p.bulanTmt]));
 
   for (const u of usulan) {
     const tmt = u.pegawaiId ? tmtPegawai.get(u.pegawaiId) ?? null : null;
@@ -101,10 +138,12 @@ export function daftarTugasUpt(
         usulanId: u.id,
         pegawaiId: u.pegawaiId,
         tmt,
+        terkunci: null,
       });
       continue;
     }
     if (u.status !== "draf") continue;
+    const terkunci = drafTerkunci(u, u.pegawaiId ? bulanPegawai.get(u.pegawaiId) : null, bulanUsulan);
     tugas.push(
       u.kekurangan.length > 0
         ? {
@@ -117,6 +156,7 @@ export function daftarTugasUpt(
             usulanId: u.id,
             pegawaiId: u.pegawaiId,
             tmt,
+            terkunci,
           }
         : {
             kunci: `usulan:${u.id}`,
@@ -128,6 +168,7 @@ export function daftarTugasUpt(
             usulanId: u.id,
             pegawaiId: u.pegawaiId,
             tmt,
+            terkunci,
           },
     );
   }
@@ -147,12 +188,15 @@ export function daftarTugasUpt(
       usulanId: null,
       pegawaiId: p.id,
       tmt: p.tmtKgb,
+      terkunci: null,
     });
   }
 
   // Yang jatuh temponya lebih dekat dikerjakan lebih dulu; yang tanpa TMT jatuh ke belakang.
+  // Draf yang terkunci selalu di belakang yang dapat dikerjakan sekarang.
   return tugas.sort(
     (a, b) =>
+      Number(!!a.terkunci) - Number(!!b.terkunci) ||
       URUTAN[a.jenis] - URUTAN[b.jenis] ||
       (a.tmt ?? "9999").localeCompare(b.tmt ?? "9999") ||
       a.nama.localeCompare(b.nama),

@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { daftarTugasUpt, type PegawaiTugas, type UsulanTugas } from "./tugasUpt";
+import { daftarTugasUpt, drafTerkunci, type PegawaiTugas, type UsulanTugas } from "./tugasUpt";
 
 const pegawai = (p: Partial<PegawaiTugas> = {}): PegawaiTugas => ({
   id: "p1",
@@ -85,4 +85,34 @@ test("dalam satu jenis: TMT terdekat dulu, lalu nama, yang tanpa TMT paling bela
     "2026-06",
   );
   assert.deepEqual(daftar.map((t) => t.nama), ["Depan", "Anwar", "Belakang", "Tanpa TMT"]);
+});
+
+/* ── Draf terkunci sampai masa usul KGB-nya (ADR-059) ── */
+
+test("draf perbaikan data terkunci sampai bulan kirim KGB-nya, 2 bulan sebelum TMT", () => {
+  // Bulan usulan Desember 2026 (dikirim Oktober). KGB Januari 2028: dibuka November 2027.
+  assert.deepEqual(drafTerkunci({ status: "draf", jenis: "perubahan" }, "2028-01", "2026-12"), { bulanTmt: "2028-01", bulanKirim: "2027-11" });
+  // Masa usulnya sudah dibuka (bulan ini) atau sudah lewat: terbuka.
+  assert.equal(drafTerkunci({ status: "draf", jenis: "perubahan" }, "2026-12", "2026-12"), null);
+  assert.equal(drafTerkunci({ status: "draf", jenis: "perubahan" }, "2026-08", "2026-12"), null);
+  // Pegawai baru, usulan yang dikembalikan Kanwil, dan pegawai tanpa TMT tidak pernah dikunci.
+  assert.equal(drafTerkunci({ status: "draf", jenis: "baru" }, "2028-01", "2026-12"), null);
+  assert.equal(drafTerkunci({ status: "revisi", jenis: "perubahan" }, "2028-01", "2026-12"), null);
+  assert.equal(drafTerkunci({ status: "draf", jenis: "perubahan" }, null, "2026-12"), null);
+  // Pergantian tahun.
+  assert.equal(drafTerkunci({ status: "draf" }, "2027-02", "2026-12")?.bulanKirim, "2026-12");
+});
+
+test("daftar kerja: draf terkunci membawa bulan kirimnya dan selalu di belakang yang dapat dikerjakan", () => {
+  const daftar = daftarTugasUpt(
+    [
+      usulan({ id: "u-jauh", pegawaiId: "p-jauh", jenis: "perubahan" }),
+      usulan({ id: "u-dekat", pegawaiId: "p1", jenis: "perubahan", kekurangan: ["jabatan"] }),
+    ],
+    [pegawai({ id: "p-jauh", bulanTmt: "2028-01", tmtKgb: "2028-01-01", usulanBerjalan: "draf" }), pegawai({ usulanBerjalan: "draf" })],
+    "2026-06",
+  );
+  assert.deepEqual(daftar.map((t) => t.usulanId), ["u-dekat", "u-jauh"]);
+  assert.equal(daftar[0].terkunci, null);
+  assert.deepEqual(daftar[1].terkunci, { bulanTmt: "2028-01", bulanKirim: "2027-11" });
 });
