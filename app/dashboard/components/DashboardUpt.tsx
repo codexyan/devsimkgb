@@ -201,6 +201,10 @@ function keadaan(p: PegawaiUpt): { teks: string; nada?: Nada } {
 
 /** Satu dokumen di papan beserta cara menggambarnya; penggabungan per pegawai di lib/papanUpt.ts. */
 interface SumberPapan extends SumberKartu {
+  /** Nama pegawai; dipakai pencarian di Perlu dikerjakan (ADR-060). */
+  nama: string;
+  /** Id usulan bila kartu ini draf lengkap yang dapat dicentang untuk diajukan. */
+  pilihSiap?: string | null;
   render: (lain: string[]) => React.ReactNode;
 }
 
@@ -337,6 +341,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     { jenis: "bulan"; bulanTmt: string } | { jenis: "terlambat" } | null
   >(null);
   const [pilihAjukan, setPilihAjukan] = useState<Set<string>>(() => new Set());
+  const [cariKerja, setCariKerja] = useState("");
   const [dialogAjukan, setDialogAjukan] = useState(false);
   /** Unggahan massal: satu berkas menjadi banyak draf sekaligus. */
   const [suratAjukan, setSuratAjukan] = useState({ nomorSurat: "", tanggalSurat: "" });
@@ -951,7 +956,10 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         kunci: t.kunci,
         pegawaiId: t.pegawaiId,
         nip: t.nip,
+        nama: t.nama,
         waktu: u?.diajukanAt ?? null,
+        // Draf lengkap yang dapat dicentang; dipakai "Centang semua yang siap" di Perlu dikerjakan (ADR-060).
+        pilihSiap: u && !kunci && t.jenis === "ajukan" ? u.id : null,
         ringkas: kunci ? `draf data terkunci sampai ${namaBulan(kunci.bulanKirim)}` : cfg.judul.toLowerCase(),
         render: (lain: string[]) => (
           <KartuUpt
@@ -1023,6 +1031,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         kunci: `laporan:${l.id}`,
         pegawaiId: l.pegawaiId ?? null,
         nip: l.nip,
+        nama: l.nama,
         waktu: l.tmt ?? null,
         ringkas: `laporan ${l.label.toLowerCase()} dikembalikan`,
         render: (lain: string[]) => (
@@ -1048,6 +1057,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         kunci: `usulan:${u.id}`,
         pegawaiId: u.pegawaiId,
         nip: u.nip,
+        nama: u.nama,
         waktu: u.diajukanAt ?? null,
         ringkas: `${LABEL_JENIS_USULAN[u.jenis] ?? u.jenis} menunggu tinjauan Kanwil`,
         render: (lain: string[]) => (
@@ -1070,6 +1080,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
       kunci: `proses:${p.id}`,
       pegawaiId: p.id,
       nip: p.nip,
+      nama: p.nama,
       waktu: null,
       ringkas: "SK sedang dibuat Kanwil",
       render: (lain: string[]) => (
@@ -1088,6 +1099,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         kunci: `laporan:${l.id}`,
         pegawaiId: l.pegawaiId ?? null,
         nip: l.nip,
+        nama: l.nama,
         waktu: l.tmt ?? null,
         ringkas: `laporan ${l.label.toLowerCase()} menunggu tinjauan`,
         render: (lain: string[]) => (
@@ -1112,6 +1124,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         kunci: `sk:${sk.id}`,
         pegawaiId: sk.pegawaiId ?? null,
         nip: sk.nip ?? "",
+        nama: sk.nama,
         waktu: sk.diunggahAt ?? null,
         ringkas: sk.berkasAda ? "SK terbit, belum direkam di Gaji Web" : "SK menunggu berkas dari Tim SDM",
         render: (lain: string[]) => (
@@ -1165,6 +1178,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         kunci: `sk:${sk.id}`,
         pegawaiId: sk.pegawaiId ?? null,
         nip: sk.nip ?? "",
+        nama: sk.nama,
         waktu: sk.gajiWebAt ?? null,
         ringkas: `SK TMT ${fmtTgl(sk.tmtKgbBaru)} sudah direkam di Gaji Web`,
         render: (lain: string[]) => (
@@ -1197,6 +1211,27 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
 
   /** Satu kartu per pegawai; dokumen lain miliknya disebut di kartu itu (lib/papanUpt.ts). */
   const kolomPapan = kartuPerKolom(sumberPapan);
+  // Pencarian di Perlu dikerjakan: sesudah Unggah daftar kolom ini dapat berisi ratusan draf (ADR-060).
+  const qKerja = cariKerja.trim().toLowerCase();
+  const angkaKerja = qKerja.replace(/\D/g, "");
+  const cocokKerja = (g: { utama: SumberPapan }) =>
+    !qKerja ||
+    g.utama.nama.toLowerCase().includes(qKerja) ||
+    (!!angkaKerja && g.utama.nip.replace(/\D/g, "").includes(angkaKerja));
+  const kerjaTampil = kolomPapan.kerja.filter(cocokKerja);
+  const kunciTampil = kolomPapan.kunci.filter(cocokKerja);
+  const siapTampil = kerjaTampil.map((g) => g.utama.pilihSiap).filter((id): id is string => !!id);
+  const semuaSiapDipilih = siapTampil.length > 0 && siapTampil.every((id) => pilihAjukan.has(id));
+  function centangSemuaSiap() {
+    setPilihAjukan((lama) => {
+      const baru = new Set(lama);
+      for (const id of siapTampil) {
+        if (semuaSiapDipilih) baru.delete(id);
+        else baru.add(id);
+      }
+      return baru;
+    });
+  }
 
   return (
     <div className="dsb-halaman" data-muat-layar="">
@@ -1614,7 +1649,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         </div>
         <div className="dsb-papan dsb-antrian-gulir" role="list" aria-label="Kolom alur KGB">
           {KOLOM_UPT.map(({ k, judul, ket, nada }) => {
-            const isi = kolomPapan[k];
+            const isi = k === "kerja" ? kerjaTampil : kolomPapan[k];
             const diciut = ciutPapan.has(k);
             return (
               <section key={k} role="listitem" className="dsb-papan-kolom" data-ciut={diciut ? "" : undefined} aria-label={`${judul}: ${isi.length}`}>
@@ -1627,31 +1662,51 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 >
                   <span className="dsb-titik" data-nada={nada} aria-hidden="true" />
                   <span className="dsb-papan-judul">{judul}</span>
-                  <span className="dsb-papan-jumlah">{isi.length}</span>
+                  <span className="dsb-papan-jumlah">{k === "kerja" ? kolomPapan.kerja.length : isi.length}</span>
                   {!diciut && <span className="upt-papan-ket">{ket}</span>}
                 </button>
                 {!diciut && (
                   <div className="dsb-papan-isi">
+                    {/* Kotak cari muncul bila kartunya cukup banyak; tetap terlihat selama ada kata carian. */}
+                    {k === "kerja" && (kolomPapan.kerja.length + kolomPapan.kunci.length > 4 || cariKerja) && (
+                      <div className="upt-papan-cari">
+                        <input
+                          type="search"
+                          className="dsb-cari"
+                          placeholder="Cari nama atau NIP"
+                          value={cariKerja}
+                          onChange={(e) => setCariKerja(e.target.value)}
+                          aria-label="Cari di Perlu dikerjakan"
+                        />
+                        {siapTampil.length > 1 && (
+                          <button type="button" className="pgw-tautan" onClick={centangSemuaSiap}>
+                            {semuaSiapDipilih ? "Batalkan centang" : `Centang ${siapTampil.length} yang siap`}
+                          </button>
+                        )}
+                      </div>
+                    )}
                     {isi.length === 0 && (
-                      <p className="dsb-papan-kosong">{memuat && !data ? "Memuat…" : KOSONG_UPT[k]}</p>
+                      <p className="dsb-papan-kosong">
+                        {memuat && !data ? "Memuat…" : k === "kerja" && qKerja ? "Tidak ada yang cocok dengan pencarian." : KOSONG_UPT[k]}
+                      </p>
                     )}
                     {isi.map((g) => (
                       <React.Fragment key={g.kunci}>{g.utama.render(g.lain.map((l) => l.ringkas))}</React.Fragment>
                     ))}
                     {/* Draf data yang masa usul KGB-nya belum dibuka (ADR-059): terlipat, tanpa centang, dan
                         terbuka sendiri pada bulan kirimnya, 2 bulan sebelum TMT. */}
-                    {k === "kerja" && kolomPapan.kunci.length > 0 && (
-                      <details className="upt-terkunci">
+                    {k === "kerja" && kunciTampil.length > 0 && (
+                      <details className="upt-terkunci" open={qKerja ? true : undefined}>
                         <summary>
                           Terkunci sampai masa usul KGB
-                          <span className="dsb-papan-jumlah">{kolomPapan.kunci.length}</span>
+                          <span className="dsb-papan-jumlah">{kunciTampil.length}</span>
                         </summary>
                         <p className="upt-terkunci-ket">
                           Draf data pegawai yang KGB-nya belum masuk masa usul. Terbuka sendiri pada bulan kirimnya, 2 bulan
                           sebelum TMT. Yang mendesak tetap dapat diajukan lewat Usulan kolektif.
                         </p>
                         <div className="upt-terkunci-isi">
-                          {kolomPapan.kunci.map((g) => (
+                          {kunciTampil.map((g) => (
                             <React.Fragment key={g.kunci}>{g.utama.render(g.lain.map((l) => l.ringkas))}</React.Fragment>
                           ))}
                         </div>

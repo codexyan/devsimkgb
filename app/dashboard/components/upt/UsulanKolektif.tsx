@@ -184,7 +184,7 @@ const rupiah = (n: number) => `Rp${new Intl.NumberFormat("id-ID").format(n)}`;
 const ukuranBerkas = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
 type Langkah = 1 | 2 | 3;
-type Saring = "periode" | "draf" | "semua";
+type Saring = "periode" | "baru" | "draf" | "semua";
 
 export default function UsulanKolektif() {
   const [pegawai, setPegawai] = useState<PegawaiUpt[]>([]);
@@ -192,7 +192,11 @@ export default function UsulanKolektif() {
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
   const [terpilih, setTerpilih] = useState<Set<string>>(() => new Set());
+  // Draf pegawai baru ikut dipilih kecuali dikeluarkan di sini; draf yang baru dimuat ulang tetap ikut (ADR-060).
+  const [baruDikeluarkan, setBaruDikeluarkan] = useState<Set<string>>(() => new Set());
   const [cari, setCari] = useState("");
+  // Pencarian di langkah Lengkapi: daftar kirinya dapat berisi ratusan pegawai baru hasil Unggah daftar.
+  const [cariBaris, setCariBaris] = useState("");
   // Dibuka dari kartu Terlambat, saringan periode justru menyembunyikan yang baru saja dicentang:
   // TMT mereka sudah lewat bulan usulan. Karena itu halaman langsung dibuka pada "Semua".
   const [saring, setSaring] = useState<Saring>(() =>
@@ -230,8 +234,13 @@ export default function UsulanKolektif() {
       const du = (await ru.json().catch(() => [])) as DrafUpt[];
       if (!rp.ok) throw new Error(dp.error ?? "Data pegawai gagal dimuat");
       const daftar = dp.pegawai ?? [];
+      const semuaDraf = Array.isArray(du) ? du : [];
       setPegawai(daftar);
-      setDraf(Array.isArray(du) ? du : []);
+      setDraf(semuaDraf);
+      // Dibuka tanpa tautan pengingat, tanpa pegawai jatuh tempo, tetapi ada draf pegawai baru (lazimnya sesudah
+      // Unggah daftar): langsung tampilkan pegawai barunya, bukan "Tidak ada pegawai dengan KGB TMT …".
+      if (!pilihAwal && !daftar.some((p) => p.bulanTmt === bulanUsulan) && semuaDraf.some((d) => d.jenis === "baru" && (d.status === "draf" || d.status === "revisi")))
+        setSaring((s) => (s === "periode" ? "baru" : s));
       if (pilihAwal) {
         // Untuk yang terlambat, yang dicentang hanya yang benar-benar masih menunggu tindakan UPT: Kanwil
         // belum memproses KGB-nya sama sekali. Yang SK-nya sudah terbit atau sedang diproses tidak perlu
@@ -270,18 +279,52 @@ export default function UsulanKolektif() {
   const adaDraf = pegawai.filter((p) => drafPerPegawai.has(p.id));
   const daftarPilih = pegawai.filter(
     (p) =>
+      saring !== "baru" &&
       (saring === "semua" || (saring === "periode" ? p.bulanTmt === bulanUsulan : drafPerPegawai.has(p.id))) &&
       (!q || `${p.nama} ${p.nip}`.toLowerCase().includes(q)),
   );
-  /** Pegawai dikelompokkan per bulan TMT, terdekat lebih dulu. */
-  const kelompokPilih = useMemo(() => {
+  /**
+   * Pegawai dikelompokkan per bulan TMT, terdekat lebih dulu. Dihitung langsung, tanpa useMemo: React Compiler
+   * tidak dapat mempertahankan memo manual ini begitu draf pegawai baru ikut dipilih dan dicari di halaman yang sama,
+   * dan daftarnya cukup kecil untuk dihitung ulang tiap render.
+   */
+  const kelompokPilih = (() => {
     const peta = new Map<string, PegawaiUpt[]>();
     for (const p of daftarPilih) {
       const k = p.bulanTmt ?? "tanpa";
       peta.set(k, [...(peta.get(k) ?? []), p]);
     }
     return [...peta.entries()].sort(([a], [b]) => (a === "tanpa" ? 1 : b === "tanpa" ? -1 : a.localeCompare(b)));
-  }, [daftarPilih]);
+  })();
+
+  const baruDipilih = drafBaru.filter((d) => !baruDikeluarkan.has(d.id));
+  /** Draf pegawai baru yang tampil: pada saringan "Pegawai baru" dan "Semua", menurut pencarian. */
+  const drafBaruTampil =
+    saring === "baru" || saring === "semua"
+      ? drafBaru.filter((d) => !q || `${d.nama ?? ""} ${d.nip ?? ""}`.toLowerCase().includes(q))
+      : [];
+  const semuaBaruTampilDipilih = drafBaruTampil.length > 0 && drafBaruTampil.every((d) => !baruDikeluarkan.has(d.id));
+
+  function alihBaru(id: string) {
+    setBaruDikeluarkan((lama) => {
+      const baru = new Set(lama);
+      if (baru.has(id)) baru.delete(id);
+      else baru.add(id);
+      return baru;
+    });
+  }
+
+  /** Pilih atau keluarkan seluruh draf pegawai baru yang sedang tampil (menurut pencarian). */
+  function pilihSemuaBaru(centang: boolean) {
+    setBaruDikeluarkan((lama) => {
+      const baru = new Set(lama);
+      for (const d of drafBaruTampil) {
+        if (centang) baru.delete(d.id);
+        else baru.add(d.id);
+      }
+      return baru;
+    });
+  }
 
   function alih(id: string) {
     setTerpilih((lama) => {
@@ -310,7 +353,7 @@ export default function UsulanKolektif() {
     const dariPegawai = pegawai
       .filter((p) => terpilih.has(p.id))
       .map((p) => lama.get(drafPerPegawai.has(p.id) ? `draf:${drafPerPegawai.get(p.id)!.id}` : `pegawai:${p.id}`) ?? barisDari(p, drafPerPegawai.get(p.id) ?? null));
-    const baru = drafBaru.map((d) => lama.get(`draf:${d.id}`) ?? barisDari(null, d));
+    const baru = baruDipilih.map((d) => lama.get(`draf:${d.id}`) ?? barisDari(null, d));
     const susun = [...dariPegawai, ...baru];
     setBaris(susun);
     setAktif((a) => (a && susun.some((b) => b.kunci === a) ? a : susun[0]?.kunci ?? null));
@@ -451,7 +494,7 @@ export default function UsulanKolektif() {
 
   const jumlahBerubah = baris?.filter((b) => b.keadaan !== "tersimpan" && berubah(b)).length ?? 0;
   const jumlahLengkap = baris?.filter((b) => kelengkapan(b).kurang.length === 0).length ?? 0;
-  const jumlahDipilih = terpilih.size + drafBaru.length;
+  const jumlahDipilih = terpilih.size + baruDipilih.length;
   const barisAktif = baris?.find((b) => b.kunci === aktif) ?? baris?.[0] ?? null;
   const indeksAktif = barisAktif && baris ? baris.indexOf(barisAktif) : -1;
 
@@ -522,30 +565,95 @@ export default function UsulanKolektif() {
               <button type="button" aria-pressed={saring === "periode"} onClick={() => setSaring("periode")}>
                 Jatuh tempo TMT {namaBulan(bulanUsulan)} <small>{jatuhTempo.length}</small>
               </button>
+              {drafBaru.length > 0 && (
+                <button type="button" aria-pressed={saring === "baru"} onClick={() => setSaring("baru")}>
+                  Pegawai baru <small>{drafBaru.length}</small>
+                </button>
+              )}
               <button type="button" aria-pressed={saring === "draf"} onClick={() => setSaring("draf")}>
                 Ada draf <small>{adaDraf.length}</small>
               </button>
               <button type="button" aria-pressed={saring === "semua"} onClick={() => setSaring("semua")}>
-                Semua <small>{pegawai.length}</small>
+                Semua <small>{pegawai.length + drafBaru.length}</small>
               </button>
             </div>
             <input type="search" className="dsb-cari" placeholder="Cari nama atau NIP" value={cari} onChange={(e) => setCari(e.target.value)} aria-label="Cari pegawai" />
           </div>
 
-          {drafBaru.length > 0 && (
+          {/* Pegawai baru di luar saringannya: cukup satu baris ringkas, karena mereka tetap ikut dipilih. Dulu
+              seluruh namanya ditulis sebagai satu paragraf, yang dengan 159 pegawai menjadi dinding teks (ADR-060). */}
+          {drafBaru.length > 0 && saring !== "baru" && saring !== "semua" && (
             <p className="kol-info">
-              {drafBaru.length} pegawai baru dari Unggah daftar ikut otomatis: {drafBaru.map((d) => d.nama).join(", ")}.
+              {baruDipilih.length} dari {drafBaru.length} pegawai baru ikut dipilih.{" "}
+              <button type="button" className="pgw-tautan" onClick={() => setSaring("baru")}>
+                Lihat pegawai baru
+              </button>
             </p>
+          )}
+
+          {drafBaruTampil.length > 0 && (
+            <div className="kol-kelompok-daftar">
+              <section className="kol-kelompok" aria-label="Pegawai baru">
+                <div className="kol-kelompok-kepala">
+                  <p>
+                    Pegawai baru
+                    <span className="dsb-tag" data-nada="hijau">belum tercatat di Kanwil</span>
+                    <small>
+                      {drafBaruTampil.length === drafBaru.length ? `${drafBaru.length} pegawai` : `${drafBaruTampil.length} dari ${drafBaru.length} pegawai`}
+                      {" · "}
+                      {drafBaru.filter((d) => d.kekurangan.length === 0).length} siap diajukan
+                    </small>
+                  </p>
+                  <button type="button" className="pgw-tautan" onClick={() => pilihSemuaBaru(!semuaBaruTampilDipilih)}>
+                    {semuaBaruTampilDipilih ? "Batalkan semua" : "Pilih semua"}
+                  </button>
+                </div>
+                <ul className="kol-kartu-daftar">
+                  {drafBaruTampil.map((d) => {
+                    const dipilih = !baruDikeluarkan.has(d.id);
+                    const golongan = d.nilai?.golonganRuang;
+                    return (
+                      <li key={d.id}>
+                        <label className="kol-kartu" data-pilih={dipilih ? "" : undefined}>
+                          <input type="checkbox" className="sr-only" checked={dipilih} onChange={() => alihBaru(d.id)} />
+                          <span className="kol-kartu-centang" aria-hidden="true">{dipilih ? "✓" : ""}</span>
+                          <span className="min-w-0">
+                            <strong>{d.nama}</strong>
+                            <span className="kol-kartu-sub">{d.nip}</span>
+                            <span className="kol-kartu-tanda">
+                              {golongan && <span className="dsb-tag" data-garis="">{golongan}</span>}
+                              {d.status === "revisi" ? (
+                                <span className="dsb-tag" data-garis="" data-nada="merah">dikembalikan</span>
+                              ) : d.kekurangan.length === 0 ? (
+                                <span className="dsb-tag" data-garis="" data-nada="hijau">siap</span>
+                              ) : (
+                                <span className="dsb-tag" data-garis="" data-nada="kuning" title={d.kekurangan.join(", ")}>
+                                  kurang {d.kekurangan.length}
+                                </span>
+                              )}
+                            </span>
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            </div>
           )}
 
           {memuat ? (
             <p className="dsb-kosong">Memuat pegawai…</p>
+          ) : saring === "baru" ? (
+            drafBaruTampil.length === 0 && <p className="dsb-kosong">Tidak ada pegawai baru yang cocok.</p>
           ) : kelompokPilih.length === 0 ? (
+            saring === "semua" && drafBaruTampil.length > 0 ? null : (
             <p className="dsb-kosong">
               {saring === "periode"
                 ? `Tidak ada pegawai dengan KGB TMT ${namaBulan(bulanUsulan)}. Pilih "Semua" untuk mengusulkan perbaikan data pegawai lain.`
                 : "Tidak ada pegawai yang cocok."}
             </p>
+            )
           ) : (
             <div className="kol-kelompok-daftar">
               {kelompokPilih.map(([bulan, daftar]) => {
@@ -601,9 +709,17 @@ export default function UsulanKolektif() {
 
           <div className="kol-kaki">
             <span>
-              <strong>{jumlahDipilih}</strong> pegawai dipilih{drafBaru.length > 0 ? ` (termasuk ${drafBaru.length} pegawai baru)` : ""}.
-              {terpilih.size > 0 && (
-                <button type="button" className="pgw-tautan" onClick={() => setTerpilih(new Set())} style={{ marginLeft: 8 }}>
+              <strong>{jumlahDipilih}</strong> pegawai dipilih{baruDipilih.length > 0 ? ` (termasuk ${baruDipilih.length} pegawai baru)` : ""}.
+              {jumlahDipilih > 0 && (
+                <button
+                  type="button"
+                  className="pgw-tautan"
+                  onClick={() => {
+                    setTerpilih(new Set());
+                    setBaruDikeluarkan(new Set(drafBaru.map((d) => d.id)));
+                  }}
+                  style={{ marginLeft: 8 }}
+                >
                   Kosongkan
                 </button>
               )}
@@ -619,8 +735,21 @@ export default function UsulanKolektif() {
       {langkah === 2 && baris && (
         <section className="dsb-panel kol-panel" aria-label="Lengkapi data dan berkas">
           <div className="kol-md">
+            <div className="kol-md-kiri">
+            {baris.length > 8 && (
+              <input
+                type="search"
+                className="dsb-cari kol-md-cari"
+                placeholder={`Cari di ${baris.length} pegawai`}
+                value={cariBaris}
+                onChange={(e) => setCariBaris(e.target.value)}
+                aria-label="Cari pegawai yang diusulkan"
+              />
+            )}
             <ul className="kol-md-daftar" aria-label="Pegawai yang diusulkan">
-              {baris.map((b) => {
+              {baris
+                .filter((b) => !cariBaris.trim() || `${b.nama} ${b.nip}`.toLowerCase().includes(cariBaris.trim().toLowerCase()))
+                .map((b) => {
                 const k = kelengkapan(b);
                 return (
                   <li key={b.kunci}>
@@ -648,6 +777,7 @@ export default function UsulanKolektif() {
                 );
               })}
             </ul>
+            </div>
 
             {barisAktif && (
               <DetailBaris
