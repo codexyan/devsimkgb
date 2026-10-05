@@ -15,6 +15,7 @@ import {
   nilaiInputTanggal,
   nomorSkTerisi,
   pesanBidangWajib,
+  selaraskanDasarPegawai,
   subjudulPegawai,
   tahunTanggalInput,
 } from "./format";
@@ -66,13 +67,9 @@ test("dasarAwalInputKgb: Input Ulang memakai data KGB yang dibatalkan, selain it
     tmtSK: "2026-11-01T00:00:00.000Z",
   };
   assert.deepEqual(dasarAwalInputKgb(jadwalDibatalkan), dasarAwalInputKgb(selesai));
-  // Tanpa nomor SK terakhir, TMT tetap menjadi isian awal.
-  assert.deepEqual(dasarAwalInputKgb({ ...kosong, prevTmtSK: "2024-06-01T00:00:00.000Z" }), {
-    nomorSK: null,
-    tanggalSK: null,
-    tmtSK: "2024-06-01T00:00:00.000Z",
-    penetapSkDasar: null,
-  });
+  // TMT saja tanpa nomor maupun tanggal SK bukan SK yang dikenali: modal mencari sendiri di riwayat (termasuk kolom
+  // SK arsip) dan data pegawai, alih-alih terbuka berisi TMT saja dengan catatan "belum tercatat" (ADR-056).
+  assert.equal(dasarAwalInputKgb({ ...kosong, prevTmtSK: "2024-06-01T00:00:00.000Z" }), null);
 });
 
 function itemRiwayat(ubah: Partial<RiwayatKgbItem>): RiwayatKgbItem {
@@ -251,4 +248,77 @@ test("dasarDariKenaikanPangkat: SK PI sesudah KGB terakhir menjadi Atas dasar (A
   assert.equal(dasarDariKenaikanPangkat(kgbTerakhir, []), null);
   // Tanpa SK dasar yang diketahui, KP terbaru dipakai.
   assert.equal(dasarDariKenaikanPangkat(null, [lama, pi])?.nomorSK, "W.19-KP.03.01-7");
+});
+
+/* ── Atas Dasar SK diselaraskan dengan SK dasar pada data pegawai (ADR-056) ── */
+
+const salinanDitolak = {
+  nomorSK: "W.19-KP.04.04- 5591",
+  tanggalSK: "2024-10-04",
+  tmtSK: "2024-12-01",
+  penetapSkDasar: "Kepala Kantor Wilayah Kementerian Hukum dan HAM Kalimantan Selatan",
+};
+const skPegawai = {
+  nomorSkDasar: "W.19-KP.04.04-5591",
+  tanggalSkDasar: "2024-10-04T00:00:00.000Z",
+  penetapSkDasar: "Kepala Kantor Wilayah Kementerian Imigrasi dan Pemasyarakatan Kalimantan Selatan",
+  tmtKgbTerakhir: "2024-12-01T00:00:00.000Z",
+};
+
+test("SK yang sama: nomor dan pejabat penetap diambil dari data pegawai, walau salinannya berspasi lain", () => {
+  assert.deepEqual(selaraskanDasarPegawai(salinanDitolak, skPegawai), {
+    nomorSK: "W.19-KP.04.04-5591",
+    tanggalSK: "2024-10-04",
+    tmtSK: "2024-12-01",
+    penetapSkDasar: "Kepala Kantor Wilayah Kementerian Imigrasi dan Pemasyarakatan Kalimantan Selatan",
+  });
+  // Pejabat penetap pada data pegawai kosong: salinan tetap dipakai untuk baris itu.
+  assert.equal(selaraskanDasarPegawai(salinanDitolak, { ...skPegawai, penetapSkDasar: null })?.penetapSkDasar, salinanDitolak.penetapSkDasar);
+  // Sudah sama persis: tidak ada yang diubah.
+  const sama = { ...salinanDitolak, nomorSK: "W.19-KP.04.04-5591", penetapSkDasar: skPegawai.penetapSkDasar };
+  assert.equal(selaraskanDasarPegawai(sama, skPegawai), null);
+});
+
+test("SK dasar data pegawai yang lebih baru menggantikan salinan; salinan yang lebih baru (SK terbitan SIM-KGB) dipertahankan", () => {
+  const baru = { ...skPegawai, nomorSkDasar: "W.19-KP.04.04-7001", tanggalSkDasar: "2026-01-10T00:00:00.000Z" };
+  assert.deepEqual(selaraskanDasarPegawai(salinanDitolak, baru), {
+    nomorSK: "W.19-KP.04.04-7001",
+    tanggalSK: "2026-01-10",
+    tmtSK: "2024-12-01",
+    penetapSkDasar: skPegawai.penetapSkDasar,
+  });
+  const terbitanSimKgb = { nomorSK: "W.19-KP.04.04-9000", tanggalSK: "2026-11-20", tmtSK: "2026-12-01", penetapSkDasar: "Kepala Kantor Wilayah" };
+  assert.equal(selaraskanDasarPegawai(terbitanSimKgb, skPegawai), null);
+});
+
+test("salinan kosong diisi SK dasar data pegawai; data pegawai tanpa SK dasar tidak mengubah apa pun", () => {
+  const kosong = { nomorSK: "", tanggalSK: "", tmtSK: "", penetapSkDasar: "" };
+  assert.deepEqual(selaraskanDasarPegawai(kosong, skPegawai), {
+    nomorSK: "W.19-KP.04.04-5591",
+    tanggalSK: "2024-10-04",
+    tmtSK: "2024-12-01",
+    penetapSkDasar: skPegawai.penetapSkDasar,
+  });
+  assert.equal(selaraskanDasarPegawai(salinanDitolak, { nomorSkDasar: null, tanggalSkDasar: null, penetapSkDasar: null, tmtKgbTerakhir: null }), null);
+});
+
+test("dasarDariKenaikanPangkat: KP yang lebih lama dari KGB terakhir pegawai, atau sesudah TMT KGB ini, bukan dasar (ADR-056)", () => {
+  const kp2025 = { nomorSK: "KP-2025", tanggalSK: "2025-03-20", tmtPangkat: "2025-04-01", penetapSK: "Kakanwil" };
+  const kp2027 = { nomorSK: "KP-2027", tanggalSK: "2027-03-20", tmtPangkat: "2027-04-01", penetapSK: "Kakanwil" };
+  // Riwayat KGB kosong, tetapi data pegawai mencatat KGB terakhir Januari 2026 (terjadi di luar SIM-KGB).
+  assert.equal(dasarDariKenaikanPangkat(null, [kp2025], { tmtKgbTerakhir: "2026-01-01" }), null);
+  // KP yang baru berlaku sesudah TMT KGB yang diinput belum menetapkan gaji yang dinaikkan KGB itu.
+  assert.equal(dasarDariKenaikanPangkat(null, [kp2027], { tmtKgbTerakhir: "2026-01-01", tmtKgbBaru: "2026-12-01" }), null);
+  // Di antara batas itu, yang TMT-nya paling baru tetap terpilih; TMT yang sama dengan KGB terakhir dimenangkan KP.
+  const kpSama = { ...kp2025, nomorSK: "KP-2026", tmtPangkat: "2026-01-01" };
+  assert.equal(
+    dasarDariKenaikanPangkat(null, [kp2025, kpSama, kp2027], { tmtKgbTerakhir: "2026-01-01", tmtKgbBaru: "2028-01-01" })?.nomorSK,
+    "KP-2027",
+  );
+  assert.equal(dasarDariKenaikanPangkat(null, [kp2025, kpSama], { tmtKgbTerakhir: "2026-01-01" })?.nomorSK, "KP-2026");
+});
+
+test("selaraskanDasarPegawai: dua SK bernomor berbeda pada tanggal yang sama tidak dianggap satu SK", () => {
+  const lain = { ...salinanDitolak, nomorSK: "W.19-KP.04.04-6000" };
+  assert.equal(selaraskanDasarPegawai(lain, skPegawai), null);
 });

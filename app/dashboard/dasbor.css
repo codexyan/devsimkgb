@@ -1616,6 +1616,10 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 .upt-kartu .dsb-kartu-kepala .dsb-cek { flex-shrink: 0; }
 .upt-kartu .dsb-kartu-aksi { display: flex; flex-wrap: wrap; gap: 6px; }
 .upt-kartu-catatan { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: var(--dt3); }
+/* SK dasar yang masih di usulan UPT, di bawah kolom Dasar KGB berikutnya (ADR-057). */
+.upt-dasar-usulan { display: grid; justify-items: start; gap: 2px; min-width: 0; margin: 6px 0 0; padding-top: 6px; border-top: 1px dashed var(--ln1); }
+.upt-dasar-usulan .dsb-tag { font-size: 10.5px; }
+.upt-dasar-usulan p { max-width: 100%; }
 .dsb-kartu-kgb[data-nada="ungu"] { box-shadow: inset 3px 0 0 var(--st-violet); }
 
 .dsb-hanya-sempit { display: none; }
@@ -2695,10 +2699,18 @@ html[data-gerak="kurangi"] .dsb-putar {
 .kol-kelompok-kepala small { font-size: 11.5px; font-weight: 500; color: var(--dt5); }
 .kol-kelompok-kepala .pgw-tautan { font-size: 12.5px; font-weight: 600; }
 .kol-kaki .pgw-tautan { font-size: 12.5px; }
-.kol-pilihan { display: flex; gap: 4px; max-width: 420px; padding: 3px; border: 1px solid var(--ln1); border-radius: 10px; background: var(--sub); }
-.kol-pilihan button { flex: 1; padding: 7px 10px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 12.5px; font-weight: 500;
-  color: var(--dt3); cursor: pointer; }
-.kol-pilihan button[aria-checked="true"] { background: var(--card); color: var(--dtn); font-weight: 600; box-shadow: 0 1px 2px rgba(15, 30, 60, .1), 0 0 0 1px var(--ln1); }
+/* Sama dengan .kgbm-pilihan di modal: titik radio terisi dan bingkai navy pada pilihan aktif (ADR-057). */
+.kol-pilihan { display: flex; gap: 4px; max-width: 420px; padding: 4px; border: 1px solid var(--ln1); border-radius: 12px; background: var(--sub); }
+.kol-pilihan button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 7px 12px;
+  border: 1px solid transparent; border-radius: 9px; background: none; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--dt4); cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s, box-shadow .15s; }
+.kol-pilihan button::before { content: ""; flex: none; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%;
+  border: 1.5px solid var(--ln0); background: var(--card); transition: border-color .15s, border-width .15s; }
+.kol-pilihan button:hover:not([aria-checked="true"]) { color: var(--dt2); }
+.kol-pilihan button[aria-checked="true"] { background: var(--card); border-color: var(--navy-solid); color: var(--dtn); font-weight: 650;
+  box-shadow: 0 1px 3px rgba(15, 30, 60, .14); }
+.kol-pilihan button[aria-checked="true"]::before { border: 4.5px solid var(--navy-solid); }
+.kol-pilihan button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .kol-kartu-daftar { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .kol-kartu-daftar-satu { grid-template-columns: minmax(0, 1fr); }
 .kol-kartu { display: flex; align-items: flex-start; gap: 10px; height: 100%; padding: 10px 12px; border: 1px solid var(--ln1); border-radius: 12px;

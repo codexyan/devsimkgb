@@ -10,6 +10,7 @@ import { kunciBulanTmt, type RekapStatusKgb } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan, namaTampilSatker, namaUnitKerja } from "@/app/dashboard/satker/labelSatker";
 import { LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { BELUM_SELESAI, LABEL_JENIS_USULAN } from "@/lib/usulanPegawai";
+import { kunciNomorSk } from "@/lib/nomorSurat";
 import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
 import { kartuPerKolom, type KolomUpt, type SumberKartu } from "@/lib/papanUpt";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
@@ -63,6 +64,8 @@ interface PegawaiUpt {
   usulanBerjalan?: string | null;
   /** SK yang menjadi dasar KGB berikutnya (ADR-030); null bila belum ada SK yang tercatat. */
   dasarKgb?: DasarKgbBerikutnya | null;
+  /** SK dasar pada usulan UPT yang belum selesai; menjadi dasar setelah disetujui Kanwil (ADR-057). */
+  skDiUsulan?: { status: string; nomorSK: string | null; tanggalSK: string | null; berkas: boolean } | null;
   dataSekarang: Record<string, string>;
   /** SK dasar dan berkas yang sudah disetujui Kanwil; terbawa ke usulan perbaikan berikutnya. */
   bawaan?: PegawaiUntukUsulan["bawaan"];
@@ -759,7 +762,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                               {/* Dasar yang bukan SK KGB berarti ada SK yang terbit sesudah KGB terakhir dan
                                   menggeser masa kerja golongannya. Ditandai agar terlihat sekilas, sebab
                                   justru baris inilah yang paling mudah keliru saat dikonfirmasi. */}
-                              {p.dasarKgb.jenis !== "kgb" && (
+                              {(p.dasarKgb.jenis === "kp" || p.dasarKgb.jenis === "pmk") && (
                                 <span
                                   className="dsb-tag"
                                   data-garis=""
@@ -781,6 +784,35 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                           ) : (
                             <span className="dsb-kecil">Belum ada SK tercatat</span>
                           )}
+                          {/* SK yang sudah diunggah UPT pada usulannya belum menjadi dasar sebelum Kanwil menyetujui;
+                              ditampilkan agar tidak terkira berkasnya hilang (ADR-057). */}
+                          {p.skDiUsulan &&
+                            (!p.dasarKgb || kunciNomorSk(p.dasarKgb.nomorSK) !== kunciNomorSk(p.skDiUsulan.nomorSK)) && (
+                              <div
+                                className="upt-dasar-usulan"
+                                title="SK ini menjadi dasar KGB berikutnya setelah usulannya disetujui Kanwil"
+                              >
+                                <span
+                                  className="dsb-tag"
+                                  data-garis=""
+                                  data-nada={p.skDiUsulan.status === "menunggu" ? "biru" : p.skDiUsulan.status === "revisi" ? "ungu" : "kuning"}
+                                >
+                                  {p.skDiUsulan.status === "menunggu"
+                                    ? "Menunggu Kanwil"
+                                    : p.skDiUsulan.status === "revisi"
+                                      ? "Dikembalikan"
+                                      : "Di draf, belum diajukan"}
+                                </span>
+                                <p className="dsb-kecil truncate" style={{ margin: 0 }} title={p.skDiUsulan.nomorSK ?? undefined}>
+                                  {[
+                                    p.skDiUsulan.nomorSK ?? (p.skDiUsulan.berkas ? "Pindaian SK, nomor belum diisi" : null),
+                                    p.skDiUsulan.tanggalSK ? fmtTgl(p.skDiUsulan.tanggalSK) : null,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                </p>
+                              </div>
+                            )}
                         </td>
                         <td>
                           <span className="dsb-status" data-nada={k.nada === "merah" ? "merah" : undefined}>
@@ -911,7 +943,10 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           <KartuUpt
             lain={lain}
             nama={t.nama}
-            sub={`${t.nip} · ${tmtSingkat(t.tmt)}`}
+            // Kartu draf adalah usulan DATA (perbaikan atau pegawai baru), bukan usulan KGB; jenisnya disebut di sini.
+            // Dulu baris ini hanya "TMT Jan 2028", sehingga draf yang siap diajukan terbaca sebagai KGB yang
+            // seharusnya masih terkunci (ADR-057).
+            sub={u ? `${t.nip} · ${LABEL_JENIS_USULAN[u.jenis] ?? "Usulan data"}` : `${t.nip} · ${tmtSingkat(t.tmt)}`}
             nada={t.jenis === "perbaiki" ? "ungu" : undefined}
             tanda={{ teks: cfg.judul, nada: cfg.nada }}
             // Penugasan BKO disebut di sini supaya tidak terkira orangnya sudah pindah dan usulannya
@@ -919,6 +954,11 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             catatan={
               [
                 t.catatan ? `${t.jenis === "perbaiki" ? "Catatan Kanwil" : "Belum ada"}: ${t.catatan}` : "",
+                // KGB pegawai ini belum dibuka: usulan datanya tetap boleh diajukan sekarang, jadwal KGB-nya tidak
+                // ikut maju. Disebut terang supaya draf tidak terkira membuka KGB lebih awal.
+                u && p?.terkunci && p.bulanTmt
+                  ? `KGB ${namaBulan(p.bulanTmt)} belum dibuka (diusulkan ${namaBulan(geserBulan(p.bulanTmt, -2))}); usulan data ini boleh diajukan sekarang`
+                  : "",
                 p?.satkerTugas ? `Sedang BKO di ${namaUnitKerja(p.satkerTugas)}; KGB tetap diusulkan satker ini` : "",
               ]
                 .filter(Boolean)

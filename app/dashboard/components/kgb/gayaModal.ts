@@ -73,12 +73,20 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
   border-radius: 10px 0 0 10px; background: var(--tint-navy); color: var(--dt3); font-size: 12px; white-space: nowrap; }
 .kgbm-berawalan > .kgbm-input { border-radius: 0 10px 10px 0; }
 .kgbm-bantuan { display: block; margin-top: 3px; font-size: 11px; font-weight: 400; line-height: 1.45; color: var(--dt4); }
-/* Pilihan keadaan: dua tombol berdampingan, yang terpilih diberi latar */
-.kgbm-pilihan { display: flex; gap: 6px; padding: 3px; border-radius: 10px; background: var(--sub); border: 1px solid var(--ln1); }
-.kgbm-pilihan button { flex: 1; border: 0; border-radius: 8px; padding: 7px 10px; background: none; font: inherit;
-  font-size: 12px; font-weight: 500; color: var(--dt3); cursor: pointer; }
-.kgbm-pilihan button[aria-checked="true"] { background: var(--kartu); color: var(--dtn); font-weight: 600;
-  box-shadow: 0 1px 2px rgba(15, 30, 60, .08); }
+/* Pilihan keadaan: dua tombol berdampingan berbentuk radio. Yang terpilih berlatar kartu, berbingkai navy, dan
+   titik radionya terisi, jadi terbaca tanpa bergantung pada warna latar saja. Dulu latarnya var(--kartu), variabel
+   milik halaman publik yang tidak ada di dasbor, sehingga pilihan aktif tampak sama dengan yang tidak (ADR-057). */
+.kgbm-pilihan { display: flex; gap: 6px; padding: 4px; border-radius: 12px; background: var(--sub); border: 1px solid var(--ln1); }
+.kgbm-pilihan button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px;
+  border: 1px solid transparent; border-radius: 9px; padding: 7px 12px; background: none; font: inherit; font-size: 12.5px;
+  font-weight: 500; color: var(--dt4); cursor: pointer; transition: background .15s, color .15s, border-color .15s, box-shadow .15s; }
+.kgbm-pilihan button::before { content: ""; flex: none; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%;
+  border: 1.5px solid var(--ln0); background: var(--card); transition: border-color .15s, border-width .15s; }
+.kgbm-pilihan button:hover:not([aria-checked="true"]) { color: var(--dt2); }
+.kgbm-pilihan button[aria-checked="true"] { background: var(--card); border-color: var(--navy-solid); color: var(--dtn); font-weight: 650;
+  box-shadow: 0 1px 3px rgba(15, 30, 60, .14); }
+.kgbm-pilihan button[aria-checked="true"]::before { border: 4.5px solid var(--navy-solid); }
+.kgbm-pilihan button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 /* Panel hasil hitungan: angka yang tidak boleh diketik operator */
 .kgbm-hitungan { border: 1px solid var(--tint-navy-ln, var(--ln1)); border-radius: 10px; padding: 10px 12px; background: var(--tint-navy); }
 .kgbm-hitungan-judul { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--dt4); }

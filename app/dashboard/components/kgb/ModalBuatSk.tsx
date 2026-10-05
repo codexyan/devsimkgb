@@ -90,8 +90,20 @@ export default function ModalBuatSk({
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
 
-  // Data SK terakhir yang terakhir tersimpan lewat PATCH, agar tidak dikirim ulang tanpa perubahan.
-  const dasarTersimpan = useRef<string | null>(null);
+  // Data SK terakhir yang terakhir tersimpan lewat PATCH, agar tidak dikirim ulang tanpa perubahan. Isian awal
+  // berasal dari data KGB itu sendiri, jadi dianggap sudah tersimpan; dulu pratinjau pertama selalu mengirimnya
+  // ulang dan dapat menimpa isian yang lebih baru dari tab lain dengan data kartu yang sudah usang (ADR-056).
+  const dasarTersimpan = useRef<string | null>(
+    (() => {
+      const awal = isianDasarSk(dasarAwal);
+      return JSON.stringify({
+        nomorSK: awal.nomorSK.trim(),
+        tanggalSK: awal.tanggalSK,
+        tmtSK: awal.tmtSK,
+        penetapSkDasar: awal.penetapSkDasar.trim(),
+      });
+    })(),
+  );
   // Naik setiap isian berubah; hasil pratinjau yang dimulai sebelum perubahan dibuang.
   const putaranIsian = useRef(0);
   const urlPratinjau = useRef<Record<Versi, string | null>>({ biasa: null, srikandi: null });

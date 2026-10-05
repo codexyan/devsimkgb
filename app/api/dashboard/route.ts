@@ -129,6 +129,10 @@ export async function GET() {
       );
       const nomorPrev = prev?.surat?.nomorSurat;
       const adaNomorPrev = !!nomorPrev && nomorPrev !== "-";
+      // Arsip KGB sering tanpa surat (atau bersurat bernomor "-"); SK-nya tersimpan di kolom SK record itu sendiri,
+      // sama dengan yang dibaca dasarAwalDariRiwayat. Tanpa ini Input KGB dari dasbor terbuka hanya berisi TMT
+      // (ADR-056).
+      const arsipPrev = !adaNomorPrev && prev?.isArsip === true && !!prev.nomorSK?.trim() && prev.nomorSK.trim() !== "-";
 
       return {
         id: p.id,
@@ -158,11 +162,16 @@ export async function GET() {
         gajiPokokBaru: k?.gajiPokokBaru ?? null,
         mkgTahunBaru: k?.mkgTahunBaru ?? null,
         mkgBulanBaru: k?.mkgBulanBaru ?? null,
-        prevNomorSK: adaNomorPrev ? nomorPrev : null,
-        prevTanggalSK: adaNomorPrev ? isoTanggalKalender(prev?.surat?.tanggalSurat) : null,
-        prevTmtSK: isoTanggalKalender(prev?.tmtKgbBaru),
-        // SK dasar KGB berikutnya = surat KGB yang terakhir selesai, jadi penetapnya penandatangan surat itu.
-        prevPenetapSkDasar: penetapDariSurat(prev?.surat),
+        prevNomorSK: adaNomorPrev ? nomorPrev : arsipPrev ? prev!.nomorSK!.trim() : null,
+        prevTanggalSK: adaNomorPrev
+          ? isoTanggalKalender(prev?.surat?.tanggalSurat)
+          : arsipPrev
+            ? isoTanggalKalender(prev!.tanggalSK)
+            : null,
+        prevTmtSK: arsipPrev && tanggalKalender(prev!.tmtSK) ? isoTanggalKalender(prev!.tmtSK) : isoTanggalKalender(prev?.tmtKgbBaru),
+        // SK dasar KGB berikutnya = surat KGB yang terakhir selesai, jadi penetapnya penandatangan surat itu; arsip
+        // membawa penetapnya sendiri.
+        prevPenetapSkDasar: arsipPrev ? prev!.penetapSkDasar?.trim() || null : penetapDariSurat(prev?.surat),
       };
     });
 

@@ -3,6 +3,7 @@
 import type { DataDasarSk, PegawaiKgb, RiwayatKgbItem } from "@/lib/kgbAksi";
 import { kalkulasiKGB, type HasilKalkulasiKGB } from "@/lib/tabelGaji";
 import { isoTanggalLokal, tanggalKalender, type NilaiTanggal } from "@/lib/waktu";
+import { kunciNomorSk } from "@/lib/nomorSurat";
 
 /** Identitas pegawai yang ditampilkan di kepala modal. */
 export interface RingkasPegawai {
@@ -74,8 +75,64 @@ export function dasarAwalInputKgb(k: DataDasarKartuKgb): DasarSkAwal | null {
   if (k.statusKGB === "ditolak" && nomorSkTerisi(k.nomorSK)) {
     return { nomorSK: k.nomorSK, tanggalSK: k.tanggalSK, tmtSK: k.tmtSK, penetapSkDasar: k.penetapSkDasar };
   }
-  if (!k.prevNomorSK && !k.prevTanggalSK && !k.prevTmtSK) return null;
+  // TMT saja tanpa nomor maupun tanggal bukan SK yang dikenali; null membuat modal mencari sendiri di riwayat
+  // dan data pegawai, alih-alih membuka isian yang hanya berisi TMT (ADR-056).
+  if (!nomorSkTerisi(k.prevNomorSK) && !k.prevTanggalSK) return null;
   return { nomorSK: k.prevNomorSK, tanggalSK: k.prevTanggalSK, tmtSK: k.prevTmtSK, penetapSkDasar: k.prevPenetapSkDasar };
+}
+
+/** SK dasar pada data pegawai (Data Pegawai, kartu Dasar KGB: SK dasar dan Ditetapkan oleh). */
+export type SkDasarPegawai = Pick<PegawaiKgb, "nomorSkDasar" | "tanggalSkDasar" | "penetapSkDasar" | "tmtKgbTerakhir">;
+
+/**
+ * Isian Atas Dasar SK Terakhir yang diselaraskan dengan SK dasar pada data pegawai, atau null bila tidak ada yang
+ * perlu diubah (ADR-056).
+ *
+ * Isian awal Input KGB berasal dari salinan: data KGB yang ditolak (Input Ulang), KGB sebelumnya pada kartu
+ * dasbor, atau jadwal Belum Diproses. Salinan itu tidak ikut berubah ketika operator membetulkan SK dasar di Data
+ * Pegawai, misalnya menulis ulang pejabat penetapnya; akibatnya baris Oleh di SK KGB memakai tulisan lama. Data
+ * pegawai karena itu diutamakan:
+ * - SK yang sama (nomornya setara walau berbeda spasi atau huruf besar, atau tanggal SK-nya sama ketika salah
+ *   satunya tidak bernomor): nomor, tanggal, dan pejabat penetap diambil dari data pegawai, yang kosong saja yang
+ *   memakai salinan;
+ * - SK dasar data pegawai lebih baru (tanggal SK-nya lebih akhir), atau salinannya tidak menyebut SK apa pun:
+ *   SK dasar data pegawai dipakai seluruhnya;
+ * - salinan menyebut SK yang lebih baru, yaitu SK KGB yang diterbitkan SIM-KGB sesudah SK dasar data pegawai:
+ *   salinan dipertahankan, sebab pejabat penetapnya memang pejabat yang menandatangani SK itu.
+ */
+export function selaraskanDasarPegawai(isian: DataDasarSk, pegawai: SkDasarPegawai): DataDasarSk | null {
+  const nomorP = nomorSkTerisi(pegawai.nomorSkDasar);
+  const tanggalP = nilaiInputTanggal(pegawai.tanggalSkDasar);
+  const penetapP = pegawai.penetapSkDasar?.trim() ?? "";
+  if (!nomorP && !tanggalP && !penetapP) return null;
+
+  const salinanKosong = !isian.nomorSK.trim() && !isian.tanggalSK;
+  const nomorS = nomorSkTerisi(isian.nomorSK);
+  // Tanggal yang sama saja tidak cukup bila keduanya bernomor: dua SK berbeda dapat terbit pada hari yang sama.
+  const samaSk =
+    (!!nomorP && !!nomorS && kunciNomorSk(nomorP) === kunciNomorSk(nomorS)) ||
+    (!!tanggalP && tanggalP === isian.tanggalSK && (!nomorP || !nomorS));
+  const pegawaiLebihBaru = !!tanggalP && (!isian.tanggalSK || tanggalP > isian.tanggalSK);
+
+  let hasil: DataDasarSk;
+  if (samaSk) {
+    hasil = {
+      nomorSK: nomorP || isian.nomorSK,
+      tanggalSK: tanggalP || isian.tanggalSK,
+      tmtSK: isian.tmtSK || nilaiInputTanggal(pegawai.tmtKgbTerakhir),
+      penetapSkDasar: penetapP || isian.penetapSkDasar,
+    };
+  } else if (salinanKosong || (pegawaiLebihBaru && !!nomorP)) {
+    hasil = {
+      nomorSK: nomorP,
+      tanggalSK: tanggalP,
+      tmtSK: nilaiInputTanggal(pegawai.tmtKgbTerakhir) || isian.tmtSK,
+      penetapSkDasar: penetapP || (salinanKosong ? isian.penetapSkDasar : ""),
+    };
+  } else {
+    return null;
+  }
+  return JSON.stringify(hasil) === JSON.stringify(isian) ? null : hasil;
 }
 
 /** true bila keempat isian Atas Dasar SK Terakhir masih kosong. */
@@ -190,22 +247,30 @@ export interface KenaikanPangkatDasar {
  * Atas dasar SK KGB adalah SK terbaru yang menetapkan gaji pokok (ADR-020). Bila SK kenaikan pangkat, termasuk
  * penyesuaian ijazah, ber-TMT pada atau sesudah TMT SK dasar yang ditemukan (SK KGB terakhir atau SK CPNS),
  * SK kenaikan pangkat itulah dasarnya. null bila tidak ada kenaikan pangkat yang lebih baru.
+ *
+ * Batasnya dua (ADR-056). Bawah: TMT SK dasar, atau TMT KGB terakhir pada data pegawai bila lebih akhir; tanpa itu
+ * KP bertahun-tahun lalu terpilih bila riwayat KGB pegawai kosong, padahal KGB sesudahnya terjadi di luar SIM-KGB.
+ * Atas: TMT KGB yang sedang diinput; SK yang baru berlaku sesudahnya belum menetapkan gaji yang dinaikkan KGB ini.
  */
 export function dasarDariKenaikanPangkat(
   dasar: DasarSkAwal | null | undefined,
   riwayat: ReadonlyArray<KenaikanPangkatDasar>,
+  batas: { tmtKgbTerakhir?: NilaiTanggal; tmtKgbBaru?: NilaiTanggal } = {},
 ): (DasarSkAwal & { kp: KenaikanPangkatDasar }) | null {
+  const bawahDasar = tanggalKalender(dasar?.tmtSK);
+  const bawahPegawai = tanggalKalender(batas.tmtKgbTerakhir);
+  const bawah = bawahDasar && bawahPegawai ? (bawahDasar > bawahPegawai ? bawahDasar : bawahPegawai) : bawahDasar ?? bawahPegawai;
+  const atas = tanggalKalender(batas.tmtKgbBaru);
   let kp: KenaikanPangkatDasar | null = null;
   let tmtKp: Date | null = null;
   for (const r of riwayat) {
     const t = tanggalKalender(r.tmtPangkat);
-    if (t && (!tmtKp || t > tmtKp)) {
+    if (!t || (bawah && t < bawah) || (atas && t > atas)) continue;
+    if (!tmtKp || t > tmtKp) {
       kp = r;
       tmtKp = t;
     }
   }
   if (!kp || !tmtKp) return null;
-  const tmtDasar = tanggalKalender(dasar?.tmtSK);
-  if (tmtDasar && tmtKp < tmtDasar) return null;
   return { nomorSK: kp.nomorSK, tanggalSK: kp.tanggalSK, tmtSK: kp.tmtPangkat, penetapSkDasar: kp.penetapSK ?? null, kp };
 }

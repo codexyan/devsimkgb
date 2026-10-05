@@ -61,3 +61,37 @@ test("KGB arsip memakai nomor SK yang diarsipkan, bukan surat SIM-KGB", () => {
   assert.equal(d?.nomorSK, "ARSIP-12");
   assert.equal(d?.tanggalSK, tgl(2025, 2, 1).toISOString());
 });
+
+/* ── SK dasar pada Data Pegawai (ADR-057) ── */
+
+const skDasar = { nomorSkDasar: "W.17-KP.04.03-210", tanggalSkDasar: tgl(2025, 12, 10), tmtKgbTerakhir: tgl(2026, 1), mkgTahun: 12, mkgBulan: 0 };
+
+test("tanpa riwayat KGB di SIM-KGB, SK dasar pada Data Pegawai menjadi dasar KGB berikutnya", () => {
+  const d = dasarKgbBerikutnya({ kgb: [], pegawai: skDasar });
+  assert.deepEqual(d, {
+    jenis: "kgb",
+    label: "SK KGB terakhir",
+    nomorSK: "W.17-KP.04.03-210",
+    tanggalSK: tgl(2025, 12, 10).toISOString(),
+    tmt: tgl(2026, 1).toISOString(),
+  });
+  // Yang belum pernah KGB: SK dasarnya SK CPNS.
+  assert.equal(dasarKgbBerikutnya({ kgb: [], pegawai: { ...skDasar, mkgTahun: 0, mkgBulan: 0 } })?.label, "SK CPNS");
+  // SK dasar yang belum diisi sama sekali tetap tidak memunculkan apa pun.
+  assert.equal(dasarKgbBerikutnya({ kgb: [], pegawai: { tmtKgbTerakhir: tgl(2026, 1), mkgTahun: 12, mkgBulan: 0 } }), null);
+});
+
+test("riwayat KGB selesai tetap didahulukan, kecuali SK dasar Data Pegawai bertanggal lebih akhir", () => {
+  assert.equal(dasarKgbBerikutnya({ kgb: kgbSelesai, pegawai: { ...skDasar, tanggalSkDasar: tgl(2024, 1, 1) } })?.nomorSK, "W.17-KP.04.03-529");
+  assert.equal(
+    dasarKgbBerikutnya({ kgb: kgbSelesai, pegawai: { ...skDasar, tanggalSkDasar: tgl(2026, 9, 1), tmtKgbTerakhir: tgl(2026, 10) } })?.nomorSK,
+    "W.17-KP.04.03-210",
+  );
+});
+
+test("SK kenaikan pangkat yang lebih lama dari KGB terakhir pada Data Pegawai tidak menjadi dasar", () => {
+  const pangkat = [{ nomorSK: "KP-LAMA", tmt: tgl(2025, 4), jenisKp: "reguler" }];
+  assert.equal(dasarKgbBerikutnya({ kgb: [], pangkat, pegawai: skDasar })?.nomorSK, "W.17-KP.04.03-210");
+  // Walau SK dasarnya belum diisi, KGB terakhir Januari 2026 tetap lebih baru dari KP April 2025.
+  assert.equal(dasarKgbBerikutnya({ kgb: [], pangkat, pegawai: { tmtKgbTerakhir: tgl(2026, 1), mkgTahun: 12 } }), null);
+});

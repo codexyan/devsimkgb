@@ -13,8 +13,11 @@ export async function nomorSkBentrok(nomor: string, kgbId: string): Promise<stri
     db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
     db.riwayatKGB.findMany(),
   ]);
-  const dariSurat = surat.find((s) => s.kgbId !== kgbId && kunciNomorSk(s.nomorSurat) === kunci)?.kgbId;
-  const dariDraf = semuaKgb.find((k) => k.id !== kgbId && kunciNomorSk(k.drafNomorSurat) === kunci)?.id;
+  // KGB yang dibatalkan tidak lagi memegang nomornya: Input Ulang KGB lazimnya memakai nomor arsiparis yang sama,
+  // dan dulu ditolak "sudah dipakai" oleh KGB batal milik pegawai yang sama (ADR-056).
+  const batal = new Set(semuaKgb.filter((k) => k.status === "ditolak").map((k) => k.id));
+  const dariSurat = surat.find((s) => s.kgbId !== kgbId && !batal.has(s.kgbId) && kunciNomorSk(s.nomorSurat) === kunci)?.kgbId;
+  const dariDraf = semuaKgb.find((k) => k.id !== kgbId && !batal.has(k.id) && kunciNomorSk(k.drafNomorSurat) === kunci)?.id;
   const kgbLainId = dariSurat ?? dariDraf;
   if (!kgbLainId) return null;
 

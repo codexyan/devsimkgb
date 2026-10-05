@@ -275,6 +275,20 @@ export async function POST(req: Request) {
   const gajiTurun = pesanGajiTurun(rencana, pegawai);
   if (gajiTurun) return NextResponse.json({ error: gajiTurun }, { status: 400 });
 
+  // TMT SK dasar selalu mendahului KGB yang dihitung darinya. TMT sesudah TMT KGB ini hampir selalu TMT KGB baru
+  // yang terketik di kolom TMT SK terakhir (ADR-056). Arsip dikecualikan: di sana kolom itu TMT SK yang diarsipkan.
+  const tmtSkKalender = tanggalKalender(tmtSK);
+  const tmtKgbKalender = tanggalKalender(rencana.tmtKgbBaru);
+  if (!isArsip && tmtSkKalender && tmtKgbKalender && tmtSkKalender > tmtKgbKalender)
+    return NextResponse.json(
+      {
+        error:
+          `TMT SK terakhir (${formatTanggalId(tmtSkKalender)}) sesudah TMT KGB ini (${formatTanggalId(tmtKgbKalender)}). ` +
+          "Isi TMT yang tertulis pada SK dasarnya (SK KGB terakhir, SK kenaikan pangkat, atau SK CPNS), bukan TMT KGB yang baru.",
+      },
+      { status: 400 },
+    );
+
   // Hukdis yang ditandai berdampak KGB menahan proses selama masih berlaku. Arsip ikut ditahan:
   // SK yang terbit di luar SIM-KGB pada masa hukdis perlu diperiksa sebelum dicatat. Hukdis yang mulai
   // sesudah TMT KGB ini menunda KGB berikutnya, sehingga tidak menahan KGB ini.
@@ -411,8 +425,10 @@ export async function POST(req: Request) {
     nomorSK,
     tanggalSK,
     tmtSK,
-    // Placeholder bisa sudah membawa penetap dari surat KGB sebelumnya.
-    penetapSkDasar: penetapSkDasar ?? existing?.penetapSkDasar ?? null,
+    // Penetap hanya dari isian Input KGB (ADR-056). Dulu yang kosong diisi diam-diam dengan penetap jadwal Belum
+    // Diproses, yang dapat milik SK lain (SK KGB sebelumnya atau SK kenaikan pangkat), lalu tercetak di SK.
+    // Buat SK tetap mewajibkannya, jadi yang kosong akan ditagih di sana.
+    penetapSkDasar,
     status: "sedang_diproses",
     flagRapelan: jendela.flagRapelan,
     createdBy: userLogin.id,

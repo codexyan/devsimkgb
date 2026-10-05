@@ -312,5 +312,9 @@ export function gabungIsianPegawai(
     (k) => body[k] !== undefined && teksIsian(body[k]) !== teksIsian(lama[k]),
   );
   if (body.gajiPokok === undefined && dasarBerubah) hasil.gajiPokok = "";
+  // Pangkat juga: koreksi golongan tidak mengirim pangkat, dan pangkat lama akan bertahan di samping golongan baru
+  // ("Penata Muda Tingkat I (III/c)"). Kosong berarti dibaca dari golongan (ADR-056).
+  const golonganBerubah = body.golonganRuang !== undefined && teksIsian(body.golonganRuang) !== teksIsian(lama.golonganRuang);
+  if (body.pangkat === undefined && golonganBerubah) hasil.pangkat = "";
   return hasil;
 }
