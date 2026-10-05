@@ -394,8 +394,9 @@ export default function UnggahDaftar() {
             <Catatan>
               Unduh templat Excel di bawah, lalu isi lembar <strong>{LEMBAR_DATA_UPT}</strong>, satu baris untuk satu
               pegawai. Templatnya memuat lembar panduan dan contoh. Isinya masuk sebagai data yang disiapkan, belum
-              terkirim: setelah ini lengkapi yang masih kurang di Usulan kolektif, lalu ajukan bersama satu surat
-              usulan. Kolom unit kerja pada berkas diabaikan, sebab satkernya mengikuti akun ini.
+              terkirim: setelah ini pilih dan lengkapi pegawainya di Usulan kolektif, saringan Pegawai baru, lalu
+              ajukan bersama satu surat usulan. Kolom unit kerja pada berkas diabaikan, sebab satkernya mengikuti akun
+              ini.
             </Catatan>
 
             {/* Kesalahan yang paling sering terjadi dan paling sulit disadari, karena NIP yang rusak
@@ -739,8 +740,9 @@ export default function UnggahDaftar() {
             )}
 
             <p className="kgbm-bantuan">
-              Langkah berikutnya: lengkapi data dan berkas tiap pegawai di Usulan kolektif, lalu ajukan bersama satu
-              surat usulan Srikandi.
+              Langkah berikutnya: di Usulan kolektif, saringan Pegawai baru, pilih pegawai yang akan dikirim (bisa
+              bertahap), lengkapi data dan berkasnya, lalu ajukan bersama satu surat usulan Srikandi. Pegawai baru tidak
+              ikut usulan KGB periode berjalan kecuali dipilih.
             </p>
 
             <div className="kol-kaki">
@@ -752,7 +754,7 @@ export default function UnggahDaftar() {
                 <Link href="/dashboard/upt/pegawai" className="dsb-tombol" data-jenis="garis">
                   Data Pegawai
                 </Link>
-                <Link href="/dashboard/upt/kolektif" className="dsb-tombol">
+                <Link href="/dashboard/upt/kolektif?saring=baru" className="dsb-tombol">
                   Lanjut ke Usulan kolektif →
                 </Link>
               </span>
