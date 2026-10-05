@@ -6,12 +6,17 @@ import Papa from "papaparse";
 import { Catatan } from "@/app/dashboard/components/kgb";
 import { GAYA_MODAL_KGB } from "@/app/dashboard/components/kgb/gayaModal";
 import {
+  ATURAN_DASAR_BARU,
   BATAS_BARIS_IMPOR,
+  KOLOM_DASAR_BARU,
   KOLOM_IMPOR_UPT,
   KOLOM_TEMPLAT_UPT,
+  LABEL_PERAN_KOLOM,
+  LEMBAR_DATA_UPT,
+  PANDUAN_DASAR_BARU,
+  kunciKolomTemplat,
   templatCsvUpt,
   type HasilImpor,
-  type PeranKolomTemplat,
 } from "@/lib/imporUsulanUpt";
 import { FORMAT_TANGGAL_DITERIMA } from "@/lib/dataPegawai";
 import { buangPetunjukPemisah } from "@/lib/csv";
@@ -27,12 +32,6 @@ import { buangPetunjukPemisah } from "@/lib/csv";
  * Yang menilai isinya tetap server (lib/imporUsulanUpt.ts, lewat /api/upt/usulan/impor): peramban hanya
  * mengurai berkas dan menggambar hasilnya, sehingga aturannya tidak pernah ada dua salinan.
  */
-
-const LABEL_PERAN: Record<PeranKolomTemplat, string> = {
-  wajib: "wajib",
-  diajukan: "wajib saat diajukan",
-  opsional: "boleh kosong",
-};
 
 /** Satu baris berkas beserta penilaian server atasnya. */
 interface BarisPratinjau {
@@ -99,13 +98,32 @@ const KELOMPOK: { k: HasilImpor; label: string; nada: string; ket: string }[] = 
 
 const dapatDipilih = (b: BarisPratinjau) => b.hasil === "baru" || b.hasil === "perubahan";
 
-function unduhTemplat() {
-  const url = URL.createObjectURL(new Blob([templatCsvUpt()], { type: "text/csv;charset=utf-8" }));
+function unduh(isi: BlobPart, jenis: string, nama: string) {
+  const url = URL.createObjectURL(new Blob([isi], { type: jenis }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = "templat_data_pegawai_upt.csv";
+  a.download = nama;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/* Templat Excel menjadi templat utama: kolom NIP-nya sudah bertipe Text, tanggalnya bertipe tanggal, dan
+   kolom berpilihan berupa daftar pilihan, jadi tiga kesalahan CSV yang paling sering tidak dapat terjadi.
+   Penulisnya dimuat saat tombolnya ditekan saja, supaya halaman ini tidak memikulnya sejak awal. */
+async function unduhTemplatExcel() {
+  const { templatXlsxUpt, NAMA_TEMPLAT_XLSX_UPT } = await import("@/lib/templatUnggahUpt");
+  unduh(templatXlsxUpt() as BlobPart, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", NAMA_TEMPLAT_XLSX_UPT);
+}
+
+function unduhTemplatCsv() {
+  unduh(templatCsvUpt(), "text/csv;charset=utf-8", "templat_data_pegawai_upt.csv");
+}
+
+/** Isian keenam kolom dasarBaru pada satu keadaan, sebagai teks pendek untuk panduan di layar. */
+function ringkasIsianDasar(isian: Readonly<Record<string, string>>): string {
+  const terisi = KOLOM_DASAR_BARU.filter((k) => isian[k]);
+  if (terisi.length === 0) return "keenam kolom kosong";
+  return terisi.map((k) => `${k}: ${isian[k]}`).join(" · ");
 }
 
 export default function UnggahDaftar() {
@@ -132,38 +150,65 @@ export default function UnggahDaftar() {
     setHasilSimpan(null);
   }
 
+  /** Baris hasil urai berkas, Excel maupun CSV, diperiksa bentuknya lalu dikirim ke server. */
+  function terima(semua: Record<string, unknown>[]) {
+    const data = semua.filter((r) => Object.values(r).some((v) => String(v ?? "").trim() !== ""));
+    if (data.length === 0) {
+      setGalat("Berkas tidak berisi satu baris data pun.");
+      return;
+    }
+    const kepala = Object.keys(data[0] ?? {});
+    const hilang = KOLOM_IMPOR_UPT.filter((k) => !kepala.includes(k));
+    if (hilang.length > 0) {
+      setGalat(`Baris kepala berkas tidak memuat kolom: ${hilang.join(", ")}. Unduh templatnya di langkah ini.`);
+      return;
+    }
+    if (data.length > BATAS_BARIS_IMPOR) {
+      setGalat(`Sekali unggah paling banyak ${BATAS_BARIS_IMPOR} baris; berkas ini ${data.length} baris.`);
+      return;
+    }
+    setBaris(data);
+    void periksa(data);
+  }
+
+  async function bacaExcel(file: File) {
+    setSibuk(true);
+    try {
+      const { bacaXlsx, keRekaman } = await import("@/lib/xlsx");
+      // Lembar "Data Pegawai" pada templat; berkas buatan sendiri dibaca dari lembar pertamanya.
+      const lembar = bacaXlsx(new Uint8Array(await file.arrayBuffer()), { lembar: LEMBAR_DATA_UPT });
+      setSibuk(false);
+      terima(keRekaman(lembar, kunciKolomTemplat));
+    } catch (e) {
+      setSibuk(false);
+      setGalat(e instanceof Error && e.name === "GalatXlsx" ? e.message : "Berkas Excel tidak dapat dibaca. Simpan ulang sebagai Excel Workbook (.xlsx), lalu unggah lagi.");
+    }
+  }
+
   function pilihBerkas(file: File | null) {
     setPratinjau(null);
     setBaris(null);
     setGalat(null);
     setNamaBerkas(file?.name ?? "");
     if (!file) return;
+    const nama = file.name.toLowerCase();
+    if (nama.endsWith(".xls") || nama.endsWith(".xlsb") || nama.endsWith(".ods")) {
+      setGalat("Berkas ini bukan .xlsx. Di Excel, pilih File → Save As → Excel Workbook (.xlsx), atau pakai templat Excel di langkah ini.");
+      return;
+    }
+    if (nama.endsWith(".xlsx") || nama.endsWith(".xlsm")) {
+      void bacaExcel(file);
+      return;
+    }
     Papa.parse<Record<string, unknown>>(file, {
       header: true,
       skipEmptyLines: true,
       // Baris `sep=;` pada templat yang diunduh bukan data, jadi dibuang sebelum diurai. Pemisahnya
       // sendiri ditebak PapaParse, sehingga berkas simpanan Excel berkoma pun tetap terbaca.
       beforeFirstChunk: buangPetunjukPemisah,
-      complete: (hasil) => {
-        const data = hasil.data.filter((r) => Object.values(r).some((v) => String(v ?? "").trim() !== ""));
-        if (data.length === 0) {
-          setGalat("Berkas tidak berisi satu baris data pun.");
-          return;
-        }
-        const kepala = Object.keys(data[0] ?? {});
-        const hilang = KOLOM_IMPOR_UPT.filter((k) => !kepala.includes(k));
-        if (hilang.length > 0) {
-          setGalat(`Baris kepala berkas tidak memuat kolom: ${hilang.join(", ")}. Unduh templatnya di langkah ini.`);
-          return;
-        }
-        if (data.length > BATAS_BARIS_IMPOR) {
-          setGalat(`Sekali unggah paling banyak ${BATAS_BARIS_IMPOR} baris; berkas ini ${data.length} baris.`);
-          return;
-        }
-        setBaris(data);
-        void periksa(data);
-      },
-      error: () => setGalat("Berkas tidak dapat dibaca. Pastikan berformat CSV."),
+      transformHeader: kunciKolomTemplat,
+      complete: (hasil) => terima(hasil.data),
+      error: () => setGalat("Berkas tidak dapat dibaca. Pastikan berformat Excel (.xlsx) atau CSV."),
     });
   }
 
@@ -286,8 +331,8 @@ export default function UnggahDaftar() {
           <p className="dsb-label">Data Pegawai</p>
           <h1 className="dsb-halaman-judul">Unggah daftar pegawai</h1>
           <p className="dsb-sub">
-            Satu berkas CSV berisi banyak pegawai sekaligus. Isinya diperiksa dan ditampilkan lebih dulu; tidak ada
-            yang tersimpan sebelum Anda mencentang dan menekan Simpan.
+            Satu berkas Excel (.xlsx) atau CSV berisi banyak pegawai sekaligus. Isinya diperiksa dan ditampilkan lebih
+            dulu; tidak ada yang tersimpan sebelum Anda mencentang dan menekan Simpan.
           </p>
         </div>
       </header>
@@ -329,7 +374,8 @@ export default function UnggahDaftar() {
         <section className="dsb-panel kol-panel ung-panel" aria-label="Pilih berkas">
           <div className="ung-isi">
             <Catatan>
-              Isi templat CSV di bawah, satu baris untuk satu pegawai. Isinya masuk sebagai data yang disiapkan, belum
+              Unduh templat Excel di bawah, lalu isi lembar <strong>{LEMBAR_DATA_UPT}</strong>, satu baris untuk satu
+              pegawai. Templatnya memuat lembar panduan dan contoh. Isinya masuk sebagai data yang disiapkan, belum
               terkirim: setelah ini lengkapi yang masih kurang di Usulan kolektif, lalu ajukan bersama satu surat
               usulan. Kolom unit kerja pada berkas diabaikan, sebab satkernya mengikuti akun ini.
             </Catatan>
@@ -338,29 +384,31 @@ export default function UnggahDaftar() {
                 tetap berupa 18 angka. Diletakkan di depan, sebelum berkas dipilih, sebab sesudah
                 berkasnya telanjur disimpan Excel angka aslinya sudah tidak dapat dikembalikan. */}
             <Catatan nada="amber">
-              <strong>Jaga kolom NIP sebelum menyimpan di Excel.</strong> Excel memperlakukan NIP sebagai
-              angka biasa, menampilkannya <code>1,97E+17</code>, lalu menyimpan yang tampil itu ke CSV.
-              NIP <code>197112051998031004</code> berubah menjadi <code>197112000000000000</code>,
-              tetap 18 angka, tetapi bukan lagi NIP siapa pun.
+              <strong>Jaga kolom NIP.</strong> Excel memperlakukan NIP sebagai angka biasa dan hanya menyimpan 15
+              angka pertamanya, sehingga NIP <code>197112051998031004</code> berubah menjadi{" "}
+              <code>197112051998031000</code>: tetap 18 angka, tetapi bukan lagi NIP siapa pun.
               <br />
-              Cara amannya: buka berkas lewat <strong>Data → From Text/CSV</strong>, setel kolom{" "}
-              <code>nip</code> sebagai <strong>Text</strong> sebelum ditarik masuk. Bila mengetik manual,
-              awali dengan tanda petik satu: <code>&apos;197112051998031004</code>. Templat ini memang sudah
-              terbagi rapi per kolom saat diklik ganda, tetapi klik ganda tetap merusak NIP; jalannya tetap
-              lewat Data → From Text/CSV.
+              Pada <strong>templat Excel</strong> kolom <code>nip</code> sudah berformat Text, jadi NIP yang diketik
+              di sana tetap utuh. Bila menyalin dari daftar lain, pastikan NIP-nya tampil 18 angka utuh, bukan{" "}
+              <code>1,97E+17</code> atau berakhiran <code>000</code>; yang demikian harus diketik ulang dari SK.
               <br />
-              Bila NIP sudah telanjur tampil <code>1,97E+17</code>,{" "}
-              <strong>tutup berkasnya tanpa menyimpan</strong> lalu buka ulang dengan cara di atas. NIP
-              yang rusak akan ditolak di langkah berikutnya beserta sebabnya, jadi tidak akan diam-diam
-              tersimpan sebagai pegawai baru.
+              Pada <strong>berkas CSV</strong>, jangan membukanya dengan klik ganda: buka lewat{" "}
+              <strong>Data → From Text/CSV</strong> dan setel kolom <code>nip</code> sebagai <strong>Text</strong>{" "}
+              sebelum ditarik masuk. NIP yang rusak ditolak di langkah berikutnya beserta sebabnya, jadi tidak akan
+              diam-diam tersimpan sebagai pegawai baru.
             </Catatan>
 
             <div className="kgbm-data">
               <div className="kgbm-data-kepala">
-                <span>Templat CSV</span>
-                <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" onClick={unduhTemplat}>
-                  Unduh templat
-                </button>
+                <span>Templat</span>
+                <span className="ung-templat-tombol">
+                  <button type="button" className="kgbm-tombol kgbm-utama kgbm-tombol-kecil" onClick={() => void unduhTemplatExcel()}>
+                    Unduh templat Excel
+                  </button>
+                  <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" onClick={unduhTemplatCsv}>
+                    CSV
+                  </button>
+                </span>
               </div>
               <details className="kgbm-panduan">
                 <summary>Panduan kolom ({KOLOM_TEMPLAT_UPT.length} kolom)</summary>
@@ -370,7 +418,9 @@ export default function UnggahDaftar() {
                       <dt>
                         <code>{k.kolom}</code>
                         <br />
-                        <span data-peran={k.peran}>{LABEL_PERAN[k.peran]}</span>
+                        <span>{k.label}</span>
+                        <br />
+                        <span data-peran={k.peran}>{LABEL_PERAN_KOLOM[k.peran]}</span>
                       </dt>
                       <dd>
                         {k.keterangan}
@@ -385,23 +435,50 @@ export default function UnggahDaftar() {
                   ))}
                 </dl>
                 <p className="kgbm-bantuan">
-                  Pegawai yang baru naik pangkat, menerima penyesuaian ijazah, atau menerima SK PMK dapat sekalian
-                  menyebut SK-nya pada kolom <code>dasarBaruJenis</code> dan kawan-kawannya, sehingga tidak perlu
-                  dilengkapi satu per satu di Usulan kolektif sesudahnya. Tanggal ditulis {FORMAT_TANGGAL_DITERIMA}.
-                  Baris contoh di templat fiktif: hapus sebelum mengunggah.
-                  Nomor SK dan pindaian berkas tidak lewat CSV; keduanya dilengkapi per pegawai sebelum diajukan.
-                  Templat memakai pemisah titik koma, seperti yang diharapkan Excel di sini, jadi kolomnya
-                  langsung terbagi; berkas yang disimpan Excel dengan pemisah koma pun tetap terbaca.
+                  Judul kolom di baris pertama jangan diubah; judul yang ditulis sedikit berbeda, misalnya{" "}
+                  <code>Golongan ruang*</code>, tetap dikenali. Tanggal ditulis {FORMAT_TANGGAL_DITERIMA}, atau
+                  sebagai tanggal Excel biasa. Nomor SK dasar dan pindaian berkas tidak lewat berkas ini; keduanya
+                  dilengkapi per pegawai sebelum diajukan. Templat CSV memuat satu baris contoh fiktif: hapus sebelum
+                  mengunggah. Pemisahnya titik koma, seperti yang diharapkan Excel di sini; berkas yang disimpan Excel
+                  dengan pemisah koma pun tetap terbaca.
+                </p>
+              </details>
+              <details className="kgbm-panduan">
+                <summary>Mengisi enam kolom dasarBaru (sebab golongan atau masa kerja berubah)</summary>
+                <ul className="ung-aturan">
+                  {ATURAN_DASAR_BARU.map((a) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+                <dl>
+                  {PANDUAN_DASAR_BARU.map((p) => (
+                    <div className="kgbm-data-baris" key={p.keadaan}>
+                      <dt>
+                        <strong>{p.keadaan}</strong>
+                        <br />
+                        <span>{p.misalnya}</span>
+                      </dt>
+                      <dd>
+                        <code>{ringkasIsianDasar(p.isian)}</code>
+                        <br />
+                        {p.barisLain}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="kgbm-bantuan">
+                  Nomor SK pada contoh di atas fiktif. Templat Excel memuat tabel yang sama pada lembar Panduan
+                  dasarBaru, lengkap dengan arti tiap pilihan <code>dasarBaruJenisKp</code>.
                 </p>
               </details>
             </div>
 
             <label className="kgbm-label">
-              Berkas CSV
+              Berkas Excel atau CSV
               <input
                 className="kgbm-input"
                 type="file"
-                accept=".csv,text/csv"
+                accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 data-autofocus
                 disabled={sibuk}
                 onChange={(e) => pilihBerkas(e.target.files?.[0] ?? null)}

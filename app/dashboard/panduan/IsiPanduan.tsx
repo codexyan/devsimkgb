@@ -7,6 +7,7 @@ import { STATUS_KGB, type StatusKgb } from "@/lib/statusKgb";
 import { formatTanggalId } from "@/lib/waktu";
 import { DaftarIsiPanduan, LanjutBagian, PanduanPeran, PilihPeran } from "./NavigasiPanduan";
 import { BUTIR_KONFIRMASI_UPT } from "@/lib/konfirmasiUpt";
+import { ATURAN_DASAR_BARU, KOLOM_DASAR_BARU, LEMBAR_DATA_UPT, PANDUAN_DASAR_BARU } from "@/lib/imporUsulanUpt";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { bagianUntukPeran, peranUntuk, type IdBagian } from "./peran";
 // Replika layar SIM-KGB untuk bagian Admin UPT; alasan memakai HTML alih-alih tangkapan layar ada di berkasnya.
@@ -796,9 +797,18 @@ export default async function IsiPanduan({
                 <h4 className="pub-h3">Mengisi banyak pegawai sekaligus dengan Unggah daftar</h4>
                 <p>
                   Untuk mengisi data pertama kali, atau meremajakan banyak data sekaligus, pakai{" "}
-                  <strong>Unggah daftar</strong>. Unduh templat CSV-nya dari layar itu, isi satu baris untuk satu
-                  pegawai, lalu unggah kembali. Isinya diperiksa dan ditampilkan lebih dulu; tidak ada yang tersimpan
-                  sebelum Anda mencentang dan menekan Simpan.
+                  <strong>Unggah daftar</strong>. Unduh <strong>templat Excel</strong>-nya dari layar itu, isi lembar{" "}
+                  <strong>{LEMBAR_DATA_UPT}</strong> satu baris untuk satu pegawai, lalu unggah kembali berkas .xlsx itu.
+                  Isinya diperiksa dan ditampilkan lebih dulu; tidak ada yang tersimpan sebelum Anda mencentang dan
+                  menekan Simpan.
+                </p>
+                <p>
+                  Templat Excel sudah menyiapkan tiga hal yang dulu paling sering salah: kolom <code>nip</code> berformat
+                  Text sehingga NIP tidak berubah menjadi <code>1,97E+17</code>, kolom tanggal berformat tanggal, dan
+                  kolom berpilihan (golongan, jenis jabatan, eselon, jenis kelamin, pendidikan, dan sebab perubahan)
+                  berupa daftar pilihan. Di dalamnya ada juga lembar <em>Panduan kolom</em>, <em>Panduan dasarBaru</em>,
+                  dan <em>Contoh</em>; hanya lembar {LEMBAR_DATA_UPT} yang terbaca saat diunggah. Templat CSV tetap
+                  tersedia dan tetap diterima.
                 </p>
                 <LayarUnggah />
                 <p>
@@ -808,7 +818,72 @@ export default async function IsiPanduan({
                   Jadi satu berkas boleh berisi seluruh pegawai satker Anda, tanpa perlu memilah lebih dulu mana yang
                   sudah ada.
                 </p>
+                <p>
+                  <strong>Masa kerja golongan pegawai baru.</strong> Angkanya disalin dari SK KGB terakhir, dan TMT KGB
+                  terakhir tetap TMT pada SK itu. Bila sesudah KGB itu pegawai naik dari golongan II ke III/a
+                  (penyesuaian ijazah atau ujian dinas), masa kerja golongannya <strong>dikurangi 5 tahun</strong>; dari
+                  golongan I ke II/a, 6 tahun. Contoh: KGB terakhir 1 Desember 2024 masih golongan II dengan masa kerja 7
+                  tahun, lalu naik ke III/a pada 2026. Barisnya ditulis III/a, masa kerja 2 tahun, TMT KGB terakhir 1
+                  Desember 2024, sehingga KGB berikutnya jatuh 1 Desember 2026. Bila masa kerjanya ditulis 7, sistem
+                  membacanya sebagai masa kerja golongan III, menjadwalkan KGB setahun lebih awal, dan gaji pokoknya salah.
+                  Tandanya mudah dikenali: pada golongan III dan IV masa kerja itu lazimnya genap.
+                </p>
+
+                <h4 className="pub-h3" id="kolom-dasar-baru">Enam kolom dasarBaru: sebab golongan atau masa kerja berubah</h4>
+                <p>
+                  Kolom <code>dasarBaruJenis</code> sampai <code>dasarBaruPenetap</code> menjawab satu pertanyaan:{" "}
+                  <strong>mengapa golongan atau masa kerja golongan pada baris itu berbeda dari yang tercatat</strong>{" "}
+                  di SIM-KGB. Untuk pegawai baru, dan untuk baris yang golongan serta masa kerjanya tidak berubah,
+                  keenamnya dikosongkan. Untuk pegawai yang baru naik pangkat atau baru menerima SK PMK, SK-nya ditulis
+                  di sini sehingga peremajaan sesudah kenaikan pangkat periode selesai sekali unggah. Kanwil mencatatnya
+                  sebagai riwayat, menghitung ulang gaji pokoknya, dan SK itulah yang menjadi dasar SK KGB berikutnya.
+                </p>
+                <div className="pub-table-wrap" tabIndex={0} role="region" aria-label="Cara mengisi kolom dasarBaru">
+                  <table className="pub-table">
+                    <caption>Isian keenam kolom dasarBaru menurut keadaan pegawai (nomor SK fiktif)</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Keadaan</th>
+                        <th scope="col">Isian kolom dasarBaru</th>
+                        <th scope="col">Golongan, masa kerja, dan TMT pada baris yang sama</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {PANDUAN_DASAR_BARU.map((p) => {
+                        const terisi = KOLOM_DASAR_BARU.filter((k) => p.isian[k]);
+                        return (
+                          <tr key={p.keadaan}>
+                            <th scope="row">
+                              {p.keadaan}
+                              <br />
+                              <small>{p.misalnya}</small>
+                            </th>
+                            <td>
+                              {terisi.length === 0
+                                ? "Keenam kolom kosong"
+                                : terisi.map((k) => (
+                                    <span key={k} className="pg-isian-dasar">
+                                      <code>{k}</code>: {p.isian[k]}
+                                    </span>
+                                  ))}
+                            </td>
+                            <td>{p.barisLain}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <ul>
+                  {ATURAN_DASAR_BARU.slice(2).map((a) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
                 <h4 className="pub-h3">Yang paling sering merusak berkas: NIP di Excel</h4>
+                <p>
+                  Templat Excel sudah menjaga kolom NIP. Bagian ini berlaku bila Anda memakai templat CSV, atau menyalin
+                  NIP dari daftar lain.
+                </p>
                 <p>
                   Excel memperlakukan NIP sebagai <em>angka</em>, bukan teks. Karena 18 digit tidak muat di lebar
                   kolom, Excel menampilkannya sebagai <code>1,97E+17</code>. Sampai di sini belum ada yang rusak.

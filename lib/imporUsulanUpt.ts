@@ -20,7 +20,11 @@ import { bandingkanUsulan, kekuranganUsulan, type PerubahanUsulan } from "./usul
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "./dataPegawai";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR } from "./pilihanPegawai";
 import { periksaNip } from "./nipPns";
+import { GOLONGAN_PANGKAT } from "./tabelGaji";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
+
+/** Lembar templat Excel yang dibaca saat berkasnya diunggah; lembar lain hanya untuk dibaca operator. */
+export const LEMBAR_DATA_UPT = "Data Pegawai";
 
 /** Kolom yang harus ada pada baris kepala berkas; isinya boleh kosong kecuali NIP dan nama. */
 export const KOLOM_IMPOR_UPT = ["nip", "nama"] as const;
@@ -31,105 +35,314 @@ export const KOLOM_IMPOR_UPT = ["nip", "nama"] as const;
  */
 export type PeranKolomTemplat = "wajib" | "diajukan" | "opsional";
 
+export const LABEL_PERAN_KOLOM: Record<PeranKolomTemplat, string> = {
+  wajib: "wajib",
+  diajukan: "wajib saat diajukan",
+  opsional: "boleh kosong",
+};
+
+/** Kolom templat unggahan UPT beserta cara mengisinya. */
+export interface KolomTemplatUpt {
+  kolom: string;
+  /** Nama isian yang dibaca manusia, untuk lembar panduan dan judul kolom yang ditulis bebas. */
+  label: string;
+  peran: PeranKolomTemplat;
+  /** Bentuk isiannya; menentukan format kolom pada templat Excel. */
+  jenis: "teks" | "angka" | "tanggal";
+  keterangan: string;
+  contoh: string;
+  /** Isian yang diterima; menjadi daftar pilihan pada templat Excel. */
+  pilihan?: readonly string[];
+}
+
+/** Keenam kolom sebab perubahan golongan atau masa kerja golongan (ADR-030). */
+export const KOLOM_DASAR_BARU = [
+  "dasarBaruJenis",
+  "dasarBaruJenisKp",
+  "dasarBaruNomorSk",
+  "dasarBaruTanggalSk",
+  "dasarBaruTmt",
+  "dasarBaruPenetap",
+] as const;
+
+export type KolomDasarBaru = (typeof KOLOM_DASAR_BARU)[number];
+
 /**
  * Kolom templat unggahan UPT: yang dibaca bacaIsianBaris, tanpa kolom hitungan (pangkat, gaji pokok,
  * TMT KGB berikutnya) yang memang tidak dibaca dari berkas. Satu daftar ini menjadi berkas templat
- * yang diunduh sekaligus panduan kolom di layar, agar keduanya tidak pernah berbeda. Contohnya fiktif.
+ * yang diunduh, lembar panduan di dalamnya, sekaligus panduan kolom di layar, agar ketiganya tidak pernah
+ * berbeda. Contohnya fiktif.
  */
-export const KOLOM_TEMPLAT_UPT: readonly {
-  kolom: string;
-  peran: PeranKolomTemplat;
-  keterangan: string;
-  contoh: string;
-}[] = [
+export const KOLOM_TEMPLAT_UPT: readonly KolomTemplatUpt[] = [
   {
     kolom: "nip",
+    label: "NIP",
     peran: "wajib",
+    jenis: "teks",
     keterangan:
-      "18 digit angka, susunannya tanggal lahir + TMT CPNS + jenis kelamin + nomor urut. Di Excel, setel kolom ini sebagai Text sebelum mengetik, atau tulis =\"199001012025061001\"; tanpa itu NIP berubah menjadi 1,99E+17 dan barisnya ditolak.",
+      "18 digit angka, susunannya tanggal lahir + TMT CPNS + jenis kelamin + nomor urut. Pada templat Excel kolom ini sudah berformat Text, jadi NIP tetap utuh. Pada CSV, tulis =\"199001012025061001\" atau setel kolomnya Text sebelum mengetik; tanpa itu NIP berubah menjadi 1,99E+17 dan barisnya ditolak.",
     contoh: "199001012025061001",
   },
-  { kolom: "nama", peran: "wajib", keterangan: "Nama lengkap sesuai SK pengangkatan.", contoh: "NAMA PEGAWAI CONTOH" },
-  { kolom: "jabatan", peran: "diajukan", keterangan: "Nama jabatan.", contoh: "Penjaga Tahanan" },
-  { kolom: "jenisJabatan", peran: "opsional", keterangan: `Salah satu: ${JENIS_JABATAN.join(" · ")}.`, contoh: JENIS_JABATAN[0] },
-  { kolom: "eselon", peran: "opsional", keterangan: `Salah satu: ${ESELON.join(" · ")}.`, contoh: ESELON[0] },
+  { kolom: "nama", label: "Nama lengkap", peran: "wajib", jenis: "teks", keterangan: "Nama lengkap beserta gelar, sesuai SK terakhir.", contoh: "NAMA PEGAWAI CONTOH" },
+  { kolom: "jabatan", label: "Jabatan", peran: "diajukan", jenis: "teks", keterangan: "Nama jabatan.", contoh: "Penjaga Tahanan" },
+  {
+    kolom: "jenisJabatan",
+    label: "Jenis jabatan",
+    peran: "opsional",
+    jenis: "teks",
+    keterangan: `Salah satu: ${JENIS_JABATAN.join(" · ")}.`,
+    contoh: JENIS_JABATAN[0],
+    pilihan: JENIS_JABATAN,
+  },
+  {
+    kolom: "eselon",
+    label: "Eselon",
+    peran: "opsional",
+    jenis: "teks",
+    keterangan: `Salah satu: ${ESELON.join(" · ")}. Pegawai tanpa jabatan struktural: Non Eselon.`,
+    contoh: ESELON[0],
+    pilihan: ESELON,
+  },
   {
     kolom: "golonganRuang",
+    label: "Golongan/ruang",
     peran: "diajukan",
-    keterangan: "Golongan/ruang sekarang, ditulis seperti II/a atau III/b.",
+    jenis: "teks",
+    keterangan:
+      "Golongan/ruang sekarang menurut SK yang paling baru (SK KGB atau SK kenaikan pangkat), ditulis seperti II/a atau III/b.",
     contoh: "II/a",
+    pilihan: Object.keys(GOLONGAN_PANGKAT),
   },
   {
     kolom: "tmtGolongan",
+    label: "TMT golongan",
     peran: "opsional",
-    keterangan: "TMT golongan sekarang. Bagi CPNS sama dengan TMT CPNS.",
+    jenis: "tanggal",
+    keterangan: "TMT golongan sekarang, dari SK kenaikan pangkat terakhir. Bagi yang belum pernah naik pangkat, sama dengan TMT CPNS.",
     contoh: "2025-06-01",
   },
   {
     kolom: "mkgTahun",
+    label: "Masa kerja golongan (tahun)",
     peran: "opsional",
-    keterangan: "Masa kerja golongan (tahun), disalin dari SK KGB terakhir. Isi 0 bila belum pernah KGB; kosong dibaca 0.",
+    jenis: "angka",
+    keterangan:
+      "Masa kerja golongan pada TMT KGB terakhir, disalin dari SK KGB terakhir. Isi 0 bila belum pernah KGB; kosong dibaca 0. " +
+      "Bila sesudah KGB terakhir itu pegawai naik dari golongan II ke III/a (penyesuaian ijazah atau ujian dinas), kurangi 5 tahun; " +
+      "dari golongan I ke II/a, kurangi 6 tahun. Kenaikan di dalam golongan yang sama (III/a ke III/b) tidak mengubahnya. " +
+      "Pada golongan III dan IV angka ini lazimnya genap; angka ganjil biasanya masa kerja golongan II yang belum dipotong.",
     contoh: "0",
   },
-  { kolom: "mkgBulan", peran: "opsional", keterangan: "Sisa bulan masa kerja golongan, 0 sampai 11.", contoh: "0" },
+  { kolom: "mkgBulan", label: "Masa kerja golongan (bulan)", peran: "opsional", jenis: "angka", keterangan: "Sisa bulan masa kerja golongan, 0 sampai 11.", contoh: "0" },
   {
     kolom: "tmtKgbTerakhir",
+    label: "TMT KGB terakhir",
     peran: "diajukan",
-    keterangan: "TMT pada SK KGB terakhir. Bila belum pernah KGB, isi TMT CPNS.",
+    jenis: "tanggal",
+    keterangan:
+      "TMT pada SK KGB terakhir. Bila belum pernah KGB, isi TMT CPNS. Jangan diganti TMT kenaikan pangkat: siklus KGB tetap berjalan dari KGB terakhir.",
     contoh: "2025-06-01",
   },
-  { kolom: "tempatLahir", peran: "opsional", keterangan: "Kota atau kabupaten tempat lahir.", contoh: "Banjarmasin" },
-  { kolom: "tanggalLahir", peran: "opsional", keterangan: "Tanggal lahir.", contoh: "1990-01-01" },
-  { kolom: "jenisKelamin", peran: "opsional", keterangan: `Salah satu: ${JENIS_KELAMIN.join(" · ")}.`, contoh: JENIS_KELAMIN[0] },
+  { kolom: "tempatLahir", label: "Tempat lahir", peran: "opsional", jenis: "teks", keterangan: "Kota atau kabupaten tempat lahir.", contoh: "Banjarmasin" },
+  { kolom: "tanggalLahir", label: "Tanggal lahir", peran: "opsional", jenis: "tanggal", keterangan: "Tanggal lahir; sama dengan delapan angka pertama NIP.", contoh: "1990-01-01" },
+  {
+    kolom: "jenisKelamin",
+    label: "Jenis kelamin",
+    peran: "opsional",
+    jenis: "teks",
+    keterangan: `Salah satu: ${JENIS_KELAMIN.join(" · ")}. Angka ke-15 NIP: 1 laki-laki, 2 perempuan.`,
+    contoh: JENIS_KELAMIN[0],
+    pilihan: JENIS_KELAMIN,
+  },
   {
     kolom: "pendidikanTerakhir",
+    label: "Pendidikan terakhir",
     peran: "opsional",
+    jenis: "teks",
     keterangan: `Salah satu: ${PENDIDIKAN_TERAKHIR.join(" · ")}.`,
     contoh: "SMA/SMK",
+    pilihan: PENDIDIKAN_TERAKHIR,
   },
   // Sebab golongan atau masa kerja golongan berubah, beserta SK-nya (ADR-030). Enam kolom ini kosong
-  // pada baris yang hanya meremajakan jabatan atau alamat; terisi pada baris pegawai yang baru naik
-  // pangkat atau baru menerima SK PMK, sehingga peremajaan sesudah kenaikan pangkat periode selesai
-  // sekali unggah, bukan dibuka satu per satu di Usulan kolektif.
+  // pada baris pegawai baru dan pada baris yang hanya meremajakan jabatan atau alamat; terisi pada baris
+  // pegawai tercatat yang baru naik pangkat atau baru menerima SK PMK, sehingga peremajaan sesudah
+  // kenaikan pangkat periode selesai sekali unggah, bukan dibuka satu per satu di Usulan kolektif.
+  // Cara mengisinya per keadaan ada di PANDUAN_DASAR_BARU.
   {
     kolom: "dasarBaruJenis",
+    label: "Sebab perubahan golongan/masa kerja",
     peran: "diajukan",
+    jenis: "teks",
     keterangan:
-      "Sebab golongan atau masa kerja golongan pada baris ini berbeda dari yang tercatat. Isi kp untuk SK kenaikan pangkat atau penyesuaian ijazah, pmk untuk SK peninjauan masa kerja, atau koreksi untuk salah ketik tanpa SK baru. Kosongkan bila keduanya tidak berubah; pegawai baru tidak perlu mengisinya.",
+      "Hanya untuk pegawai yang sudah tercatat di SIM-KGB, bila golongan atau masa kerja golongan pada baris ini berbeda dari yang tercatat. " +
+      "kp: SK kenaikan pangkat atau penyesuaian ijazah. pmk: SK peninjauan masa kerja. koreksi: yang tercatat salah ketik, tanpa SK baru. " +
+      "Kosongkan untuk pegawai baru, dan bila golongan serta masa kerjanya tidak berubah.",
     contoh: "",
+    pilihan: ["kp", "pmk", "koreksi"],
   },
   {
     kolom: "dasarBaruJenisKp",
+    label: "Jenis kenaikan pangkat",
     peran: "diajukan",
-    keterangan: `Hanya untuk dasarBaruJenis kp. Salah satu: ${Object.keys(JENIS_KP).join(" · ")}.`,
+    jenis: "teks",
+    keterangan: `Hanya bila dasarBaruJenis kp, dibaca dari SK-nya. Salah satu: ${Object.keys(JENIS_KP).join(" · ")}. Selain kp, kosongkan.`,
     contoh: "",
+    pilihan: Object.keys(JENIS_KP),
   },
   {
     kolom: "dasarBaruNomorSk",
+    label: "Nomor SK sebab perubahan",
     peran: "diajukan",
-    keterangan: "Nomor SK kenaikan pangkat atau SK PMK tersebut. Wajib bila dasarBaruJenis diisi kp atau pmk.",
+    jenis: "teks",
+    keterangan: "Nomor SK kenaikan pangkat atau SK PMK, persis seperti tertulis di SK. Wajib bila dasarBaruJenis kp atau pmk; kosongkan untuk koreksi.",
     contoh: "",
   },
   {
     kolom: "dasarBaruTanggalSk",
+    label: "Tanggal SK sebab perubahan",
     peran: "diajukan",
-    keterangan: "Tanggal SK tersebut.",
+    jenis: "tanggal",
+    keterangan: "Tanggal SK itu ditetapkan, yang tertulis di dekat tanda tangan; bukan TMT-nya.",
     contoh: "",
   },
   {
     kolom: "dasarBaruTmt",
+    label: "TMT SK sebab perubahan",
     peran: "diajukan",
+    jenis: "tanggal",
     keterangan:
-      "TMT pangkat untuk kp, atau TMT PMK untuk pmk. Tanggal inilah yang menentukan SK mana yang menjadi dasar SK KGB berikutnya: yang TMT-nya paling baru.",
+      "kp: TMT pangkat baru. pmk: TMT PMK, tidak boleh lebih awal dari TMT KGB terakhir. Tanggal inilah yang menentukan SK mana yang menjadi dasar SK KGB berikutnya: yang TMT-nya paling baru.",
     contoh: "",
   },
   {
     kolom: "dasarBaruPenetap",
+    label: "Pejabat penetap SK",
     peran: "opsional",
-    keterangan: "Pejabat yang menandatangani SK tersebut.",
+    jenis: "teks",
+    keterangan: "Jabatan pejabat yang menandatangani SK tersebut, misalnya Kepala Kantor Wilayah.",
     contoh: "",
   },
 ];
+
+/** Satu keadaan pegawai beserta isian keenam kolom dasarBaru dan kolom golongan pada barisnya. */
+export interface ContohDasarBaru {
+  keadaan: string;
+  /** Contoh perubahannya, misalnya "III/a → III/b". */
+  misalnya: string;
+  isian: Readonly<Record<KolomDasarBaru, string>>;
+  /** Cara mengisi golongan, masa kerja golongan, dan TMT pada baris yang sama. */
+  barisLain: string;
+}
+
+const tanpaDasar: Record<KolomDasarBaru, string> = {
+  dasarBaruJenis: "",
+  dasarBaruJenisKp: "",
+  dasarBaruNomorSk: "",
+  dasarBaruTanggalSk: "",
+  dasarBaruTmt: "",
+  dasarBaruPenetap: "",
+};
+
+/**
+ * Cara mengisi keenam kolom dasarBaru menurut keadaan pegawai. Dipakai lembar panduan templat Excel, layar
+ * Unggah daftar, dan halaman Panduan; diuji terhadap periksaImporUpt agar contohnya selalu lolos pemeriksaan.
+ * Nomor SK-nya fiktif.
+ */
+export const PANDUAN_DASAR_BARU: readonly ContohDasarBaru[] = [
+  {
+    keadaan: "Pegawai baru: NIP belum tercatat di SIM-KGB",
+    misalnya: "pendataan pertama",
+    isian: tanpaDasar,
+    barisLain:
+      "Keenam kolom dikosongkan. Golongan dan TMT golongan diisi keadaan sekarang; masa kerja golongan dan TMT KGB terakhir dari SK KGB terakhir. " +
+      "Bila sesudah KGB itu pegawai naik dari golongan II ke III/a, masa kerja golongannya dikurangi 5 tahun.",
+  },
+  {
+    keadaan: "Sudah tercatat; golongan dan masa kerja golongan tidak berubah",
+    misalnya: "hanya jabatan atau pendidikan yang diremajakan",
+    isian: tanpaDasar,
+    barisLain: "Keenam kolom dikosongkan. Golongan, masa kerja, dan TMT ditulis sama dengan yang tercatat.",
+  },
+  {
+    keadaan: "Sudah tercatat; naik pangkat reguler",
+    misalnya: "III/a → III/b",
+    isian: {
+      dasarBaruJenis: "kp",
+      dasarBaruJenisKp: "reguler",
+      dasarBaruNomorSk: "W.15-KP.03.01-0123",
+      dasarBaruTanggalSk: "2026-03-20",
+      dasarBaruTmt: "2026-04-01",
+      dasarBaruPenetap: "Kepala Kantor Wilayah",
+    },
+    barisLain:
+      "Golongan diisi golongan baru (III/b). Masa kerja golongan dan TMT golongan dihitung sistem dari SK ini; TMT KGB terakhir tetap dari SK KGB terakhir.",
+  },
+  {
+    keadaan: "Sudah tercatat; penyesuaian ijazah",
+    misalnya: "II/d → III/a",
+    isian: {
+      dasarBaruJenis: "kp",
+      dasarBaruJenisKp: "penyesuaian_ijazah",
+      dasarBaruNomorSk: "W.15-KP.03.02-0045",
+      dasarBaruTanggalSk: "2026-01-15",
+      dasarBaruTmt: "2026-02-01",
+      dasarBaruPenetap: "Kepala Kantor Wilayah",
+    },
+    barisLain:
+      "Golongan diisi III/a. Masa kerja golongan boleh dibiarkan seperti yang tercatat: sistem memotongnya 5 tahun sendiri. TMT KGB terakhir tidak berubah.",
+  },
+  {
+    keadaan: "Sudah tercatat; peninjauan masa kerja (PMK)",
+    misalnya: "masa kerja sebelum CPNS diperhitungkan",
+    isian: {
+      dasarBaruJenis: "pmk",
+      dasarBaruJenisKp: "",
+      dasarBaruNomorSk: "W.15-KP.04.03-0007",
+      dasarBaruTanggalSk: "2026-05-08",
+      dasarBaruTmt: "2026-06-01",
+      dasarBaruPenetap: "Kepala Kantor Wilayah",
+    },
+    barisLain:
+      "Golongan tetap. Masa kerja golongan diisi angka pada SK PMK, yaitu masa kerja pada TMT PMK. Pindaian SK PMK ditagih saat diajukan.",
+  },
+  {
+    keadaan: "Sudah tercatat; yang tercatat salah ketik",
+    misalnya: "masa kerja tercatat 4 tahun, di SK 6 tahun",
+    isian: { ...tanpaDasar, dasarBaruJenis: "koreksi" },
+    barisLain: "Golongan dan masa kerja golongan diisi angka yang benar menurut SK. Kolom dasarBaru lainnya dikosongkan.",
+  },
+];
+
+/** Aturan umum keenam kolom dasarBaru, sebagai butir panduan. */
+export const ATURAN_DASAR_BARU: readonly string[] = [
+  "Keenam kolom ini menjawab satu pertanyaan: mengapa golongan atau masa kerja golongan pada baris ini berbeda dari yang tercatat di SIM-KGB. Bila tidak berbeda, kosongkan semuanya.",
+  "Pegawai baru belum punya data pembanding, jadi kolom ini selalu dikosongkan.",
+  "Satu baris hanya menyebut satu SK, yaitu SK dengan TMT paling baru. SK itulah yang tercetak sebagai dasar pada SK KGB berikutnya.",
+  "Untuk kp, sistem menghitung sendiri masa kerja golongan, gaji pokok, dan TMT golongan dari SK-nya; jadwal KGB tidak bergeser.",
+  "Untuk pmk, golongan tetap dan masa kerja golongan mengikuti SK PMK; jadwal KGB dapat maju.",
+  `Isian kosong atau belum lengkap tidak menolak baris; yang kurang ditagih saat diajukan di Usulan kolektif. Isian yang salah tulis (misalnya "KP" atau "naik pangkat") menolak barisnya. Tanggal ditulis ${FORMAT_TANGGAL_DITERIMA}.`,
+];
+
+/** Huruf dan angka saja, huruf kecil: "Golongan ruang*" dan "golonganRuang" menjadi sama. */
+const ringkasJudul = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const KUNCI_JUDUL = new Map<string, string>(
+  KOLOM_TEMPLAT_UPT.flatMap((k) => [
+    [ringkasJudul(k.kolom), k.kolom],
+    [ringkasJudul(k.label), k.kolom],
+  ]),
+);
+
+/**
+ * Judul kolom pada berkas menjadi kunci templat. Judul yang ditulis sedikit berbeda (huruf besar, spasi,
+ * tanda bintang wajib, atau nama isiannya seperti "Golongan/ruang") tetap dikenali; judul lain dibiarkan
+ * apa adanya dan kolomnya diabaikan.
+ */
+export function kunciKolomTemplat(judul: string): string {
+  // trim() ikut membuang BOM yang menempel pada judul kolom pertama berkas CSV.
+  const bersih = judul.trim();
+  return KUNCI_JUDUL.get(ringkasJudul(bersih)) ?? bersih;
+}
 
 /** Pilihan kolom dasarBaruJenis, untuk pesan tolak yang menyebutkan apa yang diterima. */
 const PILIHAN_DASAR_BARU = "kp · pmk · koreksi";
@@ -166,6 +379,33 @@ function seragamkanTanggal(row: Record<string, unknown>): { row: Record<string, 
     if (dibaca.status === "valid") hasil[bidang.kunci] = dibaca.tanggal.toISOString().slice(0, 10);
   }
   return { row: hasil };
+}
+
+/** Tanggal berpemisah: dua angka, lalu tahun empat angka. Bacaan bakunya hari/bulan/tahun (bacaTanggal). */
+const POLA_TANGGAL_BERPEMISAH = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/;
+
+/**
+ * true bila tanggal berpemisah pada berkas ini tertulis bulan/hari/tahun, bentuk yang ditulis Excel berlokal
+ * Inggris saat menyimpan CSV (12/16/1971). Buktinya angka kedua lebih dari 12 sedangkan angka pertama tidak,
+ * dan tidak satu tanggal pun membuktikan sebaliknya (angka pertama lebih dari 12). Syarat kedua menjaga berkas
+ * hari/bulan yang kebetulan memuat satu salah ketik agar tidak ikut tertolak seluruhnya.
+ *
+ * Tanpa pemeriksaan sekali sejagat berkas ini, tanggal seperti 4/1/2024 (1 April) terbaca 4 Januari tanpa
+ * peringatan apa pun, sebab sebaris demi sebaris tanggal itu memang sah. Kejadian nyata 5 Oktober 2026: berkas
+ * Lapas Banjarmasin yang disimpan ulang Excel berbahasa Inggris, 101 baris tertolak dan 59 sisanya bertanggal
+ * tertukar.
+ */
+export function berkasBertanggalBulanHari(baris: readonly Record<string, unknown>[]): boolean {
+  let bulanHari = false;
+  for (const row of baris)
+    for (const { kunci } of KOLOM_TANGGAL) {
+      const cocok = POLA_TANGGAL_BERPEMISAH.exec(teks(row, kunci));
+      if (!cocok) continue;
+      const [a, b] = [Number(cocok[1]), Number(cocok[2])];
+      if (a > 12 && b <= 12) return false;
+      if (a <= 12 && b > 12) bulanHari = true;
+    }
+  return bulanHari;
 }
 
 /**
@@ -252,6 +492,7 @@ export function periksaImporUpt(
   konteks: KonteksImpor,
 ): HasilBarisImpor[] {
   const terlihat = new Set<string>();
+  const bulanHari = berkasBertanggalBulanHari(baris);
 
   return baris.map((row, i) => {
     const nip = teks(row, "nip");
@@ -286,6 +527,16 @@ export function periksaImporUpt(
       return tolak("Pegawai ini sedang punya usulan yang belum selesai di Kanwil");
     if (!tercatat && konteks.nipUsulan.has(nip))
       return tolak("NIP ini sudah ada pada usulan pegawai baru yang belum selesai");
+
+    // Berkas bertanggal bulan/hari: baris bertanggal berpemisah tidak dapat dibaca dengan pasti, jadi ditolak
+    // alih-alih diam-diam tertukar. Baris yang tanggalnya sudah yyyy-mm-dd tetap terbaca.
+    const ambigu = bulanHari ? KOLOM_TANGGAL.find((k) => POLA_TANGGAL_BERPEMISAH.test(teks(row, k.kunci))) : undefined;
+    if (ambigu)
+      return tolak(
+        `Tanggal pada berkas ini tertulis bulan/hari/tahun, misalnya "${teks(row, ambigu.kunci)}" pada ${ambigu.label}: ` +
+          "ciri berkas yang disimpan ulang Excel berbahasa Inggris. Tanggal seperti 4/1/2024 tidak dapat dipastikan 4 Januari " +
+          "atau 1 April, jadi tidak dibaca. Unggah templat Excel (.xlsx), atau tulis tanggalnya yyyy-mm-dd.",
+      );
 
     const seragam = seragamkanTanggal(row);
     if ("galat" in seragam) return tolak(seragam.galat);

@@ -53,9 +53,11 @@ export type HasilNip = { ok: true; nip: string; isi: NipTerbaca } | { ok: false;
  * tolak maupun di layar unggah, supaya operator membaca petunjuk yang sama persis di kedua tempat.
  */
 export const SARAN_NIP_EXCEL =
-  "Buka berkasnya lewat Data → From Text/CSV, lalu setel kolom nip sebagai Text sebelum ditarik masuk. " +
-  "Bila mengetik manual, awali dengan tanda petik satu ('197112051998031004). Berkas yang NIP-nya telanjur " +
-  "tampil 1,97E+17 jangan disimpan; tutup tanpa menyimpan, lalu buka ulang dengan cara di atas.";
+  "Pakai templat Excel dari layar Unggah daftar: kolom nip-nya sudah berformat Text, jadi NIP yang diketik tetap utuh; " +
+  "NIP yang telanjur tersimpan sebagai angka harus diketik ulang dari SK. Untuk berkas CSV, buka lewat " +
+  "Data → From Text/CSV dan setel kolom nip sebagai Text sebelum ditarik masuk; bila mengetik manual, awali dengan " +
+  "tanda petik satu ('197112051998031004). Berkas yang NIP-nya telanjur tampil 1,97E+17 jangan disimpan; tutup " +
+  "tanpa menyimpan, lalu buka ulang dengan cara itu.";
 
 /** Tahun lahir paling tua yang masih masuk akal untuk seorang PNS aktif maupun arsipnya. */
 const TAHUN_LAHIR_PALING_TUA = 1930;
@@ -176,7 +178,7 @@ export function periksaNip(mentah: unknown, tahunKini: number = new Date().getFu
         kode: "presisiHilang",
         pesan:
           `NIP "${nip}" mustahil (${rincian}), dan angkanya berakhir nol beruntun. Itu ciri khas NIP yang ` +
-          `dirusak Excel: 18 digit dipangkas menjadi angka pembulatan saat berkas disimpan sebagai CSV. ` +
+          `dirusak Excel: 18 digit dipangkas menjadi angka pembulatan karena Excel menyimpannya sebagai bilangan. ` +
           SARAN_NIP_EXCEL,
       },
     };
