@@ -1,5 +1,12 @@
 // Satu nomor dari arsiparis hanya untuk satu SK KGB: nomor itu tidak boleh sudah dipakai SK yang dibuat,
 // maupun sudah dipesan sebagai draf, oleh KGB lain. Dipakai Buat SK (pratinjau dan buat) dan Simpan draf.
+//
+// "KGB lain" berarti SK lain. Dua keadaan bukan SK lain dan tidak memegang nomor (ADR-056, ADR-058):
+// - KGB yang dibatalkan, selama SK-nya belum diunggah bertanda tangan;
+// - KGB lain milik pegawai yang sama, selama SK-nya belum diunggah: itu SK yang sama yang sedang dibuat ulang
+//   (Input Ulang KGB), dan nomor arsiparisnya memang dipakai lagi.
+// SK yang sudah diunggah bertanda tangan tetap memegang nomornya, siapa pun pemiliknya: nomor itu sudah tercetak
+// pada surat yang sah.
 
 import { db } from "./db";
 import { kunciNomorSk } from "./nomorSurat";
@@ -13,15 +20,22 @@ export async function nomorSkBentrok(nomor: string, kgbId: string): Promise<stri
     db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
     db.riwayatKGB.findMany(),
   ]);
-  // KGB yang dibatalkan tidak lagi memegang nomornya: Input Ulang KGB lazimnya memakai nomor arsiparis yang sama,
-  // dan dulu ditolak "sudah dipakai" oleh KGB batal milik pegawai yang sama (ADR-056).
-  const batal = new Set(semuaKgb.filter((k) => k.status === "ditolak").map((k) => k.id));
-  const dariSurat = surat.find((s) => s.kgbId !== kgbId && !batal.has(s.kgbId) && kunciNomorSk(s.nomorSurat) === kunci)?.kgbId;
-  const dariDraf = semuaKgb.find((k) => k.id !== kgbId && !batal.has(k.id) && kunciNomorSk(k.drafNomorSurat) === kunci)?.id;
+  const kgbById = new Map(semuaKgb.map((k) => [k.id, k]));
+  const pegawaiIni = kgbById.get(kgbId)?.pegawaiId ?? null;
+  const memegang = (k: { status: string; pegawaiId: string } | undefined, sudahDiunggah: boolean): boolean => {
+    if (sudahDiunggah || !k) return true;
+    if (k.status === "ditolak") return false;
+    return !(pegawaiIni && k.pegawaiId === pegawaiIni);
+  };
+
+  const dariSurat = surat.find(
+    (s) => s.kgbId !== kgbId && kunciNomorSk(s.nomorSurat) === kunci && memegang(kgbById.get(s.kgbId), !!s.pathFile),
+  )?.kgbId;
+  const dariDraf = semuaKgb.find((k) => k.id !== kgbId && kunciNomorSk(k.drafNomorSurat) === kunci && memegang(k, false))?.id;
   const kgbLainId = dariSurat ?? dariDraf;
   if (!kgbLainId) return null;
 
-  const kgbLain = semuaKgb.find((k) => k.id === kgbLainId);
+  const kgbLain = kgbById.get(kgbLainId);
   const pegawaiLain = kgbLain ? await db.pegawai.findUnique({ id: kgbLain.pegawaiId }) : null;
   const siapa = pegawaiLain ? `${pegawaiLain.nama} (${pegawaiLain.nip})` : "pegawai lain";
   return dariSurat
