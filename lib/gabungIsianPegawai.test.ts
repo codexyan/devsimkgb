@@ -80,3 +80,16 @@ test("koreksi dasar gaji yang mengirim gaji pokok kosong membaca ulang gaji dari
   if (dibetulkan.galat !== undefined) return;
   assert.equal(dibetulkan.data.gajiPokok, getGajiPokok("III/a", 4, 0));
 });
+
+test("koreksi golongan tanpa mengirim pangkat: pangkat dibaca dari golongan baru, bukan pangkat lama", () => {
+  const hasil = bacaIsianPegawai(gabungIsianPegawai({ golonganRuang: "III/b", mkgTahun: "4", mkgBulan: "0" }, tersimpan), { denganNip: false });
+  assert.equal(hasil.galat, undefined);
+  if (hasil.galat !== undefined) return;
+  assert.equal(hasil.data.golonganRuang, "III/b");
+  assert.equal(hasil.data.pangkat, "Penata Muda Tingkat I");
+  // Golongan tidak berubah: pangkat tersimpan dipertahankan apa adanya.
+  const tetap = bacaIsianPegawai(gabungIsianPegawai({ jabatan: "Analis" }, { ...tersimpan, pangkat: "Penata Muda" }), { denganNip: false });
+  assert.equal(tetap.galat, undefined);
+  if (tetap.galat !== undefined) return;
+  assert.equal(tetap.data.pangkat, "Penata Muda");
+});

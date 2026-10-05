@@ -163,3 +163,50 @@ test("usulan yang mengubah golongan tanpa menyebut SK-nya ditolak saat diajukan"
     [],
   );
 });
+
+test("usulan yang mengganti nomor SK dasar mengosongkan pejabat penetap SK lama; nomor yang sama (beda spasi) tidak", async () => {
+  await denganDataLokal(async () => {
+    const { db } = await import("./db");
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+    const pegawai = {
+      id: "p2", nip: "199001012015032001", nama: "PEGAWAI DUA", tempatLahir: null, tanggalLahir: null,
+      jenisKelamin: null, pendidikanTerakhir: null, jabatan: "Penelaah", pangkat: "Penata Tingkat I",
+      golonganRuang: "III/d", unitKerja: "Kantor Wilayah", eselon: null, jenisJabatan: null,
+      tmtGolongan: tgl(2022, 4), mkgTahun: 14, mkgBulan: 0, gajiPokok: 3919100,
+      tmtKgbTerakhir: tgl(2024, 12), tmtKgbBerikutnya: tgl(2026, 12), statusHukdis: false,
+      tanggalHukdisBerakhir: null, jenisHukdis: null, keteranganHukdis: null, aktif: true,
+      createdAt: new Date(), updatedAt: new Date(), konfirmasiUptTmt: null, konfirmasiUptAt: null,
+      konfirmasiUptOleh: null, satkerTugas: null, berhentiTmt: null, berhentiAlasan: null,
+      nomorSkDasar: "W.19-KP.04.04-5591", tanggalSkDasar: tgl(2024, 10, 4), penetapSkDasar: "Kepala Kantor Wilayah lama",
+    };
+    await db.pegawai.create(pegawai);
+    const usulan = (id: string, nomorSkTerakhir: string) => ({
+      id, pegawaiId: "p2", satker: "kanwil", status: "menunggu", jenis: "perubahan", nip: null,
+      unitKerja: null, nomorSurat: "W.2", tanggalSurat: tgl(2026, 10, 5), pathBerkas: null, pathSkTerakhir: null,
+      pathSyaratCpns: null, pathSkPangkat: null, pathSkCpns: null, pathSkPmk: null, nama: null, tempatLahir: null, tanggalLahir: null,
+      jenisKelamin: null, pendidikanTerakhir: null, jabatan: "Penelaah Teknis Kebijakan", pangkat: null, golonganRuang: null, eselon: null,
+      jenisJabatan: null, tmtGolongan: null, mkgTahun: null, mkgBulan: null, gajiPokok: null, tmtKgbTerakhir: null,
+      tmtKgbBerikutnya: null, nomorSkTerakhir, tanggalSkTerakhir: tgl(2024, 10, 4), hukdisAda: false,
+      hukdisJenis: null, hukdisNomorSk: null, hukdisTmtMulai: null, hukdisTmtBerakhir: null, hukdisKeterangan: null,
+      catatanUpt: null, diajukanOleh: "UPT", diajukanAt: new Date(), ditinjauOleh: null, ditinjauAt: null, alasanTolak: null,
+      dasarBaruJenis: null, dasarBaruJenisKp: null, dasarBaruNomorSk: null, dasarBaruTanggalSk: null,
+      dasarBaruTmt: null, dasarBaruPenetap: null,
+    });
+
+    // Nomor yang sama, hanya berbeda spasi: SK-nya sama, penetapnya tetap.
+    const sama = usulan("u2", "W.19-KP.04.04- 5591");
+    await db.usulanPegawai.create(sama);
+    const hasilSama = await setujuiUsulan(sama as never, await db.pegawai.findUnique({ id: "p2" }), "Peninjau", new Date(), "u1");
+    assert.equal(hasilSama.ok, true);
+    assert.equal((await db.pegawai.findUnique({ id: "p2" }))?.penetapSkDasar, "Kepala Kantor Wilayah lama");
+
+    // Nomor lain: penetap SK lama tidak berlaku lagi untuk SK baru.
+    const lain = usulan("u3", "W.19-KP.04.04-7001");
+    await db.usulanPegawai.create(lain);
+    const hasilLain = await setujuiUsulan(lain as never, await db.pegawai.findUnique({ id: "p2" }), "Peninjau", new Date(), "u1");
+    assert.equal(hasilLain.ok, true);
+    const sesudah = await db.pegawai.findUnique({ id: "p2" });
+    assert.equal(sesudah?.nomorSkDasar, "W.19-KP.04.04-7001");
+    assert.equal(sesudah?.penetapSkDasar ?? null, null);
+  });
+});

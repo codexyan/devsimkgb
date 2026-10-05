@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ambilPegawaiKgb,
   ambilRiwayatKgb,
@@ -33,6 +33,7 @@ import {
   isianDasarKosong,
   isianDasarSk,
   pesanBidangWajib,
+  selaraskanDasarPegawai,
   subjudulPegawai,
   type DasarSkAwal,
   type RingkasPegawai,
@@ -68,6 +69,15 @@ export default function ModalInputKgb({
 }: PropsModalInputKgb) {
   const { memuat, galat: galatMuat, pegawai, perhitungan, muatUlang } = usePegawaiKgb(ringkas.id);
   const [form, setForm] = useState<DataDasarSk>(() => isianDasarSk(dasarAwal));
+  // Isian Atas Dasar yang terakhir diisi otomatis. Sumber berikutnya (riwayat, data pegawai, SK kenaikan pangkat)
+  // boleh menggantinya selama operator belum menyunting; isian yang sudah disunting tidak pernah ditimpa.
+  const otomatis = useRef<DataDasarSk>(form);
+  const isiOtomatis = (baru: DataDasarSk) =>
+    setForm((f) => {
+      if (!isianDasarKosong(f) && JSON.stringify(f) !== JSON.stringify(otomatis.current)) return f;
+      otomatis.current = baru;
+      return baru;
+    });
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
   const cariDiRiwayat = dasarDariRiwayat && isianDasarKosong(isianDasarSk(dasarAwal));
@@ -83,8 +93,14 @@ export default function ModalInputKgb({
   // Berjalan setelah SK dasar dari riwayat KGB, data pegawai, atau usulan UPT diketahui. Isian hanya diganti
   // selama belum disunting: masih kosong atau masih sama dengan SK dasar yang ditemukan.
   const dasarDiketahui = dasarRiwayat === null ? null : (dasarRiwayat ?? dasarAwal ?? undefined);
+  const riwayatDimuatAwal = dasarRiwayat === null;
   useEffect(() => {
-    if (dasarDiketahui === null) return;
+    // Menunggu data pegawai: TMT KGB terakhir dan TMT KGB yang diinput membatasi SK yang boleh menjadi dasar.
+    if (dasarDiketahui === null || !pegawai) return;
+    const batasKp = {
+      tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
+      tmtKgbBaru: perhitungan?.ok ? perhitungan.hasil.tmtKgbBaru : null,
+    };
     let batal = false;
     Promise.all([ambilRiwayatPangkat(ringkas.id), ambilRiwayatPmk(ringkas.id)]).then(([hasilKp, hasilPmk]) => {
       if (batal) return;
@@ -95,20 +111,17 @@ export default function ModalInputKgb({
           ? hasilPmk.data.map((r) => ({ jenis: "pmk" as const, nomorSK: r.nomorSK, tanggalSK: r.tanggalSK, tmtPangkat: r.tmtPmk, penetapSK: r.penetapSK }))
           : []),
       ];
-      const kp = dasarDariKenaikanPangkat(dasarDiketahui, kandidat);
+      const kp = dasarDariKenaikanPangkat(dasarDiketahui, kandidat, batasKp);
       if (!kp) return;
       setDasarKp(kp);
-      const semula = isianDasarSk(dasarDiketahui);
-      setForm((f) =>
-        isianDasarKosong(f) || JSON.stringify(f) === JSON.stringify(semula) ? isianDasarSk(kp) : f,
-      );
+      isiOtomatis(isianDasarSk(kp));
     });
     return () => {
       batal = true;
     };
-    // dasarDiketahui berganti sekali, saat pencarian SK dasar selesai.
+    // dasarDiketahui berganti sekali, saat pencarian SK dasar selesai; data pegawai dimuat sekali.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dasarDiketahui === null, ringkas.id]);
+  }, [dasarDiketahui === null, ringkas.id, !!pegawai]);
 
   useEffect(() => {
     if (!cariDiRiwayat) return;
@@ -126,7 +139,9 @@ export default function ModalInputKgb({
             nomorSK: p.nomorSkDasar ?? null,
             tanggalSK: p.tanggalSkDasar ?? null,
             tmtSK: p.tmtKgbTerakhir,
-            penetapSkDasar: p.penetapSkDasar?.trim() || dasar?.penetapSkDasar || null,
+            // Penetap jadwal Belum Diproses milik SK lain (SK KGB terbitan SIM-KGB atau SK kenaikan pangkat), jadi
+            // tidak dipasangkan dengan nomor SK dasar data pegawai; kosong lebih aman daripada pejabat yang keliru.
+            penetapSkDasar: p.penetapSkDasar?.trim() || null,
           };
         }
       }
@@ -136,16 +151,28 @@ export default function ModalInputKgb({
         const usulan = hasilUsulan.ok ? hasilUsulan.data : null;
         if (usulan) {
           setSkUsulan(usulan);
-          dasar = { ...dasar, nomorSK: usulan.nomorSK, tanggalSK: usulan.tanggalSK, tmtSK: usulan.tmtSK };
+          // Usulan UPT tidak memuat pejabat penetap; penetap dari sumber lain milik SK lain.
+          dasar = { nomorSK: usulan.nomorSK, tanggalSK: usulan.tanggalSK, tmtSK: usulan.tmtSK, penetapSkDasar: null };
         }
       }
       setDasarRiwayat(dasar ?? undefined);
-      if (dasar) setForm((f) => (isianDasarKosong(f) ? isianDasarSk(dasar) : f));
+      if (dasar && isianDasarKosong(otomatis.current)) isiOtomatis(isianDasarSk(dasar));
     });
     return () => {
       batal = true;
     };
   }, [cariDiRiwayat, ringkas.id]);
+
+  // SK dasar pada data pegawai (Ditetapkan oleh, nomor, tanggal) adalah data terbaru: salinan pada data KGB yang
+  // ditolak atau pada kartu dasbor tidak ikut berubah saat SK dasar dibetulkan (ADR-056). Diselaraskan setelah
+  // pencarian riwayat selesai, dan tidak dipakai bila dasarnya SK kenaikan pangkat atau PMK yang lebih baru.
+  useEffect(() => {
+    if (!pegawai || riwayatDimuatAwal || dasarKp) return;
+    const selaras = selaraskanDasarPegawai(otomatis.current, pegawai);
+    if (!selaras) return;
+    isiOtomatis(selaras);
+    setDariDataPegawai(true);
+  }, [pegawai, riwayatDimuatAwal, dasarKp]);
 
   const judul = ulang ? "Input Ulang KGB" : "Input KGB";
   const hasil = perhitungan?.ok ? perhitungan.hasil : null;
@@ -375,6 +402,11 @@ export default function ModalInputKgb({
           nilai={form.nomorSK}
           onUbah={ubah("nomorSK")}
           placeholder="Nomor sesuai dokumen SK"
+          petunjuk={
+            /\s[-./]|[-./]\s/.test(form.nomorSK)
+              ? "Ada spasi di sekitar tanda pemisah, misalnya \"- 5591\". Nomor tercetak apa adanya; cocokkan dengan SK."
+              : undefined
+          }
           nonaktif={sibuk}
           fokusAwal
         />

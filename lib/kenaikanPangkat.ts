@@ -116,10 +116,15 @@ export function dampakKenaikanPangkatPadaKgb<T extends { status: string; isArsip
 export function skKpLebihBaru(
   tmtPangkat: NilaiTanggal,
   kgb: ReadonlyArray<{ status: string; tmtKgbBaru: NilaiTanggal }>,
+  /**
+   * TMT KGB terakhir pada data pegawai. KGB yang terjadi di luar SIM-KGB tidak punya riwayat selesai, tetapi tetap
+   * lebih baru dari SK kenaikan pangkat yang TMT-nya lebih dulu (ADR-056).
+   */
+  tmtKgbTerakhirPegawai?: NilaiTanggal,
 ): boolean {
   const tmtKp = tanggalKalender(tmtPangkat);
   if (!tmtKp) return false;
-  let tmtKgb: Date | null = null;
+  let tmtKgb: Date | null = tanggalKalender(tmtKgbTerakhirPegawai);
   for (const k of kgb) {
     if (k.status !== "selesai") continue;
     const t = tanggalKalender(k.tmtKgbBaru);

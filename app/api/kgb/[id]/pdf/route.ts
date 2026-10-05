@@ -201,11 +201,17 @@ export async function POST(
     tanggalSurat,
     kppn,
     satker: { nama: satker.nama, kanwil: satker.jenis === "kanwil" },
+    // Pangkat dan golongan diambil dari data KGB, sama dengan gaji pokok dan masa kerjanya (ADR-056). Data pegawai
+    // dapat sudah berubah sesudah Input KGB (kenaikan pangkat yang dicatat belakangan, koreksi golongan), sehingga
+    // satu SK mencetak dua golongan yang berbeda.
     pegawai: {
       nama: pegawai.nama,
       nip: pegawai.nip,
-      pangkat: pegawai.pangkat,
-      golonganRuang: pegawai.golonganRuang,
+      pangkat:
+        getPangkat(kgb.golonganLama) ||
+        (kgb.golonganLama === pegawai.golonganRuang ? pegawai.pangkat : "") ||
+        pegawai.pangkat,
+      golonganRuang: kgb.golonganLama || pegawai.golonganRuang,
     },
     kgb: {
       gajiPokokLama: kgb.gajiPokokLama,

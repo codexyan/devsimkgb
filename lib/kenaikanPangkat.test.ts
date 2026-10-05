@@ -76,3 +76,11 @@ test("SK KP menjadi Atas dasar bila ber-TMT pada atau sesudah KGB terakhir yang 
   assert.equal(skKpLebihBaru("2023-04-01", []), true);
   assert.equal(skKpLebihBaru(null, kgb), false);
 });
+
+test("skKpLebihBaru: KGB terakhir di luar SIM-KGB (hanya di data pegawai) tetap lebih baru dari KP yang lebih dulu", () => {
+  // Tanpa riwayat KGB selesai, KP April 2025 dulu dianggap terbaru walau KGB Januari 2026 sudah terjadi.
+  assert.equal(skKpLebihBaru("2025-04-01", [], "2026-01-01"), false);
+  assert.equal(skKpLebihBaru("2026-01-01", [], "2026-01-01"), true);
+  assert.equal(skKpLebihBaru("2026-04-01", [], "2026-01-01"), true);
+  assert.equal(skKpLebihBaru("2025-04-01", []), true, "tanpa keterangan apa pun, perilakunya tidak berubah");
+});

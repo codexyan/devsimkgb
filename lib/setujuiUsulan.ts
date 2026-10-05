@@ -21,6 +21,7 @@ import { ringkasDasarBaru } from "./dasarBaruUsulan";
 // berasal dari hitungan SK di lib/catatDasarGaji.ts, sama persis dengan Catat KP/PMK di halaman pegawai.
 import { KOLOM_DITENTUKAN_SK, hitungDasarSkUsulan } from "./dasarSkUsulan";
 import { tanggalKalender } from "./waktu";
+import { kunciNomorSk } from "./nomorSurat";
 
 
 export interface HasilSetujui {
@@ -170,9 +171,15 @@ export async function setujuiUsulan(
       { id: pegawaiLama.id },
       {
         ...nilaiDitulis,
-        // SK dasar ikut diperbarui hanya bila UPT mengisinya pada usulan ini (ADR-010).
+        // SK dasar ikut diperbarui hanya bila UPT mengisinya pada usulan ini (ADR-010). Bila nomornya berganti,
+        // pejabat penetap SK lama tidak lagi berlaku; usulan UPT tidak memuat penetap, jadi dikosongkan dan diisi
+        // Tim SDM saat Input KGB (ADR-056).
         ...(usulan.nomorSkTerakhir?.trim() ? { nomorSkDasar: usulan.nomorSkTerakhir.trim() } : {}),
         ...(usulan.tanggalSkTerakhir ? { tanggalSkDasar: usulan.tanggalSkTerakhir } : {}),
+        ...(usulan.nomorSkTerakhir?.trim() &&
+        kunciNomorSk(usulan.nomorSkTerakhir) !== kunciNomorSk(pegawaiLama.nomorSkDasar)
+          ? { penetapSkDasar: null }
+          : {}),
         konfirmasiUptTmt: tmtSiklus,
         konfirmasiUptAt: sekarang,
         konfirmasiUptOleh: usulan.diajukanOleh,

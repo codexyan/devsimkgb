@@ -123,13 +123,15 @@ export async function PATCH(
   if (jadwalBerubah || gajiBerubah) {
     const riwayat = await db.riwayatKGB.findMany({ where: { pegawaiId: id } });
     const berjalan = kgbBerjalanTerbaru(riwayat);
-    if (jadwalBerubah && berjalan) {
+    // Gaji pokok ikut dikunci (ADR-056): KGB yang berjalan sudah menyalin gaji pokok lama, dan salinan itulah
+    // yang tercetak sebagai Gaji Pokok Lama di SK. Mengubahnya di sini membuat SK tetap mencetak angka lama.
+    if ((jadwalBerubah || gajiBerubah) && berjalan) {
       const label = infoStatusKgb(berjalan.status).label;
       const saran = berjalan.status === "sedang_diproses"
         ? "Batalkan KGB tersebut terlebih dahulu bila data ini perlu diperbaiki."
         : "Perubahan dapat dilakukan setelah keuangan mengonfirmasi KGB tersebut.";
       return NextResponse.json(
-        { error: `Golongan, masa kerja golongan, dan TMT KGB tidak dapat diubah karena KGB pegawai ini berstatus ${label}. ${saran}` },
+        { error: `Golongan, masa kerja golongan, gaji pokok, dan TMT KGB tidak dapat diubah karena KGB pegawai ini berstatus ${label}. ${saran}` },
         { status: 409 },
       );
     }

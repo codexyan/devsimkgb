@@ -138,7 +138,7 @@ export async function catatKenaikanPangkat(input: {
 
   // Penetap yang belum diketahui dibiarkan kosong agar Tim SDM mengisinya saat Input KGB, bukan tercetak
   // penetap SK KGB lama.
-  const kpTerbaru = skKpLebihBaru(tmtPangkat, kgbPegawai);
+  const kpTerbaru = skKpLebihBaru(tmtPangkat, kgbPegawai, pegawai.tmtKgbTerakhir);
   const diselaraskan: string[] = [];
   for (const k of dampak.diselaraskan) {
     const tmtKgbBaru = tanggalKalender(k.tmtKgbBaru);
@@ -276,7 +276,7 @@ export async function catatPmk(input: {
     },
   );
 
-  const pmkTerbaru = skKpLebihBaru(tmtPmk, kgbPegawai);
+  const pmkTerbaru = skKpLebihBaru(tmtPmk, kgbPegawai, pegawai.tmtKgbTerakhir);
   const placeholder = [...dampak.diselaraskan].sort(
     (a, b) => (tanggalKalender(a.tmtKgbBaru)?.getTime() ?? 0) - (tanggalKalender(b.tmtKgbBaru)?.getTime() ?? 0),
   );
