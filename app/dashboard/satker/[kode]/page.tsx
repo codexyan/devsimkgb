@@ -168,7 +168,7 @@ export default function HalamanSatkerDetail() {
               {pegawai.length === 0 ? "Belum ada data pegawai untuk satker ini. Impor lewat Data Pegawai." : "Tidak ada pegawai untuk saringan ini."}
             </p>
           ) : (
-            <div className="overflow-x-auto" style={{ borderTop: "1px solid var(--ln2)" }}>
+            <div className="relative overflow-x-auto" style={{ borderTop: "1px solid var(--ln2)" }}>
               <table className="dsb-tabel" style={{ minWidth: "640px" }}>
                 <thead>
                   <tr>

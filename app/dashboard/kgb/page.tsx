@@ -728,6 +728,105 @@ export default function KGBPage() {
     { value: STATUS_BELUM_DIBUKA, label: "Belum dibuka", count: summary ? belumDibuka : null },
   ];
 
+  /** Keadaan satu KGB pada daftar; dipakai bersama oleh tabel layar lebar dan kartu ponsel (ADR-064). */
+  function keadaanBaris(k: KGB) {
+    const jendela = jendelaProsesKgb(k.tmtKgbBaru, hariIni);
+    const satker = SATKER.find((s) => s.kode === kodeSatkerPegawai(k.pegawai.unitKerja));
+    return {
+      warna: warnaStatusKgb(k.status),
+      terlambat: terlambatSdm(k),
+      jendela,
+      terkunci: k.status === "belum_diproses" && !!jendela?.isLocked,
+      namaSatker: satker && satker.jenis !== "kanwil" ? satker.nama.replace(/\bKelas\s+/, "") : null,
+    };
+  }
+  type KeadaanBaris = ReturnType<typeof keadaanBaris>;
+
+  function identitasBaris(k: KGB, b: KeadaanBaris) {
+    return (
+      <div className="flex items-center gap-2.5">
+        <span className="dsb-avatar" aria-hidden="true">
+          {k.pegawai.nama.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+        </span>
+        <div className="min-w-0" style={{ lineHeight: 1.35 }}>
+          <p className="dsb-nama" style={{ margin: 0 }}>{k.pegawai.nama}</p>
+          <p className="dsb-kecil" style={{ margin: 0 }}>
+            {k.pegawai.nip}
+            {b.namaSatker ? ` · ${b.namaSatker}` : ""}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  function gajiBaris(k: KGB) {
+    return (
+      <>
+        <p style={{ margin: 0, color: "var(--dt3)", fontVariantNumeric: "tabular-nums" }}>
+          {k.golonganLama} · {formatRupiah(k.gajiPokokLama)}
+        </p>
+        {k.isVirtual ? (
+          <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>Gaji baru dihitung saat input</p>
+        ) : (
+          <p style={{ margin: "2px 0 0", color: "var(--dtn)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+            {formatRupiah(k.gajiPokokBaru)}
+            <span className="dsb-kecil" style={{ fontWeight: 400 }}> · MKG {k.mkgTahunBaru ?? "-"} thn {k.mkgBulanBaru ?? "-"} bln</span>
+          </p>
+        )}
+      </>
+    );
+  }
+
+  function tmtBaris(k: KGB, b: KeadaanBaris) {
+    return (
+      <>
+        {tanggalPendek(k.tmtKgbBaru)}
+        {b.jendela && k.status === "belum_diproses" && (
+          <p className="dsb-kecil" style={{ margin: "2px 0 0", color: b.terlambat ? "var(--st-red)" : undefined }}>
+            {b.terkunci ? `Dibuka ${tanggalPendek(b.jendela.unlockDate)}` : `Batas input ${tanggalPendek(b.jendela.deadlineSDM)}`}
+          </p>
+        )}
+      </>
+    );
+  }
+
+  function tandaBaris(k: KGB, b: KeadaanBaris) {
+    return (
+      <>
+        <span className="dsb-tag" style={b.terkunci ? undefined : { background: b.warna.bg, color: b.warna.color }} data-garis={b.terkunci ? "" : undefined}>
+          {b.terkunci ? "Belum dibuka" : infoStatusKgb(k.status).label}
+        </span>
+        {b.terlambat && (
+          <span className="dsb-tag" style={{ background: "var(--tint-red-bg2)", color: "var(--st-red)" }} title="Batas input SDM sudah lewat; berpotensi rapelan">
+            Lewat batas input
+          </span>
+        )}
+        {!k.isVirtual && k.status === "belum_diproses" && k.nomorSK === "" && (
+          <span className="dsb-tag" data-garis="">Antrean otomatis</span>
+        )}
+        {!k.isVirtual && !k.isArsip && !k.penetapSkDasar &&
+          (k.status === "sedang_diproses" || (k.status === "belum_diproses" && k.nomorSK !== "")) && (
+          <span className="dsb-tag" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber2)" }} title="Pejabat penetap SK terakhir belum diisi; lengkapi saat Buat SK">
+            Penetap SK perlu dilengkapi
+          </span>
+        )}
+      </>
+    );
+  }
+
+  function aksiBaris(k: KGB) {
+    return (
+      <>
+        {!k.isVirtual && (
+          <button type="button" onClick={() => bukaDetail(k)} className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">
+            Detail
+          </button>
+        )}
+        {renderAksiBaris(k)}
+      </>
+    );
+  }
+
   return (
     <>
     <div className="dsb-halaman">
@@ -801,7 +900,7 @@ export default function KGBPage() {
           </div>
 
           {/* Pencarian, saringan, dan urutan */}
-          <div className="dsb-alat">
+          <div className="dsb-alat kgb-alat">
             <input
               type="search"
               className="dsb-cari"
@@ -877,7 +976,9 @@ export default function KGBPage() {
             {kgbList.length === 0 ? "Belum ada data KGB." : "Tidak ada KGB yang cocok dengan saringan."}
           </p>
         ) : (
-          <div className="overflow-x-auto tbl-scroll" style={{ borderTop: "1px solid var(--ln2)" }}>
+          <>
+          {/* ── Tabel layar lebar ── */}
+          <div className="hidden md:block overflow-x-auto tbl-scroll" style={{ borderTop: "1px solid var(--ln2)" }}>
             <table className="dsb-tabel" style={{ minWidth: "900px" }}>
               <thead>
                 <tr>
@@ -890,83 +991,21 @@ export default function KGBPage() {
               </thead>
               <tbody>
                 {displayList.map((k) => {
-                  const warna = warnaStatusKgb(k.status);
-                  const terlambat = terlambatSdm(k);
-                  const jendela = jendelaProsesKgb(k.tmtKgbBaru, hariIni);
-                  const terkunci = k.status === "belum_diproses" && !!jendela?.isLocked;
-                  const satker = kodeSatkerPegawai(k.pegawai.unitKerja);
-                  const namaSatker = SATKER.find((s) => s.kode === satker);
+                  const b = keadaanBaris(k);
                   return (
                     <tr
                       key={k.id ?? `virtual-${k.pegawaiId}`}
-                      className={terkunci ? "dsb-redup" : undefined}
-                      style={{ background: terlambat ? "var(--tint-red-bg)" : undefined }}
+                      className={b.terkunci ? "dsb-redup" : undefined}
+                      style={{ background: b.terlambat ? "var(--tint-red-bg)" : undefined }}
                     >
+                      <td>{identitasBaris(k, b)}</td>
+                      <td className="whitespace-nowrap">{gajiBaris(k)}</td>
+                      <td className="whitespace-nowrap">{tmtBaris(k, b)}</td>
                       <td>
-                        <div className="flex items-center gap-2.5">
-                          <span className="dsb-avatar" aria-hidden="true">
-                            {k.pegawai.nama.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
-                          </span>
-                          <div className="min-w-0" style={{ lineHeight: 1.35 }}>
-                            <p className="dsb-nama" style={{ margin: 0 }}>{k.pegawai.nama}</p>
-                            <p className="dsb-kecil" style={{ margin: 0 }}>
-                              {k.pegawai.nip}
-                              {namaSatker && namaSatker.jenis !== "kanwil" ? ` · ${namaSatker.nama.replace(/\bKelas\s+/, "")}` : ""}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap">
-                        <p style={{ margin: 0, color: "var(--dt3)", fontVariantNumeric: "tabular-nums" }}>
-                          {k.golonganLama} · {formatRupiah(k.gajiPokokLama)}
-                        </p>
-                        {k.isVirtual ? (
-                          <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>Gaji baru dihitung saat input</p>
-                        ) : (
-                          <p style={{ margin: "2px 0 0", color: "var(--dtn)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
-                            {formatRupiah(k.gajiPokokBaru)}
-                            <span className="dsb-kecil" style={{ fontWeight: 400 }}> · MKG {k.mkgTahunBaru ?? "-"} thn {k.mkgBulanBaru ?? "-"} bln</span>
-                          </p>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap">
-                        {tanggalPendek(k.tmtKgbBaru)}
-                        {jendela && k.status === "belum_diproses" && (
-                          <p className="dsb-kecil" style={{ margin: "2px 0 0", color: terlambat ? "var(--st-red)" : undefined }}>
-                            {terkunci ? `Dibuka ${tanggalPendek(jendela.unlockDate)}` : `Batas input ${tanggalPendek(jendela.deadlineSDM)}`}
-                          </p>
-                        )}
-                      </td>
-                      <td>
-                        <div className="flex flex-col items-start gap-1">
-                          <span className="dsb-tag" style={terkunci ? undefined : { background: warna.bg, color: warna.color }} data-garis={terkunci ? "" : undefined}>
-                            {terkunci ? "Belum dibuka" : infoStatusKgb(k.status).label}
-                          </span>
-                          {terlambat && (
-                            <span className="dsb-tag" style={{ background: "var(--tint-red-bg2)", color: "var(--st-red)" }} title="Batas input SDM sudah lewat; berpotensi rapelan">
-                              Lewat batas input
-                            </span>
-                          )}
-                          {!k.isVirtual && k.status === "belum_diproses" && k.nomorSK === "" && (
-                            <span className="dsb-tag" data-garis="">Antrean otomatis</span>
-                          )}
-                          {!k.isVirtual && !k.isArsip && !k.penetapSkDasar &&
-                            (k.status === "sedang_diproses" || (k.status === "belum_diproses" && k.nomorSK !== "")) && (
-                            <span className="dsb-tag" style={{ background: "var(--tint-amber-bg)", color: "var(--st-amber2)" }} title="Pejabat penetap SK terakhir belum diisi; lengkapi saat Buat SK">
-                              Penetap SK perlu dilengkapi
-                            </span>
-                          )}
-                        </div>
+                        <div className="flex flex-col items-start gap-1">{tandaBaris(k, b)}</div>
                       </td>
                       <td className="kanan whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1.5">
-                          {!k.isVirtual && (
-                            <button type="button" onClick={() => bukaDetail(k)} className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">
-                              Detail
-                            </button>
-                          )}
-                          {renderAksiBaris(k)}
-                        </div>
+                        <div className="inline-flex items-center gap-1.5">{aksiBaris(k)}</div>
                       </td>
                     </tr>
                   );
@@ -974,6 +1013,37 @@ export default function KGBPage() {
               </tbody>
             </table>
           </div>
+
+          {/* ── Kartu layar sempit (ADR-064): tabel selebar 900 px hanya dapat digeser ke samping di ponsel, sehingga
+              status dan tombol aksinya tersembunyi di luar layar. Isinya sama dengan tabel, dari fungsi yang sama. ── */}
+          <ul className="md:hidden kgb-kartu-daftar" style={{ borderTop: "1px solid var(--ln2)" }}>
+            {displayList.map((k) => {
+              const b = keadaanBaris(k);
+              return (
+                <li
+                  key={k.id ?? `virtual-${k.pegawaiId}`}
+                  className="kgb-kartu"
+                  data-redup={b.terkunci ? "" : undefined}
+                  style={{ background: b.terlambat ? "var(--tint-red-bg)" : undefined }}
+                >
+                  {identitasBaris(k, b)}
+                  <div className="kgb-kartu-rinci">
+                    <div>
+                      <span className="dsb-kecil">Gaji pokok lama → baru</span>
+                      {gajiBaris(k)}
+                    </div>
+                    <div>
+                      <span className="dsb-kecil">TMT KGB</span>
+                      {tmtBaris(k, b)}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">{tandaBaris(k, b)}</div>
+                  <div className="flex flex-wrap items-center gap-2">{aksiBaris(k)}</div>
+                </li>
+              );
+            })}
+          </ul>
+          </>
         )}
       </section>
 

@@ -862,7 +862,7 @@ export default function ImportPage() {
                   Pratinjau data valid ({validRows.length} baris)
                 </p>
               </div>
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr style={{ borderBottom: "0.5px solid var(--ln1)" }}>
