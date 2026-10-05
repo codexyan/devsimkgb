@@ -2760,12 +2760,24 @@ html[data-gerak="kurangi"] .dsb-putar {
   .kol-alat .dsb-segmen { flex-wrap: wrap; }
 }
 
-/* Langkah 2: daftar pegawai di kiri, detail di kanan. Di layar sempit daftar menjadi baris geser di atas. */
+/* Langkah 2: daftar pegawai di kiri, detail di kanan. Di layar sempit (< 1024 px) daftar menjadi baris geser di atas.
+   Tata gulirnya (ADR-061):
+     - layar kerja (>= 1200 x 720): halaman pas satu layar; daftar kiri dan isi detail bergulir sendiri-sendiri,
+       sedangkan kepala halaman, penanda langkah, kepala detail, dan kaki tetap terlihat;
+     - layar lebar tetapi pendek: halaman bergulir; daftar kiri menempel setinggi layar dan bergulir sendiri, kepala
+       detail menempel di atas, kaki menempel di bawah;
+     - layar sempit: satu gulir halaman tanpa gulir bersarang, seperti halaman lain (ADR-003). */
 .kol-md { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); min-height: 420px; }
-/* Kolom kiri langkah Lengkapi: kotak cari (bila banyak) dan daftar pegawai (ADR-060). */
-.kol-md-kiri { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--ln2); background: var(--sub); }
-.kol-md-cari { flex: none; margin: 8px 8px 0; position: sticky; top: 0; z-index: 1; }
-.kol-md-daftar { margin: 0; padding: 8px; list-style: none; }
+.kol-md-kiri { min-width: 0; border-right: 1px solid var(--ln2); border-top-left-radius: 11px; background: var(--sub); }
+.kol-md-tempel { display: flex; flex-direction: column; min-height: 0; }
+/* Kotak cari dan saringan kelengkapan, bila pegawainya lebih dari delapan (ADR-060, ADR-061). */
+.kol-md-alat { flex: none; display: grid; gap: 6px; padding: 8px 8px 0; }
+.kol-md-cari { width: 100%; }
+.kol-md-saring { display: flex; flex-wrap: nowrap; }
+.kol-md-saring button { flex: 1 1 auto; justify-content: center; gap: 4px; padding: 4px 6px; font-size: 12px; white-space: nowrap; }
+.kol-md-saring small { font-size: 11px; color: var(--dt5); font-variant-numeric: tabular-nums; }
+.kol-md-daftar { position: relative; margin: 0; padding: 8px; list-style: none; }
+.kol-md-kosong { padding: 12px 10px; font-size: 12.5px; color: var(--dt5); }
 .kol-md-daftar button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px;
   background: none; font: inherit; text-align: left; cursor: pointer; }
 .kol-md-daftar button:hover { background: var(--card); }
@@ -2775,12 +2787,22 @@ html[data-gerak="kurangi"] .dsb-putar {
 .kol-md-daftar button[data-keadaan="galat"] span span { color: var(--st-red); }
 .kol-md-daftar button[data-keadaan="tersimpan"] span span { color: var(--st-green); }
 .kol-md-daftar .dsb-tag { margin-left: auto; font-size: 10px; }
-@media (max-width: 900px) {
+/* Di bawah 1024 px menu samping menjadi tombol melayang di pojok kiri atas, sehingga kolom yang menempel di atas
+   akan tertutup olehnya. Batas susunan dua kolom karena itu disamakan dengan batas menu samping. */
+@media (max-width: 1023px) {
   .kol-md { grid-template-columns: minmax(0, 1fr); }
-  .kol-md-kiri { border-right: 0; border-bottom: 1px solid var(--ln2); }
+  .kol-md-kiri { border-right: 0; border-bottom: 1px solid var(--ln2); border-radius: 11px 11px 0 0; }
   .kol-md-daftar { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
   .kol-md-daftar li { flex: 0 0 auto; }
   .kol-md-daftar button { width: auto; max-width: 220px; background: var(--card); border-color: var(--ln1); }
+}
+@media (min-width: 1024px) {
+  /* Yang menempel merapat ke tepi atas layar, melewati bantalan atas <main> (--bantal), supaya isi detail yang tergulir
+     tidak mengintip di atasnya. Tinggi daftar menyisakan bantalan bawah dan kaki (.kol-kaki) yang juga menempel; tinggi
+     kaki diukur komponen ke --kol-kaki karena kaki menjadi dua baris bila panelnya sempit. */
+  .kol-md-tempel { position: sticky; top: calc(-1 * var(--bantal, 0px)); max-height: calc(100dvh - var(--bantal, 0px) - var(--kol-kaki, 60px) - 4px); }
+  .kol-md-daftar { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+  .kol-md-kepala { position: sticky; top: calc(-1 * var(--bantal, 0px)); z-index: 2; }
 }
 .kol-lingkar { flex-shrink: 0; }
 .kol-lingkar circle { fill: none; stroke-width: 3; }
@@ -2789,8 +2811,10 @@ html[data-gerak="kurangi"] .dsb-putar {
 .kol-lingkar[data-penuh] .kol-lingkar-isi { stroke: var(--st-green); }
 .kol-lingkar-centang { fill: none; stroke: var(--st-green); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
-.kol-md-detail { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 16px 20px 20px; }
-.kol-md-kepala { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.kol-md-detail { display: flex; flex-direction: column; min-width: 0; }
+.kol-md-kepala { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--ln2); border-top-right-radius: 11px; background: var(--card); }
+.kol-md-isi { display: flex; flex-direction: column; gap: 16px; padding: 16px 20px 20px; }
 .kol-md-kepala h2 { margin: 0; font-family: var(--huruf-judul); font-size: 19px; font-weight: 500; letter-spacing: -.01em; color: var(--dtn); }
 .kol-md-urut { margin: 0 0 2px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--dt5); }
 .kol-md-nav { display: flex; gap: 4px; }
@@ -2846,6 +2870,40 @@ html[data-gerak="kurangi"] .dsb-putar {
 .kol-ajukan-surat .kol-isi { padding: 8px 10px; font-size: 13px; background: var(--card); }
 .kol-ringkas { padding: 10px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--ln1); font-size: 12.5px; line-height: 1.55; color: var(--dt3); }
 .kol-ringkas strong { color: var(--dtn); }
+
+/* Tata gulir Usulan kolektif (ADR-061), lanjutan model halaman kerja ADR-003. Elemen yang menempel berhenti di dalam
+   bantalan wadah gulirnya; --bantal sama dengan bantalan <main> (.dsb-main) di layar lebar. */
+.kol { --bantal: clamp(12px, 1.4vw, 20px); }
+/* Kaki yang menempel berhenti di dalam bantalan bawah <main>; celah di bawahnya ditutup warna latar halaman supaya isi
+   panel tidak mengintip. Saat kaki tidak menempel, penutup ini jatuh di bantalan halaman yang warnanya sama. */
+.kol .kol-kaki::after { content: ""; position: absolute; top: 100%; left: -1px; right: -1px; height: 20px; background: var(--lavender-wash);
+  pointer-events: none; }
+@media (min-width: 901px) {
+  /* Langkah 3: isian surat menempel di samping daftar pegawai yang panjang. top 0 berarti tepat di dalam bantalan
+     wadah gulirnya, yaitu tempatnya semula, sehingga saat diam ia tidak bergeser. */
+  .kol-ajukan { align-items: start; }
+  .kol-ajukan-surat { position: sticky; top: 0; }
+}
+@media (min-width: 1024px) {
+  /* Langkah 1: kepala kelompok (bulan TMT, pegawai baru) beserta "Pilih semua" menempel selagi kartunya digulir. */
+  .kol-gulir .kol-kelompok-kepala { position: sticky; top: calc(-1 * var(--bantal)); z-index: 1; margin: -10px -16px 8px; padding: 10px 16px 6px;
+    background: var(--card); }
+  /* Langkah 3: kepala daftar ("Pilih semua yang siap") menempel; latarnya menutup bantalan atas wadah gulir. */
+  .kol-ajukan .kol-kelompok-kepala { position: sticky; top: calc(-1 * var(--bantal)); z-index: 1; margin: -16px 0 0; padding: 16px 0 8px;
+    background: var(--card); }
+}
+@media (min-width: 1200px) and (min-height: 720px) {
+  /* Di layar kerja wadah gulirnya bukan <main> lagi, melainkan .kol-gulir (tanpa bantalan) dan .kol-ajukan (16 px). */
+  .kol[data-muat-layar] .kol-gulir .kol-kelompok-kepala { top: 0; }
+  .kol[data-muat-layar] .kol-ajukan .kol-kelompok-kepala { top: -16px; }
+  /* Langkah 2 di layar kerja: kisi daftar dan detail mengisi panel; daftar kiri dan isi detail bergulir sendiri. */
+  .dsb-halaman[data-muat-layar] .kol-panel.dsb-penuh > .kol-md { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .kol[data-muat-layar] :is(.kol-md-kiri, .kol-md-detail) { min-height: 0; }
+  .kol[data-muat-layar] .kol-md-tempel { position: static; height: 100%; max-height: none; }
+  .kol[data-muat-layar] .kol-md-daftar { overscroll-behavior: contain; }
+  .kol[data-muat-layar] .kol-md-kepala { position: static; }
+  .kol[data-muat-layar] .kol-md-isi { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+}
 
 /* Pengingat periode pengusulan KGB Admin UPT (ADR-029) */
 .pgu-batas { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--tint-amber-ln); border-radius: 12px;

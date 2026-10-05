@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BATAS_BERKAS_USULAN_BYTE, PESAN_BERKAS_TERLALU_BESAR, berkasUntukKeadaan, hitungUsulan, pernahKgb } from "@/lib/usulanPegawai";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
@@ -21,7 +21,8 @@ import { formatTanggalId, hariIniWita } from "@/lib/waktu";
    perbaikan data, dan kelengkapan berkas sekaligus. Halaman ini tiga langkah:
      1. Pilih pegawai: dikelompokkan per bulan TMT, dengan saringan jatuh tempo periode ini, ada draf, dan semua.
      2. Lengkapi: daftar pegawai terpilih di kiri dengan lingkar kelengkapan, detail satu pegawai di kanan (keadaan
-        KGB, dasar gaji dengan gaji pokok hasil hitungan, berkas tarik-lepas, catatan). Tanpa gulir mendatar.
+        KGB, dasar gaji dengan gaji pokok hasil hitungan, berkas tarik-lepas, catatan). Tanpa gulir mendatar; daftar
+        dan isi detail bergulir sendiri-sendiri (ADR-061).
      3. Ajukan: pilih draf yang siap, isi surat, lalu kirim ke Kanwil.
    Tiap pegawai tetap disimpan lewat rute yang sama dengan formulir perorangan (POST/PATCH /api/upt/usulan),
    sehingga aturan kelengkapan dan pemeriksaannya tidak berbeda. SK dasar dan berkas yang sudah disetujui Kanwil
@@ -195,8 +196,14 @@ export default function UsulanKolektif() {
   // Draf pegawai baru ikut dipilih kecuali dikeluarkan di sini; draf yang baru dimuat ulang tetap ikut (ADR-060).
   const [baruDikeluarkan, setBaruDikeluarkan] = useState<Set<string>>(() => new Set());
   const [cari, setCari] = useState("");
-  // Pencarian di langkah Lengkapi: daftar kirinya dapat berisi ratusan pegawai baru hasil Unggah daftar.
+  // Pencarian dan saringan kelengkapan di langkah Lengkapi: daftar kirinya dapat berisi ratusan pegawai baru hasil
+  // Unggah daftar (ADR-060, ADR-061).
   const [cariBaris, setCariBaris] = useState("");
+  const [saringBaris, setSaringBaris] = useState<"semua" | "kurang" | "lengkap">("semua");
+  const halamanRef = useRef<HTMLDivElement>(null);
+  const daftarRef = useRef<HTMLUListElement>(null);
+  const mdRef = useRef<HTMLDivElement>(null);
+  const kakiRef = useRef<HTMLDivElement>(null);
   // Dibuka dari kartu Terlambat, saringan periode justru menyembunyikan yang baru saja dicentang:
   // TMT mereka sudah lewat bulan usulan. Karena itu halaman langsung dibuka pada "Semua".
   const [saring, setSaring] = useState<Saring>(() =>
@@ -265,6 +272,58 @@ export default function UsulanKolektif() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Berpindah langkah: halaman mulai dari atas, seperti membuka halaman baru (ADR-061).
+  useEffect(() => {
+    halamanRef.current?.closest("main")?.scrollTo({ top: 0, behavior: "instant" });
+  }, [langkah]);
+
+  // Tinggi kaki langkah Lengkapi (dua baris bila panelnya sempit) membatasi tinggi daftar kiri yang menempel, agar
+  // ujung daftarnya tidak tertutup kaki yang juga menempel.
+  useEffect(() => {
+    const kaki = kakiRef.current;
+    const akar = halamanRef.current;
+    if (!kaki || !akar) return;
+    const ukur = () => akar.style.setProperty("--kol-kaki", `${kaki.offsetHeight}px`);
+    ukur();
+    const amati = new ResizeObserver(ukur);
+    amati.observe(kaki);
+    return () => amati.disconnect();
+  }, [langkah]);
+
+  /**
+   * Langkah Lengkapi, berpindah pegawai: bila halaman sudah tergulir melewati awal detail (layar pendek, detail ikut
+   * gulir halaman), detail yang baru dibuka ditampilkan dari atasnya. Yang menempel berhenti di dalam bantalan atas
+   * <main>, jadi detail disejajarkan ke sana, bukan ke tepi luarnya (ADR-061).
+   */
+  useEffect(() => {
+    const md = mdRef.current;
+    const main = md?.closest("main");
+    if (!md || !main) return;
+    const lewat = md.getBoundingClientRect().top - (main.getBoundingClientRect().top + (parseFloat(getComputedStyle(main).paddingTop) || 0));
+    if (lewat < 0) main.scrollBy({ top: lewat, behavior: "instant" });
+  }, [aktif]);
+
+  /**
+   * Pegawai yang dibuka selalu terlihat di daftar kiri: saat berpindah dengan ‹ ›, kembali dari langkah lain, atau
+   * daftarnya disaring dan dicari. Yang digulir hanya daftarnya (menurun di layar lebar, mendatar di layar sempit), dan
+   * yang dihitung adalah bagian yang benar-benar tampak: tidak tertutup kaki yang menempel dan tidak di luar layar.
+   */
+  useEffect(() => {
+    const ul = daftarRef.current;
+    const main = ul?.closest("main");
+    const li = ul?.querySelector<HTMLElement>('[aria-current="true"]')?.closest("li");
+    if (!ul || !main || !li) return;
+    const rMain = main.getBoundingClientRect();
+    const rUl = ul.getBoundingClientRect();
+    const rLi = li.getBoundingClientRect();
+    const atas = Math.max(rUl.top, rMain.top);
+    const bawah = Math.min(rUl.bottom, kakiRef.current?.getBoundingClientRect().top ?? Infinity, rMain.bottom);
+    if (rLi.top < atas) ul.scrollTop -= atas - rLi.top + 8;
+    else if (rLi.bottom > bawah) ul.scrollTop += rLi.bottom - bawah + 8;
+    if (rLi.left < rUl.left) ul.scrollLeft -= rUl.left - rLi.left + 8;
+    else if (rLi.right > rUl.right) ul.scrollLeft += rLi.right - rUl.right + 8;
+  }, [aktif, langkah, saringBaris, cariBaris]);
 
   /** Usulan yang masih dipegang UPT (draf atau dikembalikan), per pegawai. */
   const drafPerPegawai = useMemo(
@@ -496,7 +555,25 @@ export default function UsulanKolektif() {
   const jumlahLengkap = baris?.filter((b) => kelengkapan(b).kurang.length === 0).length ?? 0;
   const jumlahDipilih = terpilih.size + baruDipilih.length;
   const barisAktif = baris?.find((b) => b.kunci === aktif) ?? baris?.[0] ?? null;
-  const indeksAktif = barisAktif && baris ? baris.indexOf(barisAktif) : -1;
+  /**
+   * Daftar kiri langkah Lengkapi menurut pencarian dan saringan kelengkapan, yang tampil bila pegawainya lebih dari
+   * delapan. Pegawai yang sedang dibuka tetap ada di daftar walau baru saja lengkap, supaya tidak lenyap selagi
+   * disunting; ia lepas begitu berpindah ke pegawai lain (ADR-061).
+   */
+  const adaAlatBaris = (baris?.length ?? 0) > 8;
+  const qBaris = adaAlatBaris ? cariBaris.trim().toLowerCase() : "";
+  const saringanBaris = adaAlatBaris ? saringBaris : "semua";
+  const barisTampil = (baris ?? []).filter(
+    (b) =>
+      (!qBaris || `${b.nama} ${b.nip}`.toLowerCase().includes(qBaris)) &&
+      (saringanBaris === "semua" ||
+        b.kunci === barisAktif?.kunci ||
+        (kelengkapan(b).kurang.length === 0) === (saringanBaris === "lengkap")),
+  );
+  // ‹ › mengikuti daftar yang tampil; bila pegawai yang dibuka tidak ada di sana, mengikuti seluruh daftar.
+  const navBaris = barisAktif && barisTampil.includes(barisAktif) ? barisTampil : (baris ?? []);
+  const indeksNav = barisAktif ? navBaris.indexOf(barisAktif) : -1;
+  const navTersaring = navBaris.length !== (baris?.length ?? 0);
 
   const LANGKAH: { n: Langkah; judul: string; ket: string; bisa: boolean }[] = [
     { n: 1, judul: "Pilih pegawai", ket: `${jumlahDipilih} dipilih`, bisa: true },
@@ -504,8 +581,10 @@ export default function UsulanKolektif() {
     { n: 3, judul: "Ajukan dengan surat", ket: drafSesiIni.length ? `${siapAjukan.length} siap diajukan` : "simpan draf dulu", bisa: drafSesiIni.length > 0 },
   ];
 
+  // Halaman kerja (ADR-003, ADR-061): di layar kerja halaman pas satu layar; yang bergulir hanya daftar di dalam
+  // panel tiap langkah, sedangkan kepala halaman, penanda langkah, dan kaki panel tetap terlihat.
   return (
-    <div className="dsb-halaman kol">
+    <div ref={halamanRef} className="dsb-halaman kol" data-muat-layar="">
       <header className="dsb-halaman-kepala dsb-muncul">
         <div className="min-w-0">
           <p className="dsb-label">Data Pegawai</p>
@@ -559,7 +638,7 @@ export default function UsulanKolektif() {
 
       {/* ── Langkah 1: pilih pegawai ─────────────────────────────── */}
       {langkah === 1 && (
-        <section className="dsb-panel kol-panel" aria-label="Pilih pegawai">
+        <section className="dsb-panel kol-panel dsb-penuh" aria-label="Pilih pegawai">
           <div className="kol-alat">
             <div className="dsb-segmen" role="group" aria-label="Saring pegawai">
               <button type="button" aria-pressed={saring === "periode"} onClick={() => setSaring("periode")}>
@@ -591,121 +670,124 @@ export default function UsulanKolektif() {
             </p>
           )}
 
-          {drafBaruTampil.length > 0 && (
-            <div className="kol-kelompok-daftar">
-              <section className="kol-kelompok" aria-label="Pegawai baru">
-                <div className="kol-kelompok-kepala">
-                  <p>
-                    Pegawai baru
-                    <span className="dsb-tag" data-nada="hijau">belum tercatat di Kanwil</span>
-                    <small>
-                      {drafBaruTampil.length === drafBaru.length ? `${drafBaru.length} pegawai` : `${drafBaruTampil.length} dari ${drafBaru.length} pegawai`}
-                      {" · "}
-                      {drafBaru.filter((d) => d.kekurangan.length === 0).length} siap diajukan
-                    </small>
-                  </p>
-                  <button type="button" className="pgw-tautan" onClick={() => pilihSemuaBaru(!semuaBaruTampilDipilih)}>
-                    {semuaBaruTampilDipilih ? "Batalkan semua" : "Pilih semua"}
-                  </button>
-                </div>
-                <ul className="kol-kartu-daftar">
-                  {drafBaruTampil.map((d) => {
-                    const dipilih = !baruDikeluarkan.has(d.id);
-                    const golongan = d.nilai?.golonganRuang;
-                    return (
-                      <li key={d.id}>
-                        <label className="kol-kartu" data-pilih={dipilih ? "" : undefined}>
-                          <input type="checkbox" className="sr-only" checked={dipilih} onChange={() => alihBaru(d.id)} />
-                          <span className="kol-kartu-centang" aria-hidden="true">{dipilih ? "✓" : ""}</span>
-                          <span className="min-w-0">
-                            <strong>{d.nama}</strong>
-                            <span className="kol-kartu-sub">{d.nip}</span>
-                            <span className="kol-kartu-tanda">
-                              {golongan && <span className="dsb-tag" data-garis="">{golongan}</span>}
-                              {d.status === "revisi" ? (
-                                <span className="dsb-tag" data-garis="" data-nada="merah">dikembalikan</span>
-                              ) : d.kekurangan.length === 0 ? (
-                                <span className="dsb-tag" data-garis="" data-nada="hijau">siap</span>
-                              ) : (
-                                <span className="dsb-tag" data-garis="" data-nada="kuning" title={d.kekurangan.join(", ")}>
-                                  kurang {d.kekurangan.length}
-                                </span>
-                              )}
-                            </span>
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            </div>
-          )}
-
-          {memuat ? (
-            <p className="dsb-kosong">Memuat pegawai…</p>
-          ) : saring === "baru" ? (
-            drafBaruTampil.length === 0 && <p className="dsb-kosong">Tidak ada pegawai baru yang cocok.</p>
-          ) : kelompokPilih.length === 0 ? (
-            saring === "semua" && drafBaruTampil.length > 0 ? null : (
-            <p className="dsb-kosong">
-              {saring === "periode"
-                ? `Tidak ada pegawai dengan KGB TMT ${namaBulan(bulanUsulan)}. Pilih "Semua" untuk mengusulkan perbaikan data pegawai lain.`
-                : "Tidak ada pegawai yang cocok."}
-            </p>
-            )
-          ) : (
-            <div className="kol-kelompok-daftar">
-              {kelompokPilih.map(([bulan, daftar]) => {
-                const bisa = daftar.filter(dapatDipilih);
-                const semuaDipilih = bisa.length > 0 && bisa.every((p) => terpilih.has(p.id));
-                return (
-                  <section key={bulan} className="kol-kelompok" aria-label={bulan === "tanpa" ? "Tanpa jadwal KGB" : `TMT ${namaBulan(bulan)}`}>
-                    <div className="kol-kelompok-kepala">
-                      <p>
-                        {bulan === "tanpa" ? "Tanpa jadwal KGB" : `TMT ${namaBulan(bulan)}`}
-                        {bulan === bulanUsulan && <span className="dsb-tag" data-nada="kuning">periode ini</span>}
-                        <small>{daftar.length} pegawai</small>
-                      </p>
-                      {bisa.length > 0 && (
-                        <button type="button" className="pgw-tautan" onClick={() => pilihKelompok(daftar, !semuaDipilih)}>
-                          {semuaDipilih ? "Batalkan semua" : "Pilih semua"}
-                        </button>
-                      )}
-                    </div>
-                    <ul className="kol-kartu-daftar">
-                      {daftar.map((p) => {
-                        const dipilih = terpilih.has(p.id);
-                        const d = drafPerPegawai.get(p.id);
-                        return (
-                          <li key={p.id}>
-                            <label className="kol-kartu" data-pilih={dipilih ? "" : undefined} data-mati={dapatDipilih(p) ? undefined : ""}>
-                              <input type="checkbox" className="sr-only" checked={dipilih} disabled={!dapatDipilih(p)} onChange={() => alih(p.id)} />
-                              <span className="kol-kartu-centang" aria-hidden="true">{dipilih ? "✓" : ""}</span>
-                              <span className="min-w-0">
-                                <strong>{p.nama}</strong>
-                                <span className="kol-kartu-sub">{p.nip}</span>
-                                <span className="kol-kartu-tanda">
-                                  <span className="dsb-tag" data-garis="">{p.golonganRuang}</span>
-                                  {!dapatDipilih(p) ? (
-                                    <span className="dsb-tag" data-garis="" data-nada="biru">ditinjau Kanwil</span>
-                                  ) : d?.status === "revisi" ? (
-                                    <span className="dsb-tag" data-garis="" data-nada="merah">dikembalikan</span>
-                                  ) : d ? (
-                                    <span className="dsb-tag" data-garis="" data-nada="kuning">ada draf</span>
-                                  ) : null}
-                                </span>
+          {/* Bagian yang bergulir; saringan, pencarian, dan kaki tetap terlihat (ADR-061). */}
+          <div className="kol-gulir dsb-gulir">
+            {drafBaruTampil.length > 0 && (
+              <div className="kol-kelompok-daftar">
+                <section className="kol-kelompok" aria-label="Pegawai baru">
+                  <div className="kol-kelompok-kepala">
+                    <p>
+                      Pegawai baru
+                      <span className="dsb-tag" data-nada="hijau">belum tercatat di Kanwil</span>
+                      <small>
+                        {drafBaruTampil.length === drafBaru.length ? `${drafBaru.length} pegawai` : `${drafBaruTampil.length} dari ${drafBaru.length} pegawai`}
+                        {" · "}
+                        {drafBaru.filter((d) => d.kekurangan.length === 0).length} siap diajukan
+                      </small>
+                    </p>
+                    <button type="button" className="pgw-tautan" onClick={() => pilihSemuaBaru(!semuaBaruTampilDipilih)}>
+                      {semuaBaruTampilDipilih ? "Batalkan semua" : "Pilih semua"}
+                    </button>
+                  </div>
+                  <ul className="kol-kartu-daftar">
+                    {drafBaruTampil.map((d) => {
+                      const dipilih = !baruDikeluarkan.has(d.id);
+                      const golongan = d.nilai?.golonganRuang;
+                      return (
+                        <li key={d.id}>
+                          <label className="kol-kartu" data-pilih={dipilih ? "" : undefined}>
+                            <input type="checkbox" className="sr-only" checked={dipilih} onChange={() => alihBaru(d.id)} />
+                            <span className="kol-kartu-centang" aria-hidden="true">{dipilih ? "✓" : ""}</span>
+                            <span className="min-w-0">
+                              <strong>{d.nama}</strong>
+                              <span className="kol-kartu-sub">{d.nip}</span>
+                              <span className="kol-kartu-tanda">
+                                {golongan && <span className="dsb-tag" data-garis="">{golongan}</span>}
+                                {d.status === "revisi" ? (
+                                  <span className="dsb-tag" data-garis="" data-nada="merah">dikembalikan</span>
+                                ) : d.kekurangan.length === 0 ? (
+                                  <span className="dsb-tag" data-garis="" data-nada="hijau">siap</span>
+                                ) : (
+                                  <span className="dsb-tag" data-garis="" data-nada="kuning" title={d.kekurangan.join(", ")}>
+                                    kurang {d.kekurangan.length}
+                                  </span>
+                                )}
                               </span>
-                            </label>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </section>
-                );
-              })}
-            </div>
-          )}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              </div>
+            )}
+
+            {memuat ? (
+              <p className="dsb-kosong">Memuat pegawai…</p>
+            ) : saring === "baru" ? (
+              drafBaruTampil.length === 0 && <p className="dsb-kosong">Tidak ada pegawai baru yang cocok.</p>
+            ) : kelompokPilih.length === 0 ? (
+              saring === "semua" && drafBaruTampil.length > 0 ? null : (
+              <p className="dsb-kosong">
+                {saring === "periode"
+                  ? `Tidak ada pegawai dengan KGB TMT ${namaBulan(bulanUsulan)}. Pilih "Semua" untuk mengusulkan perbaikan data pegawai lain.`
+                  : "Tidak ada pegawai yang cocok."}
+              </p>
+              )
+            ) : (
+              <div className="kol-kelompok-daftar">
+                {kelompokPilih.map(([bulan, daftar]) => {
+                  const bisa = daftar.filter(dapatDipilih);
+                  const semuaDipilih = bisa.length > 0 && bisa.every((p) => terpilih.has(p.id));
+                  return (
+                    <section key={bulan} className="kol-kelompok" aria-label={bulan === "tanpa" ? "Tanpa jadwal KGB" : `TMT ${namaBulan(bulan)}`}>
+                      <div className="kol-kelompok-kepala">
+                        <p>
+                          {bulan === "tanpa" ? "Tanpa jadwal KGB" : `TMT ${namaBulan(bulan)}`}
+                          {bulan === bulanUsulan && <span className="dsb-tag" data-nada="kuning">periode ini</span>}
+                          <small>{daftar.length} pegawai</small>
+                        </p>
+                        {bisa.length > 0 && (
+                          <button type="button" className="pgw-tautan" onClick={() => pilihKelompok(daftar, !semuaDipilih)}>
+                            {semuaDipilih ? "Batalkan semua" : "Pilih semua"}
+                          </button>
+                        )}
+                      </div>
+                      <ul className="kol-kartu-daftar">
+                        {daftar.map((p) => {
+                          const dipilih = terpilih.has(p.id);
+                          const d = drafPerPegawai.get(p.id);
+                          return (
+                            <li key={p.id}>
+                              <label className="kol-kartu" data-pilih={dipilih ? "" : undefined} data-mati={dapatDipilih(p) ? undefined : ""}>
+                                <input type="checkbox" className="sr-only" checked={dipilih} disabled={!dapatDipilih(p)} onChange={() => alih(p.id)} />
+                                <span className="kol-kartu-centang" aria-hidden="true">{dipilih ? "✓" : ""}</span>
+                                <span className="min-w-0">
+                                  <strong>{p.nama}</strong>
+                                  <span className="kol-kartu-sub">{p.nip}</span>
+                                  <span className="kol-kartu-tanda">
+                                    <span className="dsb-tag" data-garis="">{p.golonganRuang}</span>
+                                    {!dapatDipilih(p) ? (
+                                      <span className="dsb-tag" data-garis="" data-nada="biru">ditinjau Kanwil</span>
+                                    ) : d?.status === "revisi" ? (
+                                      <span className="dsb-tag" data-garis="" data-nada="merah">dikembalikan</span>
+                                    ) : d ? (
+                                      <span className="dsb-tag" data-garis="" data-nada="kuning">ada draf</span>
+                                    ) : null}
+                                  </span>
+                                </span>
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <div className="kol-kaki">
             <span>
@@ -733,58 +815,72 @@ export default function UsulanKolektif() {
 
       {/* ── Langkah 2: lengkapi per pegawai (daftar dan detail) ──── */}
       {langkah === 2 && baris && (
-        <section className="dsb-panel kol-panel" aria-label="Lengkapi data dan berkas">
-          <div className="kol-md">
+        <section className="dsb-panel kol-panel dsb-penuh" aria-label="Lengkapi data dan berkas">
+          <div className="kol-md" ref={mdRef}>
             <div className="kol-md-kiri">
-            {baris.length > 8 && (
-              <input
-                type="search"
-                className="dsb-cari kol-md-cari"
-                placeholder={`Cari di ${baris.length} pegawai`}
-                value={cariBaris}
-                onChange={(e) => setCariBaris(e.target.value)}
-                aria-label="Cari pegawai yang diusulkan"
-              />
-            )}
-            <ul className="kol-md-daftar" aria-label="Pegawai yang diusulkan">
-              {baris
-                .filter((b) => !cariBaris.trim() || `${b.nama} ${b.nip}`.toLowerCase().includes(cariBaris.trim().toLowerCase()))
-                .map((b) => {
-                const k = kelengkapan(b);
-                return (
-                  <li key={b.kunci}>
-                    <button type="button" aria-current={barisAktif?.kunci === b.kunci ? "true" : undefined} data-keadaan={b.keadaan} onClick={() => setAktif(b.kunci)}>
-                      <Lingkar selesai={k.selesai} total={k.total} />
-                      <span className="min-w-0">
-                        <strong>{b.nama}</strong>
-                        <span>
-                          {b.keadaan === "menyimpan"
-                            ? "Menyimpan…"
-                            : b.keadaan === "galat"
-                              ? b.pesan ?? "Gagal disimpan"
-                              : b.keadaan === "tersimpan"
-                                ? "Tersimpan"
-                                : berubah(b)
-                                  ? "Berubah, belum disimpan"
-                                  : k.kurang.length === 0
-                                    ? "Lengkap"
-                                    : `Kurang ${k.kurang.length}`}
-                        </span>
-                      </span>
-                      {b.jenis === "baru" && <span className="dsb-tag" data-garis="" data-nada="hijau">baru</span>}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+              {/* Menempel di layar pendek: daftar setinggi layar dan bergulir sendiri selagi detail ikut gulir halaman. */}
+              <div className="kol-md-tempel">
+                {adaAlatBaris && (
+                  <div className="kol-md-alat">
+                    <input
+                      type="search"
+                      className="dsb-cari kol-md-cari"
+                      placeholder={`Cari di ${baris.length} pegawai`}
+                      value={cariBaris}
+                      onChange={(e) => setCariBaris(e.target.value)}
+                      aria-label="Cari pegawai yang diusulkan"
+                    />
+                    <div className="dsb-segmen kol-md-saring" role="group" aria-label="Saring menurut kelengkapan">
+                      <button type="button" aria-pressed={saringBaris === "semua"} onClick={() => setSaringBaris("semua")}>
+                        Semua <small>{baris.length}</small>
+                      </button>
+                      <button type="button" aria-pressed={saringBaris === "kurang"} onClick={() => setSaringBaris("kurang")}>
+                        Kurang <small>{baris.length - jumlahLengkap}</small>
+                      </button>
+                      <button type="button" aria-pressed={saringBaris === "lengkap"} onClick={() => setSaringBaris("lengkap")}>
+                        Lengkap <small>{jumlahLengkap}</small>
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <ul ref={daftarRef} className="kol-md-daftar" aria-label="Pegawai yang diusulkan">
+                  {barisTampil.map((b) => {
+                    const k = kelengkapan(b);
+                    return (
+                      <li key={b.kunci}>
+                        <button type="button" aria-current={barisAktif?.kunci === b.kunci ? "true" : undefined} data-keadaan={b.keadaan} onClick={() => setAktif(b.kunci)}>
+                          <Lingkar selesai={k.selesai} total={k.total} />
+                          <span className="min-w-0">
+                            <strong>{b.nama}</strong>
+                            <span>
+                              {b.keadaan === "menyimpan"
+                                ? "Menyimpan…"
+                                : b.keadaan === "galat"
+                                  ? b.pesan ?? "Gagal disimpan"
+                                  : b.keadaan === "tersimpan"
+                                    ? "Tersimpan"
+                                    : berubah(b)
+                                      ? "Berubah, belum disimpan"
+                                      : k.kurang.length === 0
+                                        ? "Lengkap"
+                                        : `Kurang ${k.kurang.length}`}
+                            </span>
+                          </span>
+                          {b.jenis === "baru" && <span className="dsb-tag" data-garis="" data-nada="hijau">baru</span>}
+                        </button>
+                      </li>
+                    );
+                  })}
+                  {barisTampil.length === 0 && <li className="kol-md-kosong">Tidak ada pegawai yang cocok.</li>}
+                </ul>
+              </div>
             </div>
 
             {barisAktif && (
               <DetailBaris
                 key={barisAktif.kunci}
                 b={barisAktif}
-                ke={indeksAktif + 1}
-                dari={baris.length}
+                urut={`Pegawai ${indeksNav + 1} dari ${navBaris.length}${navTersaring ? " yang tampil" : ""}`}
                 onKeadaan={(pernah) =>
                   ubahBaris(barisAktif.kunci, (x) => ({ ...x, pernah, isian: pernah ? x.isian : { ...x.isian, mkgTahun: "0", mkgBulan: "0" } }))
                 }
@@ -792,13 +888,13 @@ export default function UsulanKolektif() {
                 onCatatan={(teks) => ubahBaris(barisAktif.kunci, (x) => ({ ...x, catatanUpt: teks }))}
                 onDasar={(kolom, nilai) => ubahBaris(barisAktif.kunci, (x) => ({ ...x, dasar: { ...x.dasar, [kolom]: nilai } }))}
                 onBerkas={(medan, f) => pilihBerkas(barisAktif.kunci, medan, f)}
-                onSebelum={indeksAktif > 0 ? () => setAktif(baris[indeksAktif - 1].kunci) : undefined}
-                onBerikut={indeksAktif < baris.length - 1 ? () => setAktif(baris[indeksAktif + 1].kunci) : undefined}
+                onSebelum={indeksNav > 0 ? () => setAktif(navBaris[indeksNav - 1].kunci) : undefined}
+                onBerikut={indeksNav >= 0 && indeksNav < navBaris.length - 1 ? () => setAktif(navBaris[indeksNav + 1].kunci) : undefined}
               />
             )}
           </div>
 
-          <div className="kol-kaki">
+          <div ref={kakiRef} className="kol-kaki">
             <span>
               <strong>{jumlahLengkap}</strong> dari {baris.length} lengkap · <strong>{jumlahBerubah}</strong> belum disimpan. Berkas PDF
               paling besar 500 KB.
@@ -825,8 +921,9 @@ export default function UsulanKolektif() {
 
       {/* ── Langkah 3: ajukan dengan satu surat ──────────────────── */}
       {langkah === 3 && baris && (
-        <section className="dsb-panel kol-panel" aria-label="Ajukan dengan satu surat">
-          <div className="kol-ajukan">
+        <section className="dsb-panel kol-panel dsb-penuh" aria-label="Ajukan dengan satu surat">
+          {/* Daftar pegawai pada surat bergulir; isian surat menempel di sampingnya (ADR-061). */}
+          <div className="kol-ajukan dsb-gulir">
             <div className="kol-ajukan-daftar">
               <div className="kol-kelompok-kepala">
                 <p>
@@ -980,11 +1077,13 @@ function KotakBerkas({
   );
 }
 
-/** Detail satu pegawai di langkah 2: keadaan KGB, isian yang menentukan gaji, berkas, dan catatan. */
+/**
+ * Detail satu pegawai di langkah 2: keadaan KGB, isian yang menentukan gaji, berkas, dan catatan. Kepalanya (nama dan
+ * ‹ ›) tetap terlihat; isinya bergulir di bawahnya (ADR-061).
+ */
 function DetailBaris({
   b,
-  ke,
-  dari,
+  urut,
   onKeadaan,
   onIsi,
   onCatatan,
@@ -994,8 +1093,8 @@ function DetailBaris({
   onBerikut,
 }: {
   b: Baris;
-  ke: number;
-  dari: number;
+  /** Urutan pegawai ini, mis. "Pegawai 3 dari 12". */
+  urut: string;
   onKeadaan: (pernah: boolean) => void;
   onIsi: (kolom: string, nilai: string) => void;
   onCatatan: (teks: string) => void;
@@ -1024,7 +1123,7 @@ function DetailBaris({
     <div className="kol-md-detail">
       <div className="kol-md-kepala">
         <div className="min-w-0">
-          <p className="kol-md-urut">Pegawai {ke} dari {dari}</p>
+          <p className="kol-md-urut">{urut}</p>
           <h2>{b.nama}</h2>
           <p className="kol-kartu-sub">
             {b.nip}
@@ -1037,162 +1136,164 @@ function DetailBaris({
         </span>
       </div>
 
-      {b.keadaan === "galat" && b.pesan && <p className="pmh-galat">{b.pesan}</p>}
-      {k.kurang.length > 0 ? (
-        <p className="kol-kurang">
-          <span aria-hidden="true">!</span> Belum lengkap: {k.kurang.join(", ")}.
-        </p>
-      ) : (
-        <p className="kol-kurang" data-lengkap="">
-          <span aria-hidden="true">✓</span> Data dan berkas wajib sudah lengkap.
-        </p>
-      )}
-
-      <div className="kol-bagian">
-        <p className="kol-subjudul">Keadaan KGB</p>
-        <div className="kol-pilihan" role="radiogroup" aria-label="Keadaan KGB">
-          <button type="button" role="radio" aria-checked={b.pernah} onClick={() => onKeadaan(true)}>Sudah pernah KGB</button>
-          <button type="button" role="radio" aria-checked={!b.pernah} onClick={() => onKeadaan(false)}>Belum pernah KGB</button>
-        </div>
-      </div>
-
-      <div className="kol-bagian">
-        <p className="kol-subjudul">Dasar gaji <span>isian yang berubah ditandai kuning</span></p>
-        <div className="kol-isian-kisi">
-          <label className="kol-label">
-            <span className="kol-wajib">Golongan ruang</span>
-            <select className="kol-isi" data-beda={beda("golonganRuang")} value={b.isian.golonganRuang ?? ""} onChange={(e) => onIsi("golonganRuang", e.target.value)}>
-              <option value="">Pilih golongan</option>
-              {Object.entries(GOLONGAN_PANGKAT).map(([g, p]) => (
-                <option key={g} value={g}>{g} · {p}</option>
-              ))}
-            </select>
-          </label>
-          <div className="kol-label">
-            <span className={b.pernah ? "kol-wajib" : undefined}>Masa kerja golongan</span>
-            <span className="kol-mkg">
-              <input className="kol-isi" data-beda={beda("mkgTahun")} inputMode="numeric" value={b.isian.mkgTahun ?? ""} disabled={!b.pernah} onChange={(e) => onIsi("mkgTahun", e.target.value.replace(/\D/g, "").slice(0, 2))} aria-label="Tahun" />
-              <span>tahun</span>
-              <input className="kol-isi" data-beda={beda("mkgBulan")} inputMode="numeric" value={b.isian.mkgBulan ?? ""} disabled={!b.pernah} onChange={(e) => onIsi("mkgBulan", e.target.value.replace(/\D/g, "").slice(0, 2))} aria-label="Bulan" />
-              <span>bulan</span>
-            </span>
-          </div>
-          <label className="kol-label">
-            <span className="kol-wajib">{b.pernah ? "TMT KGB terakhir" : "TMT CPNS"}</span>
-            <input className="kol-isi" type="date" data-beda={beda("tmtKgbTerakhir")} value={b.isian.tmtKgbTerakhir ?? ""} onChange={(e) => onIsi("tmtKgbTerakhir", e.target.value)} />
-          </label>
-          <label className="kol-label">
-            <span className="kol-wajib">{b.pernah ? "Nomor SK KGB terakhir" : "Nomor SK CPNS"}</span>
-            <input className="kol-isi" data-beda={beda("nomorSkTerakhir")} value={b.isian.nomorSkTerakhir ?? ""} onChange={(e) => onIsi("nomorSkTerakhir", e.target.value)} placeholder="Sesuai SK" />
-          </label>
-          <label className="kol-label">
-            <span className="kol-wajib">{b.pernah ? "Tanggal SK KGB terakhir" : "Tanggal SK CPNS"}</span>
-            <input className="kol-isi" type="date" data-beda={beda("tanggalSkTerakhir")} value={b.isian.tanggalSkTerakhir ?? ""} onChange={(e) => onIsi("tanggalSkTerakhir", e.target.value)} />
-          </label>
-        </div>
-        <div className="kol-hitung">
-          <div>
-            <span>Gaji pokok</span>
-            <strong>{hitung.gajiPokok > 0 ? rupiah(hitung.gajiPokok) : "–"}</strong>
-          </div>
-          <div>
-            <span>KGB berikutnya</span>
-            <strong>{hitung.tmtKgbBerikutnya ? formatTanggalId(hitung.tmtKgbBerikutnya) : "–"}</strong>
-          </div>
-          {hitung.peringatan.length > 0 && <p>{hitung.peringatan[0]}</p>}
-        </div>
-      </div>
-
-      {/* Sebab perubahan golongan atau masa kerja golongan; Kanwil memakainya membentuk riwayat (ADR-030). */}
-      {(perluSebab || !!b.dasar.jenis) && (
-        <div className="kol-bagian">
-          <p className="kol-subjudul">
-            Sebab golongan atau masa kerja berubah <span>SK inilah yang menjadi dasar SK KGB berikutnya</span>
+      <div className="kol-md-isi">
+        {b.keadaan === "galat" && b.pesan && <p className="pmh-galat">{b.pesan}</p>}
+        {k.kurang.length > 0 ? (
+          <p className="kol-kurang">
+            <span aria-hidden="true">!</span> Belum lengkap: {k.kurang.join(", ")}.
           </p>
-          <div className="kol-sebab">
-            {(["kp", "pmk", "koreksi"] as JenisDasarBaru[]).map((j) => (
-              <label key={j} className="kol-sebab-pilihan" data-pilih={b.dasar.jenis === j ? "" : undefined}>
-                <input type="radio" name={`sebab-${b.kunci}`} className="sr-only" checked={b.dasar.jenis === j} onChange={() => onDasar("jenis", j)} />
-                <span className="kol-sebab-titik" aria-hidden="true" />
-                <span className="min-w-0">
-                  <strong>{LABEL_DASAR_BARU[j]}</strong>
-                  <span>{KETERANGAN_DASAR_BARU[j]}</span>
-                </span>
-              </label>
-            ))}
+        ) : (
+          <p className="kol-kurang" data-lengkap="">
+            <span aria-hidden="true">✓</span> Data dan berkas wajib sudah lengkap.
+          </p>
+        )}
+
+        <div className="kol-bagian">
+          <p className="kol-subjudul">Keadaan KGB</p>
+          <div className="kol-pilihan" role="radiogroup" aria-label="Keadaan KGB">
+            <button type="button" role="radio" aria-checked={b.pernah} onClick={() => onKeadaan(true)}>Sudah pernah KGB</button>
+            <button type="button" role="radio" aria-checked={!b.pernah} onClick={() => onKeadaan(false)}>Belum pernah KGB</button>
           </div>
-          {(b.dasar.jenis === "kp" || b.dasar.jenis === "pmk") && (
-            <div className="kol-isian-kisi">
-              {b.dasar.jenis === "kp" && (
-                <label className="kol-label">
-                  <span className="kol-wajib">Jenis kenaikan pangkat</span>
-                  <select className="kol-isi" value={b.dasar.jenisKp} onChange={(e) => onDasar("jenisKp", e.target.value)}>
-                    {Object.entries(JENIS_KP).map(([k, l]) => (
-                      <option key={k} value={k}>{l}</option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <label className="kol-label">
-                <span className="kol-wajib">Nomor {b.dasar.jenis === "kp" ? "SK kenaikan pangkat" : "SK PMK"}</span>
-                <input className="kol-isi" value={b.dasar.nomorSk} onChange={(e) => onDasar("nomorSk", e.target.value)} placeholder="Sesuai SK" />
-              </label>
-              <label className="kol-label">
-                <span className="kol-wajib">Tanggal SK</span>
-                <input className="kol-isi" type="date" value={b.dasar.tanggalSk} onChange={(e) => onDasar("tanggalSk", e.target.value)} />
-              </label>
-              <label className="kol-label">
-                <span className="kol-wajib">{b.dasar.jenis === "kp" ? "TMT pangkat" : "TMT PMK"}</span>
-                <input className="kol-isi" type="date" value={b.dasar.tmt} onChange={(e) => onDasar("tmt", e.target.value)} />
-              </label>
-              <label className="kol-label">
-                <span>Ditetapkan oleh</span>
-                <input className="kol-isi" value={b.dasar.penetap} onChange={(e) => onDasar("penetap", e.target.value)} placeholder="Pejabat penanda tangan SK" />
-              </label>
+        </div>
+
+        <div className="kol-bagian">
+          <p className="kol-subjudul">Dasar gaji <span>isian yang berubah ditandai kuning</span></p>
+          <div className="kol-isian-kisi">
+            <label className="kol-label">
+              <span className="kol-wajib">Golongan ruang</span>
+              <select className="kol-isi" data-beda={beda("golonganRuang")} value={b.isian.golonganRuang ?? ""} onChange={(e) => onIsi("golonganRuang", e.target.value)}>
+                <option value="">Pilih golongan</option>
+                {Object.entries(GOLONGAN_PANGKAT).map(([g, p]) => (
+                  <option key={g} value={g}>{g} · {p}</option>
+                ))}
+              </select>
+            </label>
+            <div className="kol-label">
+              <span className={b.pernah ? "kol-wajib" : undefined}>Masa kerja golongan</span>
+              <span className="kol-mkg">
+                <input className="kol-isi" data-beda={beda("mkgTahun")} inputMode="numeric" value={b.isian.mkgTahun ?? ""} disabled={!b.pernah} onChange={(e) => onIsi("mkgTahun", e.target.value.replace(/\D/g, "").slice(0, 2))} aria-label="Tahun" />
+                <span>tahun</span>
+                <input className="kol-isi" data-beda={beda("mkgBulan")} inputMode="numeric" value={b.isian.mkgBulan ?? ""} disabled={!b.pernah} onChange={(e) => onIsi("mkgBulan", e.target.value.replace(/\D/g, "").slice(0, 2))} aria-label="Bulan" />
+                <span>bulan</span>
+              </span>
             </div>
-          )}
-          {b.dasar.jenis === "kp" && (
-            <p className="kol-catatan-kecil">
-              Golongan di atas diisi golongan baru menurut SK. Masa kerja golongan dihitung ulang Kanwil dari SK itu:
-              naik dari golongan II ke III memotong masa kerja 5 tahun.
-            </p>
-          )}
-          {b.dasar.jenis === "pmk" && (
-            <p className="kol-catatan-kecil">
-              Masa kerja golongan di atas diisi sesuai yang tertulis pada SK PMK. Jadwal KGB berikutnya dapat maju,
-              dan Kanwil menghitungnya ulang saat menyetujui.
-            </p>
-          )}
+            <label className="kol-label">
+              <span className="kol-wajib">{b.pernah ? "TMT KGB terakhir" : "TMT CPNS"}</span>
+              <input className="kol-isi" type="date" data-beda={beda("tmtKgbTerakhir")} value={b.isian.tmtKgbTerakhir ?? ""} onChange={(e) => onIsi("tmtKgbTerakhir", e.target.value)} />
+            </label>
+            <label className="kol-label">
+              <span className="kol-wajib">{b.pernah ? "Nomor SK KGB terakhir" : "Nomor SK CPNS"}</span>
+              <input className="kol-isi" data-beda={beda("nomorSkTerakhir")} value={b.isian.nomorSkTerakhir ?? ""} onChange={(e) => onIsi("nomorSkTerakhir", e.target.value)} placeholder="Sesuai SK" />
+            </label>
+            <label className="kol-label">
+              <span className="kol-wajib">{b.pernah ? "Tanggal SK KGB terakhir" : "Tanggal SK CPNS"}</span>
+              <input className="kol-isi" type="date" data-beda={beda("tanggalSkTerakhir")} value={b.isian.tanggalSkTerakhir ?? ""} onChange={(e) => onIsi("tanggalSkTerakhir", e.target.value)} />
+            </label>
+          </div>
+          <div className="kol-hitung">
+            <div>
+              <span>Gaji pokok</span>
+              <strong>{hitung.gajiPokok > 0 ? rupiah(hitung.gajiPokok) : "–"}</strong>
+            </div>
+            <div>
+              <span>KGB berikutnya</span>
+              <strong>{hitung.tmtKgbBerikutnya ? formatTanggalId(hitung.tmtKgbBerikutnya) : "–"}</strong>
+            </div>
+            {hitung.peringatan.length > 0 && <p>{hitung.peringatan[0]}</p>}
+          </div>
         </div>
-      )}
 
-      <div className="kol-bagian">
-        <p className="kol-subjudul">Berkas pendukung</p>
-        <div className="kol-berkas-daftar">
-          {berkasUntukKeadaan(b.pernah).map((jenis) => {
-            const ada = b.tersimpan.find((t) => t.medan === jenis.medan) ?? b.bawaan.find((t) => t.medan === jenis.medan);
-            return (
-              <KotakBerkas
-                key={jenis.medan}
-                label={jenis.label}
-                wajib={jenis.wajib}
-                keterangan={jenis.keterangan}
-                berkas={b.berkas[jenis.medan]}
-                tersimpan={ada ? { nama: ada.nama ?? jenis.label, bawaan: !!ada.usulanId } : null}
-                onPilih={(f) => onBerkas(jenis.medan, f)}
-              />
-            );
-          })}
+        {/* Sebab perubahan golongan atau masa kerja golongan; Kanwil memakainya membentuk riwayat (ADR-030). */}
+        {(perluSebab || !!b.dasar.jenis) && (
+          <div className="kol-bagian">
+            <p className="kol-subjudul">
+              Sebab golongan atau masa kerja berubah <span>SK inilah yang menjadi dasar SK KGB berikutnya</span>
+            </p>
+            <div className="kol-sebab">
+              {(["kp", "pmk", "koreksi"] as JenisDasarBaru[]).map((j) => (
+                <label key={j} className="kol-sebab-pilihan" data-pilih={b.dasar.jenis === j ? "" : undefined}>
+                  <input type="radio" name={`sebab-${b.kunci}`} className="sr-only" checked={b.dasar.jenis === j} onChange={() => onDasar("jenis", j)} />
+                  <span className="kol-sebab-titik" aria-hidden="true" />
+                  <span className="min-w-0">
+                    <strong>{LABEL_DASAR_BARU[j]}</strong>
+                    <span>{KETERANGAN_DASAR_BARU[j]}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {(b.dasar.jenis === "kp" || b.dasar.jenis === "pmk") && (
+              <div className="kol-isian-kisi">
+                {b.dasar.jenis === "kp" && (
+                  <label className="kol-label">
+                    <span className="kol-wajib">Jenis kenaikan pangkat</span>
+                    <select className="kol-isi" value={b.dasar.jenisKp} onChange={(e) => onDasar("jenisKp", e.target.value)}>
+                      {Object.entries(JENIS_KP).map(([k, l]) => (
+                        <option key={k} value={k}>{l}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <label className="kol-label">
+                  <span className="kol-wajib">Nomor {b.dasar.jenis === "kp" ? "SK kenaikan pangkat" : "SK PMK"}</span>
+                  <input className="kol-isi" value={b.dasar.nomorSk} onChange={(e) => onDasar("nomorSk", e.target.value)} placeholder="Sesuai SK" />
+                </label>
+                <label className="kol-label">
+                  <span className="kol-wajib">Tanggal SK</span>
+                  <input className="kol-isi" type="date" value={b.dasar.tanggalSk} onChange={(e) => onDasar("tanggalSk", e.target.value)} />
+                </label>
+                <label className="kol-label">
+                  <span className="kol-wajib">{b.dasar.jenis === "kp" ? "TMT pangkat" : "TMT PMK"}</span>
+                  <input className="kol-isi" type="date" value={b.dasar.tmt} onChange={(e) => onDasar("tmt", e.target.value)} />
+                </label>
+                <label className="kol-label">
+                  <span>Ditetapkan oleh</span>
+                  <input className="kol-isi" value={b.dasar.penetap} onChange={(e) => onDasar("penetap", e.target.value)} placeholder="Pejabat penanda tangan SK" />
+                </label>
+              </div>
+            )}
+            {b.dasar.jenis === "kp" && (
+              <p className="kol-catatan-kecil">
+                Golongan di atas diisi golongan baru menurut SK. Masa kerja golongan dihitung ulang Kanwil dari SK itu:
+                naik dari golongan II ke III memotong masa kerja 5 tahun.
+              </p>
+            )}
+            {b.dasar.jenis === "pmk" && (
+              <p className="kol-catatan-kecil">
+                Masa kerja golongan di atas diisi sesuai yang tertulis pada SK PMK. Jadwal KGB berikutnya dapat maju,
+                dan Kanwil menghitungnya ulang saat menyetujui.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="kol-bagian">
+          <p className="kol-subjudul">Berkas pendukung</p>
+          <div className="kol-berkas-daftar">
+            {berkasUntukKeadaan(b.pernah).map((jenis) => {
+              const ada = b.tersimpan.find((t) => t.medan === jenis.medan) ?? b.bawaan.find((t) => t.medan === jenis.medan);
+              return (
+                <KotakBerkas
+                  key={jenis.medan}
+                  label={jenis.label}
+                  wajib={jenis.wajib}
+                  keterangan={jenis.keterangan}
+                  berkas={b.berkas[jenis.medan]}
+                  tersimpan={ada ? { nama: ada.nama ?? jenis.label, bawaan: !!ada.usulanId } : null}
+                  onPilih={(f) => onBerkas(jenis.medan, f)}
+                />
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      <div className="kol-bagian">
-        <label className="kol-label">
-          <span>
-            Catatan untuk Kanwil <span className="kol-opsional">(opsional)</span>
-          </span>
-          <textarea className="kol-isi" rows={2} value={b.catatanUpt} onChange={(e) => onCatatan(e.target.value)} placeholder="mis. SK kenaikan pangkat terbaru masih diproses BKN" />
-        </label>
+        <div className="kol-bagian">
+          <label className="kol-label">
+            <span>
+              Catatan untuk Kanwil <span className="kol-opsional">(opsional)</span>
+            </span>
+            <textarea className="kol-isi" rows={2} value={b.catatanUpt} onChange={(e) => onCatatan(e.target.value)} placeholder="mis. SK kenaikan pangkat terbaru masih diproses BKN" />
+          </label>
+        </div>
       </div>
     </div>
   );

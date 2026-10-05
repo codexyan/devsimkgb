@@ -934,7 +934,10 @@ export default async function IsiPanduan({
                 <LayarKolektif1 namaBulan={bulanTahun(TMT_KGB)} />
                 <p>
                   Sesudah memilih, Anda melengkapi data dan berkas tiap pegawai satu per satu. Daftar di kiri
-                  menunjukkan siapa yang belum lengkap; kerjakan sampai lingkaran kelengkapannya penuh.
+                  menunjukkan siapa yang belum lengkap; kerjakan sampai lingkaran kelengkapannya penuh. Bila pegawainya
+                  banyak, cari namanya atau pilih saringan <em>Kurang</em> agar yang tampil hanya yang belum lengkap.
+                  Daftar dan isian bergulir sendiri-sendiri, sehingga nama pegawai yang sedang dikerjakan dan tombol
+                  simpan selalu terlihat.
                 </p>
                 <LayarKolektif2 />
 
