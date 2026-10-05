@@ -8,7 +8,7 @@
 // sehingga membetulkan salah ketik golongan diam-diam menjatuhkan masa kerja ke nol dan gaji pokok ke
 // angka terendah golongan itu, tanpa pesan apa pun.
 
-import { bulanKeKgbBerikutnya, getMKGOptions, tambahBulan } from "./tabelGaji";
+import { bulanKeKgbBerikutnya, getGajiPokok, getMKGOptions, tambahBulan } from "./tabelGaji";
 import { tanggalKalender, type NilaiTanggal } from "./waktu";
 
 export interface LangkahMkg {
@@ -70,4 +70,70 @@ export function tmtKgbBerikutnyaHitung(
   const awal = tanggalKalender(tmtKgbTerakhir);
   if (!awal) return null;
   return tambahBulan(awal, bulanKeKgbBerikutnya(golongan, tahun, bulan));
+}
+
+/* ── Gaji pokok tercatat yang tidak sesuai golongan dan masa kerjanya (ADR-054) ───────────────────────── */
+
+export interface GajiMenyimpang {
+  tercatat: number;
+  menurutTabel: number;
+  golongan: string;
+  mkgTahun: number;
+  mkgBulan: number;
+}
+
+const rupiah = (n: number) => `Rp ${n.toLocaleString("id-ID")}`;
+
+/**
+ * Gaji pokok tercatat yang tidak sama dengan tabel PP 5/2024 untuk golongan dan masa kerja golongan yang
+ * tercatat; null bila sama, atau bila salah satunya belum terisi.
+ *
+ * Gaji pokok disimpan sebagai kolom tersendiri, sedangkan KGB dihitung dari golongan dan masa kerja. Bila
+ * keduanya tidak sejalan (gaji diketik atau diimpor apa adanya), hitungan KGB tetap benar tetapi angka
+ * tercatat itu tercetak sebagai Gaji Pokok Lama di SK, bisa lebih besar dari gaji pokok barunya.
+ */
+export function gajiTercatatMenyimpang(p: {
+  golonganRuang: string;
+  mkgTahun: number | null;
+  mkgBulan: number | null;
+  gajiPokok: number | null;
+}): GajiMenyimpang | null {
+  const mkgTahun = p.mkgTahun ?? 0;
+  const mkgBulan = p.mkgBulan ?? 0;
+  const menurutTabel = getGajiPokok(p.golonganRuang, mkgTahun, mkgBulan);
+  const tercatat = p.gajiPokok ?? 0;
+  if (!menurutTabel || !tercatat || tercatat === menurutTabel) return null;
+  return { tercatat, menurutTabel, golongan: p.golonganRuang, mkgTahun, mkgBulan };
+}
+
+/** Satu kalimat tentang gaji yang menyimpang, untuk layar Input KGB dan pesan tolak. */
+export function kalimatGajiMenyimpang(g: GajiMenyimpang): string {
+  return (
+    `Gaji pokok tercatat ${rupiah(g.tercatat)} tidak sesuai tabel PP 5/2024 untuk ${g.golongan} masa kerja ` +
+    `${g.mkgTahun} tahun ${g.mkgBulan} bulan, yaitu ${rupiah(g.menurutTabel)}.`
+  );
+}
+
+/** Jalan membetulkannya, sama di layar dan di pesan tolak. */
+export const SARAN_GAJI_MENYIMPANG =
+  "Cocokkan dengan SK KGB terakhir, lalu betulkan lewat Data Pegawai: Ubah dasar KGB, Koreksi data yang salah ketik. " +
+  "Gaji pokok dihitung ulang dari golongan dan masa kerja golongan.";
+
+/**
+ * Pesan tolak Input atau Arsip KGB yang gaji pokok barunya lebih kecil dari gaji pokok lama; null bila tidak.
+ * KGB tidak pernah menurunkan gaji (di atas langkah terakhir tabel, gajinya tetap), jadi keadaan ini selalu
+ * berarti gaji pokok tercatatnya yang keliru, dan SK yang dibuat darinya akan mencetak penurunan gaji.
+ */
+export function pesanGajiTurun(
+  rencana: { gajiPokokLama: number; gajiPokokBaru: number },
+  pegawai: { golonganRuang: string; mkgTahun: number | null; mkgBulan: number | null; gajiPokok: number | null },
+): string | null {
+  if (!rencana.gajiPokokLama || rencana.gajiPokokBaru >= rencana.gajiPokokLama) return null;
+  const menyimpang = gajiTercatatMenyimpang(pegawai);
+  return (
+    `Gaji pokok baru ${rupiah(rencana.gajiPokokBaru)} lebih kecil dari gaji pokok tercatat ${rupiah(rencana.gajiPokokLama)}, ` +
+    "sehingga SK akan mencetak penurunan gaji. " +
+    (menyimpang ? `${kalimatGajiMenyimpang(menyimpang)} ` : "") +
+    SARAN_GAJI_MENYIMPANG
+  );
 }

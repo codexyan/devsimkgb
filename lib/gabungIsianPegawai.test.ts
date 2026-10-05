@@ -63,3 +63,20 @@ test("isian kosong yang dikirim tetap mengosongkan, bukan dianggap tidak dikirim
   assert.equal(hasil.data.penetapSkDasar, null);
   assert.equal(hasil.data.eselon, null);
 });
+
+test("koreksi dasar gaji yang mengirim gaji pokok kosong membaca ulang gaji dari tabel, walau golongan dan masa kerja sama", () => {
+  // Gaji tercatat salah ketik, golongan dan masa kerjanya sudah benar: tanpa gaji kosong, gaji lama bertahan (ADR-054).
+  const keliru = { ...tersimpan, gajiPokok: 4186200 };
+  const tetap = bacaIsianPegawai(gabungIsianPegawai({ golonganRuang: "III/a", mkgTahun: "4", mkgBulan: "0" }, keliru), { denganNip: false });
+  assert.equal(tetap.galat, undefined);
+  if (tetap.galat !== undefined) return;
+  assert.equal(tetap.data.gajiPokok, 4186200);
+
+  const dibetulkan = bacaIsianPegawai(
+    gabungIsianPegawai({ golonganRuang: "III/a", mkgTahun: "4", mkgBulan: "0", gajiPokok: "" }, keliru),
+    { denganNip: false },
+  );
+  assert.equal(dibetulkan.galat, undefined);
+  if (dibetulkan.galat !== undefined) return;
+  assert.equal(dibetulkan.data.gajiPokok, getGajiPokok("III/a", 4, 0));
+});
