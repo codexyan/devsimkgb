@@ -1611,6 +1611,20 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 
 .upt-papan-ket { flex-basis: 100%; font-size: 11.5px; font-weight: 400; color: var(--dt5); }
 .upt-papan-kaki { flex: none; padding: 8px; border-top: 1px solid var(--ln2); }
+/* Draf yang masa usul KGB-nya belum dibuka, terlipat di bawah Perlu dikerjakan (ADR-059). */
+.upt-terkunci { margin-top: 2px; padding-top: 8px; border-top: 1px dashed var(--ln1); }
+.upt-terkunci > summary { display: flex; align-items: center; gap: 6px; padding: 4px; list-style: none; cursor: pointer;
+  font-size: 12px; font-weight: 600; color: var(--dt3); border-radius: 8px; }
+.upt-terkunci > summary::-webkit-details-marker { display: none; }
+.upt-terkunci > summary::before { content: ""; width: 0; height: 0; border-style: solid; border-width: 4px 0 4px 6px;
+  border-color: transparent transparent transparent var(--dt4); transition: transform .15s; }
+.upt-terkunci[open] > summary::before { transform: rotate(90deg); }
+.upt-terkunci > summary:hover { color: var(--dtn); }
+.upt-terkunci > summary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.upt-terkunci-ket { margin: 0 4px 8px; font-size: 11.5px; line-height: 1.45; color: var(--dt5); }
+.upt-terkunci-isi { display: flex; flex-direction: column; gap: 8px; }
+.upt-kartu[data-terkunci] { border-style: dashed; background: var(--sub); }
+.upt-kartu[data-terkunci] .dsb-nama { color: var(--dt2); }
 .upt-papan-kaki .dsb-tombol { width: 100%; justify-content: center; }
 .upt-kartu .dsb-kartu-kepala { flex-wrap: nowrap; align-items: center; justify-content: flex-start; gap: 8px; }
 .upt-kartu .dsb-kartu-kepala .dsb-cek { flex-shrink: 0; }

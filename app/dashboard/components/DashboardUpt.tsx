@@ -216,6 +216,7 @@ const KOLOM_UPT: { k: KolomUpt; judul: string; ket: string; nada: Nada }[] = [
 
 const KOSONG_UPT: Record<KolomUpt, string> = {
   kerja: "Tidak ada yang perlu dikerjakan. Pegawai baru ditambahkan dari Data Pegawai.",
+  kunci: "",
   kanwil: "Tidak ada yang sedang di Kanwil.",
   sk: "Belum ada SK baru yang perlu direkam.",
   selesai: "Belum ada KGB yang direkam di Gaji Web.",
@@ -232,10 +233,13 @@ function KartuUpt({
   pilih,
   aksi,
   lain,
+  terkunci,
 }: {
   nama: string;
   sub: string;
   nada?: Nada;
+  /** Draf yang masa usul KGB-nya belum dibuka; tampil redup di kelompok terlipat (ADR-059). */
+  terkunci?: boolean;
   tanda?: { teks: string; nada?: Nada };
   catatan?: string | null;
   /** Kalimat langkah berikutnya; ditampilkan sebagai keterangan saat kartu disorot, bukan teks tetap. */
@@ -246,7 +250,13 @@ function KartuUpt({
   lain?: string[];
 }) {
   return (
-    <article className="dsb-kartu-kgb upt-kartu" data-nada={nada} title={petunjuk} aria-label={nama}>
+    <article
+      className="dsb-kartu-kgb upt-kartu"
+      data-nada={nada}
+      data-terkunci={terkunci ? "" : undefined}
+      title={petunjuk}
+      aria-label={nama}
+    >
       <p className="dsb-kartu-kepala">
         {pilih}
         <span className="dsb-nama truncate">{nama}</span>
@@ -566,7 +576,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     () =>
       daftarTugasUpt(
         usulan.map((u) => ({
-          id: u.id, pegawaiId: u.pegawaiId, status: u.status,
+          id: u.id, pegawaiId: u.pegawaiId, status: u.status, jenis: u.jenis,
           nama: u.nama, nip: u.nip, kekurangan: u.kekurangan, alasanTolak: u.alasanTolak,
         })),
         pegawai.map((p) => ({
@@ -923,7 +933,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
       return { bulanTmt, jumlah: peta.get(bulanTmt) ?? (i === 0 ? perluDiusulkan.length : 0) };
     });
   })();
-  const adaDraf = tugas.some((t) => t.usulanId);
+  // Tombol Ajukan hanya bila ada draf yang memang dapat dicentang; draf terkunci tidak bercentang.
+  const adaDraf = tugas.some((t) => t.usulanId && !t.terkunci);
   const tmtSingkat = (t: string | null) => (t ? `TMT ${formatTanggalId(t, { month: "short", year: "numeric" })}` : "TMT belum tercatat");
 
   /** Sumber kartu papan; satu entri per dokumen, digabungkan per pegawai di bawah (ADR-026). */
@@ -932,32 +943,35 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
       const u = usulanById(t.usulanId);
       const p = pegawaiById(t.pegawaiId);
       const cfg = TUGAS_UPT[t.jenis];
+      // Draf yang masa usul KGB-nya belum dibuka dikunci di dasbor (ADR-059): tanpa centang, terlipat di bawah
+      // Perlu dikerjakan, dan terbuka sendiri pada bulan kirimnya.
+      const kunci = t.terkunci;
       return {
-        kolom: "kerja" as const,
+        kolom: kunci ? ("kunci" as const) : ("kerja" as const),
         kunci: t.kunci,
         pegawaiId: t.pegawaiId,
         nip: t.nip,
         waktu: u?.diajukanAt ?? null,
-        ringkas: cfg.judul.toLowerCase(),
+        ringkas: kunci ? `draf data terkunci sampai ${namaBulan(kunci.bulanKirim)}` : cfg.judul.toLowerCase(),
         render: (lain: string[]) => (
           <KartuUpt
             lain={lain}
+            terkunci={!!kunci}
             nama={t.nama}
             // Kartu draf adalah usulan DATA (perbaikan atau pegawai baru), bukan usulan KGB; jenisnya disebut di sini.
             // Dulu baris ini hanya "TMT Jan 2028", sehingga draf yang siap diajukan terbaca sebagai KGB yang
             // seharusnya masih terkunci (ADR-057).
             sub={u ? `${t.nip} · ${LABEL_JENIS_USULAN[u.jenis] ?? "Usulan data"}` : `${t.nip} · ${tmtSingkat(t.tmt)}`}
             nada={t.jenis === "perbaiki" ? "ungu" : undefined}
-            tanda={{ teks: cfg.judul, nada: cfg.nada }}
+            tanda={kunci ? { teks: `Terkunci sampai ${namaBulan(kunci.bulanKirim)}` } : { teks: cfg.judul, nada: cfg.nada }}
             // Penugasan BKO disebut di sini supaya tidak terkira orangnya sudah pindah dan usulannya
             // bukan urusan satker ini lagi; unit kerjanya memang tetap di satker ini.
             catatan={
               [
                 t.catatan ? `${t.jenis === "perbaiki" ? "Catatan Kanwil" : "Belum ada"}: ${t.catatan}` : "",
-                // KGB pegawai ini belum dibuka: usulan datanya tetap boleh diajukan sekarang, jadwal KGB-nya tidak
-                // ikut maju. Disebut terang supaya draf tidak terkira membuka KGB lebih awal.
-                u && p?.terkunci && p.bulanTmt
-                  ? `KGB ${namaBulan(p.bulanTmt)} belum dibuka (diusulkan ${namaBulan(geserBulan(p.bulanTmt, -2))}); usulan data ini boleh diajukan sekarang`
+                // Masa usul KGB-nya belum dibuka: kapan terbuka, dan jalan lain bila perbaikannya mendesak.
+                kunci
+                  ? `Masa usul KGB ${namaBulan(kunci.bulanTmt)} dibuka ${namaBulan(kunci.bulanKirim)}, 2 bulan sebelum TMT. Bila mendesak, ajukan lewat Usulan kolektif`
                   : "",
                 p?.satkerTugas ? `Sedang BKO di ${namaUnitKerja(p.satkerTugas)}; KGB tetap diusulkan satker ini` : "",
               ]
@@ -966,7 +980,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             }
             petunjuk={t.langkah}
             pilih={
-              u ? (
+              u && !kunci ? (
                 <input
                   type="checkbox"
                   className="dsb-cek"
@@ -983,7 +997,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                   <button
                     type="button"
                     className="dsb-tombol dsb-tombol-kecil"
-                    data-jenis={t.jenis === "ajukan" ? "garis" : undefined}
+                    data-jenis={t.jenis === "ajukan" || kunci ? "garis" : undefined}
                     onClick={() => lanjutkanDraf(u)}
                   >
                     {t.jenis === "perbaiki" ? "Perbaiki" : t.jenis === "lengkapi" ? "Lengkapi" : "Ubah"}
@@ -1624,6 +1638,25 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                     {isi.map((g) => (
                       <React.Fragment key={g.kunci}>{g.utama.render(g.lain.map((l) => l.ringkas))}</React.Fragment>
                     ))}
+                    {/* Draf data yang masa usul KGB-nya belum dibuka (ADR-059): terlipat, tanpa centang, dan
+                        terbuka sendiri pada bulan kirimnya, 2 bulan sebelum TMT. */}
+                    {k === "kerja" && kolomPapan.kunci.length > 0 && (
+                      <details className="upt-terkunci">
+                        <summary>
+                          Terkunci sampai masa usul KGB
+                          <span className="dsb-papan-jumlah">{kolomPapan.kunci.length}</span>
+                        </summary>
+                        <p className="upt-terkunci-ket">
+                          Draf data pegawai yang KGB-nya belum masuk masa usul. Terbuka sendiri pada bulan kirimnya, 2 bulan
+                          sebelum TMT. Yang mendesak tetap dapat diajukan lewat Usulan kolektif.
+                        </p>
+                        <div className="upt-terkunci-isi">
+                          {kolomPapan.kunci.map((g) => (
+                            <React.Fragment key={g.kunci}>{g.utama.render(g.lain.map((l) => l.ringkas))}</React.Fragment>
+                          ))}
+                        </div>
+                      </details>
+                    )}
                     {k === "selesai" && isi.length > 0 && (
                       <Link href="/dashboard/upt/riwayat" className="dsb-tautan" style={{ padding: "4px 4px 8px" }}>
                         Selengkapnya di Riwayat →

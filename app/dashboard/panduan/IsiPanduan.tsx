@@ -1123,9 +1123,11 @@ export default async function IsiPanduan({
                   <strong className="pub-note-title">Menindaklanjutinya di SIM-KGB</strong>
                   <p>
                     Pegawai yang KGB-nya masuk bulan usulan muncul di kolom <strong>Perlu dikerjakan</strong> sebagai
-                    pengingat <em>Perlu diperiksa</em>, lengkap dengan batas input Kanwil. Draf usulan data (perbaikan atau
-                    pegawai baru) juga ada di kolom itu berapa pun TMT KGB-nya, sebab yang diajukan adalah datanya, bukan
-                    KGB-nya: KGB yang belum dibuka tetap terkunci, dan kartunya menyebut kapan KGB itu diusulkan. Bila ada yang keliru, pilih{" "}
+                    pengingat <em>Perlu diperiksa</em>, lengkap dengan batas input Kanwil. Draf perbaikan data milik pegawai
+                    yang masa usul KGB-nya belum dibuka disimpan terlipat di bagian <em>Terkunci sampai masa usul KGB</em>,
+                    tanpa kotak centang, dan terbuka sendiri pada bulan kirimnya, 2 bulan sebelum TMT. Draf pegawai baru
+                    dan usulan yang dikembalikan Kanwil tidak pernah dikunci. Perbaikan yang mendesak tetap dapat
+                    diajukan lebih awal lewat <strong>Usulan kolektif</strong>. Bila ada yang keliru, pilih{" "}
                     <strong>Usulkan perbaikan data</strong> sebelum batas itu. Hukuman disiplin yang belum dilaporkan
                     disampaikan lewat menu <strong>Lapor Hukdis</strong>; pegawai yang pindah, BKO, atau berhenti
                     dilaporkan dengan <strong>Laporkan mutasi</strong> pada barisnya. Pegawai yang sedang{" "}
