@@ -2858,6 +2858,12 @@ html[data-gerak="kurangi"] .dsb-putar {
    di layar sempit tiap baris menumpuk menjadi kartu. */
 .ung-panel { padding: 0; }
 .ung-isi { display: grid; gap: 14px; padding: 16px; }
+/* Dua tombol templat (Excel utama, CSV cadangan) dan panduan keenam kolom dasarBaru di bawah panduan kolom. */
+.ung-templat-tombol { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.ung-isi .kgbm-panduan + .kgbm-panduan { border-top: .5px solid var(--ln2); }
+.ung-aturan { display: grid; gap: 4px; margin: 0; padding: 10px 12px 10px 28px; font-size: 12px; line-height: 1.5;
+  color: var(--dt2); border-bottom: .5px solid var(--ln2); }
+.ung-isi .kgbm-panduan dt strong { font-weight: 600; color: var(--dtn); }
 
 .ung-ringkas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 8px;
   padding: 14px 16px; border-bottom: 1px solid var(--ln2); }

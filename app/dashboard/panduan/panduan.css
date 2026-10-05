@@ -628,6 +628,9 @@ html[data-dash-theme="dark"] .pub.pg-dasbor .pg-bagian > .pub-h2::before {
   overscroll-behavior: contain;
 }
 
+/* Tabel cara mengisi kolom dasarBaru: satu kolom berisi beberapa pasangan kolom: nilai, satu per baris. */
+.pub.pg-dasbor .pg-isian-dasar { display: block; }
+
 .pub.pg-dasbor .pub-table-wrap {
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;

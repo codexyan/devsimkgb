@@ -9,12 +9,21 @@ import { KEPALA_BERKAS_CSV, PEMISAH_CSV, buangPetunjukPemisah } from "./csv";
 import {
   KOLOM_IMPOR_UPT,
   KOLOM_TEMPLAT_UPT,
+  LEMBAR_DATA_UPT,
+  PANDUAN_DASAR_BARU,
   dapatDisimpan,
+  kunciKolomTemplat,
   periksaImporUpt,
   ringkasImpor,
   templatCsvUpt,
+  type ContohDasarBaru,
   type KonteksImpor,
 } from "./imporUsulanUpt";
+import { templatXlsxUpt } from "./templatUnggahUpt";
+import { bacaXlsx, keRekaman } from "./xlsx";
+import { isiHitungan } from "./usulanFormulir";
+import { hitungDasarSkUsulan } from "./dasarSkUsulan";
+import { samaTanggalKalender } from "./waktu";
 import type { PegawaiRow } from "./sheets/tables";
 
 const kosong: KonteksImpor = {
@@ -349,4 +358,101 @@ test("NIP pada isian dibaca dan diperiksa bersama isian lain", async () => {
   const sah = bacaIsianBaris({ nip: '="200509182025062002"' });
   assert.ok("isian" in sah && sah.isian.nip === "200509182025062002");
   assert.deepEqual(bacaIsianBaris({ nip: "12345" }), { galat: "NIP harus tepat 18 digit angka" });
+});
+
+/* ── Templat Excel dan panduan kolom dasarBaru ───────────────────────────────────────────────────── */
+
+test("judul kolom yang ditulis sedikit berbeda tetap dikenali sebagai kunci templat", () => {
+  // Bentuk-bentuk ini datang dari daftar pegawai buatan UPT sendiri, misalnya berkas Lapas Banjarmasin.
+  assert.equal(kunciKolomTemplat("nip*"), "nip");
+  assert.equal(kunciKolomTemplat(" Golongan ruang* "), "golonganRuang");
+  assert.equal(kunciKolomTemplat("TMT KGB Terakhir*"), "tmtKgbTerakhir");
+  assert.equal(kunciKolomTemplat("Golongan/ruang"), "golonganRuang");
+  assert.equal(kunciKolomTemplat("jenis_kelamin"), "jenisKelamin");
+  assert.equal(kunciKolomTemplat("﻿nip"), "nip");
+  assert.equal(kunciKolomTemplat("Kolom lain"), "Kolom lain");
+});
+
+test("templat Excel: lembar isiannya kosong selain judul kolom, dan ketiga baris contohnya lolos pemeriksaan", () => {
+  const berkas = templatXlsxUpt();
+  const isian = bacaXlsx(berkas, { lembar: LEMBAR_DATA_UPT });
+  assert.deepEqual(isian, [KOLOM_TEMPLAT_UPT.map((k) => k.kolom)]);
+  assert.deepEqual(keRekaman(isian, kunciKolomTemplat), []);
+
+  const contoh = keRekaman(bacaXlsx(berkas, { lembar: "Contoh" }), kunciKolomTemplat);
+  assert.equal(contoh.length, 3);
+  const tercatat = pegawai({
+    id: "p9",
+    nip: contoh[2].nip,
+    golonganRuang: "III/a",
+    mkgTahun: 20,
+    tmtGolongan: new Date(Date.UTC(2005, 0, 1)),
+    tmtKgbTerakhir: new Date(Date.UTC(2025, 0, 1)),
+  });
+  const hasil = periksaImporUpt(contoh, konteks({ pegawaiSatker: perNip(tercatat) }));
+  assert.deepEqual(hasil.map((h) => h.hasil), ["baru", "baru", "perubahan"]);
+  assert.deepEqual(hasil[0].kurang, ["SK CPNS"]);
+  assert.ok(!hasil[2].kurang.some((k) => /sebab|jenis kenaikan|nomor SK|tanggal SK|TMT pangkat/.test(k)), hasil[2].kurang.join(", "));
+
+  // Contoh kedua: III/a dengan masa kerja yang sudah dipotong; KGB berikutnya dua tahun sesudah KGB terakhir.
+  const hitung = isiHitungan(hasil[1].isian!);
+  assert.ok(samaTanggalKalender(hitung.tmtKgbBerikutnya as Date, "2026-03-01"));
+});
+
+/** Pegawai tercatat dan isian baris yang sesuai dengan satu keadaan di panduan dasarBaru. */
+function kasusPanduan(p: ContohDasarBaru): { tercatat: PegawaiRow | null; isian: Record<string, string> } {
+  const { dasarBaruJenis: jenis, dasarBaruJenisKp: jenisKp } = p.isian;
+  if (!jenis) return p.keadaan.startsWith("Pegawai baru") ? { tercatat: null, isian: {} } : { tercatat: pegawai(), isian: { jabatan: "Pengelola Data" } };
+  if (jenis === "kp" && jenisKp === "penyesuaian_ijazah")
+    return { tercatat: pegawai({ golonganRuang: "II/d", mkgTahun: 9 }), isian: { golonganRuang: "III/a", mkgTahun: "9" } };
+  if (jenis === "kp") return { tercatat: pegawai({ golonganRuang: "III/a", mkgTahun: 2 }), isian: { golonganRuang: "III/b", mkgTahun: "2" } };
+  if (jenis === "pmk") return { tercatat: pegawai({ golonganRuang: "III/a", mkgTahun: 2 }), isian: { golonganRuang: "III/a", mkgTahun: "4" } };
+  return { tercatat: pegawai({ golonganRuang: "III/a", mkgTahun: 4 }), isian: { golonganRuang: "III/a", mkgTahun: "6" } };
+}
+
+test("setiap keadaan pada panduan dasarBaru, diisi persis seperti contohnya, tidak menyisakan kekurangan sebab", () => {
+  assert.ok(PANDUAN_DASAR_BARU.length >= 6);
+  for (const p of PANDUAN_DASAR_BARU) {
+    const { tercatat, isian } = kasusPanduan(p);
+    const [h] = periksaImporUpt([baris({ ...isian, ...p.isian })], tercatat ? konteks({ pegawaiSatker: perNip(tercatat) }) : kosong);
+    assert.equal(h.hasil, tercatat ? "perubahan" : "baru", p.keadaan);
+    assert.ok(!h.kurang.some((k) => /sebab|jenis kenaikan|nomor SK|tanggal SK|TMT pangkat|TMT PMK/.test(k)), `${p.keadaan}: ${h.kurang.join(", ")}`);
+  }
+});
+
+test("penyesuaian ijazah pada panduan: masa kerja golongan dipotong 5 tahun oleh sistem, bukan oleh operator", () => {
+  const p = PANDUAN_DASAR_BARU.find((x) => x.isian.dasarBaruJenisKp === "penyesuaian_ijazah")!;
+  const { tercatat, isian } = kasusPanduan(p);
+  const [h] = periksaImporUpt([baris({ ...isian, ...p.isian })], konteks({ pegawaiSatker: perNip(tercatat!) }));
+  const sk = hitungDasarSkUsulan(tercatat!, { ...h.dasarBaru }, h.isian as Partial<PegawaiRow>);
+  assert.ok(sk.berlaku && sk.ok);
+  assert.equal(sk.nilai.golonganRuang, "III/a");
+  assert.equal(sk.nilai.mkgTahun, 4);
+});
+
+test("berkas bertanggal bulan/hari (CSV simpanan Excel berbahasa Inggris) ditolak, bukan dibaca tertukar", () => {
+  // 4/1/2025 sendirian sah sebagai 4 Januari; 12/16/1971 pada berkas yang sama membuktikan urutannya bulan/hari.
+  const hasil = periksaImporUpt(
+    [
+      baris({ tmtKgbTerakhir: "4/1/2025", tanggalLahir: "12/16/1971" }),
+      baris({ nip: "199001012025061001", tmtKgbTerakhir: "6/1/2025" }),
+      baris({ nip: "198809042025062014", tmtKgbTerakhir: "2025-06-01", tmtGolongan: "2025-06-01" }),
+    ],
+    kosong,
+  );
+  assert.deepEqual(hasil.map((h) => h.hasil), ["ditolak", "ditolak", "baru"]);
+  assert.match(hasil[1].galat ?? "", /bulan\/hari\/tahun.*6\/1\/2025.*templat Excel/);
+});
+
+test("berkas hari/bulan dengan satu salah ketik tidak ikut tertolak seluruhnya", () => {
+  const hasil = periksaImporUpt(
+    [
+      baris({ tmtKgbTerakhir: "16/12/2024" }),
+      baris({ nip: "199001012025061001", tanggalLahir: "12/16/1990" }),
+      baris({ nip: "198809042025062014", tmtKgbTerakhir: "1/6/2025" }),
+    ],
+    kosong,
+  );
+  assert.deepEqual(hasil.map((h) => h.hasil), ["baru", "ditolak", "baru"]);
+  assert.match(hasil[1].galat ?? "", /Tanggal lahir tidak valid/);
 });

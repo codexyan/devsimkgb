@@ -261,7 +261,7 @@ export function LayarDataPegawai() {
       judul="Pegawai dan KGB"
       keterangan={[
         "Usulan kolektif: menyiapkan banyak pegawai untuk satu surat. Ini jalur yang Anda pakai setiap periode.",
-        "Unggah daftar: satu berkas CSV berisi banyak pegawai sekaligus. Dipakai saat mengisi data pertama kali atau meremajakan banyak data.",
+        "Unggah daftar: satu berkas Excel (.xlsx) atau CSV berisi banyak pegawai sekaligus. Dipakai saat mengisi data pertama kali atau meremajakan banyak data.",
         "Tambah pegawai: untuk satu orang yang belum tercatat, misalnya CPNS yang baru dilantik.",
         "Usulkan perbaikan: membetulkan data satu pegawai yang sudah tercatat, termasuk NIP yang salah ketik.",
         "Titik tiga: tindakan lain untuk pegawai itu, yaitu Laporkan kenaikan pangkat, Laporkan peninjauan masa kerja, Laporkan mutasi, dan Seharusnya tidak tercatat? untuk baris yang keliru sejak awal.",
@@ -330,7 +330,7 @@ export function LayarUnggah() {
           <Langkah
             aktif={2}
             daftar={[
-              ["Pilih berkas", "daftar-pegawai.csv"],
+              ["Pilih berkas", "daftar-pegawai.xlsx"],
               ["Periksa & konfirmasi", "3 dari 6 baris dicentang"],
               ["Selesai", "belum disimpan"],
             ]}
