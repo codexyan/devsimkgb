@@ -17,6 +17,7 @@ import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/a
 import ModalDasarBaru from "@/app/dashboard/components/upt/ModalDasarBaru";
 import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
 import MenuTindakan from "@/app/dashboard/components/MenuTindakan";
+import { PERISTIWA_BUKA_PENGUMUMAN_UPT } from "@/lib/pengumumanUpt";
 import type { JenisMutasi } from "@/lib/mutasiPegawai";
 import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
@@ -1367,6 +1368,14 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               disetujui Kanwil tampil sebagai baris bertanda; memilih dan mengajukannya lewat Usul KGB Kolektif.
             </p>
           </div>
+          <button
+            type="button"
+            className="dsb-tombol dsb-tombol-kecil"
+            data-jenis="garis"
+            onClick={() => window.dispatchEvent(new Event(PERISTIWA_BUKA_PENGUMUMAN_UPT))}
+          >
+            Apa yang baru?
+          </button>
         </header>
       ) : (
       <PanelNavy
