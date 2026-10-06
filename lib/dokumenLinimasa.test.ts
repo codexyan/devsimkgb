@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dokumenLinimasa, dokumenSk, type KgbUntukDokumen } from "./dokumenLinimasa";
+import { cariDokumenSk, dokumenLinimasa, dokumenSk, type KgbUntukDokumen } from "./dokumenLinimasa";
 import type { DokumenPegawai } from "./dokumenPegawai";
 import type { SkGaji } from "./linimasaDasarSk";
 
@@ -61,4 +61,13 @@ test("arsip dokumen Kanwil didahulukan atas berkas usulan; SK CPNS dari Data Peg
   ];
   const peta = dokumenLinimasa([sk({ kunci: "data-pegawai", jenis: "cpns", nomorSK: "CPNS-9" })], dokumen, []);
   assert.deepEqual(peta["data-pegawai"], { jenis: "berkas", url: "/berkas/arsip-b", sumber: "Arsip dokumen pegawai" });
+});
+
+test("baris riwayat kenaikan pangkat memakai pencocokan yang sama dengan linimasa (ADR-067)", () => {
+  const dokumen = [dok({ id: "arsip-c", sumber: "arsip", jenis: "sk_pangkat", nomorSK: "SEK-2017.SA.04.05 TAHUN 2026" })];
+  // Spasi dan huruf besar-kecil diabaikan; titik dan angka tidak.
+  assert.equal(cariDokumenSk("kp", "sek-2017.sa.04.05 tahun  2026", dokumen)?.url, "/berkas/arsip-c");
+  assert.equal(cariDokumenSk("kp", "SEK-2017.SA.04.06 TAHUN 2026", dokumen), null);
+  assert.equal(cariDokumenSk("pmk", "SEK-2017.SA.04.05 TAHUN 2026", dokumen), null);
+  assert.equal(cariDokumenSk("kp", "", dokumen), null);
 });

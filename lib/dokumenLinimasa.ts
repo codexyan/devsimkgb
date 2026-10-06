@@ -50,19 +50,27 @@ export function dokumenSk(sk: SkGaji, dokumen: readonly DokumenPegawai[], kgb: r
         sumber: k.isArsip ? "Berkas arsip KGB" : SUMBER.sk_kgb,
       };
     }
-    const cocok = cariMenurutNomor(sk, dokumen);
+    const cocok = cariDokumenSk(sk.jenis, sk.nomorSK, dokumen);
     if (cocok) return cocok;
     // Arsip KGB tidak pernah dicetak SIM-KGB, jadi tidak punya draf cetakan.
     if (k && !k.isArsip && k.surat?.nomorSurat && k.surat.nomorSurat !== "-")
       return { jenis: "draf", kgbId: k.id, sumber: "Draf cetakan SIM-KGB, tanpa tanda tangan" };
     return null;
   }
-  return cariMenurutNomor(sk, dokumen);
+  return cariDokumenSk(sk.jenis, sk.nomorSK, dokumen);
 }
 
-function cariMenurutNomor(sk: SkGaji, dokumen: readonly DokumenPegawai[]): DokumenSk | null {
-  const jenis = JENIS_DOKUMEN_SK[sk.jenis];
-  const nomor = kunciNomorSk(sk.nomorSK);
+/**
+ * Pindaian satu SK menurut jenis dan nomornya; dipakai linimasa dan baris riwayat kenaikan pangkat dan PMK di halaman
+ * pegawai, supaya keduanya selalu menunjuk berkas yang sama.
+ */
+export function cariDokumenSk(
+  jenisSk: JenisSkGaji,
+  nomorSK: string | null | undefined,
+  dokumen: readonly DokumenPegawai[],
+): Extract<DokumenSk, { jenis: "berkas" }> | null {
+  const jenis = JENIS_DOKUMEN_SK[jenisSk];
+  const nomor = kunciNomorSk(nomorSK);
   if (!jenis || !nomor) return null;
   const calon = dokumen
     .filter(
