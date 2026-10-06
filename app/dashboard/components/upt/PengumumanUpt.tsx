@@ -8,16 +8,19 @@ import { useDialogModal } from "../useDialogModal";
 import {
   PERISTIWA_BUKA_PENGUMUMAN_UPT,
   bolehTampilPengumuman,
+  gabungDilihat,
   kunciPengumumanUpt,
   pengumumanBelumDilihat,
   sedangMengetik,
   type IdPengumumanUpt,
 } from "@/lib/pengumumanUpt";
 
-/* Pop-up pengumuman perubahan untuk Admin UPT (ADR-073, ADR-074): nama menu baru dan pegawai baru yang kini tampil di
+/* Pop-up pengumuman perubahan untuk Admin UPT (ADR-073, ADR-074, ADR-075): nama menu baru dan pegawai baru yang kini tampil di
    tabel Pegawai Satker, lalu tombol Lapor KP/PI/PMK beserta peringatan dan kabar disetujuinya. Adegan bergerak yang
    berganti sendiri, dapat dijeda, dilewati, atau dibuka lagi lewat tombol "Apa yang baru". Tiap adegan milik satu
-   pengumuman; yang tampil otomatis hanya adegan dari pengumuman yang belum dilihat pengguna itu.
+   pengumuman; yang tampil otomatis hanya adegan dari pengumuman yang belum dilihat akun itu. Penanda "sudah dilihat"
+   dicatat per akun di server (ADR-075), supaya pengumuman tampil di login pertama akun itu saja, di perangkat mana pun;
+   penanda peramban tetap dipakai sebagai cadangan bila servernya belum siap.
 
    Pengumuman ini tidak boleh menjadi sebab data hilang, maka aturannya ketat (lib/pengumumanUpt.ts): hanya tampil di
    halaman tanpa isian, tidak di atas dialog lain, tidak selagi ada kolom yang sedang diketik, dan tidak menyimpan
@@ -81,6 +84,54 @@ function catatDilihat(kunci: string) {
   }
 }
 
+/** Penanda per akun di server (ADR-075), diambil satu kali per akun selama halaman terbuka. Null: server belum siap. */
+const penandaServer = new Map<string, Promise<Set<string> | null>>();
+
+function ambilPenandaServer(nip: string): Promise<Set<string> | null> {
+  let janji = penandaServer.get(nip);
+  if (!janji) {
+    janji = fetch("/api/upt/pengumuman")
+      .then(async (r) => {
+        if (!r.ok) return null;
+        const d = (await r.json()) as { server?: boolean; dilihat?: string[] };
+        return d.server ? new Set(d.dilihat ?? []) : null;
+      })
+      .catch(() => null);
+    penandaServer.set(nip, janji);
+    // Kegagalan tidak disimpan: percobaan berikutnya boleh bertanya lagi.
+    void janji.then((h) => {
+      if (h === null) penandaServer.delete(nip);
+    });
+  }
+  return janji;
+}
+
+/** Catat ke server; gagal tidak mengganggu apa pun, sebab penanda peramban sudah dicatat lebih dulu. */
+async function catatKeServer(nip: string, ids: readonly string[]) {
+  if (ids.length === 0) return;
+  try {
+    const r = await fetch("/api/upt/pengumuman", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (!r.ok) return;
+    const d = (await r.json()) as { server?: boolean; dilihat?: string[] };
+    if (d.server) penandaServer.set(nip, Promise.resolve(new Set(d.dilihat ?? [])));
+  } catch {
+    // Jaringan putus: penanda peramban cukup untuk kali ini.
+  }
+}
+
+/** Tandai dilihat: peramban lebih dulu, lalu server bila server belum mengetahuinya. */
+function tandaiDilihat(nip: string, ids: readonly IdPengumumanUpt[]) {
+  for (const id of ids) catatDilihat(kunciPengumumanUpt(nip, id));
+  void (async () => {
+    const sudah = await (penandaServer.get(nip) ?? Promise.resolve(null));
+    await catatKeServer(nip, sudah ? ids.filter((id) => !sudah.has(id)) : ids);
+  })();
+}
+
 const gaya = (d: string): CSSProperties => ({ "--d": d }) as CSSProperties;
 
 export default function PengumumanUpt() {
@@ -92,29 +143,47 @@ export default function PengumumanUpt() {
   // Urutan adegan yang sedang diputar: yang belum dilihat saat tampil sendiri, seluruhnya saat dibuka dari tombol.
   const [daftar, setDaftar] = useState<number[]>(() => ADEGAN.map((_, i) => i));
 
-  // Tampil sendiri satu kali, sesudah halaman sempat dimuat. Bila saat itu ada dialog atau kolom yang sedang diketik,
-  // dicoba lagi beberapa kali lalu dilepas; penandanya belum dicatat, jadi muncul pada kunjungan berikutnya.
+  // Tampil sendiri satu kali per akun, sesudah halaman sempat dimuat. Bila saat itu ada dialog atau kolom yang sedang
+  // diketik, dicoba lagi beberapa kali lalu dilepas; penandanya belum dicatat, jadi muncul pada kunjungan berikutnya.
+  // Server hanya ditanya bila peramban ini belum pernah melihat semuanya, jadi halaman yang sudah biasa tidak membayar
+  // satu permintaan pun.
   useEffect(() => {
     const aman = (adaDialog: boolean, mengetik: boolean) =>
       bolehTampilPengumuman({ peran: role, jalur: pathname, adaDialog, sedangMengetik: mengetik, sudahDilihat: false });
     if (!aman(false, false)) return;
+    let batal = false;
     let percobaan = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const coba = () => {
-      const baru = pengumumanBelumDilihat((id) => sudahDilihat(kunciPengumumanUpt(nip, id)));
+    const lokal = (id: IdPengumumanUpt) => sudahDilihat(kunciPengumumanUpt(nip, id));
+    const coba = async () => {
+      if (pengumumanBelumDilihat(lokal).length === 0) return;
+      const server = await ambilPenandaServer(nip);
+      if (batal) return;
+      const { dilihat, perluDicatat } = gabungDilihat(server ? [...server] : null, lokal);
+      // Yang sudah dilihat di server dicatat juga di peramban ini, dan yang sudah dilihat di peramban ini disusulkan
+      // ke server (pengguna yang melihat pengumuman sebelum penanda server ada).
+      for (const id of dilihat) catatDilihat(kunciPengumumanUpt(nip, id));
+      if (perluDicatat.length > 0) void catatKeServer(nip, perluDicatat);
+      const baru = pengumumanBelumDilihat((id) => dilihat.includes(id));
       if (baru.length === 0) return;
       if (aman(document.querySelector('[role="dialog"]') !== null, sedangMengetik(document.activeElement))) {
         setDaftar(ADEGAN.flatMap((a, i) => (baru.includes(a.pengumuman) ? [i] : [])));
         setAdegan(0);
         setJeda(false);
         setBuka(true);
+        // Dicatat begitu tampil, bukan menunggu ditutup: pengumuman muncul di login pertama saja, dan tidak berulang
+        // bila halaman dimuat ulang sebelum ditutup. Tombol "Apa yang baru?" selalu dapat membukanya lagi.
+        tandaiDilihat(nip, baru);
         return;
       }
       percobaan += 1;
-      if (percobaan < 4) timer = setTimeout(coba, 4000);
+      if (percobaan < 4) timer = setTimeout(() => void coba(), 4000);
     };
-    timer = setTimeout(coba, 1600);
-    return () => clearTimeout(timer);
+    timer = setTimeout(() => void coba(), 1600);
+    return () => {
+      batal = true;
+      clearTimeout(timer);
+    };
   }, [role, pathname, nip]);
 
   // Dibuka lagi dari tombol "Apa yang baru"; permintaan pengguna sendiri, jadi tidak diperiksa seperti tampil otomatis.
@@ -129,9 +198,10 @@ export default function PengumumanUpt() {
     return () => window.removeEventListener(PERISTIWA_BUKA_PENGUMUMAN_UPT, bukaLagi);
   }, []);
 
-  // Menutup mencatat pengumuman yang adegannya baru saja diputar; yang tidak ikut diputar tidak ditandai dilihat.
+  // Menutup mencatat pengumuman yang adegannya baru saja diputar (yang sudah tercatat tidak dikirim ulang ke server);
+  // yang tidak ikut diputar tidak ditandai dilihat.
   const tutup = useCallback(() => {
-    for (const id of new Set(daftar.map((i) => ADEGAN[i].pengumuman))) catatDilihat(kunciPengumumanUpt(nip, id));
+    tandaiDilihat(nip, [...new Set(daftar.map((i) => ADEGAN[i].pengumuman))]);
     setBuka(false);
   }, [daftar, nip]);
   const panelRef = useDialogModal(buka, tutup);

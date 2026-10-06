@@ -120,6 +120,14 @@ export interface TemplateSuratRow {
   catatan: string | null; dibuatOleh: string | null; dibuatAt: Date | null;
 }
 
+/**
+ * Penanda bahwa satu akun sudah melihat satu pengumuman "Apa yang baru" (ADR-075). Kuncinya `userId:pengumumanId`,
+ * sehingga satu akun paling banyak punya satu baris per pengumuman, di perangkat mana pun ia masuk.
+ */
+export interface PengumumanDilihatRow {
+  id: string; userId: string; pengumumanId: string; dilihatAt: Date | null;
+}
+
 /** Satu perpindahan atau pemberhentian pegawai beserta dasar SK-nya (lib/mutasiPegawai.ts). */
 export interface RiwayatMutasiRow {
   id: string; pegawaiId: string; jenis: string;
@@ -357,6 +365,10 @@ export const defs = {
     tab: "AuditLog",
     columns: [s("id"), d("waktu"), s("aksi"), s("detail"), s("targetNama"), s("ipAddress"), s("userId")],
   },
+  PengumumanDilihat: {
+    tab: "PengumumanDilihat",
+    columns: [s("id"), s("userId"), s("pengumumanId"), d("dilihatAt")],
+  },
   RekonBulanan: {
     tab: "RekonBulanan",
     columns: [s("id"), s("bulanTmt"), d("tanggalInput"), s("inputBy"), i("jumlahData"), s("catatan"), d("createdAt")],
@@ -387,6 +399,7 @@ export const sheets = {
   hukdisKonfigurasi: new Table(defs.HukdisKonfigurasi),
   regulasi: new Table(defs.Regulasi),
   auditLog: new Table<AuditLogRow>(defs.AuditLog),
+  pengumumanDilihat: new Table<PengumumanDilihatRow>(defs.PengumumanDilihat),
   rekonBulanan: new Table(defs.RekonBulanan),
 };
 

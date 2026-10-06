@@ -56,5 +56,6 @@ export const db: Db = {
   get hukdisKonfigurasi() { return pilih("hukdisKonfigurasi"); },
   get regulasi() { return pilih("regulasi"); },
   get auditLog() { return pilih("auditLog"); },
+  get pengumumanDilihat() { return pilih("pengumumanDilihat"); },
   get rekonBulanan() { return pilih("rekonBulanan"); },
 };
