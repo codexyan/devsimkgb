@@ -2840,6 +2840,13 @@ html[data-gerak="kurangi"] .dsb-putar {
 .kol-hitung span { font-size: 11px; color: var(--dt5); }
 .kol-hitung strong { font-size: 15px; font-weight: 700; color: var(--dtn); font-variant-numeric: tabular-nums; }
 .kol-hitung p { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--st-amber); }
+.kol-hitung p[data-ket] { color: var(--dt4); }
+/* Pertanyaan wajib SK sesudah SK KGB terakhir, dan SK yang akan menjadi Atas dasar SK KGB berikutnya (ADR-065). */
+.kol-tanya { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--dt2); }
+.kol-atas-dasar { display: grid; gap: 2px; margin: 0; padding: 10px 14px; border-radius: 10px; background: var(--tint-navy); border: 1px solid var(--ln1); }
+.kol-atas-dasar span:first-child { font-size: 11px; color: var(--dt5); }
+.kol-atas-dasar strong { font-size: 13px; font-weight: 650; color: var(--dtn); overflow-wrap: anywhere; }
+.kol-atas-dasar span:last-child { font-size: 11.5px; line-height: 1.5; color: var(--dt4); }
 .kol-berkas-daftar { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 8px; }
 .kol-berkas-kotak { position: relative; }
 .kol-berkas-kotak label { display: flex; align-items: center; gap: 10px; height: 100%; padding: 10px 12px; border: 1.5px dashed var(--ln0); border-radius: 12px;

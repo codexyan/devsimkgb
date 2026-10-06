@@ -16,10 +16,11 @@ import { SATKER } from "./satker";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { rencanakanPenyesuaianKgb } from "./sesuaikanKgbUsulan";
 import { catatKenaikanPangkat, catatPmk } from "./catatDasarGaji";
+import { isJenisKp } from "./kenaikanPangkat";
 import { ringkasDasarBaru } from "./dasarBaruUsulan";
 // Kolom dasar gaji yang ditentukan SK kenaikan pangkat atau PMK (ADR-030) tidak ditulis dari usulan: nilainya
 // berasal dari hitungan SK di lib/catatDasarGaji.ts, sama persis dengan Catat KP/PMK di halaman pegawai.
-import { KOLOM_DITENTUKAN_SK, hitungDasarSkUsulan } from "./dasarSkUsulan";
+import { KOLOM_DITENTUKAN_SK, hitungDasarSkUsulan, hitungSkPegawaiBaru } from "./dasarSkUsulan";
 import { tanggalKalender } from "./waktu";
 import { kunciNomorSk } from "./nomorSurat";
 
@@ -79,8 +80,16 @@ export async function setujuiUsulan(
       };
 
     const golongan = String(nilaiBaru.golonganRuang ?? "");
-    const mkgTahun = Number(nilaiBaru.mkgTahun ?? 0);
-    const mkgBulan = Number(nilaiBaru.mkgBulan ?? 0);
+    // SK kenaikan pangkat, penyesuaian ijazah, atau PMK sesudah SK KGB terakhir (ADR-065): golongan dan masa kerja
+    // pada usulan disalin dari SK itu, jadi masa kerja pada TMT KGB terakhir, gaji pokok, dan jadwal KGB dihitung
+    // darinya. Usulan yang diajukan sudah lolos hitungan ini; yang gagal di sini berarti datanya diubah sesudahnya.
+    const skBaru = hitungSkPegawaiBaru(usulan);
+    if (skBaru.berlaku && !skBaru.ok)
+      return { ok: false, pesan: `SK sesudah SK KGB terakhir tidak dapat dihitung: periksa ${skBaru.pesan}. Kembalikan usulan ini ke UPT.` };
+    const menurutSk = skBaru.berlaku && skBaru.ok ? skBaru.nilai : null;
+    const mkgTahun = menurutSk ? menurutSk.mkgTahun : Number(nilaiBaru.mkgTahun ?? 0);
+    const mkgBulan = menurutSk ? menurutSk.mkgBulan : Number(nilaiBaru.mkgBulan ?? 0);
+    const tmtKgbBerikutnya = menurutSk ? menurutSk.tmtKgbBerikutnya : ((nilaiBaru.tmtKgbBerikutnya as Date | null) ?? null);
     const unitKerja = usulan.unitKerja ?? SATKER.find((s) => s.kode === usulan.satker)?.nama ?? "";
     const pegawaiBaru: PegawaiRow = {
       id: newId(),
@@ -101,9 +110,11 @@ export async function setujuiUsulan(
       mkgTahun,
       mkgBulan,
       // Gaji pokok dihitung dari tabel PP 5/2024 bila tidak diisi, sama dengan impor CSV.
-      gajiPokok: Number(nilaiBaru.gajiPokok ?? 0) || getGajiPokok(golongan, mkgTahun, mkgBulan) || 0,
+      gajiPokok: menurutSk
+        ? menurutSk.gajiPokok
+        : Number(nilaiBaru.gajiPokok ?? 0) || getGajiPokok(golongan, mkgTahun, mkgBulan) || 0,
       tmtKgbTerakhir: (nilaiBaru.tmtKgbTerakhir as Date | null) ?? null,
-      tmtKgbBerikutnya: (nilaiBaru.tmtKgbBerikutnya as Date | null) ?? null,
+      tmtKgbBerikutnya,
       statusHukdis: false,
       tanggalHukdisBerakhir: null,
       jenisHukdis: null,
@@ -111,7 +122,7 @@ export async function setujuiUsulan(
       aktif: true,
       createdAt: sekarang,
       updatedAt: sekarang,
-      konfirmasiUptTmt: (nilaiBaru.tmtKgbBerikutnya as Date | null) ?? null,
+      konfirmasiUptTmt: tmtKgbBerikutnya,
       konfirmasiUptAt: sekarang,
       konfirmasiUptOleh: usulan.diajukanOleh,
       satkerTugas: null,
@@ -126,6 +137,71 @@ export async function setujuiUsulan(
     await db.pegawai.create(pegawaiBaru);
     pegawaiIdHasil = pegawaiBaru.id;
     perubahan = [];
+
+    // SK itu dicatat sebagai riwayat. Riwayat inilah yang menjadikannya Atas dasar SK KGB berikutnya (ADR-020,
+    // ADR-062); tanpa itu dasar KGB pertamanya di SIM-KGB tetap SK KGB lama. Keadaan sebelum SK tidak dilaporkan pada
+    // pendataan, jadi sisi "lama" riwayatnya sama dengan sisi barunya.
+    const nomorSkBaru = usulan.dasarBaruNomorSk?.trim() ?? "";
+    const tanggalSkBaru = tanggalKalender(usulan.dasarBaruTanggalSk);
+    if (skBaru.berlaku && skBaru.ok && nomorSkBaru && tanggalSkBaru) {
+      const tmtSkBaru = skBaru.tmtSk;
+      const padaSk = skBaru.mkgPadaSk;
+      const keterangan =
+        `Dari usulan pegawai baru UPT${usulan.nomorSurat ? ` surat ${usulan.nomorSurat}` : ""}; ` +
+        `golongan dan masa kerja golongan (${padaSk.tahun} tahun ${padaSk.bulan} bulan pada TMT SK) disalin dari SK ini saat pendataan`;
+      const penetapSK = usulan.dasarBaruPenetap?.trim() || null;
+      if (skBaru.jenis === "kp") {
+        const jenisKp = usulan.dasarBaruJenisKp?.trim() ?? "";
+        await db.riwayatPangkat.create({
+          id: newId(),
+          pegawaiId: pegawaiBaru.id,
+          jenisKp: isJenisKp(jenisKp) ? jenisKp : "reguler",
+          nomorSK: nomorSkBaru,
+          tanggalSK: tanggalSkBaru,
+          tmtPangkat: tmtSkBaru,
+          // Golongan sebelum SK ini tidak dilaporkan pada pendataan.
+          golonganLama: "",
+          golonganBaru: pegawaiBaru.golonganRuang,
+          mkgTahunLama: pegawaiBaru.mkgTahun,
+          mkgBulanLama: pegawaiBaru.mkgBulan,
+          mkgTahunBaru: pegawaiBaru.mkgTahun,
+          mkgBulanBaru: pegawaiBaru.mkgBulan,
+          gajiPokokLama: pegawaiBaru.gajiPokok,
+          gajiPokokBaru: pegawaiBaru.gajiPokok,
+          keterangan,
+          createdAt: sekarang,
+          createdBy: userId,
+          penetapSK,
+        });
+      } else {
+        await db.riwayatPmk.create({
+          id: newId(),
+          pegawaiId: pegawaiBaru.id,
+          nomorSK: nomorSkBaru,
+          tanggalSK: tanggalSkBaru,
+          tmtPmk: tmtSkBaru,
+          golonganRuang: pegawaiBaru.golonganRuang,
+          tambahBulan: 0,
+          mkgTahunSebelum: padaSk.tahun,
+          mkgBulanSebelum: padaSk.bulan,
+          mkgTahunSesudah: padaSk.tahun,
+          mkgBulanSesudah: padaSk.bulan,
+          mkgTahunDasarLama: pegawaiBaru.mkgTahun,
+          mkgBulanDasarLama: pegawaiBaru.mkgBulan,
+          mkgTahunDasarBaru: pegawaiBaru.mkgTahun,
+          mkgBulanDasarBaru: pegawaiBaru.mkgBulan,
+          gajiPokokLama: pegawaiBaru.gajiPokok,
+          gajiPokokBaru: pegawaiBaru.gajiPokok,
+          tmtKgbBerikutnyaLama: pegawaiBaru.tmtKgbBerikutnya,
+          tmtKgbBerikutnyaBaru: pegawaiBaru.tmtKgbBerikutnya,
+          penetapSK,
+          keterangan,
+          createdAt: sekarang,
+          createdBy: userId,
+        });
+      }
+      dasarBaru = ringkasDasarBaru(usulan);
+    }
   } else if (pegawaiLama) {
     // Pembetulan NIP diperiksa ulang: NIP itu bisa saja sudah dipakai sejak usulan dikirim.
     if (nilaiBaru.nip && nilaiBaru.nip !== pegawaiLama.nip) {

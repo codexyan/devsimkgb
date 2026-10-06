@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { susunLinimasaDasar, type KgbUntukLinimasa, type SkPenetapGaji } from "./linimasaDasarSk";
+import { pratinjauAtasDasarUsulan, susunLinimasaDasar, type KgbUntukLinimasa, type SkPenetapGaji } from "./linimasaDasarSk";
 import { dasarKgbBerikutnya } from "./dasarKgbBerikutnya";
 
 // Tanggal kalender waktu setempat; modul membakukannya lewat tanggalKalender (WITA).
@@ -204,4 +204,56 @@ test("record KGB tanpa TMT yang sah tidak menghalangi SK KGB lain menjadi dasar"
   const rusak = { id: "rusak", status: "selesai", tmtKgbBaru: null, surat: { nomorSurat: "RUSAK" } };
   const l = susunLinimasaDasar({ kgb: [rusak, kgb2024], pegawai: { tmtKgbTerakhir: tgl(2024, 12) }, tmtKgbBaru: tgl(2026, 12) });
   assert.equal(l.dasar?.nomorSK, "W.17-KP.04.03-900");
+});
+
+/* ── Pratinjau Atas dasar pada formulir Admin UPT (ADR-065) ── */
+
+
+const acuan2024 = { nomorSK: "W.17-KP.04.03-900", tanggalSK: "2024-11-20", tmt: "2024-12-01", cpns: false };
+
+test("pratinjau UPT: tanpa SK lain, dasarnya SK KGB terakhir pada isian", () => {
+  const p = pratinjauAtasDasarUsulan({ acuan: acuan2024, laporan: null, tercatat: null });
+  assert.equal(p?.asal, "acuan");
+  assert.equal(p?.label, "SK KGB terakhir");
+});
+
+test("pratinjau UPT: SK kenaikan pangkat yang dilaporkan sesudah SK KGB terakhir menjadi dasar", () => {
+  const p = pratinjauAtasDasarUsulan({
+    acuan: acuan2024,
+    laporan: { jenis: "kp", jenisKp: "penyesuaian_ijazah", nomorSk: "PI-2026", tmt: "2026-03-01" },
+    tercatat: null,
+  });
+  assert.equal(p?.asal, "laporan");
+  assert.equal(p?.label, "SK kenaikan pangkat (Pilihan: Penyesuaian Ijazah)");
+  assert.equal(p?.nomorSK, "PI-2026");
+});
+
+test("pratinjau UPT: SK yang sudah tercatat dan lebih baru tetap terlihat walau tidak dilaporkan lagi", () => {
+  const p = pratinjauAtasDasarUsulan({
+    acuan: acuan2024,
+    laporan: null,
+    tercatat: { jenis: "kp", label: "SK kenaikan pangkat (Reguler)", nomorSK: "KP-2026", tmt: new Date(2026, 0, 1).toISOString() },
+  });
+  assert.equal(p?.asal, "tercatat");
+  assert.equal(p?.nomorSK, "KP-2026");
+});
+
+test("pratinjau UPT: SK KGB terakhir yang diketik ulang menggantikan catatan lama ber-TMT sama", () => {
+  const p = pratinjauAtasDasarUsulan({
+    acuan: { ...acuan2024, nomorSK: "W.17-KP.04.03-900-BENAR" },
+    laporan: null,
+    tercatat: { jenis: "kgb", label: "SK KGB terakhir", nomorSK: "W.17-KP.04.03-900", tmt: new Date(2024, 11, 1).toISOString() },
+  });
+  assert.equal(p?.asal, "acuan");
+  assert.equal(p?.nomorSK, "W.17-KP.04.03-900-BENAR");
+});
+
+test("pratinjau UPT: koreksi (bukan SK) dan SK tanpa TMT tidak dihitung; belum pernah KGB memakai SK CPNS", () => {
+  assert.equal(pratinjauAtasDasarUsulan({ acuan: acuan2024, laporan: { jenis: "koreksi", nomorSk: "", tmt: "" }, tercatat: null })?.asal, "acuan");
+  assert.equal(pratinjauAtasDasarUsulan({ acuan: acuan2024, laporan: { jenis: "kp", nomorSk: "KP", tmt: "" }, tercatat: null })?.asal, "acuan");
+  assert.equal(
+    pratinjauAtasDasarUsulan({ acuan: { nomorSK: "SK-CPNS", tanggalSK: "2025-05-20", tmt: "2025-06-01", cpns: true }, laporan: null, tercatat: null })?.label,
+    "SK CPNS",
+  );
+  assert.equal(pratinjauAtasDasarUsulan({ acuan: { nomorSK: "", tanggalSK: "", tmt: "", cpns: false }, laporan: null, tercatat: null }), null);
 });

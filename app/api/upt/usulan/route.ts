@@ -212,9 +212,9 @@ export async function POST(req: Request) {
     }
   }
 
-  const isian = isiHitungan(dibaca.isian, dasar);
   // Sebab perubahan golongan atau masa kerja golongan beserta SK-nya (ADR-030).
   const dasarBaru = bacaDasarBaru(teks);
+  const isian = isiHitungan(dibaca.isian, dasar, dasarBaru);
   const hukdisAda = teks("hukdisAda") === "true";
 
   // Berkas yang sudah disetujui Kanwil untuk pegawai ini ikut terbawa bila tidak diunggah ulang (ADR-017).

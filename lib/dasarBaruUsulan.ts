@@ -30,6 +30,32 @@ export function isJenisDasarBaru(nilai: unknown): nilai is JenisDasarBaru {
   return nilai === "kp" || nilai === "pmk" || nilai === "koreksi";
 }
 
+/**
+ * Nilai dasarBaruJenis bila UPT menjawab tidak ada SK kenaikan pangkat, penyesuaian ijazah, atau PMK sesudah SK KGB
+ * terakhir, dan golongan serta masa kerjanya tidak dikoreksi (ADR-065). Jawaban itu wajib, jadi "kosong" kini
+ * berarti belum dijawab, bukan tidak ada.
+ */
+export const TANPA_SK_BARU = "tidak";
+
+/** Butir kekurangan bila pertanyaan SK sesudah SK KGB terakhir belum dijawab. */
+export const KURANG_JAWABAN_SK_BARU = "jawaban Ada atau Tidak ada untuk SK sesudah SK KGB terakhir";
+
+/** dasarBaruJenis yang sah: sebab perubahan (kp, pmk, koreksi) atau jawaban tidak ada SK. */
+export function isNilaiDasarBaru(nilai: unknown): nilai is JenisDasarBaru | typeof TANPA_SK_BARU {
+  return isJenisDasarBaru(nilai) || nilai === TANPA_SK_BARU;
+}
+
+/**
+ * Jawaban atas "Sesudah SK KGB terakhir, ada SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang belum
+ * tercatat?"; null bila belum dijawab. Koreksi salah ketik berarti tidak ada SK.
+ */
+export function jawabanSkBaru(jenis: string | null | undefined): "ada" | "tidak" | null {
+  const j = jenis?.trim() ?? "";
+  if (j === "kp" || j === "pmk") return "ada";
+  if (j === TANPA_SK_BARU || j === "koreksi") return "tidak";
+  return null;
+}
+
 /** Kolom yang hanya berubah karena kenaikan pangkat, PMK, atau pembetulan salah ketik. */
 export const KOLOM_PERLU_DASAR = ["golonganRuang", "mkgTahun", "mkgBulan"] as const;
 
@@ -81,7 +107,8 @@ export interface IsianDasarBaru {
  */
 export function kekuranganDasarBaru(isian: IsianDasarBaru, perlu: boolean): string[] {
   const jenis = isian.dasarBaruJenis?.trim() ?? "";
-  if (!jenis) return perlu ? ["sebab perubahan golongan atau masa kerja golongan"] : [];
+  // Tidak ada SK, tetapi golongan atau masa kerjanya berubah: hanya koreksi salah ketik yang tersisa.
+  if (!jenis || jenis === TANPA_SK_BARU) return perlu ? ["sebab perubahan golongan atau masa kerja golongan"] : [];
   if (!isJenisDasarBaru(jenis)) return ["sebab perubahan golongan atau masa kerja golongan yang dikenal"];
   if (jenis === "koreksi") return [];
 

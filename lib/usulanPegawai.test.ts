@@ -17,6 +17,7 @@ import {
   STATUS_USULAN,
   berkasUntukKeadaan,
 } from "./usulanPegawai";
+import { KURANG_JAWABAN_SK_BARU } from "./dasarBaruUsulan";
 
 const tgl = (tahun: number, bulan: number, hari = 1) => new Date(tahun, bulan - 1, hari);
 
@@ -168,23 +169,48 @@ test("kekuranganUsulan: usulan yang sebabnya bukan PMK tidak pernah ditagih pind
   assert.deepEqual(kekuranganUsulan(skKp, "perubahan", tercatat), []);
 });
 
+test("kekuranganUsulan: SK kenaikan pangkat tanpa golongan baru, atau SK PMK tanpa masa kerjanya, ditagih (ADR-065)", () => {
+  const tercatat = { golonganRuang: "III/c", mkgTahun: 12, mkgBulan: 0, tmtKgbTerakhir: new Date(Date.UTC(2024, 11, 1)) };
+  const sk = {
+    dasarBaruJenisKp: "reguler",
+    dasarBaruNomorSk: "KP-1",
+    dasarBaruTanggalSk: new Date(Date.UTC(2025, 11, 15)),
+    dasarBaruTmt: new Date(Date.UTC(2026, 0, 1)),
+  };
+  assert.ok(kekuranganUsulan({ ...sk, dasarBaruJenis: "kp" }, "perubahan", tercatat).includes("golongan baru menurut SK kenaikan pangkat"));
+  assert.ok(
+    kekuranganUsulan({ ...sk, dasarBaruJenis: "pmk", pathSkPmk: "usulan/x_skPmk.pdf" }, "perubahan", tercatat).includes(
+      "masa kerja golongan menurut SK PMK",
+    ),
+  );
+  // Pegawai baru belum punya pembanding: golongan dan masa kerjanya disalin dari SK itu, dan sistem menghitung mundur.
+  const pegawaiBaru = {
+    nama: "PEGAWAI UJI", nip: "200002022025061001", jabatan: "Penjaga Tahanan",
+    golonganRuang: "III/a", mkgTahun: 2, mkgBulan: 0, tmtKgbTerakhir: new Date(Date.UTC(2024, 11, 1)),
+    pathSkTerakhir: "usulan/x_skTerakhir.pdf", pathSkPangkat: "usulan/x_skPangkat.pdf",
+  };
+  assert.deepEqual(kekuranganUsulan({ ...pegawaiBaru, ...sk, dasarBaruJenis: "kp" }, "baru"), []);
+});
+
 test("kekuranganUsulan: draf pegawai baru yang lengkap boleh diajukan", () => {
   const siap = {
     nama: "NOORHIKMAH", nip: "198809042025062014", jabatan: "Penjaga Tahanan",
     golonganRuang: "II/a", mkgTahun: 0, mkgBulan: 0, tmtKgbTerakhir: new Date(Date.UTC(2025, 5, 1)),
-    pathSkCpns: "usulan/rutan-rantau_skCpns_1.pdf",
+    pathSkCpns: "usulan/rutan-rantau_skCpns_1.pdf", dasarBaruJenis: "tidak",
   };
   assert.deepEqual(kekuranganUsulan(siap, "baru"), []);
 });
 
 test("kekuranganUsulan: yang kurang disebut satu per satu, bukan sekadar ditolak", () => {
   const kurang = kekuranganUsulan({ nama: "", nip: "123", golonganRuang: "" }, "baru");
-  assert.deepEqual(kurang, ["nama lengkap", "NIP 18 digit", "jabatan", "golongan/ruang", "TMT KGB terakhir", "SK CPNS"]);
+  assert.deepEqual(kurang, [
+    "nama lengkap", "NIP 18 digit", "jabatan", "golongan/ruang", "TMT KGB terakhir", "SK CPNS", KURANG_JAWABAN_SK_BARU,
+  ]);
 });
 
 test("kekuranganUsulan: usulan perbaikan boleh bersandar pada data pegawai yang sudah tercatat", () => {
   const pegawai = { golonganRuang: "III/b", mkgTahun: 10, mkgBulan: 0, tmtKgbTerakhir: new Date(Date.UTC(2024, 2, 1)) };
-  assert.deepEqual(kekuranganUsulan({ jabatan: "Analis Kepegawaian" }, "perubahan", pegawai), []);
+  assert.deepEqual(kekuranganUsulan({ jabatan: "Analis Kepegawaian", dasarBaruJenis: "tidak" }, "perubahan", pegawai), []);
   // Masa kerja yang tidak ada barisnya di tabel ditahan di sini, sebelum uangnya salah.
   const kurang = kekuranganUsulan({ golonganRuang: "II/c", mkgTahun: 0, mkgBulan: 0 }, "perubahan", pegawai);
   assert.match(kurang[0], /masa kerja golongan yang cocok dengan tabel PP 5\/2024/);
@@ -216,15 +242,15 @@ test("berkas yang diminta bertukar menurut pernah atau belum pernah KGB", () => 
 
 test("berkas wajib ditagih saat diajukan: pegawai baru selalu, perbaikan hanya bila dasar gajinya berubah", () => {
   const baru = { nama: "A", nip: "200509182025062002", jabatan: "Penjaga Tahanan", golonganRuang: "II/a",
-    mkgTahun: 0, mkgBulan: 0, tmtKgbTerakhir: tgl(2025, 6) };
+    mkgTahun: 0, mkgBulan: 0, tmtKgbTerakhir: tgl(2025, 6), dasarBaruJenis: "tidak" };
   assert.deepEqual(kekuranganUsulan(baru, "baru"), ["SK CPNS"]);
   assert.deepEqual(kekuranganUsulan({ ...baru, pathSkCpns: "usulan/x.pdf" }, "baru"), []);
   assert.deepEqual(kekuranganUsulan({ ...baru, mkgTahun: 2 }, "baru"), ["SK KGB terakhir", "SK kenaikan pangkat terakhir"]);
 
   // Perbaikan nama saja tidak menuntut berkas; perbaikan masa kerja golongan menuntutnya, beserta
   // sebab perubahannya, sebab masa kerja hanya berubah karena kenaikan pangkat, PMK, atau salah ketik (ADR-030).
-  assert.deepEqual(kekuranganUsulan({ nama: "Siti N." }, "perubahan", pegawai), []);
-  assert.deepEqual(kekuranganUsulan({ mkgTahun: 2 }, "perubahan", pegawai), [
+  assert.deepEqual(kekuranganUsulan({ nama: "Siti N.", dasarBaruJenis: "tidak" }, "perubahan", pegawai), []);
+  assert.deepEqual(kekuranganUsulan({ mkgTahun: 2, dasarBaruJenis: "tidak" }, "perubahan", pegawai), [
     "SK KGB terakhir",
     "SK kenaikan pangkat terakhir",
     "sebab perubahan golongan atau masa kerja golongan",
@@ -256,4 +282,25 @@ test("pembetulan NIP ikut diusulkan dan terbaca sebagai perubahan", () => {
   assert.deepEqual(perubahan.map((p) => [p.label, p.sekarang, p.diusulkan]), [["NIP", "200509182025062002", "200509182025062003"]]);
   // NIP yang sama dengan yang tercatat bukan perubahan, jadi isian yang terisi otomatis tidak mengotori usulan.
   assert.equal(usulanKosong({ ...pegawai, nip: "200509182025062002" }, { nip: "200509182025062002" }), true);
+});
+
+test("kekuranganUsulan: pertanyaan SK sesudah SK KGB terakhir wajib dijawab, juga bila tidak ada (ADR-065)", () => {
+  const pegawai = { golonganRuang: "III/b", mkgTahun: 10, mkgBulan: 0, tmtKgbTerakhir: tgl(2024, 3) };
+  assert.deepEqual(kekuranganUsulan({ jabatan: "Analis Kepegawaian" }, "perubahan", pegawai), [KURANG_JAWABAN_SK_BARU]);
+  assert.deepEqual(kekuranganUsulan({ jabatan: "Analis Kepegawaian", dasarBaruJenis: "tidak" }, "perubahan", pegawai), []);
+  // Koreksi salah ketik juga jawaban "tidak ada SK".
+  assert.ok(!kekuranganUsulan({ dasarBaruJenis: "koreksi" }, "perubahan", pegawai).includes(KURANG_JAWABAN_SK_BARU));
+});
+
+test("kekuranganUsulan: pegawai baru yang SK-nya tidak dapat dihitung mundur ditahan (ADR-065)", () => {
+  const baru = {
+    nama: "PEGAWAI UJI", nip: "200002022025061001", jabatan: "Penjaga Tahanan",
+    golonganRuang: "III/a", mkgTahun: 0, mkgBulan: 6, tmtKgbTerakhir: tgl(2024, 12),
+    pathSkTerakhir: "usulan/x_skTerakhir.pdf", pathSkPangkat: "usulan/x_skPangkat.pdf",
+    dasarBaruJenis: "kp", dasarBaruJenisKp: "reguler", dasarBaruNomorSk: "KP-1",
+    dasarBaruTanggalSk: tgl(2025, 12, 15), dasarBaruTmt: tgl(2026, 1),
+  };
+  // Masa kerja 6 bulan pada SK tidak mungkin: sejak KGB terakhir sudah lewat 13 bulan.
+  assert.ok(kekuranganUsulan(baru, "baru").some((k) => /paling sedikit 1 tahun 1 bulan/.test(k)));
+  assert.deepEqual(kekuranganUsulan({ ...baru, mkgTahun: 7, mkgBulan: 1 }, "baru"), []);
 });

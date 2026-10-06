@@ -72,7 +72,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if ("galat" in dibaca) return NextResponse.json({ error: dibaca.galat }, { status: 400 });
 
   const { nama, pegawai } = await namaUsulan(usulan);
-  const isian = isiHitungan(dibaca.isian, pegawai);
+  // Formulir yang tidak memuat isian SK (mis. perbaikan berkas saja) memakai SK yang sudah tersimpan pada draf.
+  const dasarBaru = form.has("dasarBaruJenis") ? bacaDasarBaru(teks) : null;
+  const isian = isiHitungan(dibaca.isian, pegawai, dasarBaru ?? usulan);
 
   // NIP boleh dibetulkan selama usulan masih dipegang UPT. Pada pegawai baru NIP adalah penandanya, jadi
   // tidak boleh kosong; pada usulan perbaikan, kosong berarti NIP tidak diusulkan berubah.
@@ -114,7 +116,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     ...isian,
     // Sebab perubahan golongan atau masa kerja golongan beserta SK-nya (ADR-030); formulir yang tidak
     // memuatnya, mis. perbaikan berkas saja, tidak menyentuh kolom ini.
-    ...(form.has("dasarBaruJenis") ? bacaDasarBaru(teks) : {}),
+    ...(dasarBaru ?? {}),
     nomorSkTerakhir: teks("nomorSkTerakhir") || null,
     tanggalSkTerakhir,
     // Laporan hukdis kini lewat modulnya sendiri (ADR-016). Formulir usulan tidak lagi mengirimnya, dan

@@ -25,6 +25,7 @@ import { templatXlsxUpt } from "./templatUnggahUpt";
 import { bacaXlsx, keRekaman } from "./xlsx";
 import { isiHitungan } from "./usulanFormulir";
 import { hitungDasarSkUsulan } from "./dasarSkUsulan";
+import { KURANG_JAWABAN_SK_BARU } from "./dasarBaruUsulan";
 import { samaTanggalKalender } from "./waktu";
 import type { PegawaiRow } from "./sheets/tables";
 
@@ -46,6 +47,8 @@ const baris = (p: Record<string, unknown> = {}) => ({
   mkgTahun: "0",
   mkgBulan: "0",
   tmtKgbTerakhir: "2025-06-01",
+  // Jawaban wajib atas SK sesudah SK KGB terakhir (ADR-065); kasus yang melaporkan SK menimpanya.
+  dasarBaruJenis: "tidak",
   ...p,
 });
 
@@ -260,7 +263,11 @@ test("baris yang menaikkan golongan tanpa menyebut SK tetap tersimpan, hanya kur
   const [h] = periksaImporUpt([naikPangkat()], satkerIni);
   assert.equal(h.hasil, "perubahan");
   assert.ok(h.kurang.includes("sebab perubahan golongan atau masa kerja golongan"));
-  assert.equal(h.dasarBaru?.dasarBaruJenis ?? null, null);
+  assert.equal(h.dasarBaru?.dasarBaruJenis, "tidak");
+  // Kolom jawaban yang dikosongkan juga tetap tersimpan sebagai draf; jawabannya ditagih saat diajukan.
+  const [kosong] = periksaImporUpt([naikPangkat({ dasarBaruJenis: "" })], satkerIni);
+  assert.equal(kosong.hasil, "perubahan");
+  assert.ok(kosong.kurang.includes(KURANG_JAWABAN_SK_BARU));
 });
 
 test("SK kenaikan pangkat yang disebut berkas melengkapi sebabnya dan ikut tersimpan", () => {
@@ -396,15 +403,23 @@ test("templat Excel: lembar isiannya kosong selain judul kolom, dan ketiga baris
   assert.deepEqual(hasil[0].kurang, ["SK CPNS"]);
   assert.ok(!hasil[2].kurang.some((k) => /sebab|jenis kenaikan|nomor SK|tanggal SK|TMT pangkat/.test(k)), hasil[2].kurang.join(", "));
 
-  // Contoh kedua: III/a dengan masa kerja yang sudah dipotong; KGB berikutnya dua tahun sesudah KGB terakhir.
-  const hitung = isiHitungan(hasil[1].isian!);
+  // Contoh kedua: pegawai baru yang menyalin golongan dan masa kerja dari SK penyesuaian ijazah (5 tahun 1 bulan pada
+  // TMT April 2025). Dihitung mundur ke TMT KGB terakhir menjadi 4 tahun, jadi KGB berikutnya dua tahun sesudahnya.
+  const hitung = isiHitungan(hasil[1].isian!, null, hasil[1].dasarBaru);
   assert.ok(samaTanggalKalender(hitung.tmtKgbBerikutnya as Date, "2026-03-01"));
+  assert.ok(!hasil[1].kurang.some((k) => /jawaban|dilaporkan|sebab|nomor SK/.test(k)), hasil[1].kurang.join(", "));
 });
 
 /** Pegawai tercatat dan isian baris yang sesuai dengan satu keadaan di panduan dasarBaru. */
 function kasusPanduan(p: ContohDasarBaru): { tercatat: PegawaiRow | null; isian: Record<string, string> } {
   const { dasarBaruJenis: jenis, dasarBaruJenisKp: jenisKp } = p.isian;
-  if (!jenis) return p.keadaan.startsWith("Pegawai baru") ? { tercatat: null, isian: {} } : { tercatat: pegawai(), isian: { jabatan: "Pengelola Data" } };
+  if (jenis === "tidak")
+    return p.keadaan.startsWith("Pegawai baru") ? { tercatat: null, isian: {} } : { tercatat: pegawai(), isian: { jabatan: "Pengelola Data" } };
+  // Pegawai baru yang naik pangkat atau PMK sesudah SK KGB terakhirnya: golongan dan masa kerja disalin dari SK itu (ADR-065).
+  if (p.keadaan.startsWith("Pegawai baru") && jenis === "kp")
+    return { tercatat: null, isian: { golonganRuang: "III/b", mkgTahun: "3", mkgBulan: "1", tmtKgbTerakhir: "2024-12-01" } };
+  if (p.keadaan.startsWith("Pegawai baru"))
+    return { tercatat: null, isian: { golonganRuang: "III/a", mkgTahun: "5", mkgBulan: "9", tmtKgbTerakhir: "2025-06-01" } };
   if (jenis === "kp" && jenisKp === "penyesuaian_ijazah")
     return { tercatat: pegawai({ golonganRuang: "II/d", mkgTahun: 9 }), isian: { golonganRuang: "III/a", mkgTahun: "9" } };
   if (jenis === "kp") return { tercatat: pegawai({ golonganRuang: "III/a", mkgTahun: 2 }), isian: { golonganRuang: "III/b", mkgTahun: "2" } };
@@ -418,7 +433,7 @@ test("setiap keadaan pada panduan dasarBaru, diisi persis seperti contohnya, tid
     const { tercatat, isian } = kasusPanduan(p);
     const [h] = periksaImporUpt([baris({ ...isian, ...p.isian })], tercatat ? konteks({ pegawaiSatker: perNip(tercatat) }) : kosong);
     assert.equal(h.hasil, tercatat ? "perubahan" : "baru", p.keadaan);
-    assert.ok(!h.kurang.some((k) => /sebab|jenis kenaikan|nomor SK|tanggal SK|TMT pangkat|TMT PMK/.test(k)), `${p.keadaan}: ${h.kurang.join(", ")}`);
+    assert.ok(!h.kurang.some((k) => /sebab|jawaban|dilaporkan|jenis kenaikan|nomor SK|tanggal SK|TMT pangkat|TMT PMK/.test(k)), `${p.keadaan}: ${h.kurang.join(", ")}`);
   }
 });
 
