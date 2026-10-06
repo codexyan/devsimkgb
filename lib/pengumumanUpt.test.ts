@@ -7,6 +7,9 @@ import { test } from "node:test";
 import {
   PENGUMUMAN_UPT,
   bolehTampilPengumuman,
+  gabungDilihat,
+  idPengumumanSah,
+  kunciBarisDilihat,
   kunciPengumumanUpt,
   pengumumanBelumDilihat,
   sedangMengetik,
@@ -61,6 +64,32 @@ test("penanda dilihat dicatat per pengguna dan per pengumuman", () => {
     "kgb-pengumuman-upt:nama-menu-2026-10:199505052019051005",
     "kunci pengumuman pertama tidak boleh berubah: yang sudah melihatnya tidak boleh melihatnya lagi",
   );
+});
+
+test("penanda server per akun digabung dengan penanda peramban", () => {
+  const tidak = () => false;
+  // Akun yang sudah melihat di server tidak melihatnya lagi di peramban yang baru dipakai.
+  const g = gabungDilihat(["nama-menu-2026-10", "lapor-sk-2026-10"], tidak);
+  assert.deepEqual(g.dilihat, ["nama-menu-2026-10", "lapor-sk-2026-10"]);
+  assert.deepEqual(pengumumanBelumDilihat((id) => g.dilihat.includes(id)), []);
+  assert.deepEqual(g.perluDicatat, []);
+  // Yang sudah dilihat di peramban ini tetapi belum tercatat di server disusulkan ke server, bukan ditampilkan lagi.
+  const susul = gabungDilihat(["nama-menu-2026-10"], (id) => id === "lapor-sk-2026-10");
+  assert.deepEqual(susul.dilihat, ["nama-menu-2026-10", "lapor-sk-2026-10"]);
+  assert.deepEqual(susul.perluDicatat, ["lapor-sk-2026-10"]);
+  // Akun baru di peramban baru: semuanya belum dilihat.
+  assert.deepEqual(gabungDilihat([], tidak).dilihat, []);
+  // Server tidak terjangkau (tabel belum dimigrasikan): hanya peramban yang menentukan, dan tidak ada yang disusulkan.
+  const tanpaServer = gabungDilihat(null, (id) => id === "nama-menu-2026-10");
+  assert.deepEqual(tanpaServer.dilihat, ["nama-menu-2026-10"]);
+  assert.deepEqual(tanpaServer.perluDicatat, []);
+});
+
+test("hanya id pengumuman yang dikenal yang dicatat, dan kunci barisnya per akun", () => {
+  assert.equal(idPengumumanSah("lapor-sk-2026-10"), true);
+  for (const x of ["", "tidak-ada", null, undefined, 3, {}, "nama-menu-2026-10 "]) assert.equal(idPengumumanSah(x), false, String(x));
+  assert.equal(kunciBarisDilihat("u1", "lapor-sk-2026-10"), "u1:lapor-sk-2026-10");
+  assert.notEqual(kunciBarisDilihat("u1", "lapor-sk-2026-10"), kunciBarisDilihat("u2", "lapor-sk-2026-10"));
 });
 
 test("pengumuman yang belum dilihat dihitung per pengumuman, menurut urutan terbit", () => {

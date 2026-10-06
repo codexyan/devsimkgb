@@ -1,9 +1,9 @@
-// Pop-up pengumuman perubahan untuk Admin UPT (ADR-073). Logika kapan pop-up boleh tampil dipisah di sini agar dapat
-// diuji, sebab kesalahan di sini berarti jendela muncul di atas pekerjaan yang sedang diketik.
+// Pop-up pengumuman perubahan untuk Admin UPT (ADR-073, ADR-075). Logika kapan pop-up boleh tampil dipisah di sini agar
+// dapat diuji, sebab kesalahan di sini berarti jendela muncul di atas pekerjaan yang sedang diketik.
 //
 // Prinsip: pengumuman tidak pernah mengganggu isian. Ia hanya tampil di halaman yang tidak memuat isian, tidak di
 // atas dialog lain, tidak selagi ada kolom yang sedang diketik, dan tidak menyimpan atau menghapus data apa pun;
-// satu-satunya yang dicatat adalah penanda "sudah dilihat" di peramban.
+// satu-satunya yang dicatat adalah penanda "sudah dilihat" per akun (di server, dengan cadangan di peramban).
 
 /**
  * Pengumuman yang berlaku, dari yang terlama. Pengumuman baru ditambahkan di akhir: pengguna yang sudah melihat yang
@@ -12,6 +12,27 @@
  */
 export const PENGUMUMAN_UPT = ["nama-menu-2026-10", "lapor-sk-2026-10"] as const;
 export type IdPengumumanUpt = (typeof PENGUMUMAN_UPT)[number];
+
+/** Id yang dikenal; rute server hanya mencatat pengumuman yang memang ada. */
+export const idPengumumanSah = (id: unknown): id is IdPengumumanUpt =>
+  typeof id === "string" && (PENGUMUMAN_UPT as readonly string[]).includes(id);
+
+/** Kunci baris penanda di server: satu akun paling banyak punya satu baris per pengumuman (ADR-075). */
+export const kunciBarisDilihat = (userId: string, id: IdPengumumanUpt) => `${userId}:${id}`;
+
+/**
+ * Pengumuman yang dianggap sudah dilihat akun ini: yang tercatat di server (null bila server tidak terjangkau atau
+ * tabelnya belum ada) digabung dengan penanda peramban. Yang sudah dilihat di peramban ini tidak ditampilkan lagi
+ * walau server belum mencatatnya, dan `perluDicatat` adalah yang masih harus disusulkan ke server.
+ */
+export function gabungDilihat(
+  server: readonly string[] | null,
+  lokal: (id: IdPengumumanUpt) => boolean,
+): { dilihat: IdPengumumanUpt[]; perluDicatat: IdPengumumanUpt[] } {
+  const dariServer = new Set(server ?? []);
+  const dilihat = PENGUMUMAN_UPT.filter((id) => dariServer.has(id) || lokal(id));
+  return { dilihat, perluDicatat: server === null ? [] : dilihat.filter((id) => !dariServer.has(id)) };
+}
 
 /** Id pengumuman yang belum dilihat, menurut urutan terbitnya; kosong berarti tidak ada yang perlu ditampilkan. */
 export function pengumumanBelumDilihat(sudahDilihat: (id: IdPengumumanUpt) => boolean): IdPengumumanUpt[] {

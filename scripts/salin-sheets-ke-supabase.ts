@@ -50,6 +50,7 @@ const DEF: Record<Kunci, TableDef> = {
   hukdisKonfigurasi: defs.HukdisKonfigurasi,
   regulasi: defs.Regulasi,
   auditLog: defs.AuditLog,
+  pengumumanDilihat: defs.PengumumanDilihat,
   rekonBulanan: defs.RekonBulanan,
 };
 
@@ -64,6 +65,7 @@ const URUTAN_TULIS: Kunci[] = [
 const WAJIB: Partial<Record<Kunci, string[]>> = {
   user: ["nip", "password", "role"],
   profileChangeRequest: ["userId", "status"],
+  pengumumanDilihat: ["userId", "pengumumanId"],
   pegawai: ["nip", "nama"],
   riwayatKGB: ["pegawaiId", "status"],
   penandatangan: ["jenis", "nama", "nip", "jabatan", "berlakuMulai"],

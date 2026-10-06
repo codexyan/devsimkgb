@@ -5,6 +5,7 @@ import {
   type AuditLogRow,
   type NotifikasiRow,
   type PegawaiRow,
+  type PengumumanDilihatRow,
   type PenandatanganRow,
   type RiwayatKGBRow,
   type RiwayatPangkatRow,
@@ -40,5 +41,6 @@ export const supabase = {
   hukdisKonfigurasi: new SupabaseTable(defs.HukdisKonfigurasi),
   regulasi: new SupabaseTable(defs.Regulasi),
   auditLog: new SupabaseTable<AuditLogRow>(defs.AuditLog),
+  pengumumanDilihat: new SupabaseTable<PengumumanDilihatRow>(defs.PengumumanDilihat),
   rekonBulanan: new SupabaseTable(defs.RekonBulanan),
 };
