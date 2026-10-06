@@ -45,8 +45,12 @@ test("SK kenaikan pangkat dan PMK dicocokkan menurut jenis dan nomor SK; usulan 
   ];
   const kp = dokumenSk(sk({ kunci: "kp:r1", jenis: "kp", nomorSK: "W.17-PI-2026" }), dokumen, []);
   assert.deepEqual(kp, { jenis: "berkas", url: "/berkas/usulan-u2-skPangkat", sumber: "Berkas usulan UPT yang disetujui" });
-  // Nomor PMK yang sama pada jenis lain tidak tertukar.
-  assert.equal(dokumenSk(sk({ kunci: "kp:r2", jenis: "kp", nomorSK: "W.17-PMK-1" }), dokumen, []), null);
+  // Nomor sama dengan jenis lain tetap ditemukan, dengan keterangan jenis unggahannya (ADR-071).
+  assert.deepEqual(dokumenSk(sk({ kunci: "kp:r2", jenis: "kp", nomorSK: "W.17-PMK-1" }), dokumen, []), {
+    jenis: "berkas",
+    url: "/berkas/usulan-u2-skPmk",
+    sumber: "Berkas usulan UPT yang disetujui (diunggah sebagai SK peninjauan masa kerja)",
+  });
   assert.equal(dokumenSk(sk({ kunci: "pmk:r3", jenis: "pmk", nomorSK: "W.17-PMK-1" }), dokumen, [])?.jenis, "berkas");
   // Berkas formulir inventarisasi tidak dipakai (ADR-027).
   assert.equal(dokumenSk(sk({ kunci: "kp:r4", jenis: "kp", nomorSK: "W.17-KP-LAIN" }), dokumen, []), null);
@@ -68,6 +72,22 @@ test("baris riwayat kenaikan pangkat memakai pencocokan yang sama dengan linimas
   // Spasi dan huruf besar-kecil diabaikan; titik dan angka tidak.
   assert.equal(cariDokumenSk("kp", "sek-2017.sa.04.05 tahun  2026", dokumen)?.url, "/berkas/arsip-c");
   assert.equal(cariDokumenSk("kp", "SEK-2017.SA.04.06 TAHUN 2026", dokumen), null);
-  assert.equal(cariDokumenSk("pmk", "SEK-2017.SA.04.05 TAHUN 2026", dokumen), null);
+  // Jenis lain dengan nomor sama tetap ditemukan, ditandai jenis unggahannya.
+  assert.match(cariDokumenSk("pmk", "SEK-2017.SA.04.05 TAHUN 2026", dokumen)?.sumber ?? "", /diunggah sebagai SK kenaikan pangkat/);
   assert.equal(cariDokumenSk("kp", "", dokumen), null);
+});
+
+test("pindaian SK dasar yang diunggah sebagai SK KGB tetap tampil di riwayat kenaikan pangkat; tanpa nomor dicocokkan menurut tanggal (ADR-071)", () => {
+  const dokumen = [
+    dok({ id: "arsip-dasar", sumber: "arsip", jenis: "sk_kgb", nomorSK: "SEK-1986.SA.04.05 TAHUN 2026", tanggal: "2026-01-29" }),
+    dok({ id: "arsip-tanpa-nomor", sumber: "arsip", jenis: "sk_pmk", nomorSK: "", tanggal: "2026-05-08" }),
+  ];
+  assert.equal(cariDokumenSk("kp", "SEK-1986.SA.04.05 TAHUN 2026", dokumen)?.url, "/berkas/arsip-dasar");
+  // Tanpa nomor: jenis dan tanggal SK harus sama.
+  assert.equal(cariDokumenSk("pmk", "W.17-PMK-9", dokumen, "2026-05-08")?.url, "/berkas/arsip-tanpa-nomor");
+  assert.equal(cariDokumenSk("pmk", "W.17-PMK-9", dokumen, "2026-05-09"), null);
+  assert.equal(cariDokumenSk("kp", "W.17-PMK-9", dokumen, "2026-05-08"), null);
+  // Yang jenisnya sama tetap didahulukan.
+  const lagi = [...dokumen, dok({ id: "arsip-kp", sumber: "arsip", jenis: "sk_pangkat", nomorSK: "SEK-1986.SA.04.05 TAHUN 2026" })];
+  assert.equal(cariDokumenSk("kp", "SEK-1986.SA.04.05 TAHUN 2026", lagi)?.url, "/berkas/arsip-kp");
 });

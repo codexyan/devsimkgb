@@ -92,8 +92,9 @@ export default function ModalBuatSk({
   // KGB yang golongan atau masa kerjanya berubah sesudah diinput tidak boleh dibuat SK-nya (ADR-062); server juga
   // menolaknya, tetapi tombolnya ditahan lebih dulu supaya alasannya terbaca sebelum mencoba.
   const ditahan = !!linimasa?.basi;
-  // Draf nomor SK baru tersimpan di SIM-KGB (ADR-011) dan hanya dipakai selama SK belum pernah dibuat.
-  // Draf lama yang sempat disimpan di peramban dipakai sampai draf server termuat, lalu dibersihkan.
+  // Draf nomor SK baru tersimpan di SIM-KGB (ADR-011). Saat SK sudah pernah dibuat (Perbaiki SK), draf menyimpan
+  // perbaikan yang belum dibuat ulang; SK yang tercatat tetap sampai Buat dan Unduh SK (ADR-071). Draf lama yang
+  // sempat disimpan di peramban hanya dipakai sebelum SK pertama dibuat, sampai draf server termuat.
   const skSudahDibuat = !!nomorSkTerisi(skBaruAwal?.nomorSurat);
   const [drafPeramban] = useState(() => (skSudahDibuat ? null : bacaDrafSk(kgbId)));
   const [sumberDraf, setSumberDraf] = useState<"server" | "peramban" | null>(() => (drafPeramban ? "peramban" : null));
@@ -131,19 +132,27 @@ export default function ModalBuatSk({
   const refKolomForm = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (skSudahDibuat || alasanTolak) return;
+    if (alasanTolak) return;
     let batal = false;
     ambilDrafSk(kgbId).then((hasil) => {
       // Isian yang sudah diketik operator tidak ditimpa draf yang datang belakangan.
       if (batal || !hasil.ok || !hasil.data.drafNomorSurat || belumTersimpan.current) return;
       const { drafNomorSurat, drafTanggalSurat } = hasil.data;
-      setSkBaru((s) => ({ nomorSurat: drafNomorSurat, tanggalSurat: nilaiInputTanggal(drafTanggalSurat) || s.tanggalSurat }));
+      const tanggalDraf = nilaiInputTanggal(drafTanggalSurat);
+      // Perbaiki SK: draf yang sama dengan SK tercatat bukan perbaikan.
+      if (
+        skSudahDibuat &&
+        drafNomorSurat === nomorSkTerisi(skBaruAwal?.nomorSurat) &&
+        (!tanggalDraf || tanggalDraf === nilaiInputTanggal(skBaruAwal?.tanggalSurat))
+      )
+        return;
+      setSkBaru((s) => ({ nomorSurat: drafNomorSurat, tanggalSurat: tanggalDraf || s.tanggalSurat }));
       setSumberDraf("server");
     });
     return () => {
       batal = true;
     };
-  }, [kgbId, skSudahDibuat, alasanTolak]);
+  }, [kgbId, skSudahDibuat, alasanTolak, skBaruAwal?.nomorSurat, skBaruAwal?.tanggalSurat]);
 
   useEffect(() => {
     const daftarUrl = urlPratinjau.current;
@@ -385,8 +394,12 @@ export default function ModalBuatSk({
       return;
     }
     const isi = isiSkBaru();
+    // Perbaiki SK: nomor dan tanggal yang sama dengan SK tercatat tidak perlu didraf; draf lama dihapus.
+    const nomorTercatat = nomorSkTerisi(skBaruAwal?.nomorSurat);
+    const samaTercatat =
+      skSudahDibuat && isi.nomorSurat === nomorTercatat && isi.tanggalSurat === nilaiInputTanggal(skBaruAwal?.tanggalSurat);
     setSibuk(true);
-    const hasilDraf = await simpanDrafSkServer(kgbId, isi);
+    const hasilDraf = await simpanDrafSkServer(kgbId, samaTercatat ? { nomorSurat: "", tanggalSurat: "" } : isi);
     setSibuk(false);
     if (!hasilDraf.ok) {
       setGalat(hasilDraf.error);
@@ -395,9 +408,13 @@ export default function ModalBuatSk({
     hapusDrafSk(kgbId);
     belumTersimpan.current = false;
     onBerhasil(
-      isi.nomorSurat
-        ? `Draf SK ${pegawai.nama} disimpan di SIM-KGB. Nomornya tetap ada saat Buat SK dibuka lagi, dari komputer mana pun.`
-        : `Data SK terakhir ${pegawai.nama} tersimpan.`,
+      skSudahDibuat
+        ? samaTercatat
+          ? `Perbaikan data SK terakhir ${pegawai.nama} tersimpan. Buat dan Unduh SK untuk mencetak ulang SK ${nomorTercatat}.`
+          : `Draf perbaikan SK ${pegawai.nama} disimpan di SIM-KGB. SK yang tercatat tetap ${nomorTercatat} sampai Buat dan Unduh SK.`
+        : isi.nomorSurat
+          ? `Draf SK ${pegawai.nama} disimpan di SIM-KGB. Nomornya tetap ada saat Buat SK dibuka lagi, dari komputer mana pun.`
+          : `Data SK terakhir ${pegawai.nama} tersimpan.`,
     );
   }
 
@@ -439,16 +456,14 @@ export default function ModalBuatSk({
             <button type="button" className="kgbm-tombol kgbm-kedua" onClick={tutup} disabled={sibuk}>
               Batal
             </button>
-            {!skSudahDibuat && (
-              <button
-                type="button"
-                className="kgbm-tombol kgbm-kedua"
-                onClick={() => void simpanDraf()}
-                disabled={sibuk || !!memuatVersi}
-              >
-                Simpan draf
-              </button>
-            )}
+            <button
+              type="button"
+              className="kgbm-tombol kgbm-kedua"
+              onClick={() => void simpanDraf()}
+              disabled={sibuk || !!memuatVersi}
+            >
+              {skSudahDibuat ? "Simpan draf perbaikan" : "Simpan draf"}
+            </button>
             <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk || !!memuatVersi || ditahan}>
               {sibuk ? "Membuat SK..." : "Buat dan Unduh SK"}
             </button>

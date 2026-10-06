@@ -46,7 +46,7 @@ export function skKgb(
         sumber: k.isArsip ? "Berkas arsip KGB" : "SK bertanda tangan di SIM-KGB",
       },
     };
-  const arsip = dokumen ? cariDokumenSk("kgb", nomor, dokumen) : null;
+  const arsip = dokumen ? cariDokumenSk("kgb", nomor, dokumen, k.surat?.tanggalSurat ?? (k.isArsip ? k.tanggalSK : null)) : null;
   if (arsip) return { nomor, dok: arsip };
   if (!k.isArsip && nomorAda(k.surat?.nomorSurat))
     return { nomor, dok: { jenis: "draf", kgbId: k.id, sumber: "Draf cetakan SIM-KGB, tanpa tanda tangan" } };
@@ -61,6 +61,7 @@ export function dokumenAtasDasar(
   nomor: string | null | undefined,
   kgb: readonly KgbUntukSinkron[],
   dokumen: readonly DokumenPegawai[] | null,
+  tanggalSK?: string | null,
 ): DokumenSk | null {
   if (!nomorAda(nomor)) return null;
   const kunci = kunciNomorSk(nomor);
@@ -71,7 +72,7 @@ export function dokumenAtasDasar(
   }
   if (!dokumen) return null;
   for (const jenis of ["kp", "pmk", "kgb", "cpns"] as const) {
-    const d = cariDokumenSk(jenis, nomor, dokumen);
+    const d = cariDokumenSk(jenis, nomor, dokumen, tanggalSK);
     if (d) return d;
   }
   return null;

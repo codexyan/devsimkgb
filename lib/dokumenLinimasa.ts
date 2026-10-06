@@ -5,9 +5,10 @@
 // SK KGB dari SIM-KGB ditautkan lewat KGB-nya: SK bertanda tangan bila sudah diunggah, selain itu draf cetakan
 // SIM-KGB tanpa tanda tangan. Berkas formulir inventarisasi tidak dipakai, sebab modul itu akan dihapus (ADR-027).
 
-import type { DokumenPegawai, JenisDokumen } from "./dokumenPegawai";
+import { JENIS_DOKUMEN, type DokumenPegawai, type JenisDokumen } from "./dokumenPegawai";
 import type { JenisSkGaji, SkGaji } from "./linimasaDasarSk";
 import { kunciNomorSk } from "./nomorSurat";
+import { tanggalKalender, type NilaiTanggal } from "./waktu";
 
 /** Cara membuka dokumen satu SK. */
 export type DokumenSk =
@@ -50,39 +51,64 @@ export function dokumenSk(sk: SkGaji, dokumen: readonly DokumenPegawai[], kgb: r
         sumber: k.isArsip ? "Berkas arsip KGB" : SUMBER.sk_kgb,
       };
     }
-    const cocok = cariDokumenSk(sk.jenis, sk.nomorSK, dokumen);
+    const cocok = cariDokumenSk(sk.jenis, sk.nomorSK, dokumen, sk.tanggalSK);
     if (cocok) return cocok;
     // Arsip KGB tidak pernah dicetak SIM-KGB, jadi tidak punya draf cetakan.
     if (k && !k.isArsip && k.surat?.nomorSurat && k.surat.nomorSurat !== "-")
       return { jenis: "draf", kgbId: k.id, sumber: "Draf cetakan SIM-KGB, tanpa tanda tangan" };
     return null;
   }
-  return cariDokumenSk(sk.jenis, sk.nomorSK, dokumen);
+  return cariDokumenSk(sk.jenis, sk.nomorSK, dokumen, sk.tanggalSK);
 }
 
 /**
- * Pindaian satu SK menurut jenis dan nomornya; dipakai linimasa dan baris riwayat kenaikan pangkat dan PMK di halaman
- * pegawai, supaya keduanya selalu menunjuk berkas yang sama.
+ * Pindaian satu SK menurut jenis dan nomornya (ADR-066, ADR-071). Urutannya:
+ * 1. nomor sama dan jenis sama;
+ * 2. nomor sama dengan jenis lain, sebab nomor SK sudah cukup menunjuk satu SK dan jenis unggahan sering keliru pilih
+ *    (mis. SK kenaikan pangkat yang diunggah sebagai SK KGB lewat Ubah SK dasar);
+ * 3. jenis sama, tanpa nomor, dan tanggal SK sama.
+ * Di antara yang setara: SK bertanda tangan, arsip yang diunggah Kanwil, lalu berkas usulan UPT yang disetujui. Berkas
+ * formulir inventarisasi tidak dipakai (ADR-027).
+ */
+export function cariDokumenMenurutSk(
+  jenis: JenisDokumen,
+  nomorSK: string | null | undefined,
+  dokumen: readonly DokumenPegawai[],
+  tanggalSK?: NilaiTanggal,
+): Extract<DokumenSk, { jenis: "berkas" }> | null {
+  const nomor = kunciNomorSk(nomorSK);
+  const tanggal = tanggalKalender(tanggalSK)?.getTime() ?? null;
+  const sah = (d: DokumenPegawai) => d.sumber in URUT_SUMBER && (d.sumber !== "usulan" || d.status === "disetujui");
+  const peringkat = (d: DokumenPegawai): number | null => {
+    const nomorDok = kunciNomorSk(d.nomorSK);
+    if (nomor && nomorDok === nomor) return d.jenis === jenis ? 0 : 1;
+    if (!nomorDok && d.jenis === jenis && tanggal !== null && tanggalKalender(d.tanggal)?.getTime() === tanggal) return 2;
+    return null;
+  };
+  const calon = dokumen
+    .filter(sah)
+    .map((d) => ({ d, p: peringkat(d) }))
+    .filter((x): x is { d: DokumenPegawai; p: number } => x.p !== null)
+    .sort((a, b) => a.p - b.p || URUT_SUMBER[a.d.sumber] - URUT_SUMBER[b.d.sumber] || b.d.tanggal.localeCompare(a.d.tanggal));
+  const hasil = calon[0];
+  if (!hasil) return null;
+  const { d } = hasil;
+  const lain = d.jenis && d.jenis !== jenis ? ` (diunggah sebagai ${JENIS_DOKUMEN[d.jenis]})` : "";
+  return { jenis: "berkas", url: d.url, sumber: `${SUMBER[d.sumber]}${lain}` };
+}
+
+/**
+ * Pindaian satu SK penetap gaji pokok; dipakai linimasa, baris riwayat kenaikan pangkat dan PMK, dan tab Riwayat KGB,
+ * supaya semuanya selalu menunjuk berkas yang sama.
  */
 export function cariDokumenSk(
   jenisSk: JenisSkGaji,
   nomorSK: string | null | undefined,
   dokumen: readonly DokumenPegawai[],
+  tanggalSK?: NilaiTanggal,
 ): Extract<DokumenSk, { jenis: "berkas" }> | null {
   const jenis = JENIS_DOKUMEN_SK[jenisSk];
-  const nomor = kunciNomorSk(nomorSK);
-  if (!jenis || !nomor) return null;
-  const calon = dokumen
-    .filter(
-      (d) =>
-        d.jenis === jenis &&
-        d.sumber in URUT_SUMBER &&
-        kunciNomorSk(d.nomorSK) === nomor &&
-        (d.sumber !== "usulan" || d.status === "disetujui"),
-    )
-    .sort((a, b) => URUT_SUMBER[a.sumber] - URUT_SUMBER[b.sumber] || b.tanggal.localeCompare(a.tanggal));
-  const d = calon[0];
-  return d ? { jenis: "berkas", url: d.url, sumber: SUMBER[d.sumber] } : null;
+  return jenis ? cariDokumenMenurutSk(jenis, nomorSK, dokumen, tanggalSK) : null;
 }
 
 /** Dokumen seluruh SK pada linimasa, menurut kuncinya. */

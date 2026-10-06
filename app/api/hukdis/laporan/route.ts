@@ -17,15 +17,17 @@ type JenisBaris = { kode: string; label: string | null };
  * didahulukan; yang sudah dicatat tetap dikirim sebagai riwayat asal usul catatan hukdisnya.
  * `aktif: false` berarti tabelnya belum dibuat di basis data, dan daftarnya memang kosong.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canManageHukdis(session.user.role ?? ""))
     return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
+  // ?pegawaiId= untuk tab Riwayat Hukdis di halaman pegawai: pindaian SK tiap hukdis yang tercatat dari laporan (ADR-071).
+  const pegawaiId = new URL(req.url).searchParams.get("pegawaiId")?.trim() || null;
   let laporan: LaporanHukdisRow[];
   try {
-    laporan = (await db.laporanHukdis.findMany()) as LaporanHukdisRow[];
+    laporan = (await db.laporanHukdis.findMany(pegawaiId ? { where: { pegawaiId } } : undefined)) as LaporanHukdisRow[];
   } catch (e) {
     if (tabelBelumAda(e)) return NextResponse.json({ aktif: false, laporan: [] });
     throw e;
@@ -65,6 +67,7 @@ export async function GET() {
         dilaporkanAt: l.dilaporkanAt ? new Date(l.dilaporkanAt).toISOString() : null,
         ditinjauOleh: l.ditinjauOleh,
         ditinjauAt: l.ditinjauAt ? new Date(l.ditinjauAt).toISOString() : null,
+        riwayatId: l.riwayatId ?? null,
       };
     })
     .sort(

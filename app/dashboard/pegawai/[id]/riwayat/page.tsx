@@ -15,6 +15,7 @@ import {
   type SkRiwayat,
 } from "./SkRiwayatDasar";
 import { cariKembar } from "@/lib/riwayatKembar";
+import { kunciNomorSk } from "@/lib/nomorSurat";
 import { RingkasAtasDasar, TombolDokumenSk, dokumenAtasDasar, pesanAtasDasarBerbeda, skKgb } from "./SinkronDasarKgb";
 import { muatLinimasaDasar, type DataLinimasa } from "@/app/dashboard/components/kgb/linimasa";
 import ModalLinimasaDasar from "@/app/dashboard/components/kgb/ModalLinimasaDasar";
@@ -238,6 +239,10 @@ export default function RiwayatKGBPage() {
   const [bukaLinimasa, setBukaLinimasa] = useState(false);
   const [memuatDraf, setMemuatDraf] = useState<string | null>(null);
   const [galatSk, setGalatSk] = useState<string | null>(null);
+  // Pindaian SK hukdis dari laporan UPT (ADR-071); hanya peninjau hukdis yang boleh membukanya.
+  const [laporanHukdis, setLaporanHukdis] = useState<
+    { id: string; riwayatId: string | null; nomorSK: string | null; status: string; berkas: { url: string } | null }[] | null
+  >(null);
   const [unggahSk, setUnggahSk] = useState<SkRiwayat | null>(null);
   const [ubahSk, setUbahSk] = useState<DataUbahSkRiwayat | null>(null);
   const [hapusKembar, setHapusKembar] = useState<{
@@ -271,6 +276,30 @@ export default function RiwayatKGBPage() {
       batal = true;
     };
   }, [bolehDokumen, activeTab, id, versiDokumenSk]);
+  useEffect(() => {
+    if (!canHukdis || activeTab !== "hukdis") return;
+    let batal = false;
+    fetch(`/api/hukdis/laporan?pegawaiId=${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then(async (r) => (r.ok ? ((await r.json()) as { laporan?: typeof laporanHukdis }).laporan ?? [] : []))
+      .then((d) => {
+        if (!batal) setLaporanHukdis(d);
+      })
+      .catch(() => {
+        if (!batal) setLaporanHukdis([]);
+      });
+    return () => {
+      batal = true;
+    };
+  }, [canHukdis, activeTab, id, versiData]);
+  /** Pindaian SK satu hukdis: dari laporan UPT yang menerbitkannya, atau laporan diterima bernomor sama. */
+  const dokumenHukdis = (h: { id: string; nomorSK: string }): DokumenSk | null | undefined => {
+    if (laporanHukdis === null) return undefined;
+    const l =
+      laporanHukdis.find((x) => x.riwayatId === h.id && x.berkas) ??
+      laporanHukdis.find((x) => x.status === "diterima" && x.berkas && kunciNomorSk(x.nomorSK) === kunciNomorSk(h.nomorSK) && !!kunciNomorSk(h.nomorSK));
+    return l?.berkas ? { jenis: "berkas", url: l.berkas.url, sumber: "Berkas laporan hukdis UPT" } : null;
+  };
+
   // KGB yang sedang diproses memakai konteks Buat SK (batas bawahnya TMT sebelum KGB itu); selain itu KGB berikutnya.
   const kgbBerjalanId = riwayat.find((r) => r.status === "sedang_diproses" && !r.isArsip)?.id ?? null;
   const tmtBerikutnya = pegawai?.tmtKgbBerikutnya ?? null;
@@ -306,8 +335,8 @@ export default function RiwayatKGBPage() {
     setPratinjauSk({ judul, subjudul: dok.sumber, url: URL.createObjectURL(hasil.data), lokal: true });
   }
   const daftarDokumen = Array.isArray(dokumenSk) ? dokumenSk : null;
-  const dokumenRiwayat = (jenis: "kp" | "pmk", nomorSK: string | null | undefined) =>
-    dokumenSk === null ? undefined : dokumenSk === "gagal" ? "gagal" : cariDokumenSk(jenis, nomorSK, dokumenSk);
+  const dokumenRiwayat = (jenis: "kp" | "pmk", nomorSK: string | null | undefined, tanggalSK?: string | null) =>
+    dokumenSk === null ? undefined : dokumenSk === "gagal" ? "gagal" : cariDokumenSk(jenis, nomorSK, dokumenSk, tanggalSK);
 
   // Popup Proses KGB dan modal aksi KGB bersama
   const [showKgbPopup, setShowKgbPopup] = useState(false);
@@ -896,7 +925,7 @@ export default function RiwayatKGBPage() {
                         tanggalSK: p.tanggalSK ?? null,
                         judul: `${p.golonganLama ? `${p.golonganLama} → ${p.golonganBaru}` : p.golonganBaru} · ${p.jenisLabel}`,
                       }}
-                      dok={dokumenRiwayat("kp", p.nomorSK)}
+                      dok={dokumenRiwayat("kp", p.nomorSK, p.tanggalSK)}
                       onLihat={(d) => setPratinjauSk({ judul: `SK kenaikan pangkat ${p.nomorSK}`, subjudul: d.sumber, url: d.url })}
                       onUnggah={() =>
                         setUnggahSk({
@@ -1017,7 +1046,7 @@ export default function RiwayatKGBPage() {
                           : undefined
                       }
                       sk={{ jenis: "sk_pmk", nomorSK: p.nomorSK ?? "", tanggalSK: p.tanggalSK ?? null, judul: "Peninjauan masa kerja" }}
-                      dok={dokumenRiwayat("pmk", p.nomorSK)}
+                      dok={dokumenRiwayat("pmk", p.nomorSK, p.tanggalSK)}
                       onLihat={(d) => setPratinjauSk({ judul: `SK PMK ${p.nomorSK}`, subjudul: d.sumber, url: d.url })}
                       onUnggah={() =>
                         setUnggahSk({ jenis: "sk_pmk", nomorSK: p.nomorSK ?? "", tanggalSK: p.tanggalSK ?? null, judul: "Peninjauan masa kerja" })
@@ -1275,7 +1304,7 @@ export default function RiwayatKGBPage() {
                                 {r.penetapSkDasar ? ` · oleh ${r.penetapSkDasar}` : ""}
                               </span>
                               <TombolDokumenSk
-                                dok={dokumenSk === null ? undefined : dokumenAtasDasar(nomorDasar, riwayat, daftarDokumen)}
+                                dok={dokumenSk === null ? undefined : dokumenAtasDasar(nomorDasar, riwayat, daftarDokumen, r.tanggalSK)}
                                 memuat={memuatDraf === `atas-${r.id}`}
                                 onLihat={(dok) => void lihatSk(`SK ${nomorDasar}`, dok, `atas-${r.id}`)}
                               />
@@ -1395,6 +1424,19 @@ export default function RiwayatKGBPage() {
                         </div>
                       )}
                     </div>
+                    {canHukdis && (
+                      // Pindaian SK hukdis dari laporan UPT, otomatis tanpa diunggah ulang (ADR-071).
+                      <div className="px-5 py-2.5 flex flex-wrap items-center gap-2" style={{ borderTop: "0.5px solid var(--ln1)", fontSize: "12px", color: "var(--dt5)" }}>
+                        {dokumenHukdis(h) === null ? (
+                          <span>Belum ada pindaian. Hukdis yang dicatat langsung, bukan dari laporan UPT, belum menyimpan pindaian SK-nya.</span>
+                        ) : (
+                          <TombolDokumenSk
+                            dok={dokumenHukdis(h)}
+                            onLihat={(dok) => void lihatSk(`SK hukuman disiplin ${h.nomorSK}`, dok, `hukdis-${h.id}`)}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
