@@ -5,8 +5,18 @@
 // atas dialog lain, tidak selagi ada kolom yang sedang diketik, dan tidak menyimpan atau menghapus data apa pun;
 // satu-satunya yang dicatat adalah penanda "sudah dilihat" di peramban.
 
-/** Pengumuman yang berlaku; naikkan id-nya bila ada pengumuman baru supaya tampil lagi satu kali. */
-export const ID_PENGUMUMAN_UPT = "nama-menu-2026-10";
+/**
+ * Pengumuman yang berlaku, dari yang terlama. Pengumuman baru ditambahkan di akhir: pengguna yang sudah melihat yang
+ * lama hanya mendapat adegan yang baru, dan pengguna yang belum pernah melihat apa pun mendapat semuanya berurutan
+ * (ADR-074). Tombol "Apa yang baru" memutar seluruhnya.
+ */
+export const PENGUMUMAN_UPT = ["nama-menu-2026-10", "lapor-sk-2026-10"] as const;
+export type IdPengumumanUpt = (typeof PENGUMUMAN_UPT)[number];
+
+/** Id pengumuman yang belum dilihat, menurut urutan terbitnya; kosong berarti tidak ada yang perlu ditampilkan. */
+export function pengumumanBelumDilihat(sudahDilihat: (id: IdPengumumanUpt) => boolean): IdPengumumanUpt[] {
+  return PENGUMUMAN_UPT.filter((id) => !sudahDilihat(id));
+}
 
 /** Peristiwa untuk membuka kembali pengumuman dari tombol "Apa yang baru". */
 export const PERISTIWA_BUKA_PENGUMUMAN_UPT = "kgb-buka-pengumuman-upt";
@@ -17,8 +27,12 @@ export const PERISTIWA_BUKA_PENGUMUMAN_UPT = "kgb-buka-pengumuman-upt";
  */
 export const HALAMAN_PENGUMUMAN_UPT: readonly string[] = ["/dashboard", "/dashboard/upt/pegawai", "/dashboard/upt/riwayat"];
 
-/** Kunci penanda "sudah dilihat" di peramban, per pengguna dan per pengumuman. */
-export const kunciPengumumanUpt = (nip: string) => `kgb-pengumuman-upt:${ID_PENGUMUMAN_UPT}:${nip || "-"}`;
+/**
+ * Kunci penanda "sudah dilihat" di peramban, per pengguna dan per pengumuman. Pengumuman pertama memakai kunci yang
+ * sama dengan sebelum ada pengumuman kedua, jadi yang sudah melihatnya tidak melihatnya lagi.
+ */
+export const kunciPengumumanUpt = (nip: string, id: IdPengumumanUpt = PENGUMUMAN_UPT[0]) =>
+  `kgb-pengumuman-upt:${id}:${nip || "-"}`;
 
 /** Elemen yang sedang menerima ketikan; fokusnya tidak boleh direbut pengumuman. */
 export function sedangMengetik(el: { tagName?: string; isContentEditable?: boolean } | null | undefined): boolean {
@@ -34,6 +48,7 @@ export interface KeadaanPengumuman {
   adaDialog: boolean;
   /** Ada kolom isian yang sedang difokuskan. */
   sedangMengetik: boolean;
+  /** Seluruh pengumuman yang berlaku sudah dilihat pengguna ini. */
   sudahDilihat: boolean;
 }
 

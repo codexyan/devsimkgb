@@ -58,6 +58,8 @@ export interface PegawaiUntukUsulan {
   bawaan?: BawaanUsulanUpt;
   /** Dasar SK KGB berikutnya menurut catatan SIM-KGB; pembanding pratinjau Atas dasar (ADR-065). */
   dasarKgb?: DasarKgbBerikutnya | null;
+  /** KGB pegawai yang sedang berjalan di Kanwil: dasar peringatan dampak laporan SK (ADR-074). */
+  kgb?: { status: string | null; tmt: string | null };
 }
 
 /**

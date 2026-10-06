@@ -27,6 +27,7 @@ export const TIPE_NOTIFIKASI = {
   KGB_PERLU_DITINJAU: "kgb_perlu_ditinjau",
   USULAN_UPT: "usulan_upt",
   USULAN_REVISI: "usulan_revisi",
+  USULAN_DISETUJUI: "usulan_disetujui",
   MUTASI_UPT: "mutasi_upt",
   MUTASI_DIKEMBALIKAN: "mutasi_dikembalikan",
   HUKDIS_UPT: "hukdis_upt",
@@ -52,7 +53,7 @@ export function tipeNotifikasiUntukRole(role: string | null | undefined): readon
       return [T.SK_MENUNGGU_KEUANGAN, T.KGB_PERLU_DITINJAU];
     case "admin_upt":
       // Disaring lagi per satker oleh GET /api/notifikasi; di sini hanya jenisnya yang dibatasi.
-      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT, T.USULAN_REVISI, T.MUTASI_DIKEMBALIKAN, T.HUKDIS_DIKEMBALIKAN];
+      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT, T.USULAN_REVISI, T.USULAN_DISETUJUI, T.MUTASI_DIKEMBALIKAN, T.HUKDIS_DIKEMBALIKAN];
     default:
       return [];
   }
@@ -211,6 +212,31 @@ export function notifikasiUsulanRevisi(
     referenceId: usulan.id,
     prioritas: "warning",
     linkHref: "/dashboard",
+    kategori: "pegawai",
+  };
+}
+
+/**
+ * Isi notifikasi untuk laporan SK kenaikan pangkat atau PMK yang disetujui Kanwil (ADR-074). Laporan SK berangkat tanpa
+ * surat dan Admin UPT tidak menerima kabar apa pun saat disetujui, sehingga ia harus membuka daftar satu per satu untuk
+ * mengetahui apakah laporannya sudah diterapkan. Rujukannya id usulan, sama dengan notifikasi usulan dikembalikan.
+ */
+export function notifikasiUsulanDisetujui(
+  usulan: { id: string; satker: string | null },
+  pegawai: { nama: string | null; nip: string | null } | null | undefined,
+  hasil: { dasarBaru: string; penyesuaianKgb: string | null },
+): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
+  const nama = pegawai?.nama?.trim() || "-";
+  const nip = pegawai?.nip?.trim() || "-";
+  return {
+    judul: `Laporan SK Disetujui: ${nama}`,
+    pesan:
+      `Kanwil menyetujui laporan SK ${nama} (${nip}). ${hasil.dasarBaru}. Riwayat dan data pegawai sudah diperbarui.` +
+      (hasil.penyesuaianKgb ? ` ${hasil.penyesuaianKgb}.` : ""),
+    tipe: T.USULAN_DISETUJUI,
+    referenceId: usulan.id,
+    prioritas: "info",
+    linkHref: "/dashboard/upt/pegawai",
     kategori: "pegawai",
   };
 }

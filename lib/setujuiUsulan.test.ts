@@ -143,6 +143,13 @@ test("usulan yang menyertakan SK penyesuaian ijazah membentuk riwayat kenaikan p
     assert.equal(baru?.golonganRuang, "III/a");
     assert.equal(Number(baru?.mkgTahun), 0);
     assert.equal(Number(riwayat[0].mkgTahunBaru), 0);
+
+    // UPT dikabari saat laporan SK-nya diterapkan (ADR-074): laporan SK berangkat tanpa surat, jadi tidak ada kabar lain.
+    const kabar = await db.notifikasi.findMany({ where: { tipe: "usulan_disetujui" } });
+    assert.equal(kabar.length, 1);
+    assert.equal(kabar[0].referenceId, "u1");
+    assert.equal(kabar[0].dibaca, false);
+    assert.match(kabar[0].pesan, /Penyesuaian Ijazah/);
   });
 });
 
@@ -248,5 +255,7 @@ test("pegawai baru yang melaporkan SK penyesuaian ijazah: masa kerja dihitung mu
     // Golongan sebelum SK tidak dilaporkan pada pendataan; penyimpanan membacanya kembali sebagai kosong.
     assert.ok(!riwayat[0].golonganLama);
     assert.match(riwayat[0].keterangan ?? "", /7 tahun 1 bulan pada TMT SK/);
+    // Pegawai baru bukan laporan SK atas pegawai yang ada, jadi tidak memicu kabar disetujui.
+    assert.equal((await db.notifikasi.findMany({ where: { tipe: "usulan_disetujui" } })).length, 0);
   });
 });

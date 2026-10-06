@@ -1171,6 +1171,31 @@ export default async function IsiPanduan({
                     <em>Dari PMK</em>.
                   </p>
                   <p>
+                    <strong>Banyak pegawai naik pangkat atau menerima SK PMK pada periode yang sama?</strong> Tekan{" "}
+                    <strong>Lapor KP/PI/PMK</strong> di bagian atas Pegawai Satker, di samping Usul KGB Kolektif.
+                    Cari dan tambahkan pegawainya; tiap pegawai mendapat satu kartu berisi jenis SK (kenaikan pangkat
+                    atau penyesuaian ijazah, atau PMK), golongan baru atau masa kerja menurut SK, nomor, tanggal, TMT,
+                    pejabat penetap, hasil hitungannya, dan pindaian SK yang masih kurang. Tanggal SK, TMT, dan
+                    penetap yang sama untuk semua pegawai dapat diisi sekali di atas; isian itu hanya dipakai bila
+                    kolom di kartunya kosong dan <strong>tidak pernah menimpa isian kartu</strong>. Tombol{" "}
+                    <strong>Simpan semua sebagai draf</strong> menyimpan seluruhnya tanpa mengirim;{" "}
+                    <strong>Kirim ke Kanwil</strong> mengirim kartu yang sudah lengkap. Kartu yang belum lengkap atau
+                    gagal tidak menghentikan kartu lain dan tidak kehilangan isiannya. Pegawai yang usulannya sedang
+                    ditinjau Kanwil tidak dapat ditambahkan, dan pegawai yang sudah punya draf dilanjutkan dari
+                    drafnya, bukan dibuatkan draf kedua. Menutup halaman dengan isian yang belum disimpan
+                    ditanyakan dulu.
+                  </p>
+                  <p>
+                    <strong>Peringatan dampak ke KGB.</strong> Laporan SK mengubah golongan atau masa kerja, jadi bila
+                    KGB pegawai itu <em>sedang diproses</em> Kanwil, kartunya memberi tahu bahwa hitungannya akan
+                    diperbarui dan SK yang sudah dibuat perlu dibuat ulang oleh Tim SDM. Bila SK KGB-nya{" "}
+                    <em>sudah ditandatangani dan diunggah</em>, kartunya memberi tahu bahwa laporan baru dapat
+                    diterapkan setelah Tim SDM membatalkan KGB itu; hubungi Tim SDM lebih dulu agar laporannya tidak
+                    tertahan. Peringatan ini tidak menghalangi Anda menyimpan atau mengirim. Setelah Kanwil menyetujui
+                    laporan, muncul notifikasi <strong>Laporan SK Disetujui</strong> di menu Notifikasi, sehingga
+                    Anda tahu laporan itu sudah diterapkan tanpa membuka daftar satu per satu.
+                  </p>
+                  <p>
                     Untuk baris yang <strong>seharusnya tidak pernah tercatat</strong>, yaitu entri ganda, NIP salah
                     ketik, atau orang yang tidak pernah bertugas di satker Anda; pakai tautan{" "}
                     <strong>Seharusnya tidak tercatat?</strong> di bawah tombol Laporkan mutasi. Isinya alasan dan
@@ -1739,7 +1764,8 @@ export default async function IsiPanduan({
                     perlu ditinjau ulang, serta usulan data dan laporan mutasi dari UPT. Tim SDM Hukdis menerima laporan
                     hukuman disiplin dari UPT dan hukuman disiplin yang segera berakhir. Keuangan Kanwil menerima SK KGB
                     menunggu konfirmasi dan KGB yang perlu ditinjau ulang. Admin UPT menerima pengingat jatuh tempo dan
-                    rapelan, SK terbit, serta usulan dan laporan yang dikembalikan, hanya untuk satkernya, dan tidak
+                    rapelan, SK terbit, laporan SK kenaikan pangkat atau PMK yang disetujui, serta usulan dan laporan
+                    yang dikembalikan, hanya untuk satkernya, dan tidak
                     dapat menandainya dibaca. Super Admin menerima semuanya. Tanda sudah dibaca pada satu notifikasi
                     berlaku untuk semua pengguna.
                   </li>
