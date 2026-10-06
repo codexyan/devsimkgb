@@ -295,3 +295,114 @@ export function ModalUnggahSkRiwayat({
     </KerangkaModal>
   );
 }
+
+/** Ringkasan satu riwayat untuk jendela hapus duplikat. */
+export interface RingkasRiwayat {
+  jenisLabel: string;
+  nomorSK: string;
+  tanggalSK: string | null;
+  penetapSK: string | null;
+}
+
+/**
+ * Hapus satu riwayat yang tercatat dua kali (ADR-069). Riwayat yang tersisa mencatat SK dan kenaikan yang sama, jadi
+ * golongan, masa kerja, gaji pokok, dan KGB tidak berubah. Kedua riwayat ditampilkan berdampingan supaya yang dihapus
+ * adalah yang data SK-nya keliru.
+ */
+export function ModalHapusRiwayatKembar({
+  pegawaiId,
+  jenis,
+  riwayatId,
+  dihapus,
+  tersisa,
+  onTutup,
+  onSelesai,
+}: {
+  pegawaiId: string;
+  jenis: "kp" | "pmk";
+  riwayatId: string;
+  dihapus: RingkasRiwayat;
+  tersisa: RingkasRiwayat;
+  onTutup: () => void;
+  onSelesai: (pesan: string) => void;
+}) {
+  const [sibuk, setSibuk] = useState(false);
+  const [galat, setGalat] = useState<string | null>(null);
+  const label = jenis === "kp" ? "kenaikan pangkat" : "PMK";
+
+  async function hapus() {
+    setSibuk(true);
+    setGalat(null);
+    try {
+      const res = await fetch(
+        `/api/pegawai/${encodeURIComponent(pegawaiId)}/${jenis === "kp" ? "pangkat" : "pmk"}?riwayatId=${encodeURIComponent(riwayatId)}`,
+        { method: "DELETE" },
+      );
+      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(d.error ?? "Riwayat gagal dihapus.");
+      onSelesai(`Riwayat ${label} kembar dihapus. SK ${tersisa.nomorSK} kini tercatat sekali, dengan data yang tersisa.`);
+    } catch (e) {
+      setGalat(e instanceof Error ? e.message : "Riwayat gagal dihapus.");
+    } finally {
+      setSibuk(false);
+    }
+  }
+
+  const isi = (r: RingkasRiwayat) => (
+    <dl className="kgbm-item-data">
+      <div>
+        <dt>Jenis</dt>
+        <dd>{r.jenisLabel}</dd>
+      </div>
+      <div>
+        <dt>Nomor</dt>
+        <dd>{r.nomorSK}</dd>
+      </div>
+      <div>
+        <dt>Tanggal</dt>
+        <dd>{r.tanggalSK ? formatTanggalId(r.tanggalSK) : "-"}</dd>
+      </div>
+      <div>
+        <dt>Oleh</dt>
+        <dd>{r.penetapSK ?? "belum tercatat"}</dd>
+      </div>
+    </dl>
+  );
+
+  return (
+    <KerangkaModal
+      judul={`Hapus riwayat ${label} kembar`}
+      subjudul={`SK ${dihapus.nomorSK} tercatat dua kali`}
+      ukuran="md"
+      nada="merah"
+      sibuk={sibuk}
+      onTutup={onTutup}
+      onKirim={() => void hapus()}
+      kaki={
+        <>
+          <button type="button" className="kgbm-tombol kgbm-kedua" onClick={onTutup} disabled={sibuk} data-autofocus>
+            Batal
+          </button>
+          <button type="submit" className="kgbm-tombol kgbm-bahaya" disabled={sibuk}>
+            {sibuk ? "Menghapus…" : "Hapus riwayat ini"}
+          </button>
+        </>
+      }
+    >
+      <PesanGalat pesan={galat} />
+      <Catatan>
+        SK dan kenaikan yang sama tercatat dua kali, sehingga linimasa SK menampilkannya dua kali. Menghapus salah satunya
+        tidak mengubah golongan, masa kerja, gaji pokok, maupun KGB. Hapus yang data SK-nya keliru; bila keduanya sama-sama
+        perlu dibetulkan, betulkan yang tersisa lewat Ubah data SK sesudahnya.
+      </Catatan>
+      <p className="kgbm-legenda">
+        <strong>Dihapus</strong>
+      </p>
+      {isi(dihapus)}
+      <p className="kgbm-legenda">
+        <strong>Tetap tercatat</strong>
+      </p>
+      {isi(tersisa)}
+    </KerangkaModal>
+  );
+}

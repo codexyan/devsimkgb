@@ -6,7 +6,7 @@ import { db } from "./db";
 import { auth } from "@/auth";
 import { canEditPegawai } from "./auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "./auth/penggunaLogin";
-import { ubahSkRiwayat } from "./ubahSkRiwayat";
+import { hapusRiwayatKembar, ubahSkRiwayat } from "./ubahSkRiwayat";
 import { tanggalKalender } from "./waktu";
 
 export async function tanganiUbahSkRiwayat(
@@ -48,6 +48,27 @@ export async function tanganiUbahSkRiwayat(
     userId: pengguna.id,
     oleh: pengguna.nama,
   });
+  if (!hasil.ok) return NextResponse.json({ error: hasil.pesan }, { status: hasil.status });
+  return NextResponse.json(hasil);
+}
+
+/** DELETE ?riwayatId=: hapus satu riwayat yang tercatat dua kali (ADR-069). */
+export async function tanganiHapusRiwayatKembar(
+  req: Request,
+  params: Promise<{ id: string }>,
+  jenis: "kp" | "pmk",
+): Promise<NextResponse> {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canEditPegawai(session.user.role ?? "")) return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+  const pengguna = await penggunaLogin(session);
+  if (!pengguna) return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
+  const riwayatId = new URL(req.url).searchParams.get("riwayatId")?.trim() ?? "";
+  if (!riwayatId) return NextResponse.json({ error: "Riwayat tidak dipilih" }, { status: 400 });
+  const { id } = await params;
+  const pegawai = await db.pegawai.findUnique({ id });
+  if (!pegawai) return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
+  const hasil = await hapusRiwayatKembar({ jenis, pegawai, riwayatId, userId: pengguna.id });
   if (!hasil.ok) return NextResponse.json({ error: hasil.pesan }, { status: hasil.status });
   return NextResponse.json(hasil);
 }

@@ -123,3 +123,71 @@ test("ubahSkRiwayat: riwayat, KGB yang sedang diproses, dan SK dasar pegawai iku
     assert.ok(sama.ok && !sama.berubah);
   });
 });
+
+test("riwayat kembar: nomor, TMT, dan golongan baru sama; nomor sama saja belum kembar", async () => {
+  const { riwayatKembar } = await import("./riwayatKembar");
+  const a = { id: "a", nomorSK: "SEK-1986.SA.04.05 TAHUN 2026", tmt: tgl(2026, 2), golonganBaru: "III/a" };
+  assert.equal(riwayatKembar(a, { ...a, id: "b", nomorSK: "sek-1986.sa.04.05 tahun 2026" }), true);
+  assert.equal(riwayatKembar(a, { ...a, id: "b", golonganBaru: "III/b" }), false);
+  assert.equal(riwayatKembar(a, { ...a, id: "b", tmt: tgl(2026, 3) }), false);
+  assert.equal(riwayatKembar(a, { ...a }), false);
+  assert.equal(riwayatKembar({ ...a, nomorSK: "" }, { ...a, id: "b", nomorSK: "" }), false);
+});
+
+test("riwayat kembar (ADR-069): data SK tetap dapat dibetulkan, salah satunya dapat dihapus, dan pencatatan ulang ditolak", async () => {
+  await denganDataLokal(async () => {
+    const { db } = await import("./db");
+    const { ubahSkRiwayat, hapusRiwayatKembar } = await import("./ubahSkRiwayat");
+    const { catatKenaikanPangkat } = await import("./catatDasarGaji");
+    const pegawai = {
+      id: "p2", nip: "199212082017121099", nama: "PEGAWAI KEMBAR", tempatLahir: null, tanggalLahir: null,
+      jenisKelamin: null, pendidikanTerakhir: null, jabatan: "Pengadministrasi Perkantoran", pangkat: "Penata Muda",
+      golonganRuang: "III/a", unitKerja: "Kantor Wilayah", eselon: null, jenisJabatan: null,
+      tmtGolongan: tgl(2026, 2), mkgTahun: 2, mkgBulan: 0, gajiPokok: 2873500,
+      tmtKgbTerakhir: tgl(2026, 12), tmtKgbBerikutnya: tgl(2028, 12), statusHukdis: false,
+      tanggalHukdisBerakhir: null, jenisHukdis: null, keteranganHukdis: null, aktif: true,
+      createdAt: new Date(), updatedAt: new Date(), konfirmasiUptTmt: null, konfirmasiUptAt: null,
+      konfirmasiUptOleh: null, satkerTugas: null, berhentiTmt: null, berhentiAlasan: null,
+      nomorSkDasar: null, tanggalSkDasar: null, penetapSkDasar: null,
+    };
+    await db.pegawai.create(pegawai);
+    const riwayat = (id: string, jenisKp: string, penetapSK: string) => ({
+      id, pegawaiId: "p2", jenisKp, nomorSK: "SEK-1986.SA.04.05 TAHUN 2026", tanggalSK: tgl(2026, 1, 29),
+      tmtPangkat: tgl(2026, 2), golonganLama: "II/b", golonganBaru: "III/a", mkgTahunLama: 7, mkgBulanLama: 0,
+      mkgTahunBaru: 2, mkgBulanBaru: 0, gajiPokokLama: 2537600, gajiPokokBaru: 2873500, keterangan: null,
+      createdAt: new Date(), createdBy: "u1", penetapSK,
+    });
+    await db.riwayatPangkat.create(riwayat("a", "reguler", "Menteri Imigrasi dan Pemasyarakatan"));
+    await db.riwayatPangkat.create(riwayat("b", "penyesuaian_ijazah", "Sekretaris Jenderal Kementerian Imigrasi dan Pemasyarakatan"));
+
+    // Penetap pada riwayat kembar tetap dapat dibetulkan (sebelumnya selalu ditolak 409).
+    const penetap = await ubahSkRiwayat({
+      jenis: "kp", pegawai: pegawai as never, riwayatId: "b", userId: "u1", oleh: "Penguji",
+      isian: { nomorSK: "SEK-1986.SA.04.05 TAHUN 2026", tanggalSK: tgl(2026, 1, 29), penetapSK: "Presiden Republik Indonesia", jenisKp: "penyesuaian_ijazah" },
+    });
+    assert.ok(penetap.ok && penetap.berubah, JSON.stringify(penetap));
+    // Mengganti nomornya menunggu duplikatnya dihapus.
+    const nomor = await ubahSkRiwayat({
+      jenis: "kp", pegawai: pegawai as never, riwayatId: "b", userId: "u1", oleh: "Penguji",
+      isian: { nomorSK: "SEK-1986.SA.04.06 TAHUN 2026", tanggalSK: tgl(2026, 1, 29), penetapSK: null, jenisKp: "penyesuaian_ijazah" },
+    });
+    assert.ok(!nomor.ok && nomor.status === 409 && /dua kali/.test(nomor.pesan));
+
+    // Hapus salah satu; yang tersisa tidak lagi punya kembaran.
+    const hapus = await hapusRiwayatKembar({ jenis: "kp", pegawai: pegawai as never, riwayatId: "a", userId: "u1" });
+    assert.ok(hapus.ok, JSON.stringify(hapus));
+    const sisa = await db.riwayatPangkat.findMany({ where: { pegawaiId: "p2" } });
+    assert.deepEqual(sisa.map((r) => r.id), ["b"]);
+    const lagi = await hapusRiwayatKembar({ jenis: "kp", pegawai: pegawai as never, riwayatId: "b", userId: "u1" });
+    assert.ok(!lagi.ok && lagi.status === 409);
+    // Data pegawai tidak berubah.
+    assert.equal((await db.pegawai.findUnique({ id: "p2" }))?.golonganRuang, "III/a");
+
+    // SK yang sama tidak dapat dicatat lagi.
+    const ulang = await catatKenaikanPangkat({
+      pegawai: { ...pegawai, golonganRuang: "II/b", mkgTahun: 7 } as never, jenisKp: "reguler", golonganBaru: "III/a",
+      nomorSK: "sek-1986.sa.04.05 tahun 2026", tanggalSK: tgl(2026, 1, 29), tmtPangkat: tgl(2026, 2), userId: "u1",
+    });
+    assert.ok(!ulang.ok && ulang.status === 409);
+  });
+});

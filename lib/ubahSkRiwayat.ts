@@ -20,6 +20,7 @@ import { kunciNomorSk } from "./nomorSurat";
 import { suratSudahDibuat, type SuratKgbTersimpan } from "./prosesKgb";
 import { daftarDokumenArsip, salinObjekKeArsip, ubahDaftarDokumenArsip } from "./dokumenPegawaiServer";
 import { namaAsliBerkas } from "./usulanPegawai";
+import { cariKembar } from "./riwayatKembar";
 import { formatTanggalId, isoTanggalLokal, tanggalKalender, type NilaiTanggal } from "./waktu";
 import type { PegawaiRow, RiwayatKGBRow, RiwayatPangkatRow, RiwayatPmkRow, UsulanPegawaiRow } from "./sheets/tables";
 
@@ -120,8 +121,18 @@ export async function ubahSkRiwayat(input: {
   ) as (RiwayatPangkatRow | RiwayatPmkRow)[];
   const riwayat = semua.find((r) => r.id === input.riwayatId);
   if (!riwayat) return { ok: false, status: 404, pesan: "Riwayat tidak ditemukan" };
-  // Nomor yang sama pada riwayat lain membuat pindaian dan Atas dasarnya tidak dapat dibedakan.
-  const kembar = semua.find((r) => r.id !== riwayat.id && kunciNomorSk(r.nomorSK) === kunciNomorSk(nomorSK));
+  // Nomor yang sama pada riwayat lain membuat pindaian dan Atas dasarnya tidak dapat dibedakan. Riwayat yang sudah
+  // telanjur kembar (ADR-069) tetap boleh dibetulkan penetap, tanggal, dan jenisnya; nomornya baru boleh diganti
+  // setelah duplikatnya dihapus, supaya KGB dan pindaian yang menunjuk nomor itu tidak terbelah.
+  const nomorBerubah = kunciNomorSk(nomorSK) !== kunciNomorSk(riwayat.nomorSK);
+  const senomor = semua.some((r) => r.id !== riwayat.id && kunciNomorSk(r.nomorSK) === kunciNomorSk(riwayat.nomorSK));
+  if (nomorBerubah && senomor)
+    return {
+      ok: false,
+      status: 409,
+      pesan: `${label} ${riwayat.nomorSK} tercatat dua kali pada pegawai ini. Hapus duplikatnya lebih dulu, baru ganti nomornya.`,
+    };
+  const kembar = nomorBerubah && semua.find((r) => r.id !== riwayat.id && kunciNomorSk(r.nomorSK) === kunciNomorSk(nomorSK));
   if (kembar)
     return { ok: false, status: 409, pesan: `Nomor ${nomorSK} sudah dipakai riwayat ${label} lain pegawai ini. Periksa kembali nomornya.` };
 
@@ -217,4 +228,59 @@ export async function ubahSkRiwayat(input: {
     detail: selaras.length > 0 ? `${ringkas}. ${selaras.join(". ")}.` : `${ringkas}.`,
   });
   return { ok: true, berubah: true, ringkas, selaras };
+}
+
+export type HasilHapusRiwayatKembar = { ok: true; ringkas: string } | { ok: false; status: number; pesan: string };
+
+/**
+ * Hapus satu riwayat kenaikan pangkat atau PMK yang tercatat dua kali (ADR-069). Hanya bila ada riwayat lain yang
+ * kembar dengannya (lib/riwayatKembar.ts): data pegawai, KGB, dan pindaian tidak berubah, sebab riwayat yang tersisa
+ * mencatat SK dan kenaikan yang sama.
+ */
+export async function hapusRiwayatKembar(input: {
+  jenis: "kp" | "pmk";
+  pegawai: PegawaiRow;
+  riwayatId: string;
+  userId: string;
+}): Promise<HasilHapusRiwayatKembar> {
+  const { jenis, pegawai } = input;
+  const label = jenis === "kp" ? "kenaikan pangkat" : "PMK";
+  const semua = (
+    jenis === "kp"
+      ? await db.riwayatPangkat.findMany({ where: { pegawaiId: pegawai.id } })
+      : await db.riwayatPmk.findMany({ where: { pegawaiId: pegawai.id } })
+  ) as (RiwayatPangkatRow | RiwayatPmkRow)[];
+  const ringkas = (r: RiwayatPangkatRow | RiwayatPmkRow) => ({
+    id: r.id,
+    nomorSK: r.nomorSK,
+    tmt: jenis === "kp" ? (r as RiwayatPangkatRow).tmtPangkat : (r as RiwayatPmkRow).tmtPmk,
+    golonganBaru: jenis === "kp" ? (r as RiwayatPangkatRow).golonganBaru : null,
+  });
+  const riwayat = semua.find((r) => r.id === input.riwayatId);
+  if (!riwayat) return { ok: false, status: 404, pesan: "Riwayat tidak ditemukan" };
+  const sisa = cariKembar(ringkas(riwayat), semua.map(ringkas));
+  if (!sisa)
+    return {
+      ok: false,
+      status: 409,
+      pesan:
+        `Riwayat ${label} ini tidak punya kembaran, jadi tidak dapat dihapus dari sini: golongan, masa kerja, dan gaji ` +
+        "pokok pegawai sudah dihitung darinya.",
+    };
+
+  if (jenis === "kp") await db.riwayatPangkat.delete({ id: riwayat.id });
+  else await db.riwayatPmk.delete({ id: riwayat.id });
+
+  const jenisKp = jenis === "kp" ? (riwayat as RiwayatPangkatRow).jenisKp : "";
+  const keterangan = [
+    jenis === "kp" && isJenisKp(jenisKp) ? JENIS_KP[jenisKp] : null,
+    riwayat.penetapSK ? `ditetapkan ${riwayat.penetapSK}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const teks =
+    `Hapus riwayat ${label} kembar ${pegawai.nama} (${pegawai.nip}): SK ${riwayat.nomorSK}` +
+    `${keterangan ? ` (${keterangan})` : ""}; riwayat yang sama tetap tercatat sekali`;
+  logAudit({ userId: input.userId, aksi: jenis === "kp" ? "hapus_riwayat_kp_kembar" : "hapus_riwayat_pmk_kembar", targetNama: pegawai.nama, detail: teks });
+  return { ok: true, ringkas: teks };
 }

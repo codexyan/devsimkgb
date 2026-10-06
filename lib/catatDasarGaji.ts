@@ -19,6 +19,7 @@ import { hitungPmk } from "./pmk";
 import { rencanaSiklusBerikutnya } from "./jadwalKgb";
 import { isoTanggalKalender } from "./rekapKgb";
 import { formatTanggalId, tanggalKalender } from "./waktu";
+import { kunciNomorSk } from "./nomorSurat";
 import type { PegawaiRow, RiwayatKGBRow, RiwayatPangkatRow, RiwayatPmkRow } from "./sheets/tables";
 
 export interface GagalCatat {
@@ -88,6 +89,15 @@ export async function catatKenaikanPangkat(input: {
 
   if (!isJenisKp(jenisKp)) return { ok: false, status: 400, pesan: "Jenis kenaikan pangkat tidak dikenal" };
   if (!nomorSK.trim()) return { ok: false, status: 400, pesan: "Nomor SK kenaikan pangkat wajib diisi" };
+  // Satu SK hanya menaikkan pangkat sekali; SK yang sama dicatat dua kali membuat linimasa dan pindaiannya kembar
+  // (ADR-069). Data SK-nya dibetulkan lewat Ubah data SK, bukan dicatat ulang.
+  const tercatat = (await db.riwayatPangkat.findMany({ where: { pegawaiId: pegawai.id } })) as RiwayatPangkatRow[];
+  if (tercatat.some((r) => kunciNomorSk(r.nomorSK) === kunciNomorSk(nomorSK)))
+    return {
+      ok: false,
+      status: 409,
+      pesan: `SK kenaikan pangkat ${nomorSK.trim()} sudah tercatat pada riwayat pegawai ini. Bila data SK-nya keliru, betulkan lewat Ubah data SK di tab Pangkat & PMK.`,
+    };
 
   const hitung = hitungKenaikanPangkat({
     golonganLama: pegawai.golonganRuang,
@@ -217,6 +227,14 @@ export async function catatPmk(input: {
   const keterangan = input.keterangan?.trim() || null;
 
   if (!nomorSK.trim()) return { ok: false, status: 400, pesan: "Nomor SK PMK wajib diisi" };
+  // Satu SK PMK hanya dicatat sekali (ADR-069).
+  const tercatat = (await db.riwayatPmk.findMany({ where: { pegawaiId: pegawai.id } })) as RiwayatPmkRow[];
+  if (tercatat.some((r) => kunciNomorSk(r.nomorSK) === kunciNomorSk(nomorSK)))
+    return {
+      ok: false,
+      status: 409,
+      pesan: `SK PMK ${nomorSK.trim()} sudah tercatat pada riwayat pegawai ini. Bila data SK-nya keliru, betulkan lewat Ubah data SK di tab Pangkat & PMK.`,
+    };
   if (Number.isNaN(mkgTahunSk)) return { ok: false, status: 400, pesan: "Masa kerja golongan pada SK PMK wajib diisi" };
 
   const hitung = hitungPmk({
