@@ -36,6 +36,35 @@ export async function simpanDokumenArsip(pegawaiId: string, dokumen: DokumenArsi
   await tulisDaftar(pegawaiId, [dokumen, ...daftar.filter((d) => d.id !== dokumen.id)]);
 }
 
+/**
+ * Ubah catatan dokumen arsip tanpa menyentuh berkasnya, mis. nomor SK yang dibetulkan pada riwayatnya (ADR-068).
+ * `ubah` mengembalikan catatan baru, atau null bila dokumen itu tidak diubah. Mengembalikan jumlah yang diubah.
+ */
+export async function ubahDaftarDokumenArsip(
+  pegawaiId: string,
+  ubah: (dokumen: DokumenArsip) => DokumenArsip | null,
+): Promise<number> {
+  const daftar = await daftarDokumenArsip(pegawaiId);
+  let jumlah = 0;
+  const baru = daftar.map((d) => {
+    const hasil = ubah(d);
+    if (!hasil) return d;
+    jumlah++;
+    return hasil;
+  });
+  if (jumlah > 0) await tulisDaftar(pegawaiId, baru);
+  return jumlah;
+}
+
+/** Salin satu objek R2 (mis. berkas usulan UPT) ke arsip dokumen pegawai; false bila objek asalnya tidak terbaca. */
+export async function salinObjekKeArsip(pegawaiId: string, kunciAsal: string, dokumen: DokumenArsip): Promise<boolean> {
+  const obj = await (await bucket()).get(kunciAsal).catch(() => null);
+  if (!obj) return false;
+  const isi = await obj.arrayBuffer();
+  await simpanDokumenArsip(pegawaiId, { ...dokumen, ukuran: dokumen.ukuran || isi.byteLength }, isi);
+  return true;
+}
+
 /** Hapus satu dokumen arsip; mengembalikan dokumen yang dihapus, atau null bila tidak ada. */
 export async function hapusDokumenArsip(pegawaiId: string, id: string): Promise<DokumenArsip | null> {
   const daftar = await daftarDokumenArsip(pegawaiId);
