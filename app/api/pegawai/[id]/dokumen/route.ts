@@ -32,6 +32,20 @@ export const runtime = "nodejs";
 
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : "");
 
+/**
+ * Nomor dan tanggal yang diketik UPT untuk satu berkas usulan, supaya berkasnya dapat dicocokkan dengan SK di
+ * linimasa (ADR-066). Pindaian SK kenaikan pangkat dan PMK bernomor SK yang dilaporkan; SK KGB terakhir dan SK CPNS
+ * bernomor SK acuan. "SK kenaikan pangkat terakhir" tanpa laporan kenaikan pangkat tidak bernomor, sebab berkas itu
+ * bisa saja SK lama yang terbawa dari usulan sebelumnya.
+ */
+function nomorBerkasUsulan(u: UsulanPegawaiRow, medan: string): { nomor: string; tanggal: string } {
+  if (medan === "berkas") return { nomor: u.nomorSurat ?? "", tanggal: iso(u.tanggalSurat) };
+  if ((medan === "skPangkat" && u.dasarBaruJenis === "kp") || (medan === "skPmk" && u.dasarBaruJenis === "pmk"))
+    return { nomor: u.dasarBaruNomorSk ?? "", tanggal: iso(u.dasarBaruTanggalSk) };
+  if (medan === "skTerakhir" || medan === "skCpns") return { nomor: u.nomorSkTerakhir ?? "", tanggal: iso(u.tanggalSkTerakhir) };
+  return { nomor: "", tanggal: "" };
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -88,17 +102,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     for (const b of BERKAS_USULAN) {
       const path = (u as unknown as Record<string, string | null>)[b.kunci];
       if (!path) continue;
+      const sk = nomorBerkasUsulan(u, b.medan);
       hasil.push({
         id: `usulan-${u.id}-${b.medan}`,
         sumber: "usulan",
         judul: b.label,
-        nomorSK: b.medan === "berkas" ? (u.nomorSurat ?? "") : "",
-        tanggal: b.medan === "berkas" ? iso(u.tanggalSurat) : "",
+        nomorSK: sk.nomor,
+        tanggal: sk.tanggal,
         keterangan: `Usulan ${u.jenis === "baru" ? "pegawai baru" : "perubahan data"} · ${u.status}`,
         ukuran: null,
         url: `/api/usulan/${encodeURIComponent(u.id)}/berkas?berkas=${b.medan}`,
         bisaHapus: false,
         jenis: JENIS_BERKAS_USULAN[b.medan],
+        status: u.status,
       });
     }
   }

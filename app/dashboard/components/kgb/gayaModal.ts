@@ -192,6 +192,15 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
 /* Linimasa SK penetap gaji pokok (ADR-062): garis tegak dengan titik per SK. SK yang menjadi dasar KGB ini bertitik dan
    berbingkai navy, KGB yang sedang dibuat bertitik hijau putus-putus, SK yang tergantikan atau berlaku sesudahnya pudar. */
 .kgbm-linimasa { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+/* Ringkasan Atas dasar di atas linimasa, tombol dokumen tiap SK, dan kelompok SK tanpa TMT (ADR-066). */
+.kgbm-linimasa-ringkas { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--navy-solid);
+  background: var(--tint-navy); }
+.kgbm-linimasa-ringkas > span:first-child { font-size: 11px; color: var(--dt5); }
+.kgbm-linimasa-ringkas strong { font-size: 13px; font-weight: 650; color: var(--dtn); overflow-wrap: anywhere; }
+.kgbm-linimasa-ringkas > span:nth-child(3) { font-size: 12px; color: var(--dt4); }
+.kgbm-linimasa-ringkas .kgbm-linimasa-dok { margin-top: 6px; }
+.kgbm-linimasa-dok { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 11.5px; color: var(--dt5); }
+.kgbm-linimasa-kelompok { margin: 6px 0 0; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--dt5); }
 .kgbm-linimasa > li { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; padding-bottom: 10px; }
 .kgbm-linimasa > li::before { content: ""; position: absolute; left: 7px; top: 18px; bottom: 0; width: 2px; background: var(--ln1); }
 .kgbm-linimasa > li:last-child { padding-bottom: 0; }
