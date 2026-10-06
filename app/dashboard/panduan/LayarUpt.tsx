@@ -261,10 +261,11 @@ export function LayarDataPegawai() {
       judul="Pegawai dan KGB"
       keterangan={[
         "Usul KGB Kolektif: menyiapkan banyak pegawai untuk satu surat. Ini jalur yang Anda pakai setiap periode.",
+        "Lapor KP/PI/PMK: melaporkan SK kenaikan pangkat, penyesuaian ijazah, atau PMK untuk satu atau banyak pegawai sekaligus, tanpa surat usulan. Dipakai untuk meremajakan data sesudah SK-nya terbit.",
         "Unggah daftar: satu berkas Excel (.xlsx) atau CSV berisi banyak pegawai sekaligus. Dipakai saat mengisi data pertama kali atau meremajakan banyak data.",
         "Tambah pegawai: untuk satu orang yang belum tercatat, misalnya CPNS yang baru dilantik.",
         "Usulkan perbaikan: membetulkan data satu pegawai yang sudah tercatat, termasuk NIP yang salah ketik.",
-        "Titik tiga: tindakan lain untuk pegawai itu, yaitu Laporkan kenaikan pangkat, Laporkan peninjauan masa kerja, Laporkan mutasi, dan Seharusnya tidak tercatat? untuk baris yang keliru sejak awal.",
+        "Titik tiga: tindakan lain untuk pegawai itu, yaitu Laporkan kenaikan pangkat dan Laporkan peninjauan masa kerja (untuk satu pegawai), Laporkan mutasi, dan Seharusnya tidak tercatat? untuk baris yang keliru sejak awal.",
       ]}
       anak={
         <>
@@ -281,12 +282,16 @@ export function LayarDataPegawai() {
                 <No n={1} />
               </span>
               <span className="lyr-sorot-bungkus">
-                <Tombol jenis="garis" anak="Unggah daftar" />
+                <Tombol jenis="garis" anak="Lapor KP/PI/PMK" />
                 <No n={2} />
               </span>
               <span className="lyr-sorot-bungkus">
-                <Tombol anak="Tambah pegawai" />
+                <Tombol jenis="garis" anak="Unggah daftar" />
                 <No n={3} />
+              </span>
+              <span className="lyr-sorot-bungkus">
+                <Tombol anak="Tambah pegawai" />
+                <No n={4} />
               </span>
             </span>
           </div>
@@ -297,11 +302,11 @@ export function LayarDataPegawai() {
             </span>
             <span className="lyr-sorot-bungkus">
               <Tombol jenis="garis" anak="Usulkan perbaikan" />
-              <No n={4} />
+              <No n={5} />
             </span>
             <span className="lyr-sorot-bungkus">
               <Tombol jenis="garis" anak="⋮" />
-              <No n={5} />
+              <No n={6} />
             </span>
           </div>
         </>

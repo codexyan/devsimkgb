@@ -4,7 +4,14 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bolehTampilPengumuman, kunciPengumumanUpt, sedangMengetik, type KeadaanPengumuman } from "./pengumumanUpt";
+import {
+  PENGUMUMAN_UPT,
+  bolehTampilPengumuman,
+  kunciPengumumanUpt,
+  pengumumanBelumDilihat,
+  sedangMengetik,
+  type KeadaanPengumuman,
+} from "./pengumumanUpt";
 
 const siap: KeadaanPengumuman = { peran: "admin_upt", jalur: "/dashboard", adaDialog: false, sedangMengetik: false, sudahDilihat: false };
 
@@ -48,4 +55,17 @@ test("kolom yang sedang diketik dikenali, termasuk isian bebas", () => {
 test("penanda dilihat dicatat per pengguna dan per pengumuman", () => {
   assert.notEqual(kunciPengumumanUpt("199505052019051005"), kunciPengumumanUpt("199001012015031001"));
   assert.match(kunciPengumumanUpt("199505052019051005"), /^kgb-pengumuman-upt:nama-menu-2026-10:/);
+  assert.notEqual(kunciPengumumanUpt("199505052019051005", "lapor-sk-2026-10"), kunciPengumumanUpt("199505052019051005"));
+  assert.equal(
+    kunciPengumumanUpt("199505052019051005", "nama-menu-2026-10"),
+    "kgb-pengumuman-upt:nama-menu-2026-10:199505052019051005",
+    "kunci pengumuman pertama tidak boleh berubah: yang sudah melihatnya tidak boleh melihatnya lagi",
+  );
+});
+
+test("pengumuman yang belum dilihat dihitung per pengumuman, menurut urutan terbit", () => {
+  assert.deepEqual(pengumumanBelumDilihat(() => false), [...PENGUMUMAN_UPT]);
+  // Yang sudah melihat pengumuman nama menu hanya mendapat pengumuman lapor SK.
+  assert.deepEqual(pengumumanBelumDilihat((id) => id === "nama-menu-2026-10"), ["lapor-sk-2026-10"]);
+  assert.deepEqual(pengumumanBelumDilihat(() => true), []);
 });

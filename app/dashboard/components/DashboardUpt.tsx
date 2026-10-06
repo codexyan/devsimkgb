@@ -411,7 +411,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   function bukaDasarBaru(p: PegawaiUpt, jenis: "kp" | "pmk") {
     setDasarBaru({
       jenis,
-      pegawai: { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan },
+      pegawai: { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan, kgb: { status: p.statusKGB, tmt: p.tmtKgb } },
       draf: drafPegawai(p.id),
     });
   }
@@ -714,6 +714,14 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             <span className="upt-deret" style={{ marginLeft: "auto" }}>
               <Link href="/dashboard/upt/kolektif" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" title="Usul KGB banyak pegawai dalam satu surat Srikandi">
                 Usul KGB Kolektif
+              </Link>
+              <Link
+                href="/dashboard/upt/lapor-sk"
+                className="dsb-tombol dsb-tombol-kecil"
+                data-jenis="garis"
+                title="SK kenaikan pangkat, penyesuaian ijazah, atau PMK untuk satu atau banyak pegawai, tanpa surat usulan"
+              >
+                Lapor KP/PI/PMK
               </Link>
               <Link
                 href="/dashboard/upt/unggah"

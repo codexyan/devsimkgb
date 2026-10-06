@@ -9,7 +9,7 @@
 
 import { db } from "./db";
 import { newId } from "./sheets/id";
-import { TIPE_NOTIFIKASI } from "./generateNotifikasi";
+import { TIPE_NOTIFIKASI, notifikasiUsulanDisetujui } from "./generateNotifikasi";
 import { bandingkanUsulan, perubahanPegawai, ringkasHukdisUsulan } from "./usulanPegawai";
 import { getGajiPokok, getPangkat } from "./tabelGaji";
 import { SATKER } from "./satker";
@@ -305,6 +305,26 @@ export async function setujuiUsulan(
   // Usulan yang sudah ditinjau tidak perlu lagi menagih tinjauan; loncengnya ditutup seperti pada
   // pembatalan oleh UPT, supaya daftar notifikasi Kanwil hanya berisi yang benar-benar tersisa.
   await db.notifikasi.deleteMany({ tipe: TIPE_NOTIFIKASI.USULAN_UPT, referenceId: usulan.id });
+  // Laporan SK berangkat tanpa surat, jadi UPT tidak punya cara lain untuk tahu laporannya sudah diterapkan (ADR-074).
+  // Hanya usulan perubahan yang benar-benar mencatat riwayat KP atau PMK yang dikabarkan; perbaikan data biasa dan
+  // pegawai baru tidak.
+  if (dasarBaru && usulan.jenis !== "baru") {
+    try {
+      await db.notifikasi.deleteMany({ tipe: TIPE_NOTIFIKASI.USULAN_DISETUJUI, referenceId: usulan.id });
+      await db.notifikasi.create({
+        ...notifikasiUsulanDisetujui(
+          { id: usulan.id, satker: usulan.satker },
+          { nama: usulan.nama ?? pegawaiLama?.nama ?? null, nip: usulan.nip ?? pegawaiLama?.nip ?? null },
+          { dasarBaru, penyesuaianKgb },
+        ),
+        id: newId(),
+        dibaca: false,
+        createdAt: sekarang,
+      });
+    } catch {
+      // Usulannya sudah disetujui dan tampak di riwayat UPT; loncengnya saja yang tidak jadi.
+    }
+  }
 
   return {
     ok: true,

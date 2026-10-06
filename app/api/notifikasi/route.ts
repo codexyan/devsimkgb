@@ -53,14 +53,15 @@ export async function GET(req: NextRequest) {
       : new Set<string>();
     // Usulan yang dikembalikan menunjuk ke usulannya, bukan ke pegawainya, sebab usulan pegawai baru
     // belum punya pegawai sampai disetujui. Satkernya karena itu dibaca dari baris usulan.
-    const adaUsulanRevisi = all.some((n) => n.tipe === TIPE_NOTIFIKASI.USULAN_REVISI);
+    const menunjukKeUsulan = (tipe: string) => tipe === TIPE_NOTIFIKASI.USULAN_REVISI || tipe === TIPE_NOTIFIKASI.USULAN_DISETUJUI;
+    const adaUsulanRevisi = all.some((n) => menunjukKeUsulan(n.tipe));
     const idUsulan = adaUsulanRevisi
       ? new Set((await db.usulanPegawai.findMany({ where: { satker: kode } })).map((u) => u.id))
       : new Set<string>();
     const milikSatker = all.filter((n) => {
       const ref = n.referenceId ?? "";
       if (n.tipe === "sk_terbit") return idKgb.has(ref);
-      if (n.tipe === TIPE_NOTIFIKASI.USULAN_REVISI) return idUsulan.has(ref);
+      if (menunjukKeUsulan(n.tipe)) return idUsulan.has(ref);
       return idPegawai.has(ref);
     });
     return NextResponse.json(milikSatker.slice(0, limit));

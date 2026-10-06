@@ -26,11 +26,12 @@ interface HasilPeriksa {
 
 /* Server hanya mengirim tipe notifikasi yang boleh dilihat peran pengguna (GET /api/notifikasi),
    jadi daftar saringan disusun dari notifikasi yang benar-benar diterima. */
-type KunciKategori = "tinjau" | "usulan" | "kgb" | "rapelan" | "sk" | "followup" | "hukdis";
+type KunciKategori = "tinjau" | "usulan" | "hasil" | "kgb" | "rapelan" | "sk" | "followup" | "hukdis";
 
 const KATEGORI: { key: KunciKategori; label: string; tipe: readonly string[]; nada: string }[] = [
   { key: "tinjau", label: "Perlu ditinjau", tipe: ["kgb_perlu_ditinjau"], nada: "merah" },
   { key: "usulan", label: "Usulan UPT", tipe: ["usulan_upt"], nada: "kuning" },
+  { key: "hasil", label: "Hasil usulan", tipe: ["usulan_disetujui", "usulan_revisi"], nada: "hijau" },
   { key: "rapelan", label: "KGB terlambat", tipe: ["rapelan"], nada: "merah" },
   { key: "kgb", label: "Jatuh tempo", tipe: ["kgb_jatuh_tempo"], nada: "navy" },
   { key: "sk", label: "SK & keuangan", tipe: ["sk_menunggu_keuangan", "sk_terbit"], nada: "ungu" },
@@ -41,6 +42,8 @@ const KATEGORI: { key: KunciKategori; label: string; tipe: readonly string[]; na
 const NADA_TIPE: Record<string, string> = {
   kgb_perlu_ditinjau: "merah",
   usulan_upt: "kuning",
+  usulan_disetujui: "hijau",
+  usulan_revisi: "kuning",
   rapelan: "merah",
   kgb_jatuh_tempo: "navy",
   sk_menunggu_keuangan: "ungu",
@@ -69,6 +72,8 @@ function IkonTipe({ tipe }: { tipe: string }) {
       return <svg {...umum}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>;
     case "followup_keuangan":
       return <svg {...umum}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>;
+    case "usulan_disetujui":
+      return <svg {...umum}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>;
     case "sk_terbit":
       return <svg {...umum}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><polyline points="9 15 11 17 15 12" /></svg>;
     case "sk_menunggu_keuangan":
@@ -262,7 +267,7 @@ export default function NotifikasiPage() {
                 ? `${belumDibaca.length} belum dibaca dari ${notifikasi.length} notifikasi.`
                 : `${notifikasi.length} notifikasi, semuanya sudah dibaca.`}{" "}
             {lihatSaja
-              ? "Akun UPT menerima pengingat KGB dan kabar SK pegawai satkernya sendiri."
+              ? "Akun UPT menerima pengingat KGB, kabar SK, dan kabar laporan SK yang disetujui untuk pegawai satkernya sendiri."
               : "Status dibaca berlaku untuk semua pengguna yang menerima notifikasi yang sama."}
           </p>
         </div>
@@ -474,6 +479,10 @@ export default function NotifikasiPage() {
                   <li>
                     <strong>SK terbit</strong>
                     <p className="dsb-kecil">Kabar untuk admin UPT bahwa SK pegawai satkernya sudah dikonfirmasi keuangan dan berkasnya dapat diunduh.</p>
+                  </li>
+                  <li>
+                    <strong>Laporan SK disetujui</strong>
+                    <p className="dsb-kecil">Kabar untuk admin UPT bahwa laporan SK kenaikan pangkat, penyesuaian ijazah, atau PMK pegawai satkernya sudah disetujui Kanwil dan diterapkan.</p>
                   </li>
                   <li>
                     <strong>Hukuman disiplin berakhir</strong>

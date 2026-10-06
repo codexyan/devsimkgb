@@ -7,6 +7,7 @@ import { test } from "node:test";
 import { aturBatasInputSdm } from "./batasInputSdm";
 import {
   bolehLihatNotifikasi,
+  notifikasiUsulanDisetujui,
   notifikasiUsulanRevisi,
   rencanaNotifikasi,
   tahapPengingatKgb,
@@ -224,13 +225,17 @@ test("SK yang baru dikonfirmasi keuangan dikabarkan sekali", () => {
 
 test("Admin UPT hanya menerima pengingat KGB, kabar SK terbit, dan yang dikembalikan kepadanya", () => {
   assert.deepEqual(tipeNotifikasiUntukRole("admin_upt"), [
-    "kgb_jatuh_tempo", "rapelan", "sk_terbit", "usulan_revisi", "mutasi_dikembalikan", "hukdis_dikembalikan",
+    "kgb_jatuh_tempo", "rapelan", "sk_terbit", "usulan_revisi", "usulan_disetujui", "mutasi_dikembalikan", "hukdis_dikembalikan",
   ]);
   // Laporan hukdis yang masih menunggu adalah urusan SDM Hukdis Kanwil (ADR-016).
   assert.equal(bolehLihatNotifikasi("admin_upt", "hukdis_upt"), false);
   assert.equal(bolehLihatNotifikasi("sdm_kgb", "hukdis_upt"), false);
   assert.equal(bolehLihatNotifikasi("admin_upt", "sk_terbit"), true);
   assert.equal(bolehLihatNotifikasi("admin_upt", "usulan_revisi"), true);
+  assert.equal(bolehLihatNotifikasi("admin_upt", "usulan_disetujui"), true);
+  // Kabar disetujui hanya untuk pelapornya; Tim SDM yang menyetujui tidak perlu dikabari hasil kerjanya sendiri.
+  assert.equal(bolehLihatNotifikasi("sdm_kgb", "usulan_disetujui"), false);
+  assert.equal(bolehLihatNotifikasi("keuangan", "usulan_disetujui"), false);
   assert.equal(bolehLihatNotifikasi("admin_upt", "mutasi_dikembalikan"), true);
   // Laporan mutasi yang masih menunggu adalah urusan Kanwil, bukan tagihan bagi pelapornya.
   assert.equal(bolehLihatNotifikasi("admin_upt", "mutasi_upt"), false);
@@ -288,6 +293,25 @@ test("usulan data dari UPT diingatkan sekali ke Kanwil", () => {
     usulan: [{ ...usulan[0], status: "disetujui" }],
   });
   assert.equal(sudahDitinjau.baru.filter((n) => n.tipe === "usulan_upt").length, 0);
+});
+
+test("laporan SK yang disetujui dikabarkan ke UPT, menunjuk ke usulannya, dan menyebut hasilnya", () => {
+  const n = notifikasiUsulanDisetujui(
+    { id: "u7", satker: "rutan-rantau" },
+    { nama: "DERA KALISTANINGSIH", nip: "200509182025062002" },
+    { dasarBaru: "Kenaikan pangkat II/b → III/a SK W.19-KP-1", penyesuaianKgb: "KGB 1 Des 2026 dihitung ulang" },
+  );
+  assert.equal(n.tipe, "usulan_disetujui");
+  // Rujukannya id usulan, sama dengan usulan dikembalikan, sebab penyaringan per satker dibaca dari baris usulan.
+  assert.equal(n.referenceId, "u7");
+  assert.match(n.pesan, /DERA KALISTANINGSIH/);
+  assert.match(n.pesan, /Kenaikan pangkat II\/b → III\/a/);
+  assert.match(n.pesan, /dihitung ulang/);
+  assert.equal(n.prioritas, "info");
+  assert.equal(n.linkHref, "/dashboard/upt/pegawai");
+  const tanpaKgb = notifikasiUsulanDisetujui({ id: "u8", satker: null }, null, { dasarBaru: "PMK SK X", penyesuaianKgb: null });
+  assert.doesNotMatch(tanpaKgb.pesan, /undefined|null/);
+  assert.match(tanpaKgb.judul, /-$/);
 });
 
 test("usulan yang dikembalikan menunjuk ke usulannya, dan membawa catatan peninjau", () => {

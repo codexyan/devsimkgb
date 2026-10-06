@@ -9,12 +9,15 @@ import {
   PERISTIWA_BUKA_PENGUMUMAN_UPT,
   bolehTampilPengumuman,
   kunciPengumumanUpt,
+  pengumumanBelumDilihat,
   sedangMengetik,
+  type IdPengumumanUpt,
 } from "@/lib/pengumumanUpt";
 
-/* Pop-up pengumuman perubahan untuk Admin UPT (ADR-073): nama menu baru dan pegawai baru yang kini tampil di tabel
-   Pegawai Satker. Tiga adegan bergerak yang berganti sendiri, dapat dijeda, dilewati, atau dibuka lagi lewat tombol
-   "Apa yang baru".
+/* Pop-up pengumuman perubahan untuk Admin UPT (ADR-073, ADR-074): nama menu baru dan pegawai baru yang kini tampil di
+   tabel Pegawai Satker, lalu tombol Lapor KP/PI/PMK beserta peringatan dan kabar disetujuinya. Adegan bergerak yang
+   berganti sendiri, dapat dijeda, dilewati, atau dibuka lagi lewat tombol "Apa yang baru". Tiap adegan milik satu
+   pengumuman; yang tampil otomatis hanya adegan dari pengumuman yang belum dilihat pengguna itu.
 
    Pengumuman ini tidak boleh menjadi sebab data hilang, maka aturannya ketat (lib/pengumumanUpt.ts): hanya tampil di
    halaman tanpa isian, tidak di atas dialog lain, tidak selagi ada kolom yang sedang diketik, dan tidak menyimpan
@@ -22,20 +25,40 @@ import {
    elemen bergerak menempati keadaan akhirnya bila animasi dimatikan, jadi pilihan "Kurangi animasi" tetap
    menampilkan isi yang utuh tanpa gerak. */
 
-const ADEGAN = [
+type Gambar = "menu" | "tabel" | "aman" | "lapor" | "kabar";
+
+const ADEGAN: readonly { pengumuman: IdPengumumanUpt; gambar: Gambar; judul: string; teks: string }[] = [
   {
+    pengumuman: "nama-menu-2026-10",
+    gambar: "menu",
     judul: "Nama menu kini sesuai fungsinya",
     teks: "Data Pegawai menjadi Pegawai Satker, dan Usulan kolektif menjadi Usul KGB Kolektif. Letak menu dan tautan lama tidak berubah.",
   },
   {
+    pengumuman: "nama-menu-2026-10",
+    gambar: "tabel",
     judul: "Pegawai baru hasil unggahan terlihat di tabel",
     teks: "Pegawai yang masih draf, dikembalikan, atau menunggu Kanwil tampil di Pegawai Satker sebagai baris bertanda, dengan saringan Belum tercatat. Barisnya berpindah sendiri setelah Kanwil menyetujui.",
   },
   {
+    pengumuman: "nama-menu-2026-10",
+    gambar: "aman",
     judul: "Data yang sudah Anda isi tetap aman",
     teks: "Perubahan ini hanya mengganti nama dan tampilan. Draf, usulan, dan berkas yang sudah Anda input tidak berubah dan tidak hilang.",
   },
-] as const;
+  {
+    pengumuman: "lapor-sk-2026-10",
+    gambar: "lapor",
+    judul: "Lapor KP/PI/PMK untuk banyak pegawai sekaligus",
+    teks: "Setelah SK kenaikan pangkat, penyesuaian ijazah, atau PMK terbit, tekan Lapor KP/PI/PMK di Pegawai Satker. Pilih beberapa pegawai, isi SK masing-masing, periksa hitungannya, lalu kirim sekaligus tanpa surat usulan.",
+  },
+  {
+    pengumuman: "lapor-sk-2026-10",
+    gambar: "kabar",
+    judul: "Ada peringatan sebelum kirim, dan kabar saat disetujui",
+    teks: "Bila KGB pegawai sedang diproses Kanwil, Anda diberi tahu dampaknya sebelum mengirim. Setelah Kanwil menyetujui laporan, kabarnya muncul di Notifikasi. Isian Anda tidak pernah ditimpa isian bersama.",
+  },
+];
 
 /** Penanda "sudah dilihat" selama sesi, untuk peramban yang menolak localStorage; per kunci agar tidak lintas akun. */
 const dilihatSesi = new Set<string>();
@@ -66,7 +89,8 @@ export default function PengumumanUpt() {
   const [buka, setBuka] = useState(false);
   const [adegan, setAdegan] = useState(0);
   const [jeda, setJeda] = useState(false);
-  const kunci = kunciPengumumanUpt(nip);
+  // Urutan adegan yang sedang diputar: yang belum dilihat saat tampil sendiri, seluruhnya saat dibuka dari tombol.
+  const [daftar, setDaftar] = useState<number[]>(() => ADEGAN.map((_, i) => i));
 
   // Tampil sendiri satu kali, sesudah halaman sempat dimuat. Bila saat itu ada dialog atau kolom yang sedang diketik,
   // dicoba lagi beberapa kali lalu dilepas; penandanya belum dicatat, jadi muncul pada kunjungan berikutnya.
@@ -77,8 +101,10 @@ export default function PengumumanUpt() {
     let percobaan = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const coba = () => {
-      if (sudahDilihat(kunci)) return;
+      const baru = pengumumanBelumDilihat((id) => sudahDilihat(kunciPengumumanUpt(nip, id)));
+      if (baru.length === 0) return;
       if (aman(document.querySelector('[role="dialog"]') !== null, sedangMengetik(document.activeElement))) {
+        setDaftar(ADEGAN.flatMap((a, i) => (baru.includes(a.pengumuman) ? [i] : [])));
         setAdegan(0);
         setJeda(false);
         setBuka(true);
@@ -89,11 +115,12 @@ export default function PengumumanUpt() {
     };
     timer = setTimeout(coba, 1600);
     return () => clearTimeout(timer);
-  }, [role, pathname, kunci]);
+  }, [role, pathname, nip]);
 
   // Dibuka lagi dari tombol "Apa yang baru"; permintaan pengguna sendiri, jadi tidak diperiksa seperti tampil otomatis.
   useEffect(() => {
     const bukaLagi = () => {
+      setDaftar(ADEGAN.map((_, i) => i));
       setAdegan(0);
       setJeda(false);
       setBuka(true);
@@ -102,15 +129,17 @@ export default function PengumumanUpt() {
     return () => window.removeEventListener(PERISTIWA_BUKA_PENGUMUMAN_UPT, bukaLagi);
   }, []);
 
+  // Menutup mencatat pengumuman yang adegannya baru saja diputar; yang tidak ikut diputar tidak ditandai dilihat.
   const tutup = useCallback(() => {
-    catatDilihat(kunci);
+    for (const id of new Set(daftar.map((i) => ADEGAN[i].pengumuman))) catatDilihat(kunciPengumumanUpt(nip, id));
     setBuka(false);
-  }, [kunci]);
+  }, [daftar, nip]);
   const panelRef = useDialogModal(buka, tutup);
 
   if (role !== "admin_upt" || !buka) return null;
 
-  const terakhir = adegan === ADEGAN.length - 1;
+  const putar = daftar.map((i) => ADEGAN[i]);
+  const terakhir = adegan === putar.length - 1;
   const lanjut = () => (terakhir ? tutup() : setAdegan((a) => a + 1));
 
   return (
@@ -137,26 +166,28 @@ export default function PengumumanUpt() {
             <span key={i} className="pmn-bintang" style={{ "--i": i } as CSSProperties} />
           ))}
           <div className="pmn-adegan" key={adegan}>
-            {adegan === 0 && <AdeganMenu />}
-            {adegan === 1 && <AdeganTabel />}
-            {adegan === 2 && <AdeganAman />}
+            {putar[adegan].gambar === "menu" && <AdeganMenu />}
+            {putar[adegan].gambar === "tabel" && <AdeganTabel />}
+            {putar[adegan].gambar === "aman" && <AdeganAman />}
+            {putar[adegan].gambar === "lapor" && <AdeganLapor />}
+            {putar[adegan].gambar === "kabar" && <AdeganKabar />}
           </div>
         </div>
 
         <div className="pmn-seg-baris" role="group" aria-label="Langkah pengumuman">
-          {ADEGAN.map((a, i) => (
+          {putar.map((a, i) => (
             <button
               key={a.judul}
               type="button"
               className="pmn-seg"
               data-status={i < adegan ? "lalu" : i === adegan ? "aktif" : "nanti"}
-              aria-label={`Langkah ${i + 1} dari ${ADEGAN.length}: ${a.judul}`}
+              aria-label={`Langkah ${i + 1} dari ${putar.length}: ${a.judul}`}
               aria-current={i === adegan ? "step" : undefined}
               onClick={() => setAdegan(i)}
             >
               <span
                 className="pmn-isi"
-                onAnimationEnd={i === adegan ? () => setAdegan((x) => Math.min(x + 1, ADEGAN.length - 1)) : undefined}
+                onAnimationEnd={i === adegan ? () => setAdegan((x) => Math.min(x + 1, putar.length - 1)) : undefined}
               />
             </button>
           ))}
@@ -181,15 +212,15 @@ export default function PengumumanUpt() {
           <p className="pmn-label">Pembaruan untuk Admin UPT</p>
           <div aria-live="polite">
             <h2 id="pmn-judul" className="pmn-judul" key={adegan}>
-              {ADEGAN[adegan].judul}
+              {putar[adegan].judul}
             </h2>
             <p id="pmn-teks" className="pmn-teks-isi" key={`t${adegan}`}>
-              {ADEGAN[adegan].teks}
+              {putar[adegan].teks}
             </p>
           </div>
           <div className="pmn-kaki">
             <span className="pmn-hitung">
-              {adegan + 1} / {ADEGAN.length}
+              {adegan + 1} / {putar.length}
             </span>
             <span className="pmn-tombol-deret">
               {adegan > 0 && (
@@ -317,6 +348,80 @@ function AdeganAman() {
       {[0, 1, 2, 3, 4, 5].map((i) => (
         <span key={i} className="pmn-percik" style={{ "--a": `${i * 60}deg` } as CSSProperties} />
       ))}
+    </div>
+  );
+}
+
+/* ── Adegan 4: lapor KP/PI/PMK massal ──────────────────────────────────── */
+
+const BARIS_LAPOR: { nama: string; jenis: string; hitung: string; d: string; e: string }[] = [
+  { nama: "Rina Lestari", jenis: "Kenaikan pangkat", hitung: "II/b → III/a", d: "1.0s", e: "3.5s" },
+  { nama: "Andi Pratama", jenis: "PMK", hitung: "6 thn → 9 thn", d: "1.4s", e: "3.7s" },
+  { nama: "Dewi Anggraini", jenis: "Penyesuaian ijazah", hitung: "II/d → III/a", d: "1.8s", e: "3.9s" },
+];
+
+function AdeganLapor() {
+  return (
+    <div className="pmn-tabel pmn-lapor">
+      <div className="pmn-bar">
+        <span className="pmn-tombol-g">Usul KGB Kolektif</span>
+        <span className="pmn-tombol-g">Unggah daftar</span>
+        <span className="pmn-tekan pmn-tekan-lapor">Lapor KP/PI/PMK</span>
+      </div>
+      <div className="pmn-kepala-lapor">
+        <span>Pegawai</span>
+        <span>SK dan hitungan</span>
+        <span>Status</span>
+      </div>
+      {BARIS_LAPOR.map((b) => (
+        <div key={b.nama} className="pmn-baris pmn-baris-lapor" data-baru="" style={{ "--d": b.d, "--e": b.e } as CSSProperties}>
+          <span className="pmn-nama">{b.nama}</span>
+          <span className="pmn-hitungan">
+            <small>{b.jenis}</small>
+            {b.hitung}
+          </span>
+          <span className="pmn-teks pmn-st">
+            <span className="pmn-st-lama">Siap kirim</span>
+            <span className="pmn-st-baru">✓ Terkirim</span>
+          </span>
+        </div>
+      ))}
+      <div className="pmn-kaki-lapor">
+        <span>3 pegawai · 3 siap dikirim</span>
+        <span className="pmn-tekan pmn-tekan-kirim">Kirim 3 ke Kanwil</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Adegan 5: peringatan dampak dan kabar disetujui ───────────────────── */
+
+function AdeganKabar() {
+  return (
+    <div className="pmn-kabar">
+      <div className="pmn-peringatan">
+        <i aria-hidden="true">!</i>
+        <span>
+          <b>Perhatikan.</b> KGB TMT 1 Des 2026 sedang diproses Kanwil. Bila laporan disetujui, hitungannya diperbarui dan SK
+          dibuat ulang oleh Tim SDM.
+        </span>
+      </div>
+      <div className="pmn-notif-baris">
+        <span className="pmn-lonceng">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          <em className="pmn-lencana">1</em>
+        </span>
+        <span className="pmn-notif">
+          <i aria-hidden="true">✓</i>
+          <span>
+            <b>Laporan SK Disetujui: Rina Lestari</b>
+            <small>Kenaikan pangkat II/b → III/a sudah dicatat. Riwayat dan data pegawai diperbarui.</small>
+          </span>
+        </span>
+      </div>
     </div>
   );
 }
