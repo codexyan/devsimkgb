@@ -133,8 +133,10 @@ const menuKeuanganSub = [
 // ditambah Profil Saya untuk mengganti password sendiri.
 const menuAdminUpt: Entry[] = [
   { href: "/dashboard", label: "Dashboard", icon: Ic.dashboard },
-  { href: "/dashboard/upt/pegawai", label: "Data Pegawai", icon: Ic.people },
-  { href: "/dashboard/upt/kolektif", label: "Usulan kolektif", icon: Ic.edit },
+  // Nama menurut fungsi (ADR-072): daftar pegawai satker beserta status KGB-nya, dan usul KGB dalam satu surat. "Data
+  // Pegawai" tetap nama menu Kanwil, yang mengubah data induknya langsung.
+  { href: "/dashboard/upt/pegawai", label: "Pegawai Satker", icon: Ic.people },
+  { href: "/dashboard/upt/kolektif", label: "Usul KGB Kolektif", icon: Ic.edit },
   // Sengaja tidak bernama "Hukuman Disiplin" seperti modul SDM Hukdis Kanwil: UPT hanya melaporkan SK,
   // sedangkan yang menetapkan hukuman, mencatatnya, dan menggeser jadwal KGB adalah Kanwil (ADR-016).
   { href: "/dashboard/upt/hukdis", label: "Lapor Hukdis", icon: Ic.shield },

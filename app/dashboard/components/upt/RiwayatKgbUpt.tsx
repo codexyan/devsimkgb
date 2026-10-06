@@ -376,7 +376,7 @@ export default function RiwayatKgbUpt() {
                             <td colSpan={5} style={{ padding: "0 16px 14px", background: "var(--sub)" }}>
                               {/* SK di luar KGB lebih dulu: saat UPT memastikan dasar gaji pokok sudah benar,
                                   SK inilah yang paling sering terlewat; KGB-nya sendiri sudah terlihat di
-                                  baris ringkasan. Baca-saja; pelaporannya lewat tindakan di Data Pegawai. */}
+                                  baris ringkasan. Baca-saja; pelaporannya lewat tindakan di Pegawai Satker. */}
                               {(skDasarPegawai.get(e.pegawaiId) ?? []).length > 0 && (
                                 <table className="dsb-tabel dsb-tabel-sisip" style={{ marginBottom: 10 }}>
                                   <caption>SK kenaikan pangkat dan peninjauan masa kerja, dicatat Kanwil</caption>

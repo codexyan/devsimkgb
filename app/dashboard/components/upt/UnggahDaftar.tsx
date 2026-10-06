@@ -331,7 +331,7 @@ export default function UnggahDaftar() {
       </style>
       <header className="dsb-halaman-kepala dsb-muncul">
         <div className="min-w-0">
-          <p className="dsb-label">Data Pegawai</p>
+          <p className="dsb-label">Pegawai Satker</p>
           <h1 className="dsb-halaman-judul">Unggah daftar pegawai</h1>
           <p className="dsb-sub">
             Satu berkas Excel (.xlsx) atau CSV berisi banyak pegawai sekaligus. Isinya diperiksa dan ditampilkan lebih
@@ -394,7 +394,7 @@ export default function UnggahDaftar() {
             <Catatan>
               Unduh templat Excel di bawah, lalu isi lembar <strong>{LEMBAR_DATA_UPT}</strong>, satu baris untuk satu
               pegawai. Templatnya memuat lembar panduan dan contoh. Isinya masuk sebagai data yang disiapkan, belum
-              terkirim: setelah ini pilih dan lengkapi pegawainya di Usulan kolektif, saringan Pegawai baru, lalu
+              terkirim: setelah ini pegawainya tampil di Pegawai Satker sebagai baris bertanda; pilih dan lengkapi di Usul KGB Kolektif, saringan Pegawai baru, lalu
               ajukan bersama satu surat usulan. Kolom unit kerja pada berkas diabaikan, sebab satkernya mengikuti akun
               ini.
             </Catatan>
@@ -701,7 +701,7 @@ export default function UnggahDaftar() {
                 ✓
               </span>
               <div className="min-w-0">
-                <h2>{hasilSimpan.disimpan} data pegawai masuk ke Perlu dikerjakan</h2>
+                <h2>{hasilSimpan.disimpan} data pegawai tersimpan sebagai draf</h2>
                 <p>
                   {hasilSimpan.baru} draf pegawai baru dan {hasilSimpan.perubahan} draf usulan perbaikan dari{" "}
                   {namaBerkas}. Belum ada yang terkirim ke Kanwil.
@@ -740,7 +740,9 @@ export default function UnggahDaftar() {
             )}
 
             <p className="kgbm-bantuan">
-              Langkah berikutnya: di Usulan kolektif, saringan Pegawai baru, pilih pegawai yang akan dikirim (bisa
+              Drafnya terlihat di tiga tempat: tabel <strong>Pegawai Satker</strong> (baris bertanda, sampai Kanwil menyetujui),{" "}
+              <strong>Perlu dikerjakan</strong> pada Dashboard, dan <strong>Usul KGB Kolektif</strong>. Langkah berikutnya: di Usul KGB
+              Kolektif, saringan Pegawai baru, pilih pegawai yang akan dikirim (bisa
               bertahap), lengkapi data dan berkasnya, lalu ajukan bersama satu surat usulan Srikandi. Pegawai baru tidak
               ikut usulan KGB periode berjalan kecuali dipilih.
             </p>
@@ -752,10 +754,10 @@ export default function UnggahDaftar() {
                   Unggah berkas lain
                 </button>
                 <Link href="/dashboard/upt/pegawai" className="dsb-tombol" data-jenis="garis">
-                  Data Pegawai
+                  Pegawai Satker
                 </Link>
                 <Link href="/dashboard/upt/kolektif?saring=baru" className="dsb-tombol">
-                  Lanjut ke Usulan kolektif →
+                  Lanjut ke Usul KGB Kolektif →
                 </Link>
               </span>
             </div>

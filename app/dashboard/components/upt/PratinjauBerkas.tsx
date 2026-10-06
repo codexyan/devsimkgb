@@ -9,7 +9,7 @@ import { BATAS_BARIS_IMPOR, KOLOM_TEMPLAT_UPT, diLuarPilihan, isianDiLuarPilihan
  * Langkah Periksa & konfirmasi menampilkan hasil bacaan server per pegawai, tetapi tidak memperlihatkan kolom
  * berkas yang tidak terbaca sama sekali. Judul yang tidak dikenali ("Tgl Lahir" yang salah eja, kolom nomor
  * urut, judul laporan di baris pertama) membuat isiannya hilang diam-diam, dan baru ketahuan sebagai "perlu
- * dilengkapi" di Usulan kolektif. Di sini operator melihat lebih dulu kolom mana yang dibaca, mana yang
+ * dilengkapi" di Usul KGB Kolektif. Di sini operator melihat lebih dulu kolom mana yang dibaca, mana yang
  * diabaikan, dan isi barisnya, lalu memutuskan sendiri untuk lanjut atau membetulkan berkasnya.
  *
  * Isinya tidak dinilai di sini; NIP, tanggal, dan isian pilihan tetap diperiksa server di langkah berikutnya.

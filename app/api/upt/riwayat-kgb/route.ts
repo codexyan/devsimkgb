@@ -85,7 +85,7 @@ export async function GET() {
 
   // Kenaikan pangkat dan PMK dalam satu daftar: keduanya menjawab pertanyaan yang sama bagi UPT; SK apa
   // yang mengubah golongan atau masa kerja golongan pegawai ini, dan kapan. Baca-saja; pelaporannya lewat
-  // tindakan di Data Pegawai, dan yang mencatat tetap Kanwil (ADR-030).
+  // tindakan di Pegawai Satker, dan yang mencatat tetap Kanwil (ADR-030).
   const skDasar = [
     ...semuaPangkat
       .filter((r) => pegawaiById.has(r.pegawaiId))
@@ -122,7 +122,7 @@ export async function GET() {
         golonganLama: r.golonganRuang,
         golonganBaru: r.golonganRuang,
         // MKG yang ditampilkan adalah yang tersimpan pada data pegawai, yaitu MKG pada TMT KGB terakhir,
-        // angka yang sama dengan yang dilihat UPT di Data Pegawai, bukan MKG pada TMT PMK.
+        // angka yang sama dengan yang dilihat UPT di Pegawai Satker, bukan MKG pada TMT PMK.
         mkgTahunLama: r.mkgTahunDasarLama,
         mkgBulanLama: r.mkgBulanDasarLama,
         mkgTahunBaru: r.mkgTahunDasarBaru,

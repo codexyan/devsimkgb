@@ -8,7 +8,7 @@ import { formatTanggalId } from "@/lib/waktu";
 
 /* Pengingat periode pengusulan KGB untuk Admin UPT (ADR-029). Surat usulan dikirim ke Kanwil tanggal 1 sampai 10
    bulan kedua sebelum TMT. Begitu masa kirim dibuka, dashboard menampilkan jendela ini sekali per periode selama
-   masih ada pegawai jatuh tempo yang belum diajukan, dengan pintasan ke Usulan kolektif yang langsung mencentang
+   masih ada pegawai jatuh tempo yang belum diajukan, dengan pintasan ke Usul KGB Kolektif yang langsung mencentang
    pegawai itu. Setelah ditutup, jendela tidak tampil lagi untuk periode yang sama di perangkat ini. */
 
 export interface PegawaiJatuhTempo {
@@ -74,7 +74,7 @@ export default function PengingatUsulan({
             Nanti saja
           </button>
           <Link href={`/dashboard/upt/kolektif?bulan=${bulanTmt}`} className="kgbm-tombol kgbm-utama" onClick={selesai}>
-            Siapkan usulan kolektif
+            Siapkan usul KGB kolektif
           </Link>
         </>
       }
@@ -115,7 +115,7 @@ export default function PengingatUsulan({
       {belumDiajukan.length > 6 && <p className="pgu-lain">dan {belumDiajukan.length - 6} pegawai lainnya.</p>}
 
       <ol className="pgu-langkah">
-        <li>Siapkan data dan berkas SK tiap pegawai di Usulan kolektif; pegawai di atas sudah tercentang.</li>
+        <li>Siapkan data dan berkas SK tiap pegawai di Usul KGB Kolektif; pegawai di atas sudah tercentang.</li>
         <li>Kirim surat usulan lewat Srikandi, lalu ajukan dengan nomor surat yang sama di SIM-KGB.</li>
       </ol>
     </KerangkaModal>

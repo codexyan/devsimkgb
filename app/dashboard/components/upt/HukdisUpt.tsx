@@ -45,7 +45,7 @@ export default function HukdisUpt() {
   const [data, setData] = useState<DataApi | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
   const [pesan, setPesan] = useState<string | null>(null);
-  // Tautan dari Data Pegawai dapat membawa ?pegawai=<id> agar formulirnya langsung terbuka setelah data termuat.
+  // Tautan dari Pegawai Satker dapat membawa ?pegawai=<id> agar formulirnya langsung terbuka setelah data termuat.
   const [formulir, setFormulir] = useState<{ awal: LaporanApi | null; pegawaiAwal: string | null } | null>(() => {
     const pegawaiAwal = new URLSearchParams(window.location.search).get("pegawai");
     return pegawaiAwal ? { awal: null, pegawaiAwal } : null;

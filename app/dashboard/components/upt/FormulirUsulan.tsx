@@ -25,7 +25,7 @@ import { asalAtasDasar, hitungFormulirUsulan, jawabSkBaru, teksAtasDasar } from 
 
    SK KGB terakhir (atau SK CPNS) menjadi acuan jadwal; SK kenaikan pangkat, penyesuaian ijazah, atau PMK
    sesudahnya dilaporkan lewat pertanyaan wajib, dan yang paling baru menjadi Atas dasar SK KGB berikutnya
-   (ADR-065). Data Pegawai baru berubah setelah usulannya disetujui Kanwil. */
+   (ADR-065). Data pegawai di SIM-KGB baru berubah setelah usulannya disetujui Kanwil. */
 
 export interface DrafUsulanUpt {
   id: string;
@@ -353,8 +353,8 @@ export default function FormulirUsulan({
       )}
       <Catatan>
         {jenis === "baru"
-          ? "Data disimpan dulu sebagai draf usulan milik satker: belum dikirim ke Kanwil dan belum masuk Data Pegawai. Setelah semua pegawai yang akan diusulkan lengkap, ajukan sekaligus dengan satu surat usulan; pegawai ini masuk Data Pegawai setelah Kanwil menyetujuinya."
-          : "Isian sudah diisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; yang dikosongkan berarti tidak diusulkan berubah. Yang disimpan di sini draf usulan: Data Pegawai baru berubah setelah usulannya diajukan dan disetujui Kanwil."}
+          ? "Data disimpan dulu sebagai draf usulan milik satker: belum dikirim ke Kanwil dan belum tercatat di SIM-KGB. Setelah semua pegawai yang akan diusulkan lengkap, ajukan sekaligus dengan satu surat usulan; pegawai ini tercatat di SIM-KGB setelah Kanwil menyetujuinya. Selama itu ia tampil di Pegawai Satker sebagai baris bertanda."
+          : "Isian sudah diisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; yang dikosongkan berarti tidak diusulkan berubah. Yang disimpan di sini draf usulan: data pegawai di SIM-KGB baru berubah setelah usulannya diajukan dan disetujui Kanwil."}
       </Catatan>
       <p className="kgbm-legenda">
         Isian dan berkas bertanda <i>*</i> wajib. Daftarnya berubah menurut keadaan pegawai:{" "}

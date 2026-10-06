@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 const DashboardUpt = dynamic(() => import("@/app/dashboard/components/DashboardUpt"), {
   ssr: false,
   loading: () => (
-    <div className="dsb-halaman" role="status" aria-label="Memuat data pegawai">
+    <div className="dsb-halaman" role="status" aria-label="Memuat pegawai satker">
       <div className="dsb-kerangka" style={{ height: 90 }} />
       <div className="dsb-kerangka" style={{ height: 480 }} />
     </div>

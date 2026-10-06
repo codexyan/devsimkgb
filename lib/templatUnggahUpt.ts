@@ -120,7 +120,7 @@ function lembarPanduanKolom(): LembarXlsx {
       [`Isi lembar "${LEMBAR_DATA_UPT}" mulai baris 2, satu baris untuk satu pegawai, paling banyak ${BATAS_BARIS_IMPOR} baris. Jangan mengubah judul kolom di baris 1; lembar lain tidak ikut terbaca.`],
       ["Warna judul kolom: merah = wajib, barisnya ditolak bila kosong; kuning = boleh kosong saat diunggah, ditagih saat diajukan; abu-abu = boleh kosong."],
       ["Pangkat, gaji pokok, dan TMT KGB berikutnya tidak perlu diisi: ketiganya dihitung sistem dari golongan, masa kerja golongan, dan TMT KGB terakhir."],
-      ["Nomor SK dasar dan pindaian SK tidak lewat berkas ini; keduanya dilengkapi per pegawai di Usulan kolektif sebelum diajukan."],
+      ["Nomor SK dasar dan pindaian SK tidak lewat berkas ini; keduanya dilengkapi per pegawai di Usul KGB Kolektif sebelum diajukan."],
       [],
       ["Kolom", "Nama isian", "Peran", "Cara mengisi", "Contoh", "Pilihan"].map((v): SelXlsx => ({ v, gaya: "kepala" })),
       ...KOLOM_TEMPLAT_UPT.map((k): SelXlsx[] => [

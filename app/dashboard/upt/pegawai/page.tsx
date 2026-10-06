@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import IsiPegawaiUpt from "./IsiPegawaiUpt";
 
-export const metadata: Metadata = { title: "Data Pegawai" };
+export const metadata: Metadata = { title: "Pegawai Satker" };
 
-/** Modul Data Pegawai Admin UPT: tabel pegawai satker beserta seluruh tindakannya. */
+/** Modul Pegawai Satker Admin UPT: tabel pegawai satker beserta seluruh tindakannya. */
 export default function HalamanPegawaiUpt() {
   return <IsiPegawaiUpt />;
 }
