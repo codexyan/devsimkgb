@@ -5,7 +5,16 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { canEditPegawai, canManageHukdis, canProcessKGB } from "@/lib/auth";
 import TabDokumenPemutakhiran from "./TabDokumenPemutakhiran";
-import { KakiSkRiwayat, ModalUbahSkRiwayat, ModalUnggahSkRiwayat, type DataUbahSkRiwayat, type SkRiwayat } from "./SkRiwayatDasar";
+import {
+  KakiSkRiwayat,
+  ModalHapusRiwayatKembar,
+  ModalUbahSkRiwayat,
+  ModalUnggahSkRiwayat,
+  type DataUbahSkRiwayat,
+  type RingkasRiwayat,
+  type SkRiwayat,
+} from "./SkRiwayatDasar";
+import { cariKembar } from "@/lib/riwayatKembar";
 import { cariDokumenSk } from "@/lib/dokumenLinimasa";
 import type { DokumenPegawai } from "@/lib/dokumenPegawai";
 import TabDataPegawai, { type TindakanPegawai } from "./TabDataPegawai";
@@ -220,6 +229,12 @@ export default function RiwayatKGBPage() {
   const [pratinjauSk, setPratinjauSk] = useState<{ judul: string; subjudul: string; url: string } | null>(null);
   const [unggahSk, setUnggahSk] = useState<SkRiwayat | null>(null);
   const [ubahSk, setUbahSk] = useState<DataUbahSkRiwayat | null>(null);
+  const [hapusKembar, setHapusKembar] = useState<{
+    jenis: "kp" | "pmk";
+    riwayatId: string;
+    dihapus: RingkasRiwayat;
+    tersisa: RingkasRiwayat;
+  } | null>(null);
   useEffect(() => {
     if (!bolehDokumen) return;
     const t = setTimeout(() => {
@@ -762,6 +777,40 @@ export default function RiwayatKGBPage() {
                       </div>
                     )}
                   </dl>
+                  {(() => {
+                    // SK yang sama tercatat dua kali (ADR-069): tampil dua kali pula di linimasa SK.
+                    const kembar = cariKembar(
+                      { id: p.id, nomorSK: p.nomorSK, tmt: p.tmtPangkat, golonganBaru: p.golonganBaru },
+                      pangkatList.map((q) => ({ ...q, tmt: q.tmtPangkat })),
+                    );
+                    if (!kembar) return null;
+                    return (
+                      <div className="px-4 py-2 flex flex-wrap items-center gap-2" style={{ borderTop: "0.5px solid var(--ln2)", background: "var(--tint-amber-bg)", fontSize: "12px", color: "var(--st-amber2)" }}>
+                        <span>
+                          Tercatat dua kali: SK dan kenaikan yang sama juga ada pada riwayat {kembar.jenisLabel}
+                          {kembar.penetapSK ? ` (ditetapkan ${kembar.penetapSK})` : ""}. Hapus salah satu yang keliru.
+                        </span>
+                        {bolehUbah && (
+                          <button
+                            type="button"
+                            className="dsb-tombol dsb-tombol-kecil"
+                            data-nada="merah"
+                            style={{ marginLeft: "auto" }}
+                            onClick={() =>
+                              setHapusKembar({
+                                jenis: "kp",
+                                riwayatId: p.id,
+                                dihapus: { jenisLabel: p.jenisLabel, nomorSK: p.nomorSK, tanggalSK: p.tanggalSK, penetapSK: p.penetapSK },
+                                tersisa: { jenisLabel: kembar.jenisLabel, nomorSK: kembar.nomorSK, tanggalSK: kembar.tanggalSK, penetapSK: kembar.penetapSK },
+                              })
+                            }
+                          >
+                            Hapus duplikat ini
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {(bolehDokumen || bolehUbah) && (
                     <KakiSkRiwayat
                       tampilDokumen={bolehDokumen}
@@ -856,6 +905,39 @@ export default function RiwayatKGBPage() {
                       </div>
                     )}
                   </dl>
+                  {(() => {
+                    const kembar = cariKembar(
+                      { id: p.id, nomorSK: p.nomorSK, tmt: p.tmtPmk },
+                      pmkList.map((q) => ({ ...q, tmt: q.tmtPmk })),
+                    );
+                    if (!kembar) return null;
+                    return (
+                      <div className="px-4 py-2 flex flex-wrap items-center gap-2" style={{ borderTop: "0.5px solid var(--ln2)", background: "var(--tint-amber-bg)", fontSize: "12px", color: "var(--st-amber2)" }}>
+                        <span>
+                          Tercatat dua kali: SK PMK yang sama juga ada pada riwayat lain
+                          {kembar.penetapSK ? ` (ditetapkan ${kembar.penetapSK})` : ""}. Hapus salah satu yang keliru.
+                        </span>
+                        {bolehUbah && (
+                          <button
+                            type="button"
+                            className="dsb-tombol dsb-tombol-kecil"
+                            data-nada="merah"
+                            style={{ marginLeft: "auto" }}
+                            onClick={() =>
+                              setHapusKembar({
+                                jenis: "pmk",
+                                riwayatId: p.id,
+                                dihapus: { jenisLabel: "PMK", nomorSK: p.nomorSK, tanggalSK: p.tanggalSK, penetapSK: p.penetapSK },
+                                tersisa: { jenisLabel: "PMK", nomorSK: kembar.nomorSK, tanggalSK: kembar.tanggalSK, penetapSK: kembar.penetapSK },
+                              })
+                            }
+                          >
+                            Hapus duplikat ini
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {(bolehDokumen || bolehUbah) && (
                     <KakiSkRiwayat
                       tampilDokumen={bolehDokumen}
@@ -889,6 +971,21 @@ export default function RiwayatKGBPage() {
 
       {pratinjauSk && (
         <ModalPratinjauBerkas judul={pratinjauSk.judul} subjudul={pratinjauSk.subjudul} url={pratinjauSk.url} onTutup={() => setPratinjauSk(null)} />
+      )}
+      {hapusKembar && (
+        <ModalHapusRiwayatKembar
+          pegawaiId={id}
+          jenis={hapusKembar.jenis}
+          riwayatId={hapusKembar.riwayatId}
+          dihapus={hapusKembar.dihapus}
+          tersisa={hapusKembar.tersisa}
+          onTutup={() => setHapusKembar(null)}
+          onSelesai={(pesan) => {
+            setHapusKembar(null);
+            setPesanBerhasil(pesan);
+            fetchData();
+          }}
+        />
       )}
       {ubahSk && (
         <ModalUbahSkRiwayat
