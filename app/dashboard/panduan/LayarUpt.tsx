@@ -107,8 +107,8 @@ function Langkah({ aktif, daftar }: { aktif: number; daftar: readonly [string, s
 export function LayarMenu() {
   const menu: [string, string][] = [
     ["Dashboard", "jadwal, pengingat, dan papan Alur KGB"],
-    ["Data Pegawai", "daftar pegawai satker Anda"],
-    ["Usulan kolektif", "menyiapkan dan mengajukan banyak pegawai"],
+    ["Pegawai Satker", "daftar pegawai satker Anda beserta status KGB-nya"],
+    ["Usul KGB Kolektif", "menyiapkan dan mengajukan banyak pegawai"],
     ["Lapor Hukdis", "melaporkan SK hukuman disiplin ke Kanwil"],
     ["Riwayat", "riwayat KGB tiap pegawai, dan jejak usulan yang pernah dikirim"],
     ["Profil Saya", "mengganti kata sandi Anda sendiri"],
@@ -119,20 +119,20 @@ export function LayarMenu() {
       judul="Enam menu untuk Admin UPT"
       keterangan={[
         "Menu Anda hanya enam ini. Seluruhnya terbatas pada satker Anda sendiri: pegawai satker lain tidak pernah tampil.",
-        "Usulan kolektif adalah tempat kerja utama Anda setiap bulan.",
+        "Usul KGB Kolektif adalah tempat kerja utama Anda setiap bulan.",
       ]}
       catatan="Bila menu yang Anda lihat berbeda, berarti akun Anda bukan Admin UPT. Hubungi Kanwil."
       anak={
         <div className="lyr-menu">
           {menu.map(([nama, ket], i) => (
-            <span key={nama} className="lyr-menu-butir" data-sorot={nama === "Usulan kolektif" ? "" : undefined}>
+            <span key={nama} className="lyr-menu-butir" data-sorot={nama === "Usul KGB Kolektif" ? "" : undefined}>
               <span className="lyr-menu-ikon" aria-hidden="true" />
               <span className="min-w-0">
                 <strong>{nama}</strong>
                 <small>{ket}</small>
               </span>
               {i === 0 && <No n={1} />}
-              {nama === "Usulan kolektif" && <No n={2} />}
+              {nama === "Usul KGB Kolektif" && <No n={2} />}
             </span>
           ))}
         </div>
@@ -152,7 +152,7 @@ export function LayarPengingat({ namaBulan, batas }: { namaBulan: string; batas:
         `Batas mengirim surat dan sisa harinya. Masa kirim dibuka tanggal 1 sampai ${KIRIM_SURAT_BATAS} pada bulan kedua sebelum TMT.`,
         "Berapa pegawai yang jatuh tempo, dan berapa yang belum Anda ajukan ke Kanwil.",
         "Nama pegawai yang belum diajukan, supaya Anda tahu persis siapa yang tertinggal.",
-        "Tombol ini membuka Usulan kolektif dengan pegawai tersebut sudah tercentang.",
+        "Tombol ini membuka Usul KGB Kolektif dengan pegawai tersebut sudah tercentang.",
       ]}
       catatan="Jendela ini muncul sekali saja di tiap perangkat. Setelah Anda tutup, ia tidak muncul lagi pada periode yang sama; jadwalnya tetap dapat dilihat di pita jadwal dashboard."
       anak={
@@ -195,7 +195,7 @@ export function LayarPengingat({ namaBulan, batas }: { namaBulan: string; batas:
           <div className="lyr-modal-kaki">
             <Tombol jenis="garis" anak="Nanti saja" />
             <span className="lyr-kaki-sorot">
-              <Tombol anak="Siapkan usulan kolektif" />
+              <Tombol anak="Siapkan usul KGB kolektif" />
               <No n={4} />
             </span>
           </div>
@@ -257,10 +257,10 @@ export function LayarPapan() {
 export function LayarDataPegawai() {
   return (
     <Layar
-      jalur="Data Pegawai"
+      jalur="Pegawai Satker"
       judul="Pegawai dan KGB"
       keterangan={[
-        "Usulan kolektif: menyiapkan banyak pegawai untuk satu surat. Ini jalur yang Anda pakai setiap periode.",
+        "Usul KGB Kolektif: menyiapkan banyak pegawai untuk satu surat. Ini jalur yang Anda pakai setiap periode.",
         "Unggah daftar: satu berkas Excel (.xlsx) atau CSV berisi banyak pegawai sekaligus. Dipakai saat mengisi data pertama kali atau meremajakan banyak data.",
         "Tambah pegawai: untuk satu orang yang belum tercatat, misalnya CPNS yang baru dilantik.",
         "Usulkan perbaikan: membetulkan data satu pegawai yang sudah tercatat, termasuk NIP yang salah ketik.",
@@ -277,7 +277,7 @@ export function LayarDataPegawai() {
             </span>
             <span className="lyr-alat-kanan">
               <span className="lyr-sorot-bungkus">
-                <Tombol jenis="garis" anak="Usulan kolektif" />
+                <Tombol jenis="garis" anak="Usul KGB Kolektif" />
                 <No n={1} />
               </span>
               <span className="lyr-sorot-bungkus">
@@ -315,7 +315,7 @@ export function LayarDataPegawai() {
 export function LayarUnggah() {
   return (
     <Layar
-      jalur="Data Pegawai › Unggah daftar"
+      jalur="Pegawai Satker › Unggah daftar"
       judul="Langkah 2: Periksa & konfirmasi"
       keterangan={[
         "Ringkasan empat kelompok: pegawai baru, perbaikan data, yang sama persis sehingga dilewati, dan yang ditolak.",
@@ -324,7 +324,7 @@ export function LayarUnggah() {
         "Baris yang ditolak menyebutkan sebabnya, termasuk bila NIP-nya ternyata tercatat di satker lain.",
         "Centang baris yang hendak disimpan. Tidak ada satu pun yang tersimpan sebelum tombol ini ditekan.",
       ]}
-      catatan="Yang tersimpan di sini masih berupa draf: belum terkirim ke Kanwil. Lengkapi berkas dan nomor SK-nya di Usulan kolektif, lalu ajukan bersama satu surat."
+      catatan="Yang tersimpan di sini masih berupa draf: belum terkirim ke Kanwil. Lengkapi berkas dan nomor SK-nya di Usul KGB Kolektif, lalu ajukan bersama satu surat."
       anak={
         <>
           <Langkah
@@ -412,12 +412,12 @@ export function LayarUnggah() {
   );
 }
 
-/* ── 6. Usulan kolektif, langkah 1: pilih pegawai ──────────────────────── */
+/* ── 6. Usul KGB Kolektif, langkah 1: pilih pegawai ──────────────────────── */
 
 export function LayarKolektif1({ namaBulan }: { namaBulan: string }) {
   return (
     <Layar
-      jalur="Usulan kolektif"
+      jalur="Usul KGB Kolektif"
       judul="Langkah 1: Pilih pegawai"
       keterangan={[
         `Saringan Jatuh tempo TMT ${namaBulan} sudah terpilih: inilah pegawai yang harus diusulkan periode ini.`,
@@ -495,12 +495,12 @@ export function LayarKolektif1({ namaBulan }: { namaBulan: string }) {
   );
 }
 
-/* ── 7. Usulan kolektif, langkah 2: lengkapi data dan berkas ───────────── */
+/* ── 7. Usul KGB Kolektif, langkah 2: lengkapi data dan berkas ───────────── */
 
 export function LayarKolektif2() {
   return (
     <Layar
-      jalur="Usulan kolektif"
+      jalur="Usul KGB Kolektif"
       judul="Langkah 2: Lengkapi data & berkas"
       keterangan={[
         "Daftar pegawai yang Anda pilih. Lingkaran di sebelah nama menunjukkan seberapa lengkap isiannya; kerjakan satu per satu sampai penuh. Bila lebih dari delapan pegawai, ada kotak cari dan saringan Kurang/Lengkap.",
@@ -510,7 +510,7 @@ export function LayarKolektif2() {
         "Jawab untuk tiap pegawai: sesudah SK KGB terakhir, adakah SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang belum tercatat? Bila ada, isi SK-nya. Baris di bawahnya menunjukkan SK yang akan menjadi Atas dasar SK KGB berikutnya.",
         "Unggah pindaian SK, masing-masing PDF paling besar 500 KB. Pindai sebagai dokumen, bukan foto kamera.",
       ]}
-      catatan="Semua isian di sini tersimpan sebagai draf usulan milik satker Anda: belum terlihat Kanwil dan belum mengubah Data Pegawai, boleh ditinggal dan dilanjutkan kapan saja. Data Pegawai berubah setelah usulannya disetujui Kanwil."
+      catatan="Semua isian di sini tersimpan sebagai draf usulan milik satker Anda: belum terlihat Kanwil dan belum mengubah data pegawai di SIM-KGB, boleh ditinggal dan dilanjutkan kapan saja. Data Pegawai berubah setelah usulannya disetujui Kanwil."
       anak={
         <>
           <Langkah
@@ -648,12 +648,12 @@ export function LayarKolektif2() {
   );
 }
 
-/* ── 8. Usulan kolektif, langkah 3: ajukan dengan satu surat ───────────── */
+/* ── 8. Usul KGB Kolektif, langkah 3: ajukan dengan satu surat ───────────── */
 
 export function LayarKolektif3() {
   return (
     <Layar
-      jalur="Usulan kolektif"
+      jalur="Usul KGB Kolektif"
       judul="Langkah 3: Ajukan dengan surat"
       keterangan={[
         "Centang pegawai yang ikut pada surat ini. Yang belum lengkap tidak dapat dicentang, dan kekurangannya disebutkan.",

@@ -165,7 +165,7 @@ export const KOLOM_TEMPLAT_UPT: readonly KolomTemplatUpt[] = [
   },
   // SK sesudah SK KGB terakhir beserta isinya (ADR-030, ADR-065). dasarBaruJenis wajib dijawab tiap baris: "tidak",
   // atau SK-nya bila ada, sehingga peremajaan sesudah kenaikan pangkat periode selesai sekali unggah, bukan dibuka
-  // satu per satu di Usulan kolektif. Cara mengisinya per keadaan ada di PANDUAN_DASAR_BARU.
+  // satu per satu di Usul KGB Kolektif. Cara mengisinya per keadaan ada di PANDUAN_DASAR_BARU.
   {
     kolom: "dasarBaruJenis",
     label: "SK sesudah SK KGB terakhir",
@@ -344,12 +344,12 @@ export const PANDUAN_DASAR_BARU: readonly ContohDasarBaru[] = [
 
 /** Aturan umum keenam kolom dasarBaru, sebagai butir panduan. */
 export const ATURAN_DASAR_BARU: readonly string[] = [
-  "SK KGB terakhir (atau SK CPNS bila belum pernah KGB) adalah acuan jadwal KGB: TMT KGB terakhir diambil darinya, dan nomor serta tanggalnya diisi saat draf dilengkapi di Usulan kolektif. Keenam kolom ini melaporkan SK yang terbit sesudahnya, yaitu kenaikan pangkat, penyesuaian ijazah, atau PMK, yang belum tercatat di SIM-KGB.",
+  "SK KGB terakhir (atau SK CPNS bila belum pernah KGB) adalah acuan jadwal KGB: TMT KGB terakhir diambil darinya, dan nomor serta tanggalnya diisi saat draf dilengkapi di Usul KGB Kolektif. Keenam kolom ini melaporkan SK yang terbit sesudahnya, yaitu kenaikan pangkat, penyesuaian ijazah, atau PMK, yang belum tercatat di SIM-KGB.",
   "dasarBaruJenis wajib dijawab tiap baris, juga untuk pegawai baru: tidak bila tidak ada SK seperti itu, kp atau pmk bila ada. Golongan dan masa kerja golongan disalin dari SK yang paling baru apa adanya; pada pegawai baru, sistem menghitung mundur masa kerja pada SK itu ke TMT KGB terakhir. Bagi pegawai yang sudah tercatat, kolom ini sekaligus menjawab mengapa golongan atau masa kerja golongannya berbeda dari yang tercatat; koreksi bila yang tercatat salah ketik.",
   "Satu baris hanya menyebut satu SK, yaitu SK dengan TMT paling baru. SK itulah yang tercetak sebagai dasar pada SK KGB berikutnya.",
   "Untuk kp pada pegawai yang sudah tercatat, sistem menghitung sendiri masa kerja golongan, gaji pokok, dan TMT golongan dari data tercatat dan SK-nya; jadwal KGB tidak bergeser.",
   "Untuk pmk, golongan tetap dan masa kerja golongan mengikuti SK PMK; jadwal KGB dapat maju.",
-  `Isian kosong atau belum lengkap tidak menolak baris; yang kurang, termasuk dasarBaruJenis yang belum dijawab, ditagih saat diajukan di Usulan kolektif. Isian yang salah tulis (misalnya "KP" atau "naik pangkat") menolak barisnya. Tanggal ditulis ${FORMAT_TANGGAL_DITERIMA}.`,
+  `Isian kosong atau belum lengkap tidak menolak baris; yang kurang, termasuk dasarBaruJenis yang belum dijawab, ditagih saat diajukan di Usul KGB Kolektif. Isian yang salah tulis (misalnya "KP" atau "naik pangkat") menolak barisnya. Tanggal ditulis ${FORMAT_TANGGAL_DITERIMA}.`,
 ];
 
 /** Huruf dan angka saja, huruf kecil: "Golongan ruang*" dan "golonganRuang" menjadi sama. */

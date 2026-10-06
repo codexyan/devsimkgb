@@ -9,7 +9,7 @@ import { ModalPratinjauBerkas } from "@/app/dashboard/components/kgb";
 
 /* Modul Riwayat Admin UPT: semua usulan data dan laporan mutasi atau pemberhentian yang pernah dikirim
    satker ini ke Kanwil, bukan hanya lima terbaru di dasbor. Draf yang belum diajukan tidak di sini,
-   melainkan di Perlu dikerjakan. Halaman ini hanya membaca; tindakan tetap di dasbor dan Data Pegawai. */
+   melainkan di Perlu dikerjakan. Halaman ini hanya membaca; tindakan tetap di dasbor dan Pegawai Satker. */
 
 interface UsulanApi {
   id: string;

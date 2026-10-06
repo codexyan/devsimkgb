@@ -176,7 +176,8 @@ interface DataUpt {
   sk: SkUpt[];
 }
 
-type Saring = "semua" | "usulkan" | "proses" | "selesai";
+/** "baru": pegawai baru yang belum tercatat di SIM-KGB (draf, dikembalikan, atau menunggu Kanwil), ADR-072. */
+type Saring = "semua" | "usulkan" | "proses" | "selesai" | "baru";
 
 const fmtRp = (n: number | null | undefined) => (typeof n === "number" ? "Rp " + n.toLocaleString("id-ID") : "-");
 const fmtTgl = (s: string | null | undefined) => (s ? formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" }) : "-");
@@ -219,7 +220,7 @@ const KOLOM_UPT: { k: KolomUpt; judul: string; ket: string; nada: Nada }[] = [
 ];
 
 const KOSONG_UPT: Record<KolomUpt, string> = {
-  kerja: "Tidak ada yang perlu dikerjakan. Pegawai baru ditambahkan dari Data Pegawai.",
+  kerja: "Tidak ada yang perlu dikerjakan. Pegawai baru ditambahkan dari Pegawai Satker.",
   kunci: "",
   kanwil: "Tidak ada yang sedang di Kanwil.",
   sk: "Belum ada SK baru yang perlu direkam.",
@@ -284,7 +285,7 @@ function KartuUpt({
  * Dasbor Admin UPT. Satu komponen melayani dua halaman agar keadaan dan dialognya (formulir usulan,
  * konfirmasi, laporan mutasi, unggah daftar) tidak terduplikasi:
  *   - "dasbor": ringkasan, Perlu dikerjakan, SK terbit, usulan terkirim, dan jadwal;
- *   - "pegawai": modul Data Pegawai, berisi tabel Pegawai dan KGB selebar halaman.
+ *   - "pegawai": modul Pegawai Satker, berisi tabel Pegawai dan KGB selebar halaman.
  */
 export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor" | "pegawai" } = {}) {
   const dashUser = useDashUser();
@@ -627,18 +628,43 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const sedangDiproses = pegawai.filter((p) => p.statusKGB === "sedang_diproses");
 
   const q = cari.trim().toLowerCase();
+  /**
+   * Pegawai baru yang belum tercatat di SIM-KGB tampil di tabel sebagai baris bertanda, supaya tabel memuat semua orang
+   * satker, termasuk hasil Unggah daftar. Barisnya hilang sendiri setelah Kanwil menyetujui dan pegawainya tercatat
+   * (ADR-072). Yang dikembalikan Kanwil didahulukan, lalu draf, lalu yang menunggu tinjauan.
+   */
+  const barisBaru = useMemo(() => {
+    const urut: Record<string, number> = { revisi: 0, draf: 1, menunggu: 2 };
+    return usulan
+      .filter((u) => u.jenis === "baru" && u.status in urut)
+      .sort((a, b) => urut[a.status] - urut[b.status] || a.nama.localeCompare(b.nama, "id"));
+  }, [usulan]);
+  // Saringan Belum tercatat hilang bersama barisnya; tanpa ini tabel kosong tanpa tombol untuk kembali.
+  const saringAktif: Saring = saring === "baru" && barisBaru.length === 0 ? "semua" : saring;
   const tampil = useMemo(
     () =>
-      pegawai.filter((p) => {
-        if (saring === "usulkan" && p.bulanTmt !== bulanUsulan) return false;
-        if (saring === "proses" && !(p.statusKGB === "sedang_diproses" || p.statusKGB === "menunggu_keuangan")) return false;
-        if (saring === "selesai" && p.statusKGB !== "selesai") return false;
-        return !q || p.nama.toLowerCase().includes(q) || p.nip.includes(q) || p.jabatan.toLowerCase().includes(q);
-      }),
-    [pegawai, saring, q, bulanUsulan],
+      saringAktif === "baru"
+        ? []
+        : pegawai.filter((p) => {
+            if (saringAktif === "usulkan" && p.bulanTmt !== bulanUsulan) return false;
+            if (saringAktif === "proses" && !(p.statusKGB === "sedang_diproses" || p.statusKGB === "menunggu_keuangan")) return false;
+            if (saringAktif === "selesai" && p.statusKGB !== "selesai") return false;
+            return !q || p.nama.toLowerCase().includes(q) || p.nip.includes(q) || p.jabatan.toLowerCase().includes(q);
+          }),
+    [pegawai, saringAktif, q, bulanUsulan],
+  );
+  const barisBaruTampil = useMemo(
+    () =>
+      saringAktif === "semua" || saringAktif === "baru"
+        ? barisBaru.filter(
+            (u) => !q || u.nama.toLowerCase().includes(q) || u.nip.includes(q) || (u.nilai?.jabatan ?? "").toLowerCase().includes(q),
+          )
+        : [],
+    [barisBaru, saringAktif, q],
   );
   const jumlah = (s: Saring) =>
-    s === "semua" ? pegawai.length
+    s === "baru" ? barisBaru.length
+    : s === "semua" ? pegawai.length + barisBaru.length
     : s === "usulkan" ? perluDiusulkan.length
     : s === "proses" ? sedangDiproses.length
     : pegawai.filter((p) => p.statusKGB === "selesai").length;
@@ -665,7 +691,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         <section className="dsb-panel dsb-antrian dsb-penuh overflow-hidden dsb-muncul" style={{ "--i": 1 } as React.CSSProperties} aria-labelledby="judul-pegawai-upt">
           <div className="dsb-panel-kepala">
             <h2 id="judul-pegawai-upt" className="dsb-panel-judul">
-              Pegawai dan KGB <small>{tampil.length} dari {pegawai.length}</small>
+              Pegawai dan KGB <small>{tampil.length + barisBaruTampil.length} dari {pegawai.length + barisBaru.length}</small>
             </h2>
           </div>
           <div className="dsb-alat" style={{ padding: "10px 16px", borderBottom: "1px solid var(--ln2)" }}>
@@ -675,16 +701,18 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 ["usulkan", `Diusulkan ${namaBulan(bulanUsulan)}`],
                 ["proses", "Diproses Kanwil"],
                 ["selesai", "Selesai"],
+                ...(barisBaru.length > 0 ? [["baru", "Belum tercatat"]] : []),
               ] as [Saring, string][]).map(([v, l]) => (
-                <button key={v} type="button" aria-pressed={saring === v} onClick={() => setSaring(v)}>
+                <button key={v} type="button" aria-pressed={saringAktif === v} onClick={() => setSaring(v)}>
                   {l} {data && <span style={{ color: "var(--dt5)" }}>{jumlah(v)}</span>}
                 </button>
               ))}
             </div>
-            {/* Satu-satunya tempat menambah pegawai: pegawai baru tersimpan sebagai draf di Perlu dikerjakan. */}
+            {/* Tempat menambah pegawai: pegawai baru tersimpan sebagai draf, tampil di tabel ini sebagai baris bertanda,
+                di Perlu dikerjakan pada Dashboard, dan di Usul KGB Kolektif (ADR-072). */}
             <span className="upt-deret" style={{ marginLeft: "auto" }}>
-              <Link href="/dashboard/upt/kolektif" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" title="Siapkan banyak pegawai untuk satu surat Srikandi sekaligus">
-                Usulan kolektif
+              <Link href="/dashboard/upt/kolektif" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" title="Usul KGB banyak pegawai dalam satu surat Srikandi">
+                Usul KGB Kolektif
               </Link>
               <Link
                 href="/dashboard/upt/unggah"
@@ -713,9 +741,9 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             <div className="flex flex-col gap-2" style={{ padding: "16px" }} role="status" aria-label="Memuat data">
               {[1, 2, 3, 4].map((i) => <div key={i} className="dsb-kerangka" style={{ height: 44, borderRadius: 8 }} />)}
             </div>
-          ) : tampil.length === 0 ? (
+          ) : tampil.length + barisBaruTampil.length === 0 ? (
             <p className="dsb-kosong" style={{ padding: "44px 16px" }}>
-              {pegawai.length === 0 ? "Belum ada pegawai satker ini di SIM-KGB." : "Tidak ada pegawai yang cocok dengan saringan."}
+              {pegawai.length + barisBaru.length === 0 ? "Belum ada pegawai satker ini di SIM-KGB." : "Tidak ada pegawai yang cocok dengan saringan."}
             </p>
           ) : (
             <div className="dsb-antrian-gulir">
@@ -732,6 +760,89 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                   </tr>
                 </thead>
                 <tbody>
+                  {/* Pegawai baru yang belum tercatat di SIM-KGB: draf, dikembalikan Kanwil, atau menunggu tinjauan (ADR-072). */}
+                  {barisBaruTampil.map((u) => {
+                    const gol = u.nilai?.golonganRuang;
+                    const jab = u.nilai?.jabatan;
+                    const kurang = u.kekurangan;
+                    return (
+                      <tr key={`baru-${u.id}`} data-baru="">
+                        <td style={{ maxWidth: "260px" }}>
+                          <p className="dsb-nama truncate" style={{ margin: 0 }}>{u.nama}</p>
+                          <p className="dsb-kecil truncate" style={{ margin: 0 }} title={jab}>
+                            {[u.nip, gol, jab].filter(Boolean).join(" · ")}
+                          </p>
+                          <p className="upt-bko">
+                            <span className="dsb-tag" data-nada="hijau">Pegawai baru</span>
+                            <span className="truncate">belum di SIM-KGB</span>
+                          </p>
+                        </td>
+                        <td>
+                          <span className="dsb-kecil">Dijadwalkan setelah tercatat</span>
+                        </td>
+                        <td style={{ maxWidth: "230px" }}>
+                          {u.surat?.nomorSkTerakhir ? (
+                            <>
+                              <p className="dsb-kecil" style={{ margin: 0, color: "var(--dt5)" }}>SK acuan, belum menjadi dasar</p>
+                              <p className="dsb-kecil truncate" style={{ margin: 0 }} title={u.surat.nomorSkTerakhir}>
+                                {[u.surat.nomorSkTerakhir, u.surat.tanggalSkTerakhir ? fmtTgl(u.surat.tanggalSkTerakhir) : null].filter(Boolean).join(" · ")}
+                              </p>
+                            </>
+                          ) : (
+                            <span className="dsb-kecil">Belum ada SK tercatat</span>
+                          )}
+                        </td>
+                        <td>
+                          <span className="dsb-status">
+                            <span
+                              className="dsb-titik"
+                              data-nada={u.status === "revisi" ? "ungu" : u.status === "menunggu" ? "biru" : "kuning"}
+                              aria-hidden="true"
+                            />
+                            {u.status === "draf"
+                              ? "Draf pegawai baru"
+                              : u.status === "revisi"
+                                ? "Dikembalikan Kanwil"
+                                : "Menunggu tinjauan Kanwil"}
+                          </span>
+                          <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>
+                            {u.status === "draf"
+                              ? kurang.length > 0
+                                ? `Kurang: ${kurang.slice(0, 2).join(", ")}${kurang.length > 2 ? ` +${kurang.length - 2}` : ""}`
+                                : "Lengkap, siap diajukan di Usul KGB Kolektif"
+                              : u.status === "revisi"
+                                ? (u.alasanTolak ?? "Perlu diperbaiki lalu dikirim ulang")
+                                : u.nomorSurat
+                                  ? `Surat ${u.nomorSurat}`
+                                  : "Sudah diusulkan"}
+                          </p>
+                        </td>
+                        <td className="kanan">
+                          <span className="upt-tindakan">
+                            {u.status === "menunggu" ? (
+                              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setDialogBatal(u)}>
+                                Batalkan usulan
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  className="dsb-tombol dsb-tombol-kecil"
+                                  data-jenis={u.status === "draf" && kurang.length === 0 ? "garis" : undefined}
+                                  onClick={() => lanjutkanDraf(u)}
+                                >
+                                  {u.status === "revisi" ? "Perbaiki usulan" : kurang.length > 0 ? "Lengkapi draf" : "Ubah draf"}
+                                </button>
+                                <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setDialogBatal(u)}>
+                                  Hapus
+                                </button>
+                              </>
+                            )}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {tampil.map((p) => {
                     const k = keadaan(p);
                     // Usulan yang sedang ditinjau Kanwil tidak boleh disentuh UPT, jadi tombolnya pun
@@ -979,7 +1090,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 t.catatan ? `${t.jenis === "perbaiki" ? "Catatan Kanwil" : "Belum ada"}: ${t.catatan}` : "",
                 // Masa usul KGB-nya belum dibuka: kapan terbuka, dan jalan lain bila perbaikannya mendesak.
                 kunci
-                  ? `Masa usul KGB ${namaBulan(kunci.bulanTmt)} dibuka ${namaBulan(kunci.bulanKirim)}, 2 bulan sebelum TMT. Bila mendesak, ajukan lewat Usulan kolektif`
+                  ? `Masa usul KGB ${namaBulan(kunci.bulanTmt)} dibuka ${namaBulan(kunci.bulanKirim)}, 2 bulan sebelum TMT. Bila mendesak, ajukan lewat Usul KGB Kolektif`
                   : "",
                 p?.satkerTugas ? `Sedang BKO di ${namaUnitKerja(p.satkerTugas)}; KGB tetap diusulkan satker ini` : "",
               ]
@@ -1248,11 +1359,12 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
       {halaman === "pegawai" ? (
         <header className="dsb-halaman-kepala dsb-muncul">
           <div className="min-w-0">
-            <p className="dsb-label">Data Pegawai</p>
-            <h1 className="dsb-halaman-judul">{data ? `Pegawai ${namaTampilSatker(data.satker)}` : "Pegawai satker"}</h1>
+            <p className="dsb-label">Pegawai Satker</p>
+            <h1 className="dsb-halaman-judul">{data ? namaTampilSatker(data.satker) : "Satker Anda"}</h1>
             <p className="dsb-sub">
               Status KGB setiap pegawai di Kanwil. Dari sini pegawai baru ditambahkan, daftar pegawai diunggah
-              sekaligus, perbaikan data diusulkan, dan mutasi atau pemberhentian dilaporkan.
+              sekaligus, perbaikan data diusulkan, dan mutasi atau pemberhentian dilaporkan. Pegawai baru yang belum
+              disetujui Kanwil tampil sebagai baris bertanda; memilih dan mengajukannya lewat Usul KGB Kolektif.
             </p>
           </div>
         </header>
@@ -1357,7 +1469,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 </button>
                 {perluDikerjakan.length > 0 && (
                   <Link href={tautan} className="kgbm-tombol kgbm-utama" onClick={() => setDialogPeriode(null)}>
-                    Siapkan usulan kolektif
+                    Siapkan usul KGB kolektif
                   </Link>
                 )}
               </>
@@ -1401,7 +1513,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                   <p className="kgbm-bantuan">
                     {terlambatMode
                       ? "Yang terlambat tetap berhak KGB; selisihnya dibayar sebagai rapelan. Ajukan secepatnya agar tidak makin menumpuk."
-                      : "Tombol di bawah membuka Usulan kolektif dengan pegawai periode ini sudah tercentang."}
+                      : "Tombol di bawah membuka Usul KGB Kolektif dengan pegawai periode ini sudah tercentang."}
                   </p>
                 )}
               </>
@@ -1643,7 +1755,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           <span className="upt-deret" style={{ marginLeft: "auto" }}>
             <Link href="/dashboard/upt/riwayat" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">Riwayat</Link>
             <Link href="/dashboard/upt/pegawai" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">
-              Data pegawai ({pegawai.length})
+              Pegawai Satker ({pegawai.length})
             </Link>
           </span>
         </div>
@@ -1703,7 +1815,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                         </summary>
                         <p className="upt-terkunci-ket">
                           Draf data pegawai yang KGB-nya belum masuk masa usul. Terbuka sendiri pada bulan kirimnya, 2 bulan
-                          sebelum TMT. Yang mendesak tetap dapat diajukan lewat Usulan kolektif.
+                          sebelum TMT. Yang mendesak tetap dapat diajukan lewat Usul KGB Kolektif.
                         </p>
                         <div className="upt-terkunci-isi">
                           {kunciTampil.map((g) => (

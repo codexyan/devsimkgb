@@ -750,7 +750,7 @@ export default async function IsiPanduan({
                   <li>Buka SIM-KGB dan kenali enam menu Anda.</li>
                   <li>Tunggu pengingat masa kirim, atau lihat sendiri pita jadwal di dashboard.</li>
                   <li>Pastikan data pegawai sudah sama dengan SK; yang keliru dibetulkan lewat usulan.</li>
-                  <li>Siapkan usulan di Usulan kolektif: pilih pegawainya, lengkapi data dan berkasnya.</li>
+                  <li>Siapkan usulan di Usul KGB Kolektif: pilih pegawainya, lengkapi data dan berkasnya.</li>
                   <li>Kirim surat usulan lewat Srikandi, lalu ajukan ke Kanwil dengan nomor surat itu.</li>
                   <li>Setelah SK terbit: unduh, rekam di Gaji Web satker, lalu tandai di SIM-KGB.</li>
                 </ol>
@@ -784,7 +784,7 @@ export default async function IsiPanduan({
                 <p>
                   Dokumen aslinya ada di UPT, sedangkan yang mengetik datanya selama ini Kanwil. Pengetikan ganda itulah
                   sumber salah masa kerja golongan. Karena itu UPT mendata sendiri pegawainya. Ada empat jalan masuk,
-                  semuanya dari menu <strong>Data Pegawai</strong>.
+                  semuanya dari menu <strong>Pegawai Satker</strong>.
                 </p>
                 <LayarDataPegawai />
                 <p>
@@ -927,9 +927,9 @@ export default async function IsiPanduan({
                   kekeliruan.
                 </p>
 
-                <h3 className="pub-h3">Langkah 4: Siapkan usulan di Usulan kolektif</h3>
+                <h3 className="pub-h3">Langkah 4: Siapkan usulan di Usul KGB Kolektif</h3>
                 <p>
-                  Inilah tempat kerja utama Anda tiap periode. <strong>Usulan kolektif</strong> menyiapkan usul KGB
+                  Inilah tempat kerja utama Anda tiap periode. <strong>Usul KGB Kolektif</strong> menyiapkan usul KGB
                   beberapa pegawai untuk satu surat, dalam tiga langkah. Halamannya dibuka pada pegawai yang jatuh tempo
                   periode ini. Draf pegawai baru hasil Unggah daftar tidak ikut kecuali dipilih di saringan{" "}
                   <em>Pegawai baru</em>, sehingga pendataan ratusan pegawai dapat dikirim bertahap dan tidak tercampur
@@ -1005,7 +1005,7 @@ export default async function IsiPanduan({
                 </p>
                 <p>
                   Setelah SK KGB direkam di Gaji Web, SK itulah dasar KGB reguler berikutnya. Kolom{" "}
-                  <em>Dasar KGB berikutnya</em> di Data Pegawai menunjukkan SK mana yang berlaku sekarang, dan berpindah
+                  <em>Dasar KGB berikutnya</em> di Pegawai Satker menunjukkan SK mana yang berlaku sekarang, dan berpindah
                   sendiri begitu ada SK kenaikan pangkat, penyesuaian ijazah, atau peninjauan masa kerja yang lebih baru
                   disetujui Kanwil. Bagi pegawai yang belum pernah KGB di SIM-KGB, kolom itu menampilkan SK dasar yang
                   tercatat di data pegawainya: SK KGB terakhir yang terbit di luar SIM-KGB, atau SK CPNS.
@@ -1137,7 +1137,7 @@ export default async function IsiPanduan({
                     yang masa usul KGB-nya belum dibuka disimpan terlipat di bagian <em>Terkunci sampai masa usul KGB</em>,
                     tanpa kotak centang, dan terbuka sendiri pada bulan kirimnya, 2 bulan sebelum TMT. Draf pegawai baru
                     dan usulan yang dikembalikan Kanwil tidak pernah dikunci. Perbaikan yang mendesak tetap dapat
-                    diajukan lebih awal lewat <strong>Usulan kolektif</strong>. Bila ada yang keliru, pilih{" "}
+                    diajukan lebih awal lewat <strong>Usul KGB Kolektif</strong>. Bila ada yang keliru, pilih{" "}
                     <strong>Usulkan perbaikan data</strong> sebelum batas itu. Hukuman disiplin yang belum dilaporkan
                     disampaikan lewat menu <strong>Lapor Hukdis</strong>; pegawai yang pindah, BKO, atau berhenti
                     dilaporkan dengan <strong>Laporkan mutasi</strong> pada barisnya. Pegawai yang sedang{" "}
@@ -1163,9 +1163,9 @@ export default async function IsiPanduan({
                     seperti laporan mutasi dan laporan hukuman disiplin. Kartunya meminta sekalian berkas lain yang
                     akan ditagih (SK KGB terakhir dan SK kenaikan pangkat terakhir), dan begitu semuanya terlampir,
                     tombol <strong>Kirim ke Kanwil</strong> menyalakan dirinya: satu jendela, selesai, tanpa mampir
-                    ke Usulan kolektif. Berkas yang pemindaiannya belum selesai tidak membuat isian hilang; simpan
+                    ke Usul KGB Kolektif. Berkas yang pemindaiannya belum selesai tidak membuat isian hilang; simpan
                     sebagai draf, lalu kirim setelah lengkap. Usulan yang sekalian mengubah jabatan atau kolom lain
-                    tetap berangkat bersurat lewat Usulan kolektif seperti biasa. SK
+                    tetap berangkat bersurat lewat Usul KGB Kolektif seperti biasa. SK
                     yang sudah dicatat Kanwil terlihat di <strong>Riwayat KGB</strong>, pada baris pegawai yang
                     dibuka, dan pada kolom <em>Dasar KGB berikutnya</em> baris itu bertanda <em>Dari KP/PI</em> atau{" "}
                     <em>Dari PMK</em>.

@@ -155,7 +155,7 @@ export async function POST(req: Request) {
       tanggalSkTerakhir: null,
       // Sebab golongan atau masa kerja berubah beserta SK-nya (ADR-030), bila berkasnya menyebutkan.
       // Baris yang mengosongkannya tetap tersimpan sebagai draf, dan kekurangannya ditagih saat draf itu
-      // dilengkapi di Usulan kolektif.
+      // dilengkapi di Usul KGB Kolektif.
       dasarBaruJenis: h.dasarBaru?.dasarBaruJenis ?? null,
       dasarBaruJenisKp: h.dasarBaru?.dasarBaruJenisKp ?? null,
       dasarBaruNomorSk: h.dasarBaru?.dasarBaruNomorSk ?? null,

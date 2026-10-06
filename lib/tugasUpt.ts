@@ -97,7 +97,7 @@ function geserBulanKunci(bulan: string, n: number): string {
  *
  * Tidak dikunci: draf pegawai baru (datanya belum ada di Kanwil sama sekali, sehingga pendataan tidak boleh menunggu
  * jadwal KGB) dan usulan yang dikembalikan Kanwil (sudah pernah dikirim dan sedang ditunggu perbaikannya). Kuncinya
- * hanya di dasbor: Usulan kolektif dan Data Pegawai tetap dapat mengajukannya bila mendesak.
+ * hanya di dasbor: Usul KGB Kolektif dan Pegawai Satker tetap dapat mengajukannya bila mendesak.
  */
 export function drafTerkunci(
   usulan: { status: string; jenis?: string },

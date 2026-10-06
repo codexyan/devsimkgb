@@ -22,7 +22,7 @@ import { pratinjauAtasDasarUsulan } from "@/lib/linimasaDasarSk";
 import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
 import { asalAtasDasar, hitungFormulirUsulan, jawabSkBaru, teksAtasDasar } from "./skSesudahAcuan";
 
-/* Usulan kolektif Admin UPT (ADR-015, ADR-029): usul KGB beberapa pegawai dalam satu surat Srikandi. Halaman dibuka
+/* Usul KGB Kolektif Admin UPT (ADR-015, ADR-029): usul KGB beberapa pegawai dalam satu surat Srikandi. Halaman dibuka
    pada pegawai jatuh tempo periode ini; perbaikan data dan draf pegawai baru hasil Unggah daftar hanya ikut bila
    dipilih (ADR-063). Halaman ini tiga langkah:
      1. Pilih pegawai: dikelompokkan per bulan TMT, dengan saringan jatuh tempo periode ini, pegawai baru, ada draf,
@@ -233,7 +233,7 @@ export default function UsulanKolektif() {
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
   const [terpilih, setTerpilih] = useState<Set<string>>(() => new Set());
-  // Draf pegawai baru hasil Unggah daftar tidak ikut kecuali dipilih di sini: Usulan kolektif terutama untuk usul KGB
+  // Draf pegawai baru hasil Unggah daftar tidak ikut kecuali dipilih di sini: Usul KGB Kolektif terutama untuk usul KGB
   // beberapa pegawai dalam satu surat Srikandi (ADR-063). Dulu semuanya ikut otomatis (ADR-060).
   const [baruTerpilih, setBaruTerpilih] = useState<Set<string>>(() => new Set());
   const [cari, setCari] = useState("");
@@ -625,17 +625,17 @@ export default function UsulanKolektif() {
     <div ref={halamanRef} className="dsb-halaman kol" data-muat-layar="">
       <header className="dsb-halaman-kepala dsb-muncul">
         <div className="min-w-0">
-          <p className="dsb-label">Data Pegawai</p>
-          <h1 className="dsb-halaman-judul">Usulan kolektif</h1>
+          <p className="dsb-label">Usulan ke Kanwil</p>
+          <h1 className="dsb-halaman-judul">Usul KGB Kolektif</h1>
           <p className="dsb-sub">
             Usul KGB beberapa pegawai dalam satu surat Srikandi: pilih pegawai yang jatuh tempo, lengkapi data dan
             berkasnya satu per satu, lalu ajukan semuanya dengan satu surat ke Kanwil.
           </p>
         </div>
-        <Link href="/dashboard/upt/pegawai" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">← Data Pegawai</Link>
+        <Link href="/dashboard/upt/pegawai" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis">← Pegawai Satker</Link>
       </header>
 
-      <ol className="kol-langkah dsb-muncul" aria-label="Langkah usulan kolektif">
+      <ol className="kol-langkah dsb-muncul" aria-label="Langkah usul KGB kolektif">
         {LANGKAH.map((l) => (
           <li key={l.n}>
             <button
@@ -938,7 +938,7 @@ export default function UsulanKolektif() {
           <div ref={kakiRef} className="kol-kaki">
             <span>
               <strong>{jumlahLengkap}</strong> dari {baris.length} lengkap · <strong>{jumlahBerubah}</strong> belum disimpan. Draf belum
-              mengubah Data Pegawai; perubahannya berlaku setelah usulan disetujui Kanwil.
+              mengubah data pegawai di SIM-KGB; perubahannya berlaku setelah usulan disetujui Kanwil.
             </span>
             <span className="kol-kaki-tombol">
               <button type="button" className="dsb-tombol kol-kaki-kembali" data-jenis="garis" onClick={() => setLangkah(1)} disabled={menyimpan}>

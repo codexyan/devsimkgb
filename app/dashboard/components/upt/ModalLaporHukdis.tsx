@@ -54,7 +54,7 @@ export default function ModalLaporHukdis({
   jenis: JenisHukdisUpt[];
   /** Diisi saat mengirim ulang laporan yang dikembalikan. */
   awal: LaporanHukdisAwal | null;
-  /** Pegawai yang langsung terpilih, mis. dari tautan di Data Pegawai. */
+  /** Pegawai yang langsung terpilih, mis. dari tautan di Pegawai Satker. */
   pegawaiAwal?: string | null;
   onTutup: () => void;
   onSelesai: (pesan: string) => void;

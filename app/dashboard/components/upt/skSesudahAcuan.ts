@@ -1,4 +1,4 @@
-// SK sesudah SK KGB terakhir pada formulir UPT (ADR-065), dipakai bersama formulir perorangan dan Usulan kolektif.
+// SK sesudah SK KGB terakhir pada formulir UPT (ADR-065), dipakai bersama formulir perorangan dan Usul KGB Kolektif.
 //
 // SK KGB terakhir (atau SK CPNS) tetap acuan jadwal KGB. SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang
 // terbit sesudahnya dilaporkan lewat satu pertanyaan wajib, dan SK paling baru di antara keduanya menjadi Atas

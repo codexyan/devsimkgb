@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 const UsulanKolektif = dynamic(() => import("@/app/dashboard/components/upt/UsulanKolektif"), {
   ssr: false,
   loading: () => (
-    <div className="dsb-halaman" role="status" aria-label="Memuat usulan kolektif">
+    <div className="dsb-halaman" role="status" aria-label="Memuat usul KGB kolektif">
       <div className="dsb-kerangka" style={{ height: 90 }} />
       <div className="dsb-kerangka" style={{ height: 420 }} />
     </div>
