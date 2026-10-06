@@ -18,7 +18,7 @@ import { formatTanggalId, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 
 /** SK riwayat yang pindaiannya diunggah. */
 export interface SkRiwayat {
-  jenis: Extract<JenisDokumen, "sk_pangkat" | "sk_pmk">;
+  jenis: Extract<JenisDokumen, "sk_pangkat" | "sk_pmk" | "sk_kgb">;
   nomorSK: string;
   tanggalSK: string | null;
   /** Judul baris riwayat, mis. "II/b → III/a · Pilihan: Penyesuaian Ijazah". */

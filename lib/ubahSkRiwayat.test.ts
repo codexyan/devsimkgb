@@ -191,3 +191,39 @@ test("riwayat kembar (ADR-069): data SK tetap dapat dibetulkan, salah satunya da
     assert.ok(!ulang.ok && ulang.status === 409);
   });
 });
+
+test("Ubah SK dasar (ADR-070): KGB yang belum ditandatangani dan riwayat bernomor sama ikut; yang bertanda tangan tidak", async () => {
+  await denganDataLokal(async () => {
+    const { db } = await import("./db");
+    const { makeRiwayatKGB } = await import("./sheets/tables");
+    const { selaraskanSkDasarPegawai } = await import("./selarasSkDasar");
+    const lama = {
+      id: "p3", nip: "199001012015031099", nama: "PEGAWAI DASAR", tempatLahir: null, tanggalLahir: null,
+      jenisKelamin: null, pendidikanTerakhir: null, jabatan: "Penelaah", pangkat: "Penata Muda",
+      golonganRuang: "III/a", unitKerja: "Kantor Wilayah", eselon: null, jenisJabatan: null,
+      tmtGolongan: tgl(2020, 4), mkgTahun: 6, mkgBulan: 0, gajiPokok: 3000000,
+      tmtKgbTerakhir: tgl(2024, 12), tmtKgbBerikutnya: tgl(2026, 12), statusHukdis: false,
+      tanggalHukdisBerakhir: null, jenisHukdis: null, keteranganHukdis: null, aktif: true,
+      createdAt: new Date(), updatedAt: new Date(), konfirmasiUptTmt: null, konfirmasiUptAt: null,
+      konfirmasiUptOleh: null, satkerTugas: null, berhentiTmt: null, berhentiAlasan: null,
+      nomorSkDasar: "W.17-KGB-2024", tanggalSkDasar: tgl(2024, 11, 20), penetapSkDasar: "Kepala Kantor Wilayah",
+    };
+    await db.pegawai.create(lama);
+    await db.riwayatKGB.create(
+      makeRiwayatKGB({ id: "k-jalan", pegawaiId: "p3", tmtKgbBaru: tgl(2026, 12), status: "sedang_diproses", nomorSK: "W.17-KGB-2024", tanggalSK: tgl(2024, 11, 20), penetapSkDasar: "Kepala Kantor Wilayah", createdAt: new Date() }),
+    );
+    await db.riwayatKGB.create(
+      makeRiwayatKGB({ id: "k-ttd", pegawaiId: "p3", tmtKgbBaru: tgl(2024, 12), status: "selesai", nomorSK: "W.17-KGB-2024", penetapSkDasar: "Kepala Kantor Wilayah", createdAt: new Date() }),
+    );
+    const baru = { ...lama, nomorSkDasar: "W.17-KGB-2024-BETUL", penetapSkDasar: "Kepala Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan" };
+    await db.pegawai.update({ id: "p3" }, baru);
+    const selaras = await selaraskanSkDasarPegawai(lama as never, baru as never);
+    const jalan = await db.riwayatKGB.findUnique({ id: "k-jalan" });
+    assert.equal(jalan?.nomorSK, "W.17-KGB-2024-BETUL");
+    assert.equal(jalan?.penetapSkDasar, baru.penetapSkDasar);
+    assert.equal((await db.riwayatKGB.findUnique({ id: "k-ttd" }))?.nomorSK, "W.17-KGB-2024");
+    assert.ok(selaras.some((s) => /ikut dibetulkan/.test(s)) && selaras.some((s) => /sudah ditandatangani/.test(s)), selaras.join(" | "));
+    // Tanpa perubahan SK dasar: tidak ada yang diselaraskan.
+    assert.deepEqual(await selaraskanSkDasarPegawai(baru as never, baru as never), []);
+  });
+});

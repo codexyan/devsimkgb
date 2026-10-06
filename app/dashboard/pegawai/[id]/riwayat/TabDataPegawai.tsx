@@ -42,6 +42,7 @@ export default function TabDataPegawai({
   versi,
   onTindakan,
   onSemuaDokumen,
+  atasDasar,
 }: {
   pegawai: PegawaiUbah;
   bolehUbah: boolean;
@@ -50,6 +51,8 @@ export default function TabDataPegawai({
   versi: number;
   onTindakan: (t: TindakanPegawai) => void;
   onSemuaDokumen: () => void;
+  /** Atas dasar KGB berikutnya menurut linimasa SK (ADR-070); hanya untuk peran pemegang dokumen. */
+  atasDasar?: ReactNode;
 }) {
   const [dokumen, setDokumen] = useState<DokumenPegawai[] | null>(null);
   const [mutasi, setMutasi] = useState<RiwayatMutasi[] | null>(null);
@@ -197,10 +200,16 @@ export default function TabDataPegawai({
               <Baris label="Gaji pokok">{rupiah(pegawai.gajiPokok)}</Baris>
               <Baris label="TMT KGB terakhir">{tgl(pegawai.tmtKgbTerakhir)}</Baris>
               <Baris label="TMT KGB berikutnya">{tgl(pegawai.tmtKgbBerikutnya)}</Baris>
-              <Baris label="SK dasar" lebar>
+              {/* SK acuan jadwal KGB; Atas dasar KGB berikutnya bisa SK lain yang lebih baru (ADR-065, ADR-070). */}
+              <Baris label={pegawai.mkgTahun === 0 && pegawai.mkgBulan === 0 ? "SK CPNS (acuan jadwal)" : "SK KGB terakhir (acuan jadwal)"} lebar>
                 {[pegawai.nomorSkDasar, pegawai.tanggalSkDasar ? formatTanggalId(pegawai.tanggalSkDasar) : ""].filter(Boolean).join(" · ")}
               </Baris>
               <Baris label="Ditetapkan oleh" lebar>{pegawai.penetapSkDasar}</Baris>
+              {atasDasar && (
+                <Baris label="Atas dasar KGB berikutnya" lebar>
+                  {atasDasar}
+                </Baris>
+              )}
             </>
           ),
         })}

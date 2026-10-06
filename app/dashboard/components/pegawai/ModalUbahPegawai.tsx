@@ -184,14 +184,16 @@ export default function ModalUbahPegawai({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(badan),
       });
-      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      const d = (await res.json().catch(() => ({}))) as { error?: string; selaras?: string[] };
       if (!res.ok) throw new Error(d.error ?? "Data pegawai gagal disimpan.");
+      // SK dasar yang dibetulkan ikut ke KGB, arsip pindaian, dan riwayat bernomor sama (ADR-070).
+      const selaras = (d.selaras ?? []).map((s) => ` ${s}.`).join("");
       const tambahan = await unggahKeArsip(pegawai.id, lampiran, {
         nomorSK: bagian === "dasar" ? form.nomorSkDasar : "",
         tanggalSK: bagian === "dasar" ? form.tanggalSkDasar : "",
         keterangan: `Dilampirkan saat mengubah ${LABEL_BAGIAN_KECIL[bagian]}`,
       });
-      onBerhasil(`${LABEL_BAGIAN[bagian]} ${pegawai.nama} tersimpan.${tambahan}`);
+      onBerhasil(`${LABEL_BAGIAN[bagian]} ${pegawai.nama} tersimpan.${selaras}${tambahan}`);
     } catch (e) {
       setGalat(e instanceof Error ? e.message : "Data pegawai gagal disimpan.");
     } finally {

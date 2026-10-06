@@ -15,6 +15,11 @@ import {
   type SkRiwayat,
 } from "./SkRiwayatDasar";
 import { cariKembar } from "@/lib/riwayatKembar";
+import { RingkasAtasDasar, TombolDokumenSk, dokumenAtasDasar, pesanAtasDasarBerbeda, skKgb } from "./SinkronDasarKgb";
+import { muatLinimasaDasar, type DataLinimasa } from "@/app/dashboard/components/kgb/linimasa";
+import ModalLinimasaDasar from "@/app/dashboard/components/kgb/ModalLinimasaDasar";
+import { unduhUlangSk } from "@/lib/kgbAksi";
+import type { DokumenSk } from "@/lib/dokumenLinimasa";
 import { cariDokumenSk } from "@/lib/dokumenLinimasa";
 import type { DokumenPegawai } from "@/lib/dokumenPegawai";
 import TabDataPegawai, { type TindakanPegawai } from "./TabDataPegawai";
@@ -226,7 +231,13 @@ export default function RiwayatKGBPage() {
   // PMK dibuka, lalu dicocokkan menurut jenis dan nomor SK, sama dengan linimasa SK penetap gaji pokok (ADR-066).
   const [dokumenSk, setDokumenSk] = useState<DokumenPegawai[] | "gagal" | null>(null);
   const [versiDokumenSk, setVersiDokumenSk] = useState(0);
-  const [pratinjauSk, setPratinjauSk] = useState<{ judul: string; subjudul: string; url: string } | null>(null);
+  const [pratinjauSk, setPratinjauSk] = useState<{ judul: string; subjudul: string; url: string; lokal?: boolean } | null>(null);
+  // Atas dasar KGB yang berjalan atau berikutnya menurut linimasa SK, satu sumber untuk kartu Dasar KGB dan tab Riwayat
+  // KGB (ADR-070).
+  const [linimasaHalaman, setLinimasaHalaman] = useState<DataLinimasa | null | "gagal">(null);
+  const [bukaLinimasa, setBukaLinimasa] = useState(false);
+  const [memuatDraf, setMemuatDraf] = useState<string | null>(null);
+  const [galatSk, setGalatSk] = useState<string | null>(null);
   const [unggahSk, setUnggahSk] = useState<SkRiwayat | null>(null);
   const [ubahSk, setUbahSk] = useState<DataUbahSkRiwayat | null>(null);
   const [hapusKembar, setHapusKembar] = useState<{
@@ -243,7 +254,7 @@ export default function RiwayatKGBPage() {
     return () => clearTimeout(t);
   }, [bolehDokumen]);
   useEffect(() => {
-    if (!bolehDokumen || activeTab !== "pangkat") return;
+    if (!bolehDokumen || (activeTab !== "pangkat" && activeTab !== "kgb" && activeTab !== "data")) return;
     let batal = false;
     fetch(`/api/pegawai/${encodeURIComponent(id)}/dokumen`, { cache: "no-store" })
       .then(async (r) => {
@@ -260,6 +271,41 @@ export default function RiwayatKGBPage() {
       batal = true;
     };
   }, [bolehDokumen, activeTab, id, versiDokumenSk]);
+  // KGB yang sedang diproses memakai konteks Buat SK (batas bawahnya TMT sebelum KGB itu); selain itu KGB berikutnya.
+  const kgbBerjalanId = riwayat.find((r) => r.status === "sedang_diproses" && !r.isArsip)?.id ?? null;
+  const tmtBerikutnya = pegawai?.tmtKgbBerikutnya ?? null;
+  useEffect(() => {
+    if (!bolehDokumen || !tmtBerikutnya || (activeTab !== "data" && activeTab !== "kgb")) return;
+    let batal = false;
+    muatLinimasaDasar(id, kgbBerjalanId ? { jenis: "buat-sk", kgbId: kgbBerjalanId } : { jenis: "input", tmtKgbBaru: tmtBerikutnya })
+      .then((h) => {
+        if (!batal) setLinimasaHalaman(h.ok ? h.data : "gagal");
+      })
+      .catch(() => {
+        if (!batal) setLinimasaHalaman("gagal");
+      });
+    return () => {
+      batal = true;
+    };
+  }, [bolehDokumen, activeTab, id, kgbBerjalanId, tmtBerikutnya, versiDokumenSk, versiData]);
+
+  /** Buka dokumen SK di jendela pratinjau; draf cetakan SIM-KGB dicetak ulang lebih dulu. */
+  async function lihatSk(judul: string, dok: DokumenSk, kunci: string) {
+    setGalatSk(null);
+    if (dok.jenis === "berkas") {
+      setPratinjauSk({ judul, subjudul: dok.sumber, url: dok.url });
+      return;
+    }
+    setMemuatDraf(kunci);
+    const hasil = await unduhUlangSk(dok.kgbId);
+    setMemuatDraf(null);
+    if (!hasil.ok) {
+      setGalatSk(hasil.error);
+      return;
+    }
+    setPratinjauSk({ judul, subjudul: dok.sumber, url: URL.createObjectURL(hasil.data), lokal: true });
+  }
+  const daftarDokumen = Array.isArray(dokumenSk) ? dokumenSk : null;
   const dokumenRiwayat = (jenis: "kp" | "pmk", nomorSK: string | null | undefined) =>
     dokumenSk === null ? undefined : dokumenSk === "gagal" ? "gagal" : cariDokumenSk(jenis, nomorSK, dokumenSk);
 
@@ -665,6 +711,12 @@ export default function RiwayatKGBPage() {
         </div>
       )}
 
+      {galatSk && (
+        <div role="alert" className="dsb-pesan" data-nada="merah" style={{ marginBottom: 16 }}>
+          <p>{galatSk}</p>
+        </div>
+      )}
+
       {/* Tabs: satu baris; di ponsel bergulir mendatar (pgw-tab di dasbor.css) */}
       <div className="pgw-tab" role="group" aria-label="Bagian halaman pegawai">
         {(["data", "kgb", "pangkat", ...(canHukdis ? ["hukdis"] : []), ...(bolehDokumen ? ["dokumen"] : [])] as const).map((tab) => (
@@ -703,6 +755,16 @@ export default function RiwayatKGBPage() {
             versi={versiData}
             onTindakan={setTindakan}
             onSemuaDokumen={() => setActiveTab("dokumen")}
+            atasDasar={
+              bolehDokumen ? (
+                <RingkasAtasDasar
+                  data={linimasaHalaman}
+                  memuatDraf={memuatDraf === "dasar"}
+                  onLihat={(sk, dok) => void lihatSk(`${sk.label}${sk.nomorSK ? ` ${sk.nomorSK}` : ""}`, dok, "dasar")}
+                  onLinimasa={() => setBukaLinimasa(true)}
+                />
+              ) : undefined
+            }
           />
         ) : (
           <div className="dsb-kerangka" style={{ height: 280 }} role="status" aria-label="Memuat data pegawai" />
@@ -970,7 +1032,23 @@ export default function RiwayatKGBPage() {
       )}
 
       {pratinjauSk && (
-        <ModalPratinjauBerkas judul={pratinjauSk.judul} subjudul={pratinjauSk.subjudul} url={pratinjauSk.url} onTutup={() => setPratinjauSk(null)} />
+        <ModalPratinjauBerkas
+          judul={pratinjauSk.judul}
+          subjudul={pratinjauSk.subjudul}
+          url={pratinjauSk.url}
+          onTutup={() => {
+            if (pratinjauSk.lokal) URL.revokeObjectURL(pratinjauSk.url);
+            setPratinjauSk(null);
+          }}
+        />
+      )}
+      {bukaLinimasa && pegawai && (
+        <ModalLinimasaDasar
+          pegawai={{ nama: pegawai.nama, nip: pegawai.nip }}
+          data={linimasaHalaman === "gagal" ? null : linimasaHalaman}
+          galat={linimasaHalaman === "gagal" ? "Linimasa SK gagal dimuat." : null}
+          onTutup={() => setBukaLinimasa(false)}
+        />
       )}
       {hapusKembar && (
         <ModalHapusRiwayatKembar
@@ -1114,7 +1192,8 @@ export default function RiwayatKGBPage() {
                         <p className="text-xs font-bold" style={{ color: "var(--dtn)" }}>
                           {tanggalPanjang(r.tmtKgbBerikutnya)}
                         </p>
-                        {nomorSkTerisi(r.nomorSK) && (
+                        {/* Pemegang dokumen melihat SK ini dan Atas dasarnya di kaki kartu, lengkap dengan pindaiannya. */}
+                        {nomorSkTerisi(r.nomorSK) && !bolehDokumen && (
                           <p className="text-xs mt-1" style={{ color: "var(--dt4)" }}>
                             {r.isArsip ? "Nomor SK" : "SK terakhir"}: {r.nomorSK}
                           </p>
@@ -1129,7 +1208,7 @@ export default function RiwayatKGBPage() {
                         <p className="text-xs" style={{ color: "var(--st-green)" }}>
                           {nomorSurat ? `${r.isArsip ? "Nomor SK" : "Nomor SK Baru"}: ${nomorSurat}` : "SK tertandatangani sudah diunggah"}
                         </p>
-                        {r.surat.pathFile && (
+                        {r.surat.pathFile && !bolehDokumen && (
                           <a
                             href={tautanBerkasSk(r.surat.pathFile)}
                             target="_blank"
@@ -1147,6 +1226,64 @@ export default function RiwayatKGBPage() {
                         )}
                       </div>
                     )}
+                    {bolehDokumen && !r.isArsip && (r.status === "sedang_diproses" || r.status === "belum_diproses") && (
+                      // Atas dasar KGB yang berjalan atau berikutnya, dari sumber yang sama dengan kartu Dasar KGB (ADR-070).
+                      <div className="px-5 py-2.5" style={{ borderTop: "0.5px solid var(--ln1)", fontSize: "12px", color: "var(--dt3)" }}>
+                        <p style={{ margin: "0 0 4px", color: "var(--dt5)" }}>Atas dasar menurut linimasa SK</p>
+                        <RingkasAtasDasar
+                          data={linimasaHalaman}
+                          memuatDraf={memuatDraf === `dasar-${r.id}`}
+                          onLihat={(sk, dok) => void lihatSk(`${sk.label}${sk.nomorSK ? ` ${sk.nomorSK}` : ""}`, dok, `dasar-${r.id}`)}
+                          onLinimasa={() => setBukaLinimasa(true)}
+                        />
+                        {pesanAtasDasarBerbeda(r, linimasaHalaman) && (
+                          <p style={{ margin: "6px 0 0", color: "var(--st-amber)" }}>{pesanAtasDasarBerbeda(r, linimasaHalaman)}</p>
+                        )}
+                      </div>
+                    )}
+                    {bolehDokumen && (() => {
+                      // SK KGB ini sendiri dan SK yang menjadi Atas dasarnya, beserta pindaiannya (ADR-070).
+                      const milik = skKgb(r, daftarDokumen);
+                      const selesai = r.isArsip || r.status === "selesai" || r.status === "menunggu_keuangan";
+                      const nomorDasar = r.isArsip ? null : nomorSkTerisi(r.nomorSK) ? r.nomorSK : null;
+                      if (!(selesai && milik.nomor) && !nomorDasar) return null;
+                      return (
+                        <div className="px-5 py-2.5 flex flex-col gap-2" style={{ borderTop: "0.5px solid var(--ln1)", fontSize: "12px", color: "var(--dt5)" }}>
+                          {selesai && milik.nomor && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span style={{ color: "var(--dt3)" }}>SK KGB ini: {milik.nomor}</span>
+                              <TombolDokumenSk
+                                dok={dokumenSk === null ? undefined : milik.dok}
+                                memuat={memuatDraf === `sk-${r.id}`}
+                                onLihat={(dok) => void lihatSk(`SK KGB ${milik.nomor}`, dok, `sk-${r.id}`)}
+                                onUnggah={() =>
+                                  setUnggahSk({
+                                    jenis: "sk_kgb",
+                                    nomorSK: milik.nomor ?? "",
+                                    tanggalSK: r.surat?.tanggalSurat ?? (r.isArsip ? r.tanggalSK : null),
+                                    judul: `SK KGB TMT ${tanggalPanjang(r.tmtKgbBaru)}`,
+                                  })
+                                }
+                              />
+                            </div>
+                          )}
+                          {nomorDasar && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span style={{ color: "var(--dt3)" }}>
+                                Atas dasar: {nomorDasar}
+                                {r.tanggalSK ? ` · ${tanggalPanjang(r.tanggalSK)}` : ""}
+                                {r.penetapSkDasar ? ` · oleh ${r.penetapSkDasar}` : ""}
+                              </span>
+                              <TombolDokumenSk
+                                dok={dokumenSk === null ? undefined : dokumenAtasDasar(nomorDasar, riwayat, daftarDokumen)}
+                                memuat={memuatDraf === `atas-${r.id}`}
+                                onLihat={(dok) => void lihatSk(`SK ${nomorDasar}`, dok, `atas-${r.id}`)}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}

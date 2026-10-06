@@ -15,6 +15,7 @@ import { rencanaSiklusBerikutnya, type RencanaSiklusKgb } from "@/lib/jadwalKgb"
 import { infoStatusKgb } from "@/lib/statusKgb";
 import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { selaraskanSkDasarPegawai } from "@/lib/selarasSkDasar";
 
 export const runtime = "nodejs";
 
@@ -184,6 +185,10 @@ export async function PATCH(
     );
   }
 
+  // SK dasar yang dibetulkan ikut ke KGB yang belum ditandatangani, arsip pindaiannya, dan riwayat bernomor sama
+  // (ADR-070), sesudah jadwal Belum Diproses di atas dibuat ulang.
+  const selaras = await selaraskanSkDasarPegawai(lama, pegawai);
+
   if (ubahNip)
     logAudit({
       userId: userLogin.id,
@@ -194,11 +199,11 @@ export async function PATCH(
   logAudit({
     userId: userLogin.id,
     aksi: "edit_pegawai",
-    detail: `Edit data pegawai: ${pegawai.nama} (${pegawai.nip}), ${pegawai.jabatan}, Gol. ${pegawai.golonganRuang}, ${pegawai.unitKerja}${placeholderBaru ? ", jadwal KGB Belum Diproses diselaraskan" : ""}`,
+    detail: `Edit data pegawai: ${pegawai.nama} (${pegawai.nip}), ${pegawai.jabatan}, Gol. ${pegawai.golonganRuang}, ${pegawai.unitKerja}${placeholderBaru ? ", jadwal KGB Belum Diproses diselaraskan" : ""}${selaras.length > 0 ? `. SK dasar: ${selaras.join("; ")}` : ""}`,
     targetNama: pegawai.nama,
   });
 
-  return NextResponse.json(untukPeran(pegawai, role));
+  return NextResponse.json({ ...untukPeran(pegawai, role), selaras });
 }
 
 type BucketSk = {
