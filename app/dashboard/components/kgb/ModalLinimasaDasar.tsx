@@ -1,18 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import KerangkaModal from "./KerangkaModal";
+import ModalPratinjauBerkas from "./ModalPratinjauBerkas";
 import { Catatan, Lencana, Memuat } from "./BidangForm";
 import { IkonRiwayat } from "./ikon";
 import { bandingkanDasarSk, subjudulPegawai, type RingkasPegawai } from "./format";
 import type { DataLinimasa } from "./linimasa";
-import type { DataDasarSk } from "@/lib/kgbAksi";
+import { unduhUlangSk, type DataDasarSk } from "@/lib/kgbAksi";
 import type { SkGaji } from "@/lib/linimasaDasarSk";
+import type { DokumenSk } from "@/lib/dokumenLinimasa";
 import { formatTanggalId } from "@/lib/waktu";
 
 /**
  * Linimasa SK penetap gaji pokok (ADR-062): seluruh SK KGB, kenaikan pangkat (termasuk penyesuaian ijazah), dan PMK
- * pegawai menurut TMT-nya, dengan SK yang menjadi Atas dasar KGB ini ditandai. Dibuka dari bagian Atas Dasar SK Terakhir
- * di Input KGB dan Buat SK, di atas modal itu, supaya Tim SDM dapat memeriksa mengapa SK itu yang terpilih.
+ * pegawai menurut TMT-nya, dari yang terlama ke yang terbaru, dengan SK yang menjadi Atas dasar KGB ini ditandai dan
+ * diringkas di atas. Dibuka dari bagian Atas Dasar SK Terakhir di Input KGB dan Buat SK, di atas modal itu, supaya Tim
+ * SDM dapat memeriksa mengapa SK itu yang terpilih. Tiap SK dapat dibuka dokumennya dalam jendela pratinjau (ADR-066).
  */
 export default function ModalLinimasaDasar({
   pegawai,
@@ -36,8 +40,49 @@ export default function ModalLinimasaDasar({
 }) {
   const linimasa = data?.linimasa ?? null;
   const banding = linimasa && isian ? bandingkanDasarSk(isian, linimasa) : null;
-  const sebelum = linimasa?.sk.filter((s) => s.peran !== "sesudah") ?? [];
-  const sesudah = linimasa?.sk.filter((s) => s.peran === "sesudah") ?? [];
+  // SK yang TMT-nya tidak tercatat tidak dapat diletakkan di garis waktu; dikelompokkan di bawah, kecuali bila justru
+  // SK itulah dasarnya.
+  const tanpaTmt = linimasa?.sk.filter((s) => !s.tmt && s.peran !== "dasar") ?? [];
+  const bertmt = linimasa?.sk.filter((s) => !tanpaTmt.includes(s)) ?? [];
+  const sebelum = bertmt.filter((s) => s.peran !== "sesudah");
+  const sesudah = bertmt.filter((s) => s.peran === "sesudah");
+  const dokumen = data?.dokumen ?? null;
+
+  const [pratinjau, setPratinjau] = useState<{ judul: string; subjudul: string; url: string; lokal: boolean } | null>(null);
+  const [memuatDraf, setMemuatDraf] = useState<string | null>(null);
+  const [galatDraf, setGalatDraf] = useState<string | null>(null);
+
+  async function lihat(sk: SkGaji, dok: DokumenSk) {
+    const judul = `${sk.label}${sk.nomorSK ? ` ${sk.nomorSK}` : ""}`;
+    setGalatDraf(null);
+    if (dok.jenis === "berkas") {
+      setPratinjau({ judul, subjudul: dok.sumber, url: dok.url, lokal: false });
+      return;
+    }
+    // SK yang belum diunggah bertanda tangan dicetak ulang dari data surat yang tersimpan, sama dengan Riwayat KGB.
+    setMemuatDraf(sk.kunci);
+    const hasil = await unduhUlangSk(dok.kgbId);
+    setMemuatDraf(null);
+    if (!hasil.ok) {
+      setGalatDraf(hasil.error);
+      return;
+    }
+    setPratinjau({ judul, subjudul: dok.sumber, url: URL.createObjectURL(hasil.data), lokal: true });
+  }
+
+  function tutupPratinjau() {
+    // Blob URL draf cetakan dicabut agar memorinya dilepas.
+    if (pratinjau?.lokal) URL.revokeObjectURL(pratinjau.url);
+    setPratinjau(null);
+  }
+
+  const tombol = (s: SkGaji) => (
+    <TombolDokumen
+      dok={dokumen ? (dokumen[s.kunci] ?? null) : undefined}
+      memuat={memuatDraf === s.kunci}
+      onLihat={(dok) => void lihat(s, dok)}
+    />
+  );
 
   return (
     <KerangkaModal
@@ -54,7 +99,8 @@ export default function ModalLinimasaDasar({
     >
       <Catatan nada="navy">
         Atas dasar SK KGB adalah <strong>SK terbaru yang menetapkan gaji pokok sebelum TMT KGB ini</strong>: SK KGB, SK
-        kenaikan pangkat (termasuk penyesuaian ijazah), atau SK PMK. SK yang berlaku sesudah TMT KGB ini belum dihitung.
+        kenaikan pangkat (termasuk penyesuaian ijazah), atau SK PMK. Linimasa di bawah berurutan dari SK terlama ke yang
+        terbaru; SK yang berlaku sesudah TMT KGB ini belum dihitung.
       </Catatan>
 
       {galat ? (
@@ -78,12 +124,30 @@ export default function ModalLinimasaDasar({
               atau sebagai Arsip KGB.
             </Catatan>
           )}
+          {linimasa.dasar && (
+            <div className="kgbm-linimasa-ringkas" role="group" aria-label="Atas dasar SK KGB ini">
+              <span>Atas dasar SK KGB ini</span>
+              <strong>
+                {linimasa.dasar.label}
+                {linimasa.dasar.nomorSK ? ` ${linimasa.dasar.nomorSK}` : ""}
+              </strong>
+              <span>
+                {linimasa.dasar.tmt ? `TMT ${formatTanggalId(linimasa.dasar.tmt)}` : "TMT tidak tercatat"}
+                {linimasa.dasar.tanggalSK ? ` · ditetapkan ${formatTanggalId(linimasa.dasar.tanggalSK)}` : ""}
+              </span>
+              {tombol(linimasa.dasar)}
+            </div>
+          )}
+          {dokumen === null && (
+            <Catatan>Daftar dokumen pegawai gagal dimuat, jadi dokumen tiap SK belum dapat dibuka. Linimasanya tetap benar.</Catatan>
+          )}
+          {galatDraf && <Catatan nada="merah">{galatDraf}</Catatan>}
           {linimasa.sk.length === 0 && !data?.tmtKgbBaru ? (
             <Catatan>Belum ada SK penetap gaji pokok yang tercatat untuk pegawai ini.</Catatan>
           ) : (
             <ol className="kgbm-linimasa" aria-label="SK penetap gaji pokok menurut TMT">
               {sebelum.map((s) => (
-                <ButirSk key={s.kunci} sk={s} />
+                <ButirSk key={s.kunci} sk={s} aksi={tombol(s)} />
               ))}
               {data?.tmtKgbBaru && (
                 <li className="kgbm-linimasa-kgb">
@@ -94,18 +158,55 @@ export default function ModalLinimasaDasar({
                 </li>
               )}
               {sesudah.map((s) => (
-                <ButirSk key={s.kunci} sk={s} />
+                <ButirSk key={s.kunci} sk={s} aksi={tombol(s)} />
               ))}
             </ol>
           )}
+          {tanpaTmt.length > 0 && (
+            <>
+              <p className="kgbm-linimasa-kelompok">TMT tidak tercatat · tidak dapat diletakkan di garis waktu</p>
+              <ol className="kgbm-linimasa" aria-label="SK penetap gaji pokok tanpa TMT">
+                {tanpaTmt.map((s) => (
+                  <ButirSk key={s.kunci} sk={s} aksi={tombol(s)} />
+                ))}
+              </ol>
+            </>
+          )}
           {linimasa.dasar && banding && <Perbandingan banding={banding} dasar={linimasa.dasar} isian={isian} onPakai={onPakai} />}
         </>
+      )}
+      {pratinjau && (
+        <ModalPratinjauBerkas judul={pratinjau.judul} subjudul={pratinjau.subjudul} url={pratinjau.url} onTutup={tutupPratinjau} />
       )}
     </KerangkaModal>
   );
 }
 
-function ButirSk({ sk }: { sk: SkGaji }) {
+/**
+ * Tombol dokumen satu SK. `dok` undefined: daftar dokumen gagal dimuat; null: belum ada pindaiannya.
+ */
+function TombolDokumen({
+  dok,
+  memuat,
+  onLihat,
+}: {
+  dok: DokumenSk | null | undefined;
+  memuat: boolean;
+  onLihat: (dok: DokumenSk) => void;
+}) {
+  if (dok === undefined) return null;
+  if (dok === null) return <span className="kgbm-linimasa-dok">Belum ada pindaian SK ini di SIM-KGB</span>;
+  return (
+    <span className="kgbm-linimasa-dok">
+      <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" disabled={memuat} onClick={() => onLihat(dok)}>
+        {memuat ? "Mencetak draf…" : dok.jenis === "draf" ? "Lihat draf SK" : "Lihat dokumen"}
+      </button>
+      <span>{dok.sumber}</span>
+    </span>
+  );
+}
+
+function ButirSk({ sk, aksi }: { sk: SkGaji; aksi?: React.ReactNode }) {
   return (
     <li data-peran={sk.peran}>
       <span className="kgbm-linimasa-titik" aria-hidden="true" />
@@ -141,6 +242,7 @@ function ButirSk({ sk }: { sk: SkGaji }) {
             </div>
           )}
         </dl>
+        {aksi}
       </div>
     </li>
   );

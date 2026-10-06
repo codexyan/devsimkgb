@@ -2,6 +2,7 @@
 // tidak mengimpor lapisan data server. Setiap aksi mengembalikan { ok, data } atau { ok, error }
 // dengan pesan galat dari API, sehingga modal cukup punya satu jalur tampilan galat.
 
+import type { DokumenPegawai } from "./dokumenPegawai";
 import { BATAS_UKURAN_SK_BYTE, PESAN_SK_TERLALU_BESAR } from "./prosesKgb";
 import type { DataSuratKGB } from "./generateSuratKGB";
 
@@ -162,6 +163,15 @@ export interface RiwayatPmkItem {
   tambahBulan?: number | null;
   gajiPokokBaru?: number | null;
   penetapSK: string | null;
+}
+
+/** Dokumen pegawai dari semua sumber (GET /api/pegawai/[id]/dokumen); hanya Super Admin dan Tim SDM KGB. */
+export function ambilDokumenPegawai(pegawaiId: string): Promise<HasilAksi<DokumenPegawai[]>> {
+  return kirimJson<DokumenPegawai[]>(
+    `/api/pegawai/${encodeURIComponent(pegawaiId)}/dokumen`,
+    { cache: "no-store" },
+    "Daftar dokumen pegawai gagal dimuat.",
+  );
 }
 
 export async function ambilRiwayatPmk(pegawaiId: string): Promise<HasilAksi<RiwayatPmkItem[]>> {

@@ -96,6 +96,8 @@ export interface DokumenPegawai {
   bisaHapus: boolean;
   /** Jenis dokumen bila diketahui, untuk memilih dokumen rujukan tiap tindakan; kosong untuk surat pengantar. */
   jenis?: JenisDokumen;
+  /** Berkas usulan UPT: status usulannya. Linimasa SK hanya memakai berkas usulan yang disetujui (ADR-066). */
+  status?: string;
 }
 
 /** Tindakan di halaman pegawai yang menampilkan dokumen rujukan (ADR-028). */
@@ -121,5 +123,6 @@ export const JENIS_BERKAS_USULAN: Record<string, JenisDokumen> = {
   skTerakhir: "sk_kgb",
   skPangkat: "sk_pangkat",
   skCpns: "sk_cpns",
+  skPmk: "sk_pmk",
   syaratCpns: "lainnya",
 };

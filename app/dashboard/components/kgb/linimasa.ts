@@ -1,8 +1,9 @@
 // Memuat linimasa SK penetap gaji pokok untuk modal Input KGB dan Buat SK (ADR-062). Datanya dari rute yang sudah
 // dipakai modal itu (data pegawai, riwayat KGB, kenaikan pangkat, PMK); susunannya dari lib/linimasaDasarSk.ts, aturan
-// yang sama dengan dasbor Admin UPT.
+// yang sama dengan dasbor Admin UPT. Dokumen tiap SK dicocokkan dari daftar dokumen pegawai (ADR-066).
 
 import {
+  ambilDokumenPegawai,
   ambilPegawaiKgb,
   ambilRiwayatKgb,
   ambilRiwayatPangkat,
@@ -11,6 +12,7 @@ import {
   type RiwayatKgbItem,
 } from "@/lib/kgbAksi";
 import { susunLinimasaDasar, type LinimasaDasarSk } from "@/lib/linimasaDasarSk";
+import { dokumenLinimasa, type DokumenSk } from "@/lib/dokumenLinimasa";
 import { pesanKgbBasi } from "@/lib/pemeriksaanUlangKgb";
 import { tmtTerakhirSebelumInput } from "@/lib/prosesKgb";
 import { tanggalKalender, type NilaiTanggal } from "@/lib/waktu";
@@ -27,6 +29,8 @@ export interface DataLinimasa {
   tmtKgbBaru: string | null;
   /** Buat SK: pesan bila golongan atau masa kerja pegawai berubah sesudah KGB ini diinput (ADR-062). */
   basi: string | null;
+  /** Dokumen tiap SK menurut kuncinya; null bila daftar dokumen gagal dimuat (linimasanya tetap tampil). */
+  dokumen: Record<string, DokumenSk | null> | null;
 }
 
 /** TMT KGB selesai yang terakhir sebelum KGB ini; cadangan bila tambahan masa kerjanya tidak diketahui. */
@@ -42,11 +46,12 @@ function selesaiSebelum(riwayat: readonly RiwayatKgbItem[], kgb: RiwayatKgbItem)
 }
 
 export async function muatLinimasaDasar(pegawaiId: string, konteks: KonteksLinimasa): Promise<HasilAksi<DataLinimasa>> {
-  const [hasilPegawai, hasilKgb, hasilKp, hasilPmk] = await Promise.all([
+  const [hasilPegawai, hasilKgb, hasilKp, hasilPmk, hasilDokumen] = await Promise.all([
     ambilPegawaiKgb(pegawaiId),
     ambilRiwayatKgb(pegawaiId),
     ambilRiwayatPangkat(pegawaiId),
     ambilRiwayatPmk(pegawaiId),
+    ambilDokumenPegawai(pegawaiId),
   ]);
   if (!hasilPegawai.ok) return hasilPegawai;
   if (!hasilKgb.ok) return hasilKgb;
@@ -108,5 +113,6 @@ export async function muatLinimasaDasar(pegawaiId: string, konteks: KonteksLinim
     tmtKgbBaru,
     kgbId,
   });
-  return { ok: true, data: { linimasa, tmtKgbBaru: tanggalKalender(tmtKgbBaru)?.toISOString() ?? null, basi } };
+  const dokumen = hasilDokumen.ok ? dokumenLinimasa(linimasa.sk, hasilDokumen.data, riwayat) : null;
+  return { ok: true, data: { linimasa, tmtKgbBaru: tanggalKalender(tmtKgbBaru)?.toISOString() ?? null, basi, dokumen } };
 }
