@@ -753,7 +753,11 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 }
 
 /* Antrian kerja: tabel bergulir di dalam panel, kepala kolom menempel */
+/* position: relative pada wadah gulir tabel: isi yang position: absolute (mis. label .sr-only "Aksi" di kepala kolom)
+   mengacu ke wadah ini dan ikut terpotong. Tanpa itu label tersebut mengacu ke dokumen, lolos dari pemotongan, dan di
+   ponsel melebarkan halaman sehingga modal tampil terpotong (ADR-064). */
 .dsb-antrian-gulir {
+  position: relative;
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -884,7 +888,27 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 /* Tabel panjang di halaman modul: bergulir mendatar selalu; pada layar lebar juga menurun di dalam panel,
    setinggi layar, agar kepala kolom tetap terlihat. Layar sempit memakai gulir halaman biasa. */
 .dsb-gulir-tabel {
+  /* Sama dengan .dsb-antrian-gulir: label .sr-only di kepala kolom tidak boleh melebarkan halaman (ADR-064). */
+  position: relative;
   overflow-x: auto;
+}
+
+/* Proses KGB di ponsel (ADR-064): tiap KGB satu kartu, bukan tabel selebar 900 px yang hanya dapat digeser ke samping
+   sehingga status dan tombol aksinya tersembunyi di luar layar. */
+.kgb-kartu-daftar { margin: 0; padding: 0; list-style: none; }
+.kgb-kartu { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; font-size: 13px; }
+.kgb-kartu + .kgb-kartu { border-top: 1px solid var(--ln2); }
+.kgb-kartu[data-redup] { color: var(--dt5); }
+.kgb-kartu-rinci { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); gap: 4px 16px; }
+.kgb-kartu-rinci > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.kgb-kartu-rinci p { margin: 0; }
+@media (max-width: 640px) {
+  /* Saringan Proses KGB di ponsel: dua kolom serata, kotak cari selebar baris, agar kartu pertama tidak terdorong jauh
+     ke bawah oleh lima pilihan yang bertumpuk satu per baris dengan lebar berbeda-beda. */
+  .dsb-alat.kgb-alat { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kgb-alat > .dsb-cari { grid-column: 1 / -1; width: 100%; }
+  .kgb-alat > .dsb-pilih { width: 100%; max-width: none; }
+  .kgb-alat > .dsb-tombol { justify-self: start; }
 }
 
 @media (min-width: 1024px) and (min-height: 640px) {

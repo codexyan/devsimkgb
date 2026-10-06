@@ -168,6 +168,10 @@ body {
      filter, dan nama kolom selalu terlihat.
    Override tinggi per halaman via --tbl-max bila chrome-nya lebih tinggi. */
 .tbl-scroll {
+  /* Wadah gulir harus menjadi blok acuan bagi isi yang position: absolute, misalnya label .sr-only "Aksi" di kepala
+     kolom. Tanpa itu label tersebut mengacu ke dokumen: lolos dari pemotongan wadah, lalu di ponsel melebarkan halaman
+     sampai tepi kanan tabel (768 px pada Proses KGB), sehingga semua modal tampil terpotong (ADR-064). */
+  position: relative;
   overflow: auto;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
