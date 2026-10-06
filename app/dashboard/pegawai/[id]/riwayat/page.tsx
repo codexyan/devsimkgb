@@ -5,6 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { canEditPegawai, canManageHukdis, canProcessKGB } from "@/lib/auth";
 import TabDokumenPemutakhiran from "./TabDokumenPemutakhiran";
+import { KakiSkRiwayat, ModalUbahSkRiwayat, ModalUnggahSkRiwayat, type DataUbahSkRiwayat, type SkRiwayat } from "./SkRiwayatDasar";
+import { cariDokumenSk } from "@/lib/dokumenLinimasa";
+import type { DokumenPegawai } from "@/lib/dokumenPegawai";
 import TabDataPegawai, { type TindakanPegawai } from "./TabDataPegawai";
 import ModalUbahPegawai, { LABEL_BAGIAN, LABEL_BAGIAN_KECIL, type BagianUbah, type PegawaiUbah } from "@/app/dashboard/components/pegawai/ModalUbahPegawai";
 import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
@@ -22,6 +25,7 @@ import {
   ModalBatalkanKgb,
   ModalBuatSk,
   ModalInputKgb,
+  ModalPratinjauBerkas,
   ModalUnggahSk,
   formatRupiah,
   nomorSkTerisi,
@@ -77,6 +81,7 @@ interface RiwayatKGB {
 /** Satu kenaikan pangkat dari GET /api/pegawai/[id]/pangkat. */
 interface RiwayatPangkat {
   id: string;
+  jenisKp: string;
   jenisLabel: string;
   nomorSK: string;
   tanggalSK: string | null;
@@ -90,6 +95,7 @@ interface RiwayatPangkat {
   gajiPokokLama: number;
   gajiPokokBaru: number;
   keterangan: string | null;
+  penetapSK: string | null;
 }
 
 /** Satu peninjauan masa kerja dari GET /api/pegawai/[id]/pmk. */
@@ -108,6 +114,7 @@ interface RiwayatPmk {
   tmtKgbBerikutnyaLama: string | null;
   tmtKgbBerikutnyaBaru: string | null;
   keterangan: string | null;
+  penetapSK: string | null;
 }
 
 interface RiwayatHukdis {
@@ -206,6 +213,13 @@ export default function RiwayatKGBPage() {
   // Tab Dokumen hanya untuk Super Admin dan Tim SDM KGB (ADR-023, ADR-028); ?tab=dokumen membukanya langsung.
   const bolehDokumen = canProcessKGB(role);
   const bolehUbah = canEditPegawai(role);
+  // Pindaian SK pada baris riwayat kenaikan pangkat dan PMK (ADR-067): daftar dokumen pegawai dimuat saat tab Pangkat &
+  // PMK dibuka, lalu dicocokkan menurut jenis dan nomor SK, sama dengan linimasa SK penetap gaji pokok (ADR-066).
+  const [dokumenSk, setDokumenSk] = useState<DokumenPegawai[] | "gagal" | null>(null);
+  const [versiDokumenSk, setVersiDokumenSk] = useState(0);
+  const [pratinjauSk, setPratinjauSk] = useState<{ judul: string; subjudul: string; url: string } | null>(null);
+  const [unggahSk, setUnggahSk] = useState<SkRiwayat | null>(null);
+  const [ubahSk, setUbahSk] = useState<DataUbahSkRiwayat | null>(null);
   useEffect(() => {
     if (!bolehDokumen) return;
     const t = setTimeout(() => {
@@ -213,6 +227,26 @@ export default function RiwayatKGBPage() {
     }, 0);
     return () => clearTimeout(t);
   }, [bolehDokumen]);
+  useEffect(() => {
+    if (!bolehDokumen || activeTab !== "pangkat") return;
+    let batal = false;
+    fetch(`/api/pegawai/${encodeURIComponent(id)}/dokumen`, { cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error();
+        return (await r.json()) as DokumenPegawai[];
+      })
+      .then((d) => {
+        if (!batal) setDokumenSk(d);
+      })
+      .catch(() => {
+        if (!batal) setDokumenSk("gagal");
+      });
+    return () => {
+      batal = true;
+    };
+  }, [bolehDokumen, activeTab, id, versiDokumenSk]);
+  const dokumenRiwayat = (jenis: "kp" | "pmk", nomorSK: string | null | undefined) =>
+    dokumenSk === null ? undefined : dokumenSk === "gagal" ? "gagal" : cariDokumenSk(jenis, nomorSK, dokumenSk);
 
   // Popup Proses KGB dan modal aksi KGB bersama
   const [showKgbPopup, setShowKgbPopup] = useState(false);
@@ -717,6 +751,10 @@ export default function RiwayatKGBPage() {
                         </span>
                       </dd>
                     </div>
+                    <div>
+                      <dt style={{ color: "var(--dt5)" }}>Ditetapkan oleh</dt>
+                      <dd style={{ margin: 0, color: p.penetapSK ? "var(--dtn)" : "var(--dt5)" }}>{p.penetapSK || "belum tercatat"}</dd>
+                    </div>
                     {p.keterangan && (
                       <div>
                         <dt style={{ color: "var(--dt5)" }}>Keterangan</dt>
@@ -724,6 +762,41 @@ export default function RiwayatKGBPage() {
                       </div>
                     )}
                   </dl>
+                  {(bolehDokumen || bolehUbah) && (
+                    <KakiSkRiwayat
+                      tampilDokumen={bolehDokumen}
+                      onUbah={
+                        bolehUbah
+                          ? () =>
+                              setUbahSk({
+                                jenis: "kp",
+                                riwayatId: p.id,
+                                judul: `${p.golonganLama ? `${p.golonganLama} → ${p.golonganBaru}` : p.golonganBaru} · ${p.jenisLabel}`,
+                                nomorSK: p.nomorSK ?? "",
+                                tanggalSK: p.tanggalSK,
+                                penetapSK: p.penetapSK,
+                                jenisKp: p.jenisKp,
+                              })
+                          : undefined
+                      }
+                      sk={{
+                        jenis: "sk_pangkat",
+                        nomorSK: p.nomorSK ?? "",
+                        tanggalSK: p.tanggalSK ?? null,
+                        judul: `${p.golonganLama ? `${p.golonganLama} → ${p.golonganBaru}` : p.golonganBaru} · ${p.jenisLabel}`,
+                      }}
+                      dok={dokumenRiwayat("kp", p.nomorSK)}
+                      onLihat={(d) => setPratinjauSk({ judul: `SK kenaikan pangkat ${p.nomorSK}`, subjudul: d.sumber, url: d.url })}
+                      onUnggah={() =>
+                        setUnggahSk({
+                          jenis: "sk_pangkat",
+                          nomorSK: p.nomorSK ?? "",
+                          tanggalSK: p.tanggalSK ?? null,
+                          judul: `${p.golonganLama ? `${p.golonganLama} → ${p.golonganBaru}` : p.golonganBaru} · ${p.jenisLabel}`,
+                        })
+                      }
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -772,6 +845,10 @@ export default function RiwayatKGBPage() {
                         </span>
                       </dd>
                     </div>
+                    <div>
+                      <dt style={{ color: "var(--dt5)" }}>Ditetapkan oleh</dt>
+                      <dd style={{ margin: 0, color: p.penetapSK ? "var(--dtn)" : "var(--dt5)" }}>{p.penetapSK || "belum tercatat"}</dd>
+                    </div>
                     {p.keterangan && (
                       <div>
                         <dt style={{ color: "var(--dt5)" }}>Keterangan</dt>
@@ -779,11 +856,64 @@ export default function RiwayatKGBPage() {
                       </div>
                     )}
                   </dl>
+                  {(bolehDokumen || bolehUbah) && (
+                    <KakiSkRiwayat
+                      tampilDokumen={bolehDokumen}
+                      onUbah={
+                        bolehUbah
+                          ? () =>
+                              setUbahSk({
+                                jenis: "pmk",
+                                riwayatId: p.id,
+                                judul: "Peninjauan masa kerja",
+                                nomorSK: p.nomorSK ?? "",
+                                tanggalSK: p.tanggalSK,
+                                penetapSK: p.penetapSK,
+                              })
+                          : undefined
+                      }
+                      sk={{ jenis: "sk_pmk", nomorSK: p.nomorSK ?? "", tanggalSK: p.tanggalSK ?? null, judul: "Peninjauan masa kerja" }}
+                      dok={dokumenRiwayat("pmk", p.nomorSK)}
+                      onLihat={(d) => setPratinjauSk({ judul: `SK PMK ${p.nomorSK}`, subjudul: d.sumber, url: d.url })}
+                      onUnggah={() =>
+                        setUnggahSk({ jenis: "sk_pmk", nomorSK: p.nomorSK ?? "", tanggalSK: p.tanggalSK ?? null, judul: "Peninjauan masa kerja" })
+                      }
+                    />
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
+      )}
+
+      {pratinjauSk && (
+        <ModalPratinjauBerkas judul={pratinjauSk.judul} subjudul={pratinjauSk.subjudul} url={pratinjauSk.url} onTutup={() => setPratinjauSk(null)} />
+      )}
+      {ubahSk && (
+        <ModalUbahSkRiwayat
+          pegawaiId={id}
+          data={ubahSk}
+          onTutup={() => setUbahSk(null)}
+          onSelesai={(pesan) => {
+            setUbahSk(null);
+            setPesanBerhasil(pesan);
+            fetchData();
+            setVersiDokumenSk((v) => v + 1);
+          }}
+        />
+      )}
+      {unggahSk && (
+        <ModalUnggahSkRiwayat
+          pegawaiId={id}
+          sk={unggahSk}
+          onTutup={() => setUnggahSk(null)}
+          onSelesai={(pesan) => {
+            setUnggahSk(null);
+            setPesanBerhasil(pesan);
+            setVersiDokumenSk((v) => v + 1);
+          }}
+        />
       )}
 
       {/* KGB Tab */}

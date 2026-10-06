@@ -10,6 +10,7 @@ import { catatKenaikanPangkat } from "@/lib/catatDasarGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
 import { tanggalKalender } from "@/lib/waktu";
+import { tanganiUbahSkRiwayat } from "@/lib/ubahSkRiwayatRute";
 import type { RiwayatPangkatRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
@@ -129,4 +130,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     },
     { status: 201 },
   );
+}
+
+/** PATCH, betulkan nomor, tanggal, penetap, atau jenis SK pada satu riwayat; salinannya ikut diselaraskan (ADR-068). */
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  return tanganiUbahSkRiwayat(req, params, "kp");
 }
