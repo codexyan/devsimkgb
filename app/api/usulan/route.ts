@@ -4,7 +4,8 @@ import { auth } from "@/auth";
 import { canProcessKGB } from "@/lib/auth";
 import { BERKAS_USULAN, bandingkanUsulan, nilaiUsulan, perubahanPegawai, ringkasHukdisUsulan, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { ringkasDasarBaru } from "@/lib/dasarBaruUsulan";
-import { usulanMenurutSk } from "@/lib/dasarSkUsulan";
+import { hitungSkPegawaiBaru, usulanBaruMenurutSk, usulanMenurutSk } from "@/lib/dasarSkUsulan";
+import { formatTanggalId } from "@/lib/waktu";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
 import type { RiwayatKGBRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
@@ -65,6 +66,9 @@ export async function GET(req: Request) {
   const daftar = semuaUsulan
     .map((u) => {
       const p = u.pegawaiId ? pegawaiById.get(u.pegawaiId) : null;
+      // Pegawai baru yang melaporkan SK sesudah SK KGB terakhir: masa kerjanya disalin dari SK itu dan dihitung
+      // mundur ke TMT KGB terakhir saat disetujui (ADR-065). Peninjau melihat hasil hitungannya.
+      const skBaru = u.jenis === "baru" ? hitungSkPegawaiBaru(u) : null;
       return {
         id: u.id,
         pegawaiId: u.pegawaiId,
@@ -82,10 +86,17 @@ export async function GET(req: Request) {
         // Kolom dasar gaji pada laporan SK kenaikan pangkat atau PMK ditampilkan menurut hitungan SK-nya,
         // yang sama dengan yang diterapkan saat disetujui, bukan angka mentah usulan (ADR-052).
         perubahan: u.status === "menunggu" && p ? bandingkanUsulan(p, usulanMenurutSk(p, u, perubahanPegawai(u))) : [],
-        nilaiDiusulkan: u.status === "menunggu" && p ? [] : nilaiUsulan(u),
+        nilaiDiusulkan: u.status === "menunggu" && p ? [] : nilaiUsulan(u.jenis === "baru" ? usulanBaruMenurutSk(u) : u),
         hukdis: ringkasHukdisUsulan(u),
         // SK kenaikan pangkat atau PMK yang disebut UPT sebagai sebab perubahan dasar gaji (ADR-030).
         dasarBaru: ringkasDasarBaru(u),
+        catatanSkBaru:
+          skBaru?.berlaku && skBaru.ok
+            ? `Masa kerja golongan pada SK ini ${skBaru.mkgPadaSk.tahun} tahun ${skBaru.mkgPadaSk.bulan} bulan (TMT ${formatTanggalId(skBaru.tmtSk)}), ` +
+              `disalin UPT apa adanya. Data di atas sudah dihitung mundur ke TMT KGB terakhir: ${skBaru.nilai.mkgTahun} tahun ${skBaru.nilai.mkgBulan} bulan.`
+            : skBaru?.berlaku
+              ? `SK ini belum dapat dihitung: periksa ${skBaru.pesan}.`
+              : null,
         hukdisKeterangan: u.hukdisKeterangan,
         nomorSkTerakhir: u.nomorSkTerakhir,
         tanggalSkTerakhir: u.tanggalSkTerakhir ? new Date(u.tanggalSkTerakhir).toISOString() : null,

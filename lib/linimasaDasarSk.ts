@@ -333,3 +333,64 @@ export function susunLinimasaDasar(input: MasukanLinimasa): LinimasaDasarSk {
 
   return { sk, dasar, kgbTanpaSk };
 }
+
+/** Atas dasar SK KGB berikutnya menurut isian usulan UPT; pratinjau di formulir Admin UPT (ADR-065). */
+export interface PratinjauAtasDasar {
+  jenis: JenisSkGaji;
+  label: string;
+  nomorSK: string | null;
+  /** TMT SK itu; bentuknya mengikuti sumbernya (yyyy-mm-dd dari isian, ISO dari catatan SIM-KGB). */
+  tmt: string | null;
+  /** laporan: SK yang dilaporkan pada usulan ini; tercatat: sudah tercatat di SIM-KGB; acuan: SK KGB terakhir (atau SK CPNS) pada isian. */
+  asal: "laporan" | "tercatat" | "acuan";
+}
+
+/**
+ * SK yang akan menjadi Atas dasar SK KGB berikutnya bila usulan ini disetujui, dengan aturan ADR-020: yang TMT-nya
+ * paling baru di antara SK KGB terakhir pada isian (acuan jadwal KGB), SK kenaikan pangkat atau PMK yang dilaporkan, dan
+ * dasar yang sudah tercatat di SIM-KGB. Pada TMT yang sama, SK kenaikan pangkat dan PMK menang atas SK KGB; di antara
+ * yang setara, isian usulan ini lebih dulu daripada catatan, sebab persetujuannya akan menggantikan catatan itu.
+ */
+export function pratinjauAtasDasarUsulan(input: {
+  acuan: { nomorSK: string; tanggalSK: string; tmt: string; cpns: boolean };
+  laporan: { jenis: string; jenisKp?: string; nomorSk: string; tmt: string } | null;
+  tercatat: { jenis: string; label: string; nomorSK: string | null; tmt: string | null } | null;
+}): PratinjauAtasDasar | null {
+  const calon: PratinjauAtasDasar[] = [];
+  const lap = input.laporan;
+  if (lap && (lap.jenis === "kp" || lap.jenis === "pmk") && tanggalKalender(lap.tmt)) {
+    calon.push({
+      jenis: lap.jenis,
+      label: lap.jenis === "kp" ? labelKenaikanPangkat(lap.jenisKp) : LABEL_SK_GAJI.pmk,
+      nomorSK: terisi(lap.nomorSk),
+      tmt: lap.tmt,
+      asal: "laporan",
+    });
+  }
+  const cat = input.tercatat;
+  if (cat && tanggalKalender(cat.tmt) && (cat.jenis === "kgb" || cat.jenis === "cpns" || cat.jenis === "kp" || cat.jenis === "pmk")) {
+    calon.push({ jenis: cat.jenis, label: cat.label, nomorSK: terisi(cat.nomorSK), tmt: cat.tmt, asal: "tercatat" });
+  }
+  const acu = input.acuan;
+  if ((terisi(acu.nomorSK) || tanggalKalender(acu.tanggalSK)) && tanggalKalender(acu.tmt)) {
+    const jenis: JenisSkGaji = acu.cpns ? "cpns" : "kgb";
+    calon.push({ jenis, label: acu.cpns ? LABEL_SK_GAJI.cpns : "SK KGB terakhir", nomorSK: terisi(acu.nomorSK), tmt: acu.tmt, asal: "acuan" });
+  }
+  const urutAsal = { laporan: 2, acuan: 1, tercatat: 0 } as const;
+  let terpilih: PratinjauAtasDasar | null = null;
+  for (const c of calon) {
+    if (!terpilih) {
+      terpilih = c;
+      continue;
+    }
+    const tc = tanggalKalender(c.tmt)!.getTime();
+    const tt = tanggalKalender(terpilih.tmt)!.getTime();
+    if (
+      tc > tt ||
+      (tc === tt && (peringkat(c.jenis) > peringkat(terpilih.jenis) ||
+        (peringkat(c.jenis) === peringkat(terpilih.jenis) && urutAsal[c.asal] > urutAsal[terpilih.asal])))
+    )
+      terpilih = c;
+  }
+  return terpilih;
+}

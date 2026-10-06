@@ -328,7 +328,7 @@ export default function RiwayatKgbUpt() {
                           <td className="whitespace-nowrap">
                             TMT {fmtTgl(akhir.tmtKgbBaru)}
                             <p className="dsb-kecil" style={{ margin: 0 }}>
-                              {akhir.golonganLama !== akhir.golonganBaru
+                              {akhir.golonganLama && akhir.golonganLama !== akhir.golonganBaru
                                 ? `${akhir.golonganLama} → ${akhir.golonganBaru}`
                                 : akhir.golonganBaru}
                             </p>
@@ -404,7 +404,7 @@ export default function RiwayatKgbUpt() {
                                           </span>
                                         </td>
                                         <td className="whitespace-nowrap">
-                                          {s.golonganLama !== s.golonganBaru
+                                          {s.golonganLama && s.golonganLama !== s.golonganBaru
                                             ? `${s.golonganLama} → ${s.golonganBaru}`
                                             : s.golonganBaru}
                                         </td>

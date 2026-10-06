@@ -6,7 +6,8 @@ import { BIDANG_USULAN, hitungUsulan, type KunciBidangUsulan } from "./usulanPeg
 import { bacaTanggalInput } from "./prosesKgb";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { isoTanggalLokal, tanggalKalender, type NilaiTanggal } from "./waktu";
-import { isJenisDasarBaru } from "./dasarBaruUsulan";
+import { TANPA_SK_BARU, isJenisDasarBaru } from "./dasarBaruUsulan";
+import { hitungSkPegawaiBaru } from "./dasarSkUsulan";
 
 /**
  * Kolom yang dihitung sistem dan karena itu tidak dibaca dari formulir. Gaji pokok dan jatuh tempo KGB
@@ -49,6 +50,8 @@ const KOSONG_DASAR_BARU: DasarBaruUsulan = {
  */
 export function bacaDasarBaru(teks: (kunci: string) => string): DasarBaruUsulan {
   const jenis = teks("dasarBaruJenis");
+  // Jawaban "tidak ada SK" disimpan supaya pertanyaannya tidak ditagih lagi (ADR-065).
+  if (jenis === TANPA_SK_BARU) return { ...KOSONG_DASAR_BARU, dasarBaruJenis: TANPA_SK_BARU };
   if (!isJenisDasarBaru(jenis)) return { ...KOSONG_DASAR_BARU };
   // Koreksi salah ketik tidak membawa SK, jadi kolom SK-nya sengaja dikosongkan.
   if (jenis === "koreksi") return { ...KOSONG_DASAR_BARU, dasarBaruJenis: jenis };
@@ -112,11 +115,20 @@ function bacaIsian(teks: (kunci: string) => string): { isian: Partial<UsulanPega
 /**
  * Lengkapi isian dengan kolom hitungan. `dasar` adalah data pegawai yang sudah tercatat, dipakai pada
  * usulan perubahan ketika operator tidak mengusulkan golongan atau masa kerjanya berubah.
+ *
+ * `dasarBaru`: SK sesudah SK KGB terakhir. Pada pegawai baru, golongan dan masa kerjanya disalin dari SK itu, jadi
+ * gaji pokok dan jadwalnya dihitung dari masa kerja pada TMT KGB terakhir (lib/dasarSkUsulan.ts, ADR-065).
  */
 export function isiHitungan(
   isian: Partial<UsulanPegawaiRow>,
   dasar?: Partial<PegawaiRow> | null,
+  dasarBaru?: Partial<DasarBaruUsulan> | null,
 ): Partial<UsulanPegawaiRow> {
+  if (!dasar && dasarBaru) {
+    const sk = hitungSkPegawaiBaru({ ...isian, ...dasarBaru });
+    if (sk.berlaku && sk.ok)
+      return { ...isian, pangkat: sk.nilai.pangkat || null, gajiPokok: sk.nilai.gajiPokok || null, tmtKgbBerikutnya: sk.nilai.tmtKgbBerikutnya };
+  }
   const ambil = <K extends KunciBidangUsulan>(kunci: K) =>
     (isian[kunci] ?? dasar?.[kunci] ?? null) as UsulanPegawaiRow[K] | null;
 

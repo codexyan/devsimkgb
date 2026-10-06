@@ -56,8 +56,9 @@ function barisContoh(): (NilaiSel | SelXlsx)[][] {
     },
     {
       keterangan:
-        "Pegawai baru yang sesudah KGB terakhir (Maret 2024, masa kerja golongan II 9 tahun) naik ke III/a lewat penyesuaian ijazah: " +
-        "masa kerja dipotong 5 tahun menjadi 4, TMT KGB terakhir tetap. Kolom dasarBaru kosong karena pegawai baru.",
+        "Pegawai baru yang sesudah KGB terakhir (Maret 2024, II/c 9 tahun) naik ke III/a lewat penyesuaian ijazah TMT April 2025: " +
+        "golongan, TMT golongan, dan masa kerja golongan disalin dari SK penyesuaian ijazah (5 tahun 1 bulan, sudah dipotong di SK-nya), " +
+        "SK-nya disebut di kolom dasarBaru. TMT KGB terakhir tetap. Sistem menghitung mundur masa kerjanya ke TMT KGB terakhir (4 tahun).",
       isi: {
         nip: "198501012015031001",
         nama: "PEGAWAI CONTOH DUA, S.H.",
@@ -66,13 +67,19 @@ function barisContoh(): (NilaiSel | SelXlsx)[][] {
         eselon: "Non Eselon",
         golonganRuang: "III/a",
         tmtGolongan: "2025-04-01",
-        mkgTahun: "4",
-        mkgBulan: "0",
+        mkgTahun: "5",
+        mkgBulan: "1",
         tmtKgbTerakhir: "2024-03-01",
         tempatLahir: "Martapura",
         tanggalLahir: "1985-01-01",
         jenisKelamin: "Laki-laki",
         pendidikanTerakhir: "S1",
+        dasarBaruJenis: "kp",
+        dasarBaruJenisKp: "penyesuaian_ijazah",
+        dasarBaruNomorSk: "W.15-KP.03.02-0031",
+        dasarBaruTanggalSk: "2025-03-20",
+        dasarBaruTmt: "2025-04-01",
+        dasarBaruPenetap: "Kepala Kantor Wilayah",
       },
     },
     {

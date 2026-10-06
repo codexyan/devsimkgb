@@ -507,10 +507,10 @@ export function LayarKolektif2() {
         "Pilih dulu keadaannya. Belum pernah KGB hanya meminta TMT CPNS dan masa kerjanya 0 tahun 0 bulan.",
         "Salin golongan dan masa kerja golongan dari SK, jangan dihitung sendiri. Isian yang Anda ubah ditandai kuning.",
         "Gaji pokok dan TMT KGB berikutnya dihitung sistem dari tabel PP 5/2024. Keduanya tidak diketik, sebab salah ketik di sini langsung menggeser uang.",
-        "Bila golongan atau masa kerja berubah, sebutkan SK penyebabnya. SK inilah yang menjadi dasar SK KGB berikutnya.",
+        "Jawab untuk tiap pegawai: sesudah SK KGB terakhir, adakah SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang belum tercatat? Bila ada, isi SK-nya. Baris di bawahnya menunjukkan SK yang akan menjadi Atas dasar SK KGB berikutnya.",
         "Unggah pindaian SK, masing-masing PDF paling besar 500 KB. Pindai sebagai dokumen, bukan foto kamera.",
       ]}
-      catatan="Semua isian di sini tersimpan sebagai draf milik satker Anda: belum terlihat Kanwil, boleh ditinggal dan dilanjutkan kapan saja."
+      catatan="Semua isian di sini tersimpan sebagai draf usulan milik satker Anda: belum terlihat Kanwil dan belum mengubah Data Pegawai, boleh ditinggal dan dilanjutkan kapan saja. Data Pegawai berubah setelah usulannya disetujui Kanwil."
       anak={
         <>
           <Langkah
@@ -587,14 +587,17 @@ export function LayarKolektif2() {
               </div>
 
               <p className="lyr-sub">
-                Sebab golongan atau masa kerja berubah <No n={5} />
+                SK sesudah SK KGB terakhir <No n={5} />
               </p>
+              <span className="lyr-pilihan">
+                <span>Tidak ada</span>
+                <span data-aktif="">Ada</span>
+              </span>
               <div className="lyr-sebab">
                 {(
                   [
                     ["Kenaikan pangkat", "termasuk penyesuaian ijazah"],
                     ["Peninjauan masa kerja", "SK PMK"],
-                    ["Koreksi salah ketik", "tanpa SK baru"],
                   ] as [string, string][]
                 ).map(([j, k], i) => (
                   <span key={j} className="lyr-sebab-butir" data-aktif={i === 0 ? "" : undefined}>
@@ -635,7 +638,7 @@ export function LayarKolektif2() {
               <b>3</b> dari 5 lengkap · <b>2</b> belum disimpan.
             </small>
             <span className="lyr-kaki-sorot">
-              <Tombol jenis="garis" anak="Simpan 2 draf" />
+              <Tombol jenis="garis" anak="Simpan 2 draf usulan" />
               <Tombol anak="Simpan & lanjut ajukan →" />
             </span>
           </div>

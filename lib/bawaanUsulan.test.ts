@@ -72,7 +72,7 @@ test("hanya berkas keadaan pegawai yang kosong dan tidak dihapus yang disalin", 
 
 test("berkas bawaan melengkapi kekurangan usulan perbaikan dasar gaji", () => {
   const pegawai = { golonganRuang: "II/a", mkgTahun: 0, mkgBulan: 0, tmtKgbTerakhir: new Date(2025, 5, 1) };
-  const perbaikan = { golonganRuang: "II/a", tmtKgbTerakhir: new Date(2025, 2, 1) };
+  const perbaikan = { golonganRuang: "II/a", tmtKgbTerakhir: new Date(2025, 2, 1), dasarBaruJenis: "tidak" };
   assert.ok(kekuranganUsulan(perbaikan, "perubahan", pegawai).includes("SK CPNS"));
   const b = bawaanPegawai({ id: "p1" }, [baru]);
   assert.deepEqual(kekuranganUsulan(denganBerkasBawaan(perbaikan, b), "perubahan", pegawai), []);

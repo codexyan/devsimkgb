@@ -14,7 +14,7 @@
 
 import { BIDANG_DIISI, bacaDasarBaru, bacaIsianBaris, type DasarBaruUsulan } from "./usulanFormulir";
 import { keBerkasCsv } from "./csv";
-import { isJenisDasarBaru } from "./dasarBaruUsulan";
+import { TANPA_SK_BARU, isNilaiDasarBaru } from "./dasarBaruUsulan";
 import { JENIS_KP, isJenisKp } from "./kenaikanPangkat";
 import { bandingkanUsulan, kekuranganUsulan, type PerubahanUsulan } from "./usulanPegawai";
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "./dataPegawai";
@@ -127,10 +127,10 @@ export const KOLOM_TEMPLAT_UPT: readonly KolomTemplatUpt[] = [
     peran: "opsional",
     jenis: "angka",
     keterangan:
-      "Masa kerja golongan pada TMT KGB terakhir, disalin dari SK KGB terakhir. Isi 0 bila belum pernah KGB; kosong dibaca 0. " +
-      "Bila sesudah KGB terakhir itu pegawai naik dari golongan II ke III/a (penyesuaian ijazah atau ujian dinas), kurangi 5 tahun; " +
-      "dari golongan I ke II/a, kurangi 6 tahun. Kenaikan di dalam golongan yang sama (III/a ke III/b) tidak mengubahnya. " +
-      "Pada golongan III dan IV angka ini lazimnya genap; angka ganjil biasanya masa kerja golongan II yang belum dipotong.",
+      "Disalin apa adanya dari SK yang paling baru, tanpa dipotong atau dihitung sendiri. Tanpa SK sesudah SK KGB terakhir: masa kerja " +
+      "golongan pada SK KGB terakhir. Bila sesudahnya ada SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang dilaporkan di kolom " +
+      "dasarBaru: masa kerja seperti tertulis pada SK itu; sistem menghitungnya mundur ke TMT KGB terakhir. Isi 0 bila belum pernah KGB; " +
+      "kosong dibaca 0.",
     contoh: "0",
   },
   { kolom: "mkgBulan", label: "Masa kerja golongan (bulan)", peran: "opsional", jenis: "angka", keterangan: "Sisa bulan masa kerja golongan, 0 sampai 11.", contoh: "0" },
@@ -163,22 +163,21 @@ export const KOLOM_TEMPLAT_UPT: readonly KolomTemplatUpt[] = [
     contoh: "SMA/SMK",
     pilihan: PENDIDIKAN_TERAKHIR,
   },
-  // Sebab golongan atau masa kerja golongan berubah, beserta SK-nya (ADR-030). Enam kolom ini kosong
-  // pada baris pegawai baru dan pada baris yang hanya meremajakan jabatan atau alamat; terisi pada baris
-  // pegawai tercatat yang baru naik pangkat atau baru menerima SK PMK, sehingga peremajaan sesudah
-  // kenaikan pangkat periode selesai sekali unggah, bukan dibuka satu per satu di Usulan kolektif.
-  // Cara mengisinya per keadaan ada di PANDUAN_DASAR_BARU.
+  // SK sesudah SK KGB terakhir beserta isinya (ADR-030, ADR-065). dasarBaruJenis wajib dijawab tiap baris: "tidak",
+  // atau SK-nya bila ada, sehingga peremajaan sesudah kenaikan pangkat periode selesai sekali unggah, bukan dibuka
+  // satu per satu di Usulan kolektif. Cara mengisinya per keadaan ada di PANDUAN_DASAR_BARU.
   {
     kolom: "dasarBaruJenis",
-    label: "Sebab perubahan golongan/masa kerja",
+    label: "SK sesudah SK KGB terakhir",
     peran: "diajukan",
     jenis: "teks",
     keterangan:
-      "Hanya untuk pegawai yang sudah tercatat di SIM-KGB, bila golongan atau masa kerja golongan pada baris ini berbeda dari yang tercatat. " +
-      "kp: SK kenaikan pangkat atau penyesuaian ijazah. pmk: SK peninjauan masa kerja. koreksi: yang tercatat salah ketik, tanpa SK baru. " +
-      "Kosongkan untuk pegawai baru, dan bila golongan serta masa kerjanya tidak berubah.",
-    contoh: "",
-    pilihan: ["kp", "pmk", "koreksi"],
+      "Wajib dijawab tiap baris: adakah SK yang terbit sesudah SK KGB terakhir (atau SK CPNS) dan belum tercatat di SIM-KGB? " +
+      "tidak: tidak ada. kp: SK kenaikan pangkat atau penyesuaian ijazah. pmk: SK peninjauan masa kerja. SK kp atau pmk itulah dasar " +
+      "SK KGB berikutnya, juga bagi pegawai baru. koreksi (hanya pegawai yang sudah tercatat): tidak ada SK, tetapi golongan atau masa " +
+      "kerja yang tercatat salah ketik.",
+    contoh: TANPA_SK_BARU,
+    pilihan: [TANPA_SK_BARU, "kp", "pmk", "koreksi"],
   },
   {
     kolom: "dasarBaruJenisKp",
@@ -194,7 +193,7 @@ export const KOLOM_TEMPLAT_UPT: readonly KolomTemplatUpt[] = [
     label: "Nomor SK sebab perubahan",
     peran: "diajukan",
     jenis: "teks",
-    keterangan: "Nomor SK kenaikan pangkat atau SK PMK, persis seperti tertulis di SK. Wajib bila dasarBaruJenis kp atau pmk; kosongkan untuk koreksi.",
+    keterangan: "Nomor SK kenaikan pangkat atau SK PMK, persis seperti tertulis di SK. Wajib bila dasarBaruJenis kp atau pmk; kosongkan untuk tidak dan koreksi.",
     contoh: "",
   },
   {
@@ -250,18 +249,48 @@ const tanpaDasar: Record<KolomDasarBaru, string> = {
  */
 export const PANDUAN_DASAR_BARU: readonly ContohDasarBaru[] = [
   {
-    keadaan: "Pegawai baru: NIP belum tercatat di SIM-KGB",
+    keadaan: "Pegawai baru; sesudah SK KGB terakhir tidak ada SK kenaikan pangkat atau PMK",
     misalnya: "pendataan pertama",
-    isian: tanpaDasar,
+    isian: { ...tanpaDasar, dasarBaruJenis: TANPA_SK_BARU },
     barisLain:
-      "Keenam kolom dikosongkan. Golongan dan TMT golongan diisi keadaan sekarang; masa kerja golongan dan TMT KGB terakhir dari SK KGB terakhir. " +
-      "Bila sesudah KGB itu pegawai naik dari golongan II ke III/a, masa kerja golongannya dikurangi 5 tahun.",
+      "dasarBaruJenis diisi tidak, kolom dasarBaru lainnya dikosongkan. Golongan, masa kerja golongan, dan TMT KGB terakhir dari SK KGB terakhir " +
+      "(atau SK CPNS bila belum pernah KGB).",
+  },
+  {
+    keadaan: "Pegawai baru; sesudah SK KGB terakhir naik pangkat atau penyesuaian ijazah",
+    misalnya: "KGB terakhir Des 2024 (III/a, 2 tahun); naik III/b Jan 2026, masa kerja di SK 3 tahun 1 bulan",
+    isian: {
+      dasarBaruJenis: "kp",
+      dasarBaruJenisKp: "reguler",
+      dasarBaruNomorSk: "W.15-KP.03.01-0098",
+      dasarBaruTanggalSk: "2025-12-15",
+      dasarBaruTmt: "2026-01-01",
+      dasarBaruPenetap: "Kepala Kantor Wilayah",
+    },
+    barisLain:
+      "Golongan, TMT golongan, dan masa kerja golongan disalin dari SK kenaikan pangkat itu apa adanya (III/b, 3 tahun 1 bulan). TMT KGB terakhir " +
+      "tetap dari SK KGB terakhir. Sistem menghitung mundur masa kerjanya ke TMT KGB terakhir (2 tahun), dan SK ini menjadi dasar SK KGB berikutnya.",
+  },
+  {
+    keadaan: "Pegawai baru; sesudah SK KGB terakhir menerima SK PMK",
+    misalnya: "KGB terakhir Jun 2025 (III/a, 2 tahun); PMK Mar 2026, masa kerja di SK 5 tahun 9 bulan",
+    isian: {
+      dasarBaruJenis: "pmk",
+      dasarBaruJenisKp: "",
+      dasarBaruNomorSk: "W.15-KP.04.03-0011",
+      dasarBaruTanggalSk: "2026-02-20",
+      dasarBaruTmt: "2026-03-01",
+      dasarBaruPenetap: "Kepala Kantor Wilayah",
+    },
+    barisLain:
+      "Masa kerja golongan disalin dari SK PMK (5 tahun 9 bulan); golongan dan TMT KGB terakhir dari SK KGB terakhir. Sistem menghitung mundur " +
+      "masa kerjanya ke TMT KGB terakhir dan menghitung jadwal KGB berikutnya dari TMT PMK. Pindaian SK PMK ditagih saat diajukan.",
   },
   {
     keadaan: "Sudah tercatat; golongan dan masa kerja golongan tidak berubah",
     misalnya: "hanya jabatan atau pendidikan yang diremajakan",
-    isian: tanpaDasar,
-    barisLain: "Keenam kolom dikosongkan. Golongan, masa kerja, dan TMT ditulis sama dengan yang tercatat.",
+    isian: { ...tanpaDasar, dasarBaruJenis: TANPA_SK_BARU },
+    barisLain: "dasarBaruJenis diisi tidak, kolom dasarBaru lainnya dikosongkan. Golongan, masa kerja, dan TMT ditulis sama dengan yang tercatat.",
   },
   {
     keadaan: "Sudah tercatat; naik pangkat reguler",
@@ -315,12 +344,12 @@ export const PANDUAN_DASAR_BARU: readonly ContohDasarBaru[] = [
 
 /** Aturan umum keenam kolom dasarBaru, sebagai butir panduan. */
 export const ATURAN_DASAR_BARU: readonly string[] = [
-  "Keenam kolom ini menjawab satu pertanyaan: mengapa golongan atau masa kerja golongan pada baris ini berbeda dari yang tercatat di SIM-KGB. Bila tidak berbeda, kosongkan semuanya.",
-  "Pegawai baru belum punya data pembanding, jadi kolom ini selalu dikosongkan.",
+  "SK KGB terakhir (atau SK CPNS bila belum pernah KGB) adalah acuan jadwal KGB: TMT KGB terakhir diambil darinya, dan nomor serta tanggalnya diisi saat draf dilengkapi di Usulan kolektif. Keenam kolom ini melaporkan SK yang terbit sesudahnya, yaitu kenaikan pangkat, penyesuaian ijazah, atau PMK, yang belum tercatat di SIM-KGB.",
+  "dasarBaruJenis wajib dijawab tiap baris, juga untuk pegawai baru: tidak bila tidak ada SK seperti itu, kp atau pmk bila ada. Golongan dan masa kerja golongan disalin dari SK yang paling baru apa adanya; pada pegawai baru, sistem menghitung mundur masa kerja pada SK itu ke TMT KGB terakhir. Bagi pegawai yang sudah tercatat, kolom ini sekaligus menjawab mengapa golongan atau masa kerja golongannya berbeda dari yang tercatat; koreksi bila yang tercatat salah ketik.",
   "Satu baris hanya menyebut satu SK, yaitu SK dengan TMT paling baru. SK itulah yang tercetak sebagai dasar pada SK KGB berikutnya.",
-  "Untuk kp, sistem menghitung sendiri masa kerja golongan, gaji pokok, dan TMT golongan dari SK-nya; jadwal KGB tidak bergeser.",
+  "Untuk kp pada pegawai yang sudah tercatat, sistem menghitung sendiri masa kerja golongan, gaji pokok, dan TMT golongan dari data tercatat dan SK-nya; jadwal KGB tidak bergeser.",
   "Untuk pmk, golongan tetap dan masa kerja golongan mengikuti SK PMK; jadwal KGB dapat maju.",
-  `Isian kosong atau belum lengkap tidak menolak baris; yang kurang ditagih saat diajukan di Usulan kolektif. Isian yang salah tulis (misalnya "KP" atau "naik pangkat") menolak barisnya. Tanggal ditulis ${FORMAT_TANGGAL_DITERIMA}.`,
+  `Isian kosong atau belum lengkap tidak menolak baris; yang kurang, termasuk dasarBaruJenis yang belum dijawab, ditagih saat diajukan di Usulan kolektif. Isian yang salah tulis (misalnya "KP" atau "naik pangkat") menolak barisnya. Tanggal ditulis ${FORMAT_TANGGAL_DITERIMA}.`,
 ];
 
 /** Huruf dan angka saja, huruf kecil: "Golongan ruang*" dan "golonganRuang" menjadi sama. */
@@ -474,7 +503,7 @@ export function isianDiLuarPilihan(baris: readonly Record<string, string>[]): Is
 }
 
 /** Pilihan kolom dasarBaruJenis, untuk pesan tolak yang menyebutkan apa yang diterima. */
-const PILIHAN_DASAR_BARU = "kp · pmk · koreksi";
+const PILIHAN_DASAR_BARU = `${TANPA_SK_BARU} · kp · pmk · koreksi`;
 
 /**
  * Isi berkas templat: baris kepala dan satu baris contoh. Kepala berkasnya dari lib/csv: BOM agar Excel
@@ -676,7 +705,7 @@ export function periksaImporUpt(
     // didiamkan: "KP" atau "naik pangkat" pada kolom ini akan tersimpan sebagai usulan tanpa sebab, lalu
     // tertahan saat diajukan tanpa petunjuk apa pun tentang apa yang salah.
     const sebab = teks(seragam.row, "dasarBaruJenis");
-    if (sebab && !isJenisDasarBaru(sebab))
+    if (sebab && !isNilaiDasarBaru(sebab))
       return tolak(`Kolom dasarBaruJenis hanya menerima ${PILIHAN_DASAR_BARU}; tertulis "${sebab}"`);
     const jenisKp = teks(seragam.row, "dasarBaruJenisKp");
     if (sebab === "kp" && jenisKp && !isJenisKp(jenisKp))

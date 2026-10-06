@@ -396,7 +396,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   function bukaUsulan(p: PegawaiUpt) {
     setFormulir({
       jenis: "perubahan",
-      pegawai: { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan },
+      pegawai: { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan, dasarKgb: p.dasarKgb },
       draf: drafPegawai(p.id),
     });
   }
@@ -422,7 +422,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     const p = (data?.pegawai ?? []).find((x) => x.id === u.pegawaiId) ?? null;
     setFormulir({
       jenis: u.jenis === "baru" ? "baru" : "perubahan",
-      pegawai: p ? { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan } : null,
+      pegawai: p ? { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan, dasarKgb: p.dasarKgb } : null,
       draf: u,
     });
   }

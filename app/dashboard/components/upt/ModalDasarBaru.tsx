@@ -10,7 +10,7 @@ import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { JENIS_KP, hitungKenaikanPangkat } from "@/lib/kenaikanPangkat";
 import { hitungPmk } from "@/lib/pmk";
 import { formatTanggalId } from "@/lib/waktu";
-import { LABEL_DASAR_BARU } from "@/lib/dasarBaruUsulan";
+import { LABEL_DASAR_BARU, TANPA_SK_BARU } from "@/lib/dasarBaruUsulan";
 
 /* Kartu "Laporkan kenaikan pangkat" dan "Laporkan peninjauan masa kerja" untuk Admin UPT (ADR-045).
  *
@@ -64,7 +64,9 @@ export default function ModalDasarBaru({
   // Draf yang sudah menyebut sebab yang sama isinya dipakai kembali; yang menyebut sebab lain dibiarkan
   // apa adanya sampai operator benar-benar menyimpan, lalu diganti, dengan peringatan di layar.
   const drafSama = draf?.dasarBaru?.jenis === jenis ? draf.dasarBaru : null;
-  const drafSebabLain = draf?.dasarBaru?.jenis && draf.dasarBaru.jenis !== jenis ? draf.dasarBaru.jenis : null;
+  // Jawaban "tidak ada SK" pada draf (ADR-065) cukup digantikan laporan ini, tanpa peringatan.
+  const drafSebabLain =
+    draf?.dasarBaru?.jenis && draf.dasarBaru.jenis !== jenis && draf.dasarBaru.jenis !== TANPA_SK_BARU ? draf.dasarBaru.jenis : null;
 
   const [golonganBaru, setGolonganBaru] = useState(jenis === "kp" ? (drafSama ? sekarang.golonganRuang ?? "" : "") : "");
   const [jenisKp, setJenisKp] = useState(drafSama?.jenisKp || "reguler");

@@ -28,6 +28,8 @@ export interface UsulanKanwil {
   nomorSkTerakhir: string | null;
   /** SK yang menetapkan gaji pokok baru pada usulan ini (ADR-030); null bila tidak ada. */
   dasarBaru?: string | null;
+  /** Pegawai baru: masa kerja pada SK sesudah SK KGB terakhir dan hasil hitung mundurnya (ADR-065). */
+  catatanSkBaru?: string | null;
   tanggalSkTerakhir: string | null;
   catatanUpt: string | null;
   diajukanOleh: string | null;
@@ -127,6 +129,7 @@ export default function DetailUsulan({ usulan: u, pratinjauDiTempat = false }: {
               ? "Tidak ada SK baru; dasar SK KGB berikutnya tidak berubah, dan pembetulannya tercatat di Log Aktivitas."
               : "Persetujuan mencatatnya sebagai riwayat, menghitung ulang gaji pokoknya, dan menjadikan SK ini dasar SK KGB berikutnya."}
           </span>
+          {u.catatanSkBaru && <span>{u.catatanSkBaru}</span>}
         </div>
       )}
 

@@ -682,7 +682,8 @@ export default function RiwayatKGBPage() {
                 <div key={p.id} className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "0.5px solid var(--ln1)" }}>
                   <div className="px-4 py-3 flex flex-wrap items-center gap-2" style={{ borderBottom: "0.5px solid var(--ln2)", background: "var(--sub)" }}>
                     <span className="text-xs font-semibold" style={{ color: "var(--dtn)" }}>
-                      {p.golonganLama} → {p.golonganBaru}
+                      {/* Golongan lama kosong: SK yang dicatat dari pendataan pegawai baru (ADR-065). */}
+                      {p.golonganLama ? `${p.golonganLama} → ${p.golonganBaru}` : p.golonganBaru}
                     </span>
                     <span className="dsb-tag" data-garis="">{p.jenisLabel}</span>
                     <span className="text-xs" style={{ color: "var(--dt4)", marginLeft: "auto" }}>

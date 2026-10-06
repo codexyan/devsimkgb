@@ -825,24 +825,25 @@ export default async function IsiPanduan({
                   sudah ada.
                 </p>
                 <p>
-                  <strong>Masa kerja golongan pegawai baru.</strong> Angkanya disalin dari SK KGB terakhir, dan TMT KGB
-                  terakhir tetap TMT pada SK itu. Bila sesudah KGB itu pegawai naik dari golongan II ke III/a
-                  (penyesuaian ijazah atau ujian dinas), masa kerja golongannya <strong>dikurangi 5 tahun</strong>; dari
-                  golongan I ke II/a, 6 tahun. Contoh: KGB terakhir 1 Desember 2024 masih golongan II dengan masa kerja 7
-                  tahun, lalu naik ke III/a pada 2026. Barisnya ditulis III/a, masa kerja 2 tahun, TMT KGB terakhir 1
-                  Desember 2024, sehingga KGB berikutnya jatuh 1 Desember 2026. Bila masa kerjanya ditulis 7, sistem
-                  membacanya sebagai masa kerja golongan III, menjadwalkan KGB setahun lebih awal, dan gaji pokoknya salah.
-                  Tandanya mudah dikenali: pada golongan III dan IV masa kerja itu lazimnya genap.
+                  <strong>Masa kerja golongan pegawai baru.</strong> Golongan dan masa kerja golongan disalin apa adanya
+                  dari SK yang paling baru, tanpa dipotong atau dihitung sendiri; TMT KGB terakhir tetap TMT pada SK KGB
+                  terakhir. Bila sesudah SK KGB itu terbit SK kenaikan pangkat, penyesuaian ijazah, atau PMK, SK itu
+                  disebut di kolom dasarBaru dan masa kerjanya disalin dari SK itu. Contoh: KGB terakhir 1 Desember 2024
+                  golongan II/d dengan masa kerja 11 tahun, lalu penyesuaian ijazah ke III/a TMT 1 Januari 2026 yang
+                  menulis masa kerja 7 tahun 1 bulan. Barisnya ditulis III/a, masa kerja 7 tahun 1 bulan, TMT KGB
+                  terakhir 1 Desember 2024, dengan SK penyesuaian ijazah itu di kolom dasarBaru. Sistem menghitung mundur
+                  masa kerjanya ke TMT KGB terakhir menjadi 6 tahun, sehingga KGB berikutnya jatuh 1 Desember 2026 dan SK
+                  penyesuaian ijazah itulah dasarnya.
                 </p>
 
                 <h4 className="pub-h3" id="kolom-dasar-baru">Enam kolom dasarBaru: sebab golongan atau masa kerja berubah</h4>
                 <p>
-                  Kolom <code>dasarBaruJenis</code> sampai <code>dasarBaruPenetap</code> menjawab satu pertanyaan:{" "}
-                  <strong>mengapa golongan atau masa kerja golongan pada baris itu berbeda dari yang tercatat</strong>{" "}
-                  di SIM-KGB. Untuk pegawai baru, dan untuk baris yang golongan serta masa kerjanya tidak berubah,
-                  keenamnya dikosongkan. Untuk pegawai yang baru naik pangkat atau baru menerima SK PMK, SK-nya ditulis
+                  Kolom <code>dasarBaruJenis</code> sampai <code>dasarBaruPenetap</code> menjawab satu pertanyaan yang{" "}
+                  <strong>wajib dijawab tiap baris</strong>: sesudah SK KGB terakhir (atau SK CPNS), adakah SK kenaikan
+                  pangkat, penyesuaian ijazah, atau PMK yang belum tercatat di SIM-KGB? Bila tidak ada, tulis{" "}
+                  <code>tidak</code> dan kosongkan lima kolom lainnya. Bila ada, juga bagi pegawai baru, SK-nya ditulis
                   di sini sehingga peremajaan sesudah kenaikan pangkat periode selesai sekali unggah. Kanwil mencatatnya
-                  sebagai riwayat, menghitung ulang gaji pokoknya, dan SK itulah yang menjadi dasar SK KGB berikutnya.
+                  sebagai riwayat, menghitung gaji pokoknya, dan SK itulah yang menjadi dasar SK KGB berikutnya.
                 </p>
                 <div className="pub-table-wrap" tabIndex={0} role="region" aria-label="Cara mengisi kolom dasarBaru">
                   <table className="pub-table">
@@ -964,12 +965,15 @@ export default async function IsiPanduan({
                     <strong>satu tahun</strong> setelah TMT CPNS, bukan dua tahun seperti golongan lain.
                   </li>
                   <li>
-                    <strong>Bila golongan atau masa kerja berubah, sebutkan SK penyebabnya.</strong> Keduanya hanya
-                    berubah karena kenaikan pangkat (termasuk penyesuaian ijazah), peninjauan masa kerja, atau salah
-                    ketik. Untuk SK baru, isi nomor, tanggal, TMT, dan pejabat penetapnya. Kanwil mencatatnya sebagai
-                    riwayat, menghitung ulang gaji pokoknya, dan <strong>SK itulah yang menjadi dasar SK KGB
-                    berikutnya</strong>. Untuk kenaikan pangkat, masa kerja yang Anda ketik hanya menjadi keterangan:
-                    sistem menghitungnya sendiri, dan naik dari golongan II ke III memotong masa kerja 5 tahun.
+                    <strong>Jawab pertanyaan SK sesudah SK KGB terakhir, tiap pegawai.</strong> Nomor, tanggal, dan TMT
+                    SK KGB terakhir (atau SK CPNS) selalu menjadi acuan jadwal KGB. Bila sesudahnya terbit SK kenaikan
+                    pangkat (termasuk penyesuaian ijazah) atau PMK yang belum tercatat, pilih <em>Ada</em> lalu isi nomor,
+                    tanggal, TMT, dan pejabat penetapnya; bila tidak, pilih <em>Tidak ada</em>. Jawaban ini wajib sebelum
+                    diajukan. Baris <em>Atas dasar SK KGB berikutnya</em> menunjukkan SK yang akan tercetak sebagai dasar:
+                    yang TMT-nya paling baru. Pada pegawai yang sudah tercatat, masa kerja untuk kenaikan pangkat
+                    dihitung sistem (naik dari golongan II ke III memotong 5 tahun); pada pegawai baru, masa kerja pada SK
+                    itu dihitung mundur ke TMT KGB terakhir. Golongan atau masa kerja yang berubah tanpa SK hanya boleh
+                    karena salah ketik: centang <em>Koreksi data</em>.
                   </li>
                   <li>
                     <strong>Unggah pindaian SK-nya</strong>, masing-masing PDF paling besar 500 KB. Pindai sebagai

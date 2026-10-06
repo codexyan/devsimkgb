@@ -8,7 +8,8 @@
 import { BATAS_UNGGAH_BYTE, pesanBerkasTerlaluBesar } from "./batasUnggah";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
-import { kekuranganDasarBaru, perluDasarBaru } from "./dasarBaruUsulan";
+import { KURANG_JAWABAN_SK_BARU, jawabanSkBaru, kekuranganDasarBaru, perluDasarBaru } from "./dasarBaruUsulan";
+import { hitungSkPegawaiBaru } from "./dasarSkUsulan";
 import { bulanKeKgbBerikutnya, getGajiPokok, getPangkat, isGolonganDikenal, tambahBulan } from "./tabelGaji";
 
 export type StatusUsulan = "draf" | "menunggu" | "revisi" | "disetujui" | "ditolak";
@@ -387,10 +388,15 @@ export function kekuranganUsulan(
   if (!golongan) kurang.push("golongan/ruang");
   if (!tanggalKalender(nilai("tmtKgbTerakhir"))) kurang.push("TMT KGB terakhir");
 
+  // Pegawai baru yang melaporkan SK sesudah SK KGB terakhir menyalin golongan dan masa kerja dari SK itu; masa kerja
+  // pada TMT KGB terakhir dihitung mundur darinya, dan dari situ pula gaji pokoknya diperiksa (ADR-065).
+  const skBaru = jenis === "baru" ? hitungSkPegawaiBaru(usulan) : null;
+  if (skBaru?.berlaku && !skBaru.ok) kurang.push(skBaru.pesan);
+  const mkgDasar = skBaru?.berlaku && skBaru.ok ? skBaru.nilai : null;
   const hitung = hitungUsulan({
     golonganRuang: golongan,
-    mkgTahun: nilai("mkgTahun"),
-    mkgBulan: nilai("mkgBulan"),
+    mkgTahun: mkgDasar ? mkgDasar.mkgTahun : nilai("mkgTahun"),
+    mkgBulan: mkgDasar ? mkgDasar.mkgBulan : nilai("mkgBulan"),
     tmtKgbTerakhir: nilai("tmtKgbTerakhir"),
   });
   if (golongan && hitung.gajiPokok === 0) {
@@ -404,9 +410,22 @@ export function kekuranganUsulan(
       if (b.wajib && !usulan[b.kunci]) kurang.push(b.label);
     }
   }
-  // Golongan dan masa kerja golongan hanya berubah karena kenaikan pangkat, PMK, atau salah ketik; usulan
-  // perbaikan wajib menyebut sebabnya beserta SK-nya (ADR-030). Pegawai baru belum punya pembanding.
-  kurang.push(...kekuranganDasarBaru(usulan, jenis !== "baru" && perluDasarBaru(perubahan)));
+  // Setiap usulan menjawab adakah SK kenaikan pangkat, penyesuaian ijazah, atau PMK sesudah SK KGB terakhir yang belum
+  // tercatat; tanpa jawaban itu Atas dasar SK KGB berikutnya bisa keliru diam-diam (ADR-065). Golongan dan masa kerja
+  // golongan hanya berubah karena SK itu atau salah ketik, jadi usulan perbaikan yang mengubahnya menyebut sebabnya
+  // (ADR-030). Pegawai baru belum punya pembanding.
+  if (!jawabanSkBaru(usulan.dasarBaruJenis)) kurang.push(KURANG_JAWABAN_SK_BARU);
+  else kurang.push(...kekuranganDasarBaru(usulan, jenis !== "baru" && perluDasarBaru(perubahan)));
+  // SK kenaikan pangkat yang dilaporkan menuntut golongan barunya, dan SK PMK menuntut masa kerja golongan menurut SK itu.
+  // Tanpa itu persetujuan Kanwil gagal menghitung SK-nya (lib/dasarSkUsulan.ts). Pegawai baru belum punya pembanding;
+  // hitungannya diperiksa di atas.
+  if (jenis !== "baru" && pegawai) {
+    const jenisSk = usulan.dasarBaruJenis?.trim();
+    if (jenisSk === "kp" && !perubahan.some((p) => p.kunci === "golonganRuang"))
+      kurang.push("golongan baru menurut SK kenaikan pangkat");
+    if (jenisSk === "pmk" && !perubahan.some((p) => p.kunci === "mkgTahun" || p.kunci === "mkgBulan"))
+      kurang.push("masa kerja golongan menurut SK PMK");
+  }
   // Pindaian SK PMK ditagih bersama berkas dasar lainnya: saat diajukan, bukan saat draf disimpan (ADR-045).
   for (const b of berkasDasarBaru(usulan.dasarBaruJenis)) if (b.wajib && !usulan[b.kunci]) kurang.push(b.label);
   return kurang;

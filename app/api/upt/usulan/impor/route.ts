@@ -101,7 +101,7 @@ export async function POST(req: Request) {
         // Nilai yang benar-benar akan tersimpan, sudah lewat pembacaan tanggal dan hitungan sistem.
         // Inilah yang diperiksa operator: tanggal yang salah tafsir terlihat di sini, bukan setelah tersimpan.
         nilai: h.isian
-          ? nilaiUsulan(isiHitungan(h.isian, pegawaiSatkerIni.get(h.nip) ?? null)).map((n) => ({
+          ? nilaiUsulan(isiHitungan(h.isian, pegawaiSatkerIni.get(h.nip) ?? null, h.dasarBaru)).map((n) => ({
               label: n.label,
               nilai: n.nilai,
             }))
@@ -174,7 +174,7 @@ export async function POST(req: Request) {
       ditinjauOleh: null,
       ditinjauAt: null,
       alasanTolak: null,
-      ...isiHitungan(h.isian!, tercatat),
+      ...isiHitungan(h.isian!, tercatat, h.dasarBaru),
     };
   };
 
