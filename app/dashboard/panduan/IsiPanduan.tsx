@@ -681,6 +681,15 @@ export default async function IsiPanduan({
                     tanggal kenaikan pangkat. Yang dapat menggesernya hanya PMK, lihat di bawah.
                   </li>
                   <li>
+                    <strong>Dua angka masa kerja, keduanya benar:</strong> SIM-KGB menyimpan masa kerja golongan pada TMT
+                    KGB terakhir, karena dari situlah KGB berikutnya dihitung. SK kenaikan pangkat menulis masa kerja pada
+                    TMT pangkatnya. Contoh: KGB terakhir 1 Desember 2024 di II/b dengan masa kerja 7 tahun, lalu
+                    penyesuaian ijazah ke III/a TMT 1 Februari 2026. Tercatat 2 tahun 0 bulan (7 tahun dipotong 5 tahun),
+                    sedangkan SK-nya menulis 3 tahun 2 bulan (14 bulan kemudian). Data Pegawai dan formulir usulan
+                    menampilkan keduanya, dan pegawai seperti ini bertanda <em>Dari KP/PI</em> karena SK itulah dasar SK
+                    KGB berikutnya.
+                  </li>
+                  <li>
                     <strong>Perlu ditinjau:</strong> KGB yang sedang diproses ketika kenaikan pangkat dicatat. Golongan
                     dan gaji pokok pada KGB itu masih memakai data lama, sehingga harus diperiksa ulang sebelum SK
                     dibuat.
@@ -945,7 +954,7 @@ export default async function IsiPanduan({
                 </p>
                 <LayarKolektif2 />
 
-                <h4 className="pub-h3">Lima aturan yang menentukan benar atau tidaknya isian</h4>
+                <h4 className="pub-h3">Enam aturan yang menentukan benar atau tidaknya isian</h4>
                 <ol>
                   <li>
                     <strong>Pilih dulu keadaan pegawainya.</strong> <em>Belum pernah KGB</em> hanya meminta TMT CPNS,
@@ -953,10 +962,11 @@ export default async function IsiPanduan({
                     yang tertulis pada SK KGB terakhir.
                   </li>
                   <li>
-                    <strong>Golongan dan masa kerja golongan disalin dari SK, bukan dihitung sendiri.</strong> TMT-nya
-                    tetap dari siklus KGB sebelumnya walau pegawainya baru naik pangkat, sebab kenaikan pangkat tidak
-                    mengulang hitungan KGB. Bila sesudah SK KGB itu terbit SK kenaikan pangkat, penyesuaian ijazah, atau
-                    peninjauan masa kerja, isikan golongan dan masa kerja dari SK yang paling baru.
+                    <strong>Golongan dan masa kerja golongan disalin dari SK, bukan dihitung sendiri.</strong> Bagian
+                    pangkat berisi keadaan pada SK KGB terakhir (atau SK CPNS): golongan, masa kerja, TMT, dan nomornya.
+                    TMT-nya tetap dari siklus KGB sebelumnya walau pegawainya baru naik pangkat, sebab kenaikan pangkat
+                    tidak mengulang hitungan KGB. SK kenaikan pangkat, penyesuaian ijazah, atau peninjauan masa kerja
+                    sesudahnya diisi di bagiannya sendiri, lihat aturan keempat.
                   </li>
                   <li>
                     <strong>Pangkat, gaji pokok, dan TMT KGB berikutnya dihitung sistem</strong> dari tabel PP 5/2024,
@@ -967,13 +977,23 @@ export default async function IsiPanduan({
                   <li>
                     <strong>Jawab pertanyaan SK sesudah SK KGB terakhir, tiap pegawai.</strong> Nomor, tanggal, dan TMT
                     SK KGB terakhir (atau SK CPNS) selalu menjadi acuan jadwal KGB. Bila sesudahnya terbit SK kenaikan
-                    pangkat (termasuk penyesuaian ijazah) atau PMK yang belum tercatat, pilih <em>Ada</em> lalu isi nomor,
-                    tanggal, TMT, dan pejabat penetapnya; bila tidak, pilih <em>Tidak ada</em>. Jawaban ini wajib sebelum
-                    diajukan. Baris <em>Atas dasar SK KGB berikutnya</em> menunjukkan SK yang akan tercetak sebagai dasar:
-                    yang TMT-nya paling baru. Pada pegawai yang sudah tercatat, masa kerja untuk kenaikan pangkat
-                    dihitung sistem (naik dari golongan II ke III memotong 5 tahun); pada pegawai baru, masa kerja pada SK
-                    itu dihitung mundur ke TMT KGB terakhir. Golongan atau masa kerja yang berubah tanpa SK hanya boleh
-                    karena salah ketik: centang <em>Koreksi data</em>.
+                    pangkat (termasuk penyesuaian ijazah) atau PMK yang belum tercatat, pilih <em>Ada</em> lalu salin dari
+                    SK itu: <em>golongan/ruang baru</em> (kenaikan pangkat), <em>masa kerja golongan menurut SK</em>, nomor,
+                    tanggal, TMT, dan pejabat penetapnya. Bila tidak, pilih <em>Tidak ada</em>; isian SK yang sudah diketik
+                    tetap tersimpan di formulir bila Anda berganti jawaban. Jawaban ini wajib sebelum diajukan. Kotak{" "}
+                    <em>Dihitung sistem sesudah SK ini</em> menghitung dengan cara persetujuan Kanwil: naik dari golongan
+                    II ke III memotong masa kerja 5 tahun, jadwal KGB tidak bergeser, lalu masa kerja yang Anda salin dari
+                    SK dicocokkan dengan hitungan sistem. Pada pegawai yang sudah tercatat, golongan dan masa kerja di
+                    bagian pangkat dikunci ke data tercatat selama SK dilaporkan. Baris <em>Atas dasar SK KGB berikutnya</em>{" "}
+                    menunjukkan SK yang akan tercetak sebagai dasar: yang TMT-nya paling baru. Golongan atau masa kerja
+                    yang berubah tanpa SK hanya boleh karena salah ketik: centang <em>Koreksi data</em>.
+                  </li>
+                  <li>
+                    <strong>Periksa pratinjau SK sebelum mengajukan.</strong> Tombol <em>Pratinjau SK KGB</em> menyusun SK
+                    KGB berikutnya dari isian formulir saat itu juga, bertanda air <em>Pratinjau usulan</em>: pangkat,
+                    gaji pokok lama dan baru, masa kerja, TMT, dan Atas dasar SK. Bila ada yang keliru, betulkan isiannya
+                    lalu buka pratinjau lagi. Nomor surat dan penandatangannya ditetapkan Kanwil, dan SK yang dibuat Kanwil
+                    tetap Anda periksa lewat <em>Review SK KGB</em> sebelum dicetak.
                   </li>
                   <li>
                     <strong>Unggah pindaian SK-nya</strong>, masing-masing PDF paling besar 500 KB. Pindai sebagai

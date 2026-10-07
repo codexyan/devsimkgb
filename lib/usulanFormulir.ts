@@ -2,12 +2,13 @@
 // penyuntingan draf, dan pengiriman usulan. Ketiganya harus membaca dan menghitung dengan cara yang
 // persis sama, sebab yang membedakan usulan siap kirim dari draf hanyalah statusnya.
 
-import { BIDANG_USULAN, hitungUsulan, type KunciBidangUsulan } from "./usulanPegawai";
+import { BIDANG_USULAN, hitungUsulan, perubahanPegawai, type KunciBidangUsulan } from "./usulanPegawai";
 import { bacaTanggalInput } from "./prosesKgb";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { isoTanggalLokal, tanggalKalender, type NilaiTanggal } from "./waktu";
 import { TANPA_SK_BARU, isJenisDasarBaru } from "./dasarBaruUsulan";
-import { hitungSkPegawaiBaru } from "./dasarSkUsulan";
+import { hitungDasarSkUsulan, hitungSkPegawaiBaru } from "./dasarSkUsulan";
+import { getPangkat, isGolonganDikenal } from "./tabelGaji";
 
 /**
  * Kolom yang dihitung sistem dan karena itu tidak dibaca dari formulir. Gaji pokok dan jatuh tempo KGB
@@ -63,6 +64,30 @@ export function bacaDasarBaru(teks: (kunci: string) => string): DasarBaruUsulan 
     dasarBaruTmt: tanggalKalender(teks("dasarBaruTmt")),
     dasarBaruPenetap: teks("dasarBaruPenetap") || null,
   };
+}
+
+/** Golongan dan masa kerja golongan pada SK acuan (ADR-078); ditulis sekaligus seperti kolom SK baru. */
+export type AcuanUsulan = Pick<UsulanPegawaiRow, "golonganAcuan" | "mkgTahunAcuan" | "mkgBulanAcuan">;
+
+export const KOSONG_ACUAN: AcuanUsulan = { golonganAcuan: null, mkgTahunAcuan: null, mkgBulanAcuan: null };
+
+/**
+ * Keadaan pada SK KGB terakhir (atau SK CPNS) yang ditulis formulir bersama SK kenaikan pangkat atau PMK sesudahnya
+ * (ADR-078). Hanya berlaku bila SK itu memang dilaporkan; jawaban lain mengosongkannya, sehingga golongan dan masa kerja
+ * pada kolom utama kembali bermakna keadaan pada SK acuan.
+ */
+export function bacaAcuan(teks: (kunci: string) => string, dasarBaru: Pick<DasarBaruUsulan, "dasarBaruJenis">): AcuanUsulan {
+  const jenis = dasarBaru.dasarBaruJenis;
+  const golongan = teks("golonganAcuan");
+  if ((jenis !== "kp" && jenis !== "pmk") || !golongan) return { ...KOSONG_ACUAN };
+  // Masa kerja yang belum diisi dibiarkan kosong, bukan nol: draf boleh setengah jadi, dan kekurangannya ditagih saat
+  // diajukan (lib/dasarSkUsulan.ts hitungSkPegawaiBaru).
+  const angka = (kunci: string) => {
+    const isi = teks(kunci).replace(/[^\d]/g, "");
+    return isi ? Number(isi) : null;
+  };
+  const mkgTahunAcuan = angka("mkgTahunAcuan");
+  return { golonganAcuan: golongan, mkgTahunAcuan, mkgBulanAcuan: angka("mkgBulanAcuan") ?? (mkgTahunAcuan === null ? null : 0) };
 }
 
 /**
@@ -122,12 +147,29 @@ function bacaIsian(teks: (kunci: string) => string): { isian: Partial<UsulanPega
 export function isiHitungan(
   isian: Partial<UsulanPegawaiRow>,
   dasar?: Partial<PegawaiRow> | null,
-  dasarBaru?: Partial<DasarBaruUsulan> | null,
+  dasarBaru?: Partial<DasarBaruUsulan & AcuanUsulan> | null,
 ): Partial<UsulanPegawaiRow> {
   if (!dasar && dasarBaru) {
     const sk = hitungSkPegawaiBaru({ ...isian, ...dasarBaru });
     if (sk.berlaku && sk.ok)
       return { ...isian, pangkat: sk.nilai.pangkat || null, gajiPokok: sk.nilai.gajiPokok || null, tmtKgbBerikutnya: sk.nilai.tmtKgbBerikutnya };
+  }
+  // Pegawai tercatat yang melaporkan SK kenaikan pangkat atau PMK: hitungan yang sama dengan persetujuan Kanwil, bukan
+  // golongan baru dengan masa kerja yang tertulis di SK (ADR-078).
+  if (dasar && dasarBaru && isGolonganDikenal(String(dasar.golonganRuang ?? ""))) {
+    // Draf boleh belum mencantumkan tanggal SK; hitungannya cukup dengan TMT-nya.
+    const sk = hitungDasarSkUsulan(
+      dasar as PegawaiRow,
+      { ...dasarBaru, dasarBaruTanggalSk: dasarBaru.dasarBaruTanggalSk ?? dasarBaru.dasarBaruTmt },
+      perubahanPegawai(isian),
+    );
+    if (sk.berlaku && sk.ok)
+      return {
+        ...isian,
+        pangkat: (sk.nilai.pangkat as string | undefined) || getPangkat(String(sk.nilai.golonganRuang ?? "")) || null,
+        gajiPokok: sk.nilai.gajiPokok || null,
+        tmtKgbBerikutnya: (sk.nilai.tmtKgbBerikutnya as Date | null) ?? null,
+      };
   }
   const ambil = <K extends KunciBidangUsulan>(kunci: K) =>
     (isian[kunci] ?? dasar?.[kunci] ?? null) as UsulanPegawaiRow[K] | null;

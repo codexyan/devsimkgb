@@ -69,8 +69,8 @@ test("penanda dilihat dicatat per pengguna dan per pengumuman", () => {
 test("penanda server per akun digabung dengan penanda peramban", () => {
   const tidak = () => false;
   // Akun yang sudah melihat di server tidak melihatnya lagi di peramban yang baru dipakai.
-  const g = gabungDilihat(["nama-menu-2026-10", "lapor-sk-2026-10"], tidak);
-  assert.deepEqual(g.dilihat, ["nama-menu-2026-10", "lapor-sk-2026-10"]);
+  const g = gabungDilihat(["nama-menu-2026-10", "lapor-sk-2026-10", "sk-usulan-2026-10"], tidak);
+  assert.deepEqual(g.dilihat, ["nama-menu-2026-10", "lapor-sk-2026-10", "sk-usulan-2026-10"]);
   assert.deepEqual(pengumumanBelumDilihat((id) => g.dilihat.includes(id)), []);
   assert.deepEqual(g.perluDicatat, []);
   // Yang sudah dilihat di peramban ini tetapi belum tercatat di server disusulkan ke server, bukan ditampilkan lagi.
@@ -94,7 +94,9 @@ test("hanya id pengumuman yang dikenal yang dicatat, dan kunci barisnya per akun
 
 test("pengumuman yang belum dilihat dihitung per pengumuman, menurut urutan terbit", () => {
   assert.deepEqual(pengumumanBelumDilihat(() => false), [...PENGUMUMAN_UPT]);
-  // Yang sudah melihat pengumuman nama menu hanya mendapat pengumuman lapor SK.
-  assert.deepEqual(pengumumanBelumDilihat((id) => id === "nama-menu-2026-10"), ["lapor-sk-2026-10"]);
+  // Yang sudah melihat pengumuman nama menu hanya mendapat pengumuman sesudahnya, berurutan.
+  assert.deepEqual(pengumumanBelumDilihat((id) => id === "nama-menu-2026-10"), ["lapor-sk-2026-10", "sk-usulan-2026-10"]);
+  // Yang sudah melihat keduanya hanya mendapat pengumuman formulir usulan (ADR-078).
+  assert.deepEqual(pengumumanBelumDilihat((id) => id !== "sk-usulan-2026-10"), ["sk-usulan-2026-10"]);
   assert.deepEqual(pengumumanBelumDilihat(() => true), []);
 });

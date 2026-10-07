@@ -20,7 +20,7 @@ import { isJenisKp } from "./kenaikanPangkat";
 import { ringkasDasarBaru } from "./dasarBaruUsulan";
 // Kolom dasar gaji yang ditentukan SK kenaikan pangkat atau PMK (ADR-030) tidak ditulis dari usulan: nilainya
 // berasal dari hitungan SK di lib/catatDasarGaji.ts, sama persis dengan Catat KP/PMK di halaman pegawai.
-import { KOLOM_DITENTUKAN_SK, hitungDasarSkUsulan, hitungSkPegawaiBaru } from "./dasarSkUsulan";
+import { KOLOM_DITENTUKAN_SK, hitungDasarSkUsulan, hitungSkPegawaiBaru, usulanMenurutSk } from "./dasarSkUsulan";
 import { tanggalKalender } from "./waktu";
 import { kunciNomorSk } from "./nomorSurat";
 
@@ -64,7 +64,11 @@ export async function setujuiUsulan(
 ): Promise<HasilSetujui | GagalSetujui> {
   const nilaiBaru = perubahanPegawai(usulan);
   let terapkanPenyesuaian: ((userId: string) => Promise<string | null>) | null = null;
-  let perubahan = pegawaiLama ? bandingkanUsulan(pegawaiLama, usulan) : [];
+  // Dibandingkan menurut hitungan SK-nya: masa kerja yang tertulis pada SK kenaikan pangkat (ADR-078) bukan angka yang
+  // ditulis ke data pegawai.
+  let perubahan = pegawaiLama
+    ? bandingkanUsulan(pegawaiLama, usulanMenurutSk(pegawaiLama, usulan, nilaiBaru as Partial<PegawaiRow>))
+    : [];
   let dasarBaru: string | null = null;
   let pegawaiIdHasil = usulan.pegawaiId;
 
@@ -87,6 +91,8 @@ export async function setujuiUsulan(
     if (skBaru.berlaku && !skBaru.ok)
       return { ok: false, pesan: `SK sesudah SK KGB terakhir tidak dapat dihitung: periksa ${skBaru.pesan}. Kembalikan usulan ini ke UPT.` };
     const menurutSk = skBaru.berlaku && skBaru.ok ? skBaru.nilai : null;
+    // Keadaan pada SK KGB terakhir yang ditulis UPT bersama SK-nya (ADR-078); null pada usulan lama.
+    const acuan = skBaru.berlaku && skBaru.ok ? skBaru.acuan : null;
     const mkgTahun = menurutSk ? menurutSk.mkgTahun : Number(nilaiBaru.mkgTahun ?? 0);
     const mkgBulan = menurutSk ? menurutSk.mkgBulan : Number(nilaiBaru.mkgBulan ?? 0);
     const tmtKgbBerikutnya = menurutSk ? menurutSk.tmtKgbBerikutnya : ((nilaiBaru.tmtKgbBerikutnya as Date | null) ?? null);
@@ -106,7 +112,10 @@ export async function setujuiUsulan(
       unitKerja,
       eselon: (nilaiBaru.eselon as string | null) ?? null,
       jenisJabatan: (nilaiBaru.jenisJabatan as string | null) ?? null,
-      tmtGolongan: (nilaiBaru.tmtGolongan as Date | null) ?? null,
+      // TMT golongan pada usulan ber-acuan adalah TMT golongan pada SK KGB terakhir; golongan barunya berlaku sejak TMT
+      // kenaikan pangkat, sama dengan Catat KP.
+      tmtGolongan:
+        acuan && skBaru.berlaku && skBaru.ok && skBaru.jenis === "kp" ? skBaru.tmtSk : ((nilaiBaru.tmtGolongan as Date | null) ?? null),
       mkgTahun,
       mkgBulan,
       // Gaji pokok dihitung dari tabel PP 5/2024 bila tidak diisi, sama dengan impor CSV.
@@ -146,9 +155,11 @@ export async function setujuiUsulan(
     if (skBaru.berlaku && skBaru.ok && nomorSkBaru && tanggalSkBaru) {
       const tmtSkBaru = skBaru.tmtSk;
       const padaSk = skBaru.mkgPadaSk;
-      const keterangan =
-        `Dari usulan pegawai baru UPT${usulan.nomorSurat ? ` surat ${usulan.nomorSurat}` : ""}; ` +
-        `golongan dan masa kerja golongan (${padaSk.tahun} tahun ${padaSk.bulan} bulan pada TMT SK) disalin dari SK ini saat pendataan`;
+      const surat = `Dari usulan pegawai baru UPT${usulan.nomorSurat ? ` surat ${usulan.nomorSurat}` : ""}; `;
+      const keterangan = acuan
+        ? `${surat}keadaan pada SK KGB terakhir (${acuan.golongan}, ${acuan.mkgTahun} tahun ${acuan.mkgBulan} bulan) dan ` +
+          `masa kerja golongan pada SK ini (${padaSk.tahun} tahun ${padaSk.bulan} bulan) dilaporkan saat pendataan`
+        : `${surat}golongan dan masa kerja golongan (${padaSk.tahun} tahun ${padaSk.bulan} bulan pada TMT SK) disalin dari SK ini saat pendataan`;
       const penetapSK = usulan.dasarBaruPenetap?.trim() || null;
       if (skBaru.jenis === "kp") {
         const jenisKp = usulan.dasarBaruJenisKp?.trim() ?? "";
@@ -159,14 +170,14 @@ export async function setujuiUsulan(
           nomorSK: nomorSkBaru,
           tanggalSK: tanggalSkBaru,
           tmtPangkat: tmtSkBaru,
-          // Golongan sebelum SK ini tidak dilaporkan pada pendataan.
-          golonganLama: "",
+          // Golongan sebelum SK ini hanya diketahui bila UPT menuliskan keadaan pada SK KGB terakhir (ADR-078).
+          golonganLama: acuan?.golongan ?? "",
           golonganBaru: pegawaiBaru.golonganRuang,
-          mkgTahunLama: pegawaiBaru.mkgTahun,
-          mkgBulanLama: pegawaiBaru.mkgBulan,
+          mkgTahunLama: acuan?.mkgTahun ?? pegawaiBaru.mkgTahun,
+          mkgBulanLama: acuan?.mkgBulan ?? pegawaiBaru.mkgBulan,
           mkgTahunBaru: pegawaiBaru.mkgTahun,
           mkgBulanBaru: pegawaiBaru.mkgBulan,
-          gajiPokokLama: pegawaiBaru.gajiPokok,
+          gajiPokokLama: acuan?.gajiPokok ?? pegawaiBaru.gajiPokok,
           gajiPokokBaru: pegawaiBaru.gajiPokok,
           keterangan,
           createdAt: sekarang,
@@ -174,6 +185,7 @@ export async function setujuiUsulan(
           penetapSK,
         });
       } else {
+        const pmk = acuan?.pmk ?? null;
         await db.riwayatPmk.create({
           id: newId(),
           pegawaiId: pegawaiBaru.id,
@@ -181,18 +193,18 @@ export async function setujuiUsulan(
           tanggalSK: tanggalSkBaru,
           tmtPmk: tmtSkBaru,
           golonganRuang: pegawaiBaru.golonganRuang,
-          tambahBulan: 0,
-          mkgTahunSebelum: padaSk.tahun,
-          mkgBulanSebelum: padaSk.bulan,
+          tambahBulan: pmk?.tambahBulan ?? 0,
+          mkgTahunSebelum: pmk?.mkgSebelumPadaTmt.tahun ?? padaSk.tahun,
+          mkgBulanSebelum: pmk?.mkgSebelumPadaTmt.bulan ?? padaSk.bulan,
           mkgTahunSesudah: padaSk.tahun,
           mkgBulanSesudah: padaSk.bulan,
-          mkgTahunDasarLama: pegawaiBaru.mkgTahun,
-          mkgBulanDasarLama: pegawaiBaru.mkgBulan,
+          mkgTahunDasarLama: acuan?.mkgTahun ?? pegawaiBaru.mkgTahun,
+          mkgBulanDasarLama: acuan?.mkgBulan ?? pegawaiBaru.mkgBulan,
           mkgTahunDasarBaru: pegawaiBaru.mkgTahun,
           mkgBulanDasarBaru: pegawaiBaru.mkgBulan,
-          gajiPokokLama: pegawaiBaru.gajiPokok,
+          gajiPokokLama: acuan?.gajiPokok ?? pegawaiBaru.gajiPokok,
           gajiPokokBaru: pegawaiBaru.gajiPokok,
-          tmtKgbBerikutnyaLama: pegawaiBaru.tmtKgbBerikutnya,
+          tmtKgbBerikutnyaLama: acuan?.tmtKgbBerikutnya ?? pegawaiBaru.tmtKgbBerikutnya,
           tmtKgbBerikutnyaBaru: pegawaiBaru.tmtKgbBerikutnya,
           penetapSK,
           keterangan,

@@ -304,3 +304,29 @@ test("kekuranganUsulan: pegawai baru yang SK-nya tidak dapat dihitung mundur dit
   assert.ok(kekuranganUsulan(baru, "baru").some((k) => /paling sedikit 1 tahun 1 bulan/.test(k)));
   assert.deepEqual(kekuranganUsulan({ ...baru, mkgTahun: 7, mkgBulan: 1 }, "baru"), []);
 });
+
+test("kekuranganUsulan ber-acuan (ADR-078): masa kerja menurut SK kenaikan pangkat dan pada SK KGB terakhir ditagih", () => {
+  const tercatat = { golonganRuang: "II/b", mkgTahun: 7, mkgBulan: 0, tmtKgbTerakhir: tgl(2024, 12), pathSkTerakhir: "x" };
+  const sk = {
+    dasarBaruJenis: "kp", dasarBaruJenisKp: "penyesuaian_ijazah", dasarBaruNomorSk: "SK-PI", dasarBaruTanggalSk: tgl(2026, 1, 29),
+    dasarBaruTmt: tgl(2026, 2), pathSkTerakhir: "a", pathSkPangkat: "b",
+  };
+  const acuan = { golonganAcuan: "II/b", mkgTahunAcuan: 7, mkgBulanAcuan: 0 };
+  // Pegawai tercatat: golongan baru ada, masa kerja menurut SK belum diisi.
+  assert.ok(
+    kekuranganUsulan({ ...sk, ...acuan, golonganRuang: "III/a", mkgTahun: null, mkgBulan: null }, "perubahan", tercatat).includes(
+      "masa kerja golongan menurut SK kenaikan pangkat",
+    ),
+  );
+  assert.deepEqual(kekuranganUsulan({ ...sk, ...acuan, golonganRuang: "III/a", mkgTahun: 3, mkgBulan: 2 }, "perubahan", tercatat), []);
+  // Laporan lama tanpa acuan tidak menagihnya.
+  assert.deepEqual(kekuranganUsulan({ ...sk, golonganRuang: "III/a" }, "perubahan", tercatat), []);
+
+  // Pegawai baru: masa kerja pada SK KGB terakhir yang belum diisi ditagih.
+  const baru = {
+    ...sk, nama: "PEGAWAI BARU", nip: "199001012020121001", jabatan: "Penjaga Tahanan",
+    golonganRuang: "III/a", mkgTahun: 3, mkgBulan: 2, tmtKgbTerakhir: tgl(2024, 12),
+  };
+  assert.deepEqual(kekuranganUsulan({ ...baru, ...acuan }, "baru"), []);
+  assert.ok(kekuranganUsulan({ ...baru, ...acuan, mkgTahunAcuan: null }, "baru").some((k) => /pada SK KGB terakhir/.test(k)));
+});

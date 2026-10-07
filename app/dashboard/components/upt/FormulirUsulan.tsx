@@ -13,7 +13,16 @@ import { KETERANGAN_DASAR_BARU, LABEL_DASAR_BARU, jawabanSkBaru, perluDasarBaru,
 import { JENIS_KP } from "@/lib/kenaikanPangkat";
 import { pratinjauAtasDasarUsulan } from "@/lib/linimasaDasarSk";
 import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
-import { asalAtasDasar, hitungFormulirUsulan, jawabSkBaru, teksAtasDasar } from "./skSesudahAcuan";
+import {
+  asalAtasDasar,
+  hitungFormulirUsulan,
+  isianUntukDisimpan,
+  jawabSkBaru,
+  mkgPadaSkTercatat,
+  pisahkanIsianSk,
+  teksAtasDasar,
+} from "./skSesudahAcuan";
+import ModalPratinjauSkUsulan from "./ModalPratinjauSkUsulan";
 
 /* Formulir data pegawai UPT: dipakai untuk menyiapkan pegawai baru maupun mengusulkan perbaikan data
    pegawai yang sudah tercatat. Isiannya selalu disimpan sebagai draf lebih dulu; pengirimannya ke
@@ -25,7 +34,9 @@ import { asalAtasDasar, hitungFormulirUsulan, jawabSkBaru, teksAtasDasar } from 
 
    SK KGB terakhir (atau SK CPNS) menjadi acuan jadwal; SK kenaikan pangkat, penyesuaian ijazah, atau PMK
    sesudahnya dilaporkan lewat pertanyaan wajib, dan yang paling baru menjadi Atas dasar SK KGB berikutnya
-   (ADR-065). Data pegawai di SIM-KGB baru berubah setelah usulannya disetujui Kanwil. */
+   (ADR-065). Bagian atas memuat keadaan pada SK KGB terakhir; golongan dan masa kerja menurut SK sesudahnya
+   diisi di bagian SK itu, dan sistem menghitung keadaan sesudahnya dengan cara persetujuan Kanwil (ADR-078).
+   Data pegawai di SIM-KGB baru berubah setelah usulannya disetujui Kanwil. */
 
 export interface DrafUsulanUpt {
   id: string;
@@ -40,6 +51,8 @@ export interface DrafUsulanUpt {
   surat: { nomorSurat: string; tanggalSurat: string; nomorSkTerakhir: string; tanggalSkTerakhir: string; catatanUpt: string } | null;
   hukdis: { ada: boolean; jenis: string; nomorSk: string; tmtMulai: string; tmtBerakhir: string; keterangan: string } | null;
   dasarBaru?: { jenis: string; jenisKp: string; nomorSk: string; tanggalSk: string; tmt: string; penetap: string } | null;
+  /** Golongan dan masa kerja pada SK KGB terakhir, bila disimpan bersama SK sesudahnya (ADR-078); null pada draf lama. */
+  acuan?: { golongan: string; mkgTahun: string; mkgBulan: string } | null;
   berkas: { medan: string; label: string; nama?: string | null }[];
 }
 
@@ -116,19 +129,21 @@ export function IsianTanggal({
   onUbah,
   wajib = false,
   bantuan,
+  nonaktif = false,
 }: {
   label: string;
   nilai: string;
   onUbah: (nilai: string) => void;
   wajib?: boolean;
   bantuan?: string;
+  nonaktif?: boolean;
 }) {
   return (
     <label className="kgbm-label">
       {wajib ? <span className="kgbm-wajib">{label}</span> : label}
-      <input className="kgbm-input" type="date" value={nilai} onChange={(e) => onUbah(e.target.value)} />
+      <input className="kgbm-input" type="date" value={nilai} disabled={nonaktif} onChange={(e) => onUbah(e.target.value)} />
       {bantuan && <span className="kgbm-bantuan">{bantuan}</span>}
-      {nilai && (
+      {nilai && !nonaktif && (
         <button type="button" className="kgbm-kosongkan" onClick={() => onUbah("")}>
           Kosongkan
         </button>
@@ -150,7 +165,17 @@ export default function FormulirUsulan({
   onTutup: () => void;
   onSelesai: (pesan: string) => void;
 }) {
-  const tersimpan: Record<string, string> = draf?.nilai ?? pegawai?.dataSekarang ?? {};
+  // Data tercatat di SIM-KGB; pada pegawai yang sudah tercatat, inilah keadaan sebelum SK yang dilaporkan.
+  const tercatat = jenis === "perubahan" ? (pegawai?.dataSekarang ?? null) : null;
+  // Draf yang melaporkan SK sesudah SK KGB terakhir dipisahkan: keadaan pada SK acuan di bagian atas, golongan dan masa
+  // kerja menurut SK itu di bagian SK (ADR-078).
+  const terpisah = pisahkanIsianSk({
+    nilai: draf?.nilai ?? pegawai?.dataSekarang ?? {},
+    jenisSk: draf?.dasarBaru?.jenis,
+    acuan: draf?.acuan,
+    tercatat,
+  });
+  const tersimpan: Record<string, string> = terpisah.atas;
   // Pegawai yang belum pernah KGB memakai TMT CPNS sebagai awal hitungan, dan TMT golongan pertamanya
   // adalah tanggal yang sama. Isian yang masih kosong diisikan dari sana daripada dibiarkan menebak;
   // operator tetap dapat menggantinya bila SK-nya berkata lain.
@@ -178,6 +203,10 @@ export default function FormulirUsulan({
     tanggalSk: draf?.dasarBaru?.tanggalSk ?? "",
     tmt: draf?.dasarBaru?.tmt ?? "",
     penetap: draf?.dasarBaru?.penetap ?? "",
+    golongan: terpisah.sk.golongan,
+    mkgTahun: terpisah.sk.mkgTahun,
+    mkgBulan: terpisah.sk.mkgBulan,
+    jenisAda: "",
   });
   const [berkas, setBerkas] = useState<Record<string, File | null>>({});
   // Berkas tersimpan yang ditandai operator untuk dihapus; dihapus server saat data disimpan.
@@ -197,6 +226,8 @@ export default function FormulirUsulan({
   const [galat, setGalat] = useState<string | null>(null);
   /** Berkas tersimpan yang sedang dibuka, agar operator dapat memastikan yang diunggah memang benar. */
   const [pratinjau, setPratinjau] = useState<{ judul: string; url: string; lokal: boolean } | null>(null);
+  /** Isian yang sedang dipratinjau sebagai SK KGB (ADR-078); null bila jendelanya tertutup. */
+  const [pratinjauSk, setPratinjauSk] = useState<Record<string, string> | null>(null);
 
 
   const ubah = (kunci: string, nilai: string) => setIsian((f) => ({ ...f, [kunci]: nilai }));
@@ -212,7 +243,10 @@ export default function FormulirUsulan({
   const label = (kunci: string, teks: string) =>
     wajibIdentitas(kunci) ? <span className="kgbm-wajib">{teks}</span> : teks;
 
-  const hitung = useMemo(
+  // Hitungan menurut SK acuan, dan sesudah SK yang dilaporkan dengan cara persetujuan Kanwil (ADR-078). Kenaikan pangkat
+  // mempertahankan jadwal KGB yang tercatat.
+  const tmtBerikutTercatat = tercatat?.tmtKgbBerikutnya ?? null;
+  const hitungan = useMemo(
     () =>
       hitungFormulirUsulan(
         {
@@ -221,11 +255,16 @@ export default function FormulirUsulan({
           mkgBulan: isian.mkgBulan ?? "0",
           tmtKgbTerakhir: isian.tmtKgbTerakhir ?? "",
         },
-        jenis === "baru",
-        { jenis: dasar.jenis, tmt: dasar.tmt },
+        { jenis: dasar.jenis, tmt: dasar.tmt, golongan: dasar.golongan, mkgTahun: dasar.mkgTahun, mkgBulan: dasar.mkgBulan },
+        tmtBerikutTercatat,
       ),
-    [isian.golonganRuang, isian.mkgTahun, isian.mkgBulan, isian.tmtKgbTerakhir, jenis, dasar.jenis, dasar.tmt],
+    [
+      isian.golonganRuang, isian.mkgTahun, isian.mkgBulan, isian.tmtKgbTerakhir,
+      dasar.jenis, dasar.tmt, dasar.golongan, dasar.mkgTahun, dasar.mkgBulan, tmtBerikutTercatat,
+    ],
   );
+  const hitung = hitungan.acuan;
+  const sesudahSk = hitungan.sesudahSk;
 
   // SK KGB terakhir (atau SK CPNS) tetap acuan jadwal; SK sesudahnya yang dilaporkan, atau yang sudah tercatat, menjadi
   // Atas dasar SK KGB berikutnya bila TMT-nya lebih baru (ADR-020, ADR-065).
@@ -237,10 +276,53 @@ export default function FormulirUsulan({
     laporan: adaSkBaru ? { jenis: dasar.jenis, jenisKp: dasar.jenisKp, nomorSk: dasar.nomorSk, tmt: dasar.tmt } : null,
     tercatat: pegawai?.dasarKgb ?? null,
   });
-  // Laporan SK pada pegawai yang sudah tercatat menuntut isian yang diubahnya; tanpa itu persetujuannya gagal.
-  const golonganTetap = jenis !== "baru" && (isian.golonganRuang ?? "") === (awal.golonganRuang ?? "");
-  const mkgTetap =
-    jenis !== "baru" && (isian.mkgTahun ?? "") === (awal.mkgTahun ?? "") && (isian.mkgBulan ?? "") === (awal.mkgBulan ?? "");
+  // Pegawai tercatat yang melaporkan SK: keadaan sebelum SK adalah data tercatat, yang juga dipakai Kanwil saat
+  // menyetujui. Golongan, TMT golongan, dan masa kerjanya dikunci supaya yang terlihat sama dengan yang dihitung.
+  const kunciAtas = !!tercatat && adaSkBaru;
+  // Masa kerja menurut SK kenaikan pangkat atau PMK yang sudah tercatat sesudah KGB terakhir: angka yang tertulis pada SK
+  // itu, berbeda dari masa kerja tercatat (pada TMT KGB terakhir) yang menjadi dasar hitungan (ADR-078).
+  const mkgSkTercatat = tercatat ? mkgPadaSkTercatat(tercatat, pegawai?.dasarKgb ?? null) : null;
+
+  /** Jawaban pertanyaan SK sesudah SK acuan. Isian yang sudah diketik tidak hilang saat jawabannya berganti. */
+  function jawabSk(ada: boolean) {
+    // Golongan baru yang telanjur diganti di bagian atas (cara lama) dipindahkan ke bagian SK.
+    const golonganDiAtas = isian.golonganRuang ?? "";
+    setDasar((d) => {
+      const baru = jawabSkBaru(d, ada);
+      if (ada && tercatat && baru.jenis === "kp" && !baru.golongan && golonganDiAtas && golonganDiAtas !== (tercatat.golonganRuang ?? ""))
+        return { ...baru, golongan: golonganDiAtas };
+      return baru;
+    });
+    if (ada && tercatat) {
+      setIsian((f) => ({
+        ...f,
+        golonganRuang: tercatat.golonganRuang ?? "",
+        tmtGolongan: tercatat.tmtGolongan ?? "",
+        mkgTahun: tercatat.mkgTahun ?? "",
+        mkgBulan: tercatat.mkgBulan ?? "",
+      }));
+      setPernahKgb(sudahPernahKgb(tercatat.mkgTahun, tercatat.mkgBulan));
+    }
+  }
+
+  /** Isian sebagaimana disimpan: isian utama, keadaan acuan, SK, dan SK acuan. Dipakai simpan dan pratinjau SK. */
+  function isianKirim(): Record<string, string> {
+    const { nilai, acuan } = isianUntukDisimpan(isian, dasar);
+    const hasil: Record<string, string> = { jenis };
+    if (pegawai) hasil.pegawaiId = pegawai.id;
+    for (const bidang of BIDANG_DIISI) hasil[bidang.kunci] = nilai[bidang.kunci] ?? "";
+    Object.assign(hasil, acuan);
+    hasil.nomorSkTerakhir = sk.nomorSkTerakhir;
+    hasil.tanggalSkTerakhir = sk.tanggalSkTerakhir;
+    hasil.catatanUpt = sk.catatanUpt;
+    hasil.dasarBaruJenis = dasar.jenis;
+    hasil.dasarBaruJenisKp = dasar.jenisKp;
+    hasil.dasarBaruNomorSk = dasar.nomorSk;
+    hasil.dasarBaruTanggalSk = dasar.tanggalSk;
+    hasil.dasarBaruTmt = dasar.tmt;
+    hasil.dasarBaruPenetap = dasar.penetap;
+    return hasil;
+  }
 
   function tandaiHapus(medan: string, hapus: boolean) {
     setHapusTersimpan((lama) => {
@@ -275,18 +357,7 @@ export default function FormulirUsulan({
     try {
       const form = new FormData();
       form.set("status", "draf");
-      form.set("jenis", jenis);
-      if (pegawai) form.set("pegawaiId", pegawai.id);
-      for (const bidang of BIDANG_DIISI) form.set(bidang.kunci, isian[bidang.kunci] ?? "");
-      form.set("nomorSkTerakhir", sk.nomorSkTerakhir);
-      form.set("tanggalSkTerakhir", sk.tanggalSkTerakhir);
-      form.set("catatanUpt", sk.catatanUpt);
-      form.set("dasarBaruJenis", dasar.jenis);
-      form.set("dasarBaruJenisKp", dasar.jenisKp);
-      form.set("dasarBaruNomorSk", dasar.nomorSk);
-      form.set("dasarBaruTanggalSk", dasar.tanggalSk);
-      form.set("dasarBaruTmt", dasar.tmt);
-      form.set("dasarBaruPenetap", dasar.penetap);
+      for (const [kunci, nilai] of Object.entries(isianKirim())) form.set(kunci, nilai);
       for (const b of BERKAS_PEGAWAI) {
         const isi = berkas[b.medan];
         if (isi) form.set(b.medan, isi);
@@ -339,6 +410,10 @@ export default function FormulirUsulan({
         <>
           <button type="button" className="kgbm-tombol kgbm-kedua" onClick={tutup} disabled={mengirim}>
             Batal
+          </button>
+          {/* Pratinjau SK KGB dari isian ini, sebelum disimpan atau diajukan (ADR-078). */}
+          <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setPratinjauSk(isianKirim())} disabled={mengirim}>
+            Pratinjau SK KGB
           </button>
           <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
             {mengirim ? "Menyimpan…" : dikembalikan ? "Simpan perbaikan" : "Simpan draf usulan"}
@@ -461,16 +536,17 @@ export default function FormulirUsulan({
         <div className="kgbm-bagian-kepala">
           <p className="kgbm-bagian-judul">Pangkat, gaji pokok, dan KGB</p>
           <p className="kgbm-bagian-ket">
-            TMT dan nomor SK dari {skAcuan} (acuan jadwal KGB); golongan dan masa kerja dari SK yang paling baru
+            Golongan, masa kerja golongan, TMT, dan nomor dari {skAcuan}, acuan jadwal KGB. SK sesudahnya diisi di bagian berikut.
           </p>
         </div>
         <div className="kgbm-bagian-isi">
           <div className="kgbm-grid2">
             <label className="kgbm-label">
-              <span className="kgbm-wajib">Golongan/ruang</span>
+              <span className="kgbm-wajib">{adaSkBaru ? `Golongan/ruang pada ${skAcuan}` : "Golongan/ruang"}</span>
               <select
                 className="kgbm-input"
                 value={isian.golonganRuang ?? ""}
+                disabled={kunciAtas}
                 onChange={(e) => ubah("golonganRuang", e.target.value)}
               >
                 <option value="">Pilih golongan</option>
@@ -483,20 +559,33 @@ export default function FormulirUsulan({
               label="TMT golongan"
               nilai={isian.tmtGolongan ?? ""}
               onUbah={(v) => ubah("tmtGolongan", v)}
-              bantuan="Tanggal berlakunya golongan sekarang, dari SK kenaikan pangkat atau SK pengangkatan."
+              nonaktif={kunciAtas}
+              bantuan={
+                adaSkBaru
+                  ? "TMT golongan di atas. Golongan baru berlaku sejak TMT pangkat pada SK di bagian berikut."
+                  : "Tanggal berlakunya golongan sekarang, dari SK kenaikan pangkat atau SK pengangkatan."
+              }
             />
           </div>
+          {kunciAtas && (
+            <Catatan nada="navy">
+              Golongan dan masa kerja golongan di bagian ini mengikuti data yang tercatat di SIM-KGB, yang dipakai Kanwil
+              menghitung SK di bagian berikut. Bila data tercatat itu keliru, jawab Tidak ada lalu ajukan koreksinya lebih
+              dulu; SK ini dilaporkan sesudah koreksinya disetujui.
+            </Catatan>
+          )}
 
           <div className="kgbm-pilihan" role="radiogroup" aria-label="Keadaan KGB pegawai">
             <button
               type="button"
               role="radio"
               aria-checked={!pernahKgb}
+              disabled={kunciAtas}
               onClick={() => { setPernahKgb(false); ubah("mkgTahun", "0"); ubah("mkgBulan", "0"); }}
             >
               Belum pernah KGB
             </button>
-            <button type="button" role="radio" aria-checked={pernahKgb} onClick={() => setPernahKgb(true)}>
+            <button type="button" role="radio" aria-checked={pernahKgb} disabled={kunciAtas} onClick={() => setPernahKgb(true)}>
               Sudah pernah KGB
             </button>
           </div>
@@ -518,6 +607,7 @@ export default function FormulirUsulan({
                       className="kgbm-input"
                       inputMode="numeric"
                       value={isian.mkgTahun ?? ""}
+                      disabled={kunciAtas}
                       onChange={(e) => ubah("mkgTahun", e.target.value.replace(/\D/g, ""))}
                     />
                   </label>
@@ -527,16 +617,25 @@ export default function FormulirUsulan({
                       className="kgbm-input"
                       inputMode="numeric"
                       value={isian.mkgBulan ?? ""}
+                      disabled={kunciAtas}
                       onChange={(e) => ubah("mkgBulan", e.target.value.replace(/\D/g, ""))}
                     />
                   </label>
                 </div>
               </div>
               <p className="kgbm-bantuan">
-                {jenis === "baru"
-                  ? "Masa kerja golongan disalin apa adanya dari SK yang paling baru: SK KGB terakhir, atau SK kenaikan pangkat atau PMK sesudahnya yang dilaporkan di bawah. Bukan dihitung sendiri dari lama bekerja."
-                  : "Masa kerja golongan disalin dari SK KGB terakhir, atau dari SK PMK yang dilaporkan di bawah. Bukan dihitung sendiri dari lama bekerja."}
+                {tercatat
+                  ? "Masa kerja golongan tercatat adalah masa kerja pada TMT KGB terakhir, dasar hitungan KGB. SK kenaikan pangkat atau PMK sesudahnya dilaporkan di bagian berikut beserta masa kerja yang tertulis di SK itu."
+                  : `Masa kerja golongan pada ${skAcuan}, disalin apa adanya dari SK itu, bukan dihitung sendiri dari lama bekerja. SK kenaikan pangkat atau PMK sesudahnya diisi di bagian berikut beserta golongan dan masa kerja menurut SK itu.`}
               </p>
+              {mkgSkTercatat && (
+                <p className="kgbm-bantuan" data-mkg-sk="">
+                  Tercatat {isian.mkgTahun || 0} tahun {isian.mkgBulan || 0} bulan pada TMT KGB terakhir (dasar hitungan). Pada TMT{" "}
+                  {mkgSkTercatat.jenis === "kp" ? "kenaikan pangkat" : "PMK"} {formatTanggalId(mkgSkTercatat.tmt)} masa kerjanya{" "}
+                  {mkgSkTercatat.mkg.tahun} tahun {mkgSkTercatat.mkg.bulan} bulan, angka yang tertulis pada SK itu. Keduanya
+                  benar; yang pertama dipakai menghitung KGB.
+                </p>
+              )}
             </>
           ) : (
             <>
@@ -558,7 +657,7 @@ export default function FormulirUsulan({
           )}
 
           <div className="kgbm-hitungan">
-            <p className="kgbm-hitungan-judul">Dihitung sistem</p>
+            <p className="kgbm-hitungan-judul">{adaSkBaru ? `Dihitung sistem menurut ${skAcuan}` : "Dihitung sistem"}</p>
             <dl>
               <div><dt>Pangkat</dt><dd>{hitung.pangkat || "-"}</dd></div>
               <div>
@@ -574,6 +673,9 @@ export default function FormulirUsulan({
             {hitung.peringatan.map((pesan) => (
               <p className="kgbm-hitungan-ingat" key={pesan}>{pesan}</p>
             ))}
+            {adaSkBaru && (
+              <p className="kgbm-hitungan-ket">Keadaan sesudah SK yang dilaporkan dihitung di bagian berikut; itulah yang dicatat Kanwil.</p>
+            )}
           </div>
 
           <div className="kgbm-grid2">
@@ -610,10 +712,10 @@ export default function FormulirUsulan({
             <span className="kgbm-wajib">Sesudah {skAcuan}, ada SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang belum tercatat?</span>
           </span>
           <div className="kgbm-pilihan" role="radiogroup" aria-label={`SK sesudah ${skAcuan}`}>
-            <button type="button" role="radio" aria-checked={jawaban === "tidak"} onClick={() => setDasar((d) => jawabSkBaru(d, false))}>
+            <button type="button" role="radio" aria-checked={jawaban === "tidak"} onClick={() => jawabSk(false)}>
               Tidak ada
             </button>
-            <button type="button" role="radio" aria-checked={adaSkBaru} onClick={() => setDasar((d) => jawabSkBaru(d, true))}>
+            <button type="button" role="radio" aria-checked={adaSkBaru} onClick={() => jawabSk(true)}>
               Ada
             </button>
           </div>
@@ -636,15 +738,51 @@ export default function FormulirUsulan({
                 ))}
               </div>
               {dasar.jenis === "kp" && (
-                <label className="kgbm-label">
-                  <span className="kgbm-wajib">Jenis kenaikan pangkat</span>
-                  <select className="kgbm-input" value={dasar.jenisKp} onChange={(e) => setDasar((d) => ({ ...d, jenisKp: e.target.value }))}>
-                    {Object.entries(JENIS_KP).map(([k, l]) => (
-                      <option key={k} value={k}>{l}</option>
-                    ))}
-                  </select>
-                </label>
+                <div className="kgbm-grid2">
+                  <label className="kgbm-label">
+                    <span className="kgbm-wajib">Jenis kenaikan pangkat</span>
+                    <select className="kgbm-input" value={dasar.jenisKp} onChange={(e) => setDasar((d) => ({ ...d, jenisKp: e.target.value }))}>
+                      {Object.entries(JENIS_KP).map(([k, l]) => (
+                        <option key={k} value={k}>{l}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="kgbm-label">
+                    <span className="kgbm-wajib">Golongan/ruang baru menurut SK</span>
+                    <select className="kgbm-input" value={dasar.golongan ?? ""} onChange={(e) => setDasar((d) => ({ ...d, golongan: e.target.value }))}>
+                      <option value="">Pilih golongan</option>
+                      {Object.entries(GOLONGAN_PANGKAT).map(([golongan, pangkat]) => (
+                        <option key={golongan} value={golongan}>{golongan} · {pangkat}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               )}
+              <div className="kgbm-grid2">
+                <label className="kgbm-label">
+                  <span className="kgbm-wajib">Masa kerja golongan menurut SK (tahun)</span>
+                  <input
+                    className="kgbm-input"
+                    inputMode="numeric"
+                    value={dasar.mkgTahun ?? ""}
+                    onChange={(e) => setDasar((d) => ({ ...d, mkgTahun: e.target.value.replace(/\D/g, "").slice(0, 2) }))}
+                  />
+                </label>
+                <label className="kgbm-label">
+                  Masa kerja golongan menurut SK (bulan)
+                  <input
+                    className="kgbm-input"
+                    inputMode="numeric"
+                    value={dasar.mkgBulan ?? ""}
+                    onChange={(e) => setDasar((d) => ({ ...d, mkgBulan: e.target.value.replace(/\D/g, "").slice(0, 2) }))}
+                  />
+                </label>
+              </div>
+              <p className="kgbm-bantuan">
+                {dasar.jenis === "kp"
+                  ? "Salin dari SK kenaikan pangkat apa adanya: masa kerja golongan pada TMT pangkat, sesudah potongan bila pindah golongan. Sistem mencocokkannya dengan hitungannya sendiri."
+                  : `Salin dari SK PMK apa adanya: masa kerja golongan pada TMT PMK sesudah ditambah. Golongan tetap ${isian.golonganRuang || "seperti di atas"}.`}
+              </p>
               <div className="kgbm-grid2">
                 <label className="kgbm-label">
                   <span className="kgbm-wajib">Nomor {dasar.jenis === "kp" ? "SK kenaikan pangkat" : "SK PMK"}</span>
@@ -664,25 +802,52 @@ export default function FormulirUsulan({
                   <input className="kgbm-input" value={dasar.penetap} onChange={(e) => setDasar((d) => ({ ...d, penetap: e.target.value }))} placeholder="Pejabat penanda tangan SK" />
                 </label>
               </div>
-              <p className="kgbm-petunjuk">
-                {jenis === "baru"
-                  ? `Golongan dan masa kerja golongan di atas disalin dari SK ${dasar.jenis === "kp" ? "kenaikan pangkat" : "PMK"} ini apa adanya, termasuk potongan masa kerja yang sudah tertulis di SK-nya. TMT KGB terakhir dan nomor SK tetap dari ${skAcuan}; sistem menghitung mundur masa kerjanya ke TMT KGB terakhir.`
-                  : dasar.jenis === "kp"
-                    ? "Golongan di atas diisi golongan baru menurut SK. Masa kerja golongan dihitung ulang Kanwil dari data tercatat: naik dari golongan II ke III memotong masa kerja 5 tahun."
-                    : "Masa kerja golongan di atas diisi sesuai yang tertulis pada SK PMK. Jadwal KGB berikutnya dapat maju, dan Kanwil menghitungnya ulang saat menyetujui."}
-              </p>
-              {dasar.jenis === "kp" && golonganTetap && (
-                <Catatan nada="amber">Ganti golongan di atas dengan golongan baru menurut SK kenaikan pangkat ini; tanpa itu usulannya belum dapat diajukan.</Catatan>
-              )}
-              {dasar.jenis === "pmk" && mkgTetap && (
-                <Catatan nada="amber">Isi masa kerja golongan di atas sesuai yang tertulis pada SK PMK ini; tanpa itu usulannya belum dapat diajukan.</Catatan>
-              )}
-              {!pernahKgb && (
-                <Catatan nada="amber">
-                  Pegawai yang belum pernah KGB tetapi sudah menerima SK ini: pilih Sudah pernah KGB, isi TMT CPNS sebagai TMT KGB terakhir dan
-                  masa kerja golongan dari SK ini, lalu lampirkan SK CPNS pada slot SK KGB terakhir.
-                </Catatan>
-              )}
+              {/* Keadaan sesudah SK ini, dengan hitungan persetujuan Kanwil (ADR-078). */}
+              <div className="kgbm-hitungan" data-sesudah-sk="">
+                <p className="kgbm-hitungan-judul">Dihitung sistem sesudah SK ini</p>
+                {sesudahSk?.ok ? (
+                  <>
+                    <dl>
+                      <div><dt>Pangkat</dt><dd>{sesudahSk.pangkat ? `${sesudahSk.pangkat} (${sesudahSk.golongan})` : sesudahSk.golongan}</dd></div>
+                      <div>
+                        <dt>Gaji pokok</dt>
+                        <dd>{sesudahSk.gajiPokok > 0 ? "Rp" + new Intl.NumberFormat("id-ID").format(sesudahSk.gajiPokok) : "-"}</dd>
+                      </div>
+                      <div>
+                        <dt>TMT KGB berikutnya</dt>
+                        <dd>{sesudahSk.tmtKgbBerikutnya ? formatTanggalId(sesudahSk.tmtKgbBerikutnya) : "-"}</dd>
+                      </div>
+                    </dl>
+                    <p className="kgbm-hitungan-ket">{sesudahSk.penjelasan}</p>
+                    {sesudahSk.cocok && !sesudahSk.cocok.cocok && (
+                      <p className="kgbm-hitungan-ingat">
+                        Masa kerja menurut SK {sesudahSk.cocok.menurutSk.tahun} tahun {sesudahSk.cocok.menurutSk.bulan} bulan, sedangkan
+                        hitungan sistem {sesudahSk.cocok.hitungan.tahun} tahun {sesudahSk.cocok.hitungan.bulan} bulan. Periksa lagi golongan dan
+                        masa kerja pada {skAcuan} di atas, TMT pangkat, dan masa kerja di SK. Bila SK memang berbeda, sebutkan pada catatan
+                        untuk Kanwil.
+                      </p>
+                    )}
+                    {sesudahSk.cocok?.cocok && (
+                      <p className="kgbm-hitungan-ket" data-cocok="">
+                        Masa kerja menurut SK sesuai hitungan sistem.
+                      </p>
+                    )}
+                    {sesudahSk.gajiPokok === 0 && (
+                      <p className="kgbm-hitungan-ingat">
+                        Masa kerja hasil hitungan belum ada di tabel gaji PP 5/2024 untuk golongan {sesudahSk.golongan}. Periksa golongan dan masa kerjanya.
+                      </p>
+                    )}
+                  </>
+                ) : sesudahSk ? (
+                  <p className="kgbm-hitungan-ingat">{sesudahSk.pesan}</p>
+                ) : (
+                  <p className="kgbm-hitungan-ket">
+                    {dasar.jenis === "kp"
+                      ? "Pilih golongan baru dan isi TMT pangkat untuk melihat gaji pokok dan KGB berikutnya sesudah SK ini."
+                      : "Isi masa kerja menurut SK PMK dan TMT PMK untuk melihat gaji pokok dan KGB berikutnya sesudah SK ini."}
+                  </p>
+                )}
+              </div>
             </>
           )}
 
@@ -782,6 +947,9 @@ export default function FormulirUsulan({
           </label>
         </div>
       </div>
+      {pratinjauSk && (
+        <ModalPratinjauSkUsulan isian={pratinjauSk} nama={isian.nama || pegawai?.nama || "Pegawai"} onTutup={() => setPratinjauSk(null)} />
+      )}
       {pratinjau && (
         <ModalPratinjauBerkas
           judul={pratinjau.judul}

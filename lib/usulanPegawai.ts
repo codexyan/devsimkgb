@@ -405,8 +405,12 @@ export function kekuranganUsulan(
 
   const perubahan = pegawai ? bandingkanUsulan(pegawai, usulan) : [];
   const perluBerkas = jenis === "baru" || perubahan.some((p) => KOLOM_DASAR_GAJI.includes(p.kunci));
+  // Keadaan KGB (sudah atau belum pernah) dibaca dari SK acuan: masa kerja pada kolom utama usulan ber-acuan adalah yang
+  // tertulis pada SK kenaikan pangkat atau PMK sesudahnya (ADR-078).
+  const acuan = usulan.golonganAcuan?.trim() ? usulan : null;
   if (perluBerkas) {
-    for (const b of berkasUntukKeadaan(pernahKgb(nilai("mkgTahun"), nilai("mkgBulan")))) {
+    const pernah = acuan ? pernahKgb(acuan.mkgTahunAcuan, acuan.mkgBulanAcuan) : pernahKgb(nilai("mkgTahun"), nilai("mkgBulan"));
+    for (const b of berkasUntukKeadaan(pernah)) {
       if (b.wajib && !usulan[b.kunci]) kurang.push(b.label);
     }
   }
@@ -426,6 +430,10 @@ export function kekuranganUsulan(
     if (jenisSk === "pmk" && !perubahan.some((p) => p.kunci === "mkgTahun" || p.kunci === "mkgBulan"))
       kurang.push("masa kerja golongan menurut SK PMK");
   }
+  // Formulir yang memisahkan keadaan pada SK KGB terakhir dari SK sesudahnya juga menagih masa kerja golongan menurut SK
+  // kenaikan pangkat, pembanding hitungan sistem (ADR-078). Laporan lama dan unggahan Excel tidak memuatnya.
+  if (acuan && usulan.dasarBaruJenis?.trim() === "kp" && (usulan.mkgTahun === null || usulan.mkgTahun === undefined))
+    kurang.push("masa kerja golongan menurut SK kenaikan pangkat");
   // Pindaian SK PMK ditagih bersama berkas dasar lainnya: saat diajukan, bukan saat draf disimpan (ADR-045).
   for (const b of berkasDasarBaru(usulan.dasarBaruJenis)) if (b.wajib && !usulan[b.kunci]) kurang.push(b.label);
   return kurang;

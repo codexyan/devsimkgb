@@ -43,6 +43,7 @@ export default function TabDataPegawai({
   onTindakan,
   onSemuaDokumen,
   atasDasar,
+  mkgMenurutSk,
 }: {
   pegawai: PegawaiUbah;
   bolehUbah: boolean;
@@ -53,6 +54,11 @@ export default function TabDataPegawai({
   onSemuaDokumen: () => void;
   /** Atas dasar KGB berikutnya menurut linimasa SK (ADR-070); hanya untuk peran pemegang dokumen. */
   atasDasar?: ReactNode;
+  /**
+   * Masa kerja golongan pada TMT SK kenaikan pangkat atau PMK sesudah KGB terakhir, seperti tertulis pada SK itu
+   * (ADR-078); null bila dasar KGB berikutnya bukan SK seperti itu.
+   */
+  mkgMenurutSk?: { mkg: { tahun: number; bulan: number }; tmt: Date; jenis: "kp" | "pmk" } | null;
 }) {
   const [dokumen, setDokumen] = useState<DokumenPegawai[] | null>(null);
   const [mutasi, setMutasi] = useState<RiwayatMutasi[] | null>(null);
@@ -196,7 +202,17 @@ export default function TabDataPegawai({
                 {pegawai.golonganRuang} · {GOLONGAN_PANGKAT[pegawai.golonganRuang as keyof typeof GOLONGAN_PANGKAT] ?? pegawai.pangkat ?? ""}
               </Baris>
               <Baris label="TMT golongan">{tgl(pegawai.tmtGolongan)}</Baris>
-              <Baris label="Masa kerja golongan">{`${pegawai.mkgTahun} thn ${pegawai.mkgBulan} bln`}</Baris>
+              <Baris label="Masa kerja golongan">
+                {`${pegawai.mkgTahun} thn ${pegawai.mkgBulan} bln`}
+                {/* Masa kerja tercatat adalah pada TMT KGB terakhir; SK kenaikan pangkat atau PMK sesudahnya menulis masa
+                    kerja pada TMT-nya sendiri. Keduanya ditampilkan agar tidak terkira datanya berubah (ADR-078). */}
+                {mkgMenurutSk && (
+                  <span style={{ display: "block", fontSize: "12px", color: "var(--dt5)" }} data-mkg-sk="">
+                    pada TMT KGB terakhir (dasar hitungan) · {mkgMenurutSk.mkg.tahun} thn {mkgMenurutSk.mkg.bulan} bln pada TMT{" "}
+                    {mkgMenurutSk.jenis === "kp" ? "kenaikan pangkat" : "PMK"} {formatTanggalId(mkgMenurutSk.tmt)}, sesuai SK
+                  </span>
+                )}
+              </Baris>
               <Baris label="Gaji pokok">{rupiah(pegawai.gajiPokok)}</Baris>
               <Baris label="TMT KGB terakhir">{tgl(pegawai.tmtKgbTerakhir)}</Baris>
               <Baris label="TMT KGB berikutnya">{tgl(pegawai.tmtKgbBerikutnya)}</Baris>

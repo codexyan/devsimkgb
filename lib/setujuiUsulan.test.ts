@@ -259,3 +259,84 @@ test("pegawai baru yang melaporkan SK penyesuaian ijazah: masa kerja dihitung mu
     assert.equal((await db.notifikasi.findMany({ where: { tipe: "usulan_disetujui" } })).length, 0);
   });
 });
+
+test("pegawai baru ber-acuan (ADR-078): dihitung dari SK KGB terakhir, riwayat KP memuat golongan lamanya", async () => {
+  await denganDataLokal(async () => {
+    const { db } = await import("./db");
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+    const { getGajiPokok } = await import("./tabelGaji");
+    // Skema Admin UPT: KGB terakhir 1 Des 2024 di II/b 7 tahun; PI 1 Feb 2026 ke III/a, di SK 3 tahun 2 bulan.
+    const usulan = {
+      id: "u10", pegawaiId: null, satker: "rutan-rantau", status: "menunggu", jenis: "baru", nip: "199202022020121002",
+      unitKerja: "Rutan Kelas IIB Rantau", nomorSurat: "W.10", tanggalSurat: tgl(2026, 10, 1), pathBerkas: null,
+      pathSkTerakhir: "a", pathSyaratCpns: null, pathSkPangkat: "b", pathSkCpns: null, pathSkPmk: null,
+      nama: "PEGAWAI BARU ACUAN", tempatLahir: null, tanggalLahir: null, jenisKelamin: null, pendidikanTerakhir: null,
+      jabatan: "Penjaga Tahanan", pangkat: null, golonganRuang: "III/a", eselon: null, jenisJabatan: null,
+      tmtGolongan: tgl(2022, 4), mkgTahun: 3, mkgBulan: 2, gajiPokok: null, tmtKgbTerakhir: tgl(2024, 12),
+      tmtKgbBerikutnya: null, nomorSkTerakhir: "W19.PAS17.KP.04.04-2611", tanggalSkTerakhir: tgl(2024, 10, 3), hukdisAda: false,
+      hukdisJenis: null, hukdisNomorSk: null, hukdisTmtMulai: null, hukdisTmtBerakhir: null, hukdisKeterangan: null,
+      catatanUpt: null, diajukanOleh: "UPT", diajukanAt: new Date(), ditinjauOleh: null, ditinjauAt: null, alasanTolak: null,
+      dasarBaruJenis: "kp", dasarBaruJenisKp: "penyesuaian_ijazah", dasarBaruNomorSk: "SEK-2156.SA.04.05",
+      dasarBaruTanggalSk: tgl(2026, 1, 29), dasarBaruTmt: tgl(2026, 2), dasarBaruPenetap: "Sekretaris Jenderal",
+      golonganAcuan: "II/b", mkgTahunAcuan: 7, mkgBulanAcuan: 0,
+    };
+    await db.usulanPegawai.create(usulan);
+    const hasil = await setujuiUsulan(usulan as never, null, "Peninjau", new Date(), "u1");
+    assert.equal(hasil.ok, true);
+    const pegawai = await db.pegawai.findUnique({ nip: "199202022020121002" });
+    assert.equal(pegawai?.golonganRuang, "III/a");
+    assert.equal(pegawai?.mkgTahun, 2);
+    assert.equal(pegawai?.mkgBulan, 0);
+    assert.equal(pegawai?.gajiPokok, getGajiPokok("III/a", 2, 0));
+    assert.equal(new Date(pegawai!.tmtKgbBerikutnya!).getTime(), new Date(2026, 11, 1).getTime(), "KGB berikutnya 1 Des 2026");
+    assert.equal(new Date(pegawai!.tmtGolongan!).getTime(), new Date(2026, 1, 1).getTime(), "TMT golongan = TMT kenaikan pangkat");
+    const riwayat = await db.riwayatPangkat.findMany({ where: { pegawaiId: pegawai!.id } });
+    assert.equal(riwayat.length, 1);
+    assert.equal(riwayat[0].golonganLama, "II/b");
+    assert.equal(riwayat[0].mkgTahunLama, 7);
+    assert.equal(riwayat[0].mkgTahunBaru, 2);
+    assert.equal(riwayat[0].gajiPokokLama, getGajiPokok("II/b", 7, 0));
+  });
+});
+
+test("pegawai tercatat ber-acuan: masa kerja menurut SK tidak ditulis, yang ditulis hitungan dari data tercatat", async () => {
+  await denganDataLokal(async () => {
+    const { db } = await import("./db");
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+    const pegawai = {
+      id: "p3", nip: "199303032015031003", nama: "PEGAWAI KP", tempatLahir: null, tanggalLahir: null,
+      jenisKelamin: null, pendidikanTerakhir: null, jabatan: "Penjaga Tahanan", pangkat: "Pengatur Muda Tingkat I",
+      golonganRuang: "II/b", unitKerja: "Rutan Kelas IIB Rantau", eselon: null, jenisJabatan: null,
+      tmtGolongan: tgl(2022, 4), mkgTahun: 7, mkgBulan: 0, gajiPokok: 0,
+      tmtKgbTerakhir: tgl(2024, 12), tmtKgbBerikutnya: tgl(2026, 12), statusHukdis: false,
+      tanggalHukdisBerakhir: null, jenisHukdis: null, keteranganHukdis: null, aktif: true,
+      createdAt: new Date(), updatedAt: new Date(), konfirmasiUptTmt: null, konfirmasiUptAt: null,
+      konfirmasiUptOleh: null, satkerTugas: null, berhentiTmt: null, berhentiAlasan: null,
+      nomorSkDasar: null, tanggalSkDasar: null, penetapSkDasar: null,
+    };
+    await db.pegawai.create(pegawai);
+    const usulan = {
+      id: "u11", pegawaiId: "p3", satker: "rutan-rantau", status: "menunggu", jenis: "perubahan", nip: null,
+      unitKerja: null, nomorSurat: null, tanggalSurat: null, pathBerkas: null, pathSkTerakhir: "a",
+      pathSyaratCpns: null, pathSkPangkat: "b", pathSkCpns: null, pathSkPmk: null, nama: null, tempatLahir: null, tanggalLahir: null,
+      jenisKelamin: null, pendidikanTerakhir: null, jabatan: null, pangkat: null, golonganRuang: "III/a", eselon: null,
+      jenisJabatan: null, tmtGolongan: tgl(2022, 4), mkgTahun: 3, mkgBulan: 2, gajiPokok: null, tmtKgbTerakhir: tgl(2024, 12),
+      tmtKgbBerikutnya: null, nomorSkTerakhir: null, tanggalSkTerakhir: null, hukdisAda: false,
+      hukdisJenis: null, hukdisNomorSk: null, hukdisTmtMulai: null, hukdisTmtBerakhir: null, hukdisKeterangan: null,
+      catatanUpt: null, diajukanOleh: "UPT", diajukanAt: new Date(), ditinjauOleh: null, ditinjauAt: null, alasanTolak: null,
+      dasarBaruJenis: "kp", dasarBaruJenisKp: "penyesuaian_ijazah", dasarBaruNomorSk: "SEK-2156.SA.04.05",
+      dasarBaruTanggalSk: tgl(2026, 1, 29), dasarBaruTmt: tgl(2026, 2), dasarBaruPenetap: "Sekretaris Jenderal",
+      golonganAcuan: "II/b", mkgTahunAcuan: 7, mkgBulanAcuan: 0,
+    };
+    await db.usulanPegawai.create(usulan);
+    const hasil = await setujuiUsulan(usulan as never, await db.pegawai.findUnique({ id: "p3" }), "Peninjau", new Date(), "u1");
+    assert.equal(hasil.ok, true);
+    const sesudah = await db.pegawai.findUnique({ id: "p3" });
+    assert.equal(sesudah?.golonganRuang, "III/a");
+    assert.equal(sesudah?.mkgTahun, 2, "bukan 3 tahun 2 bulan dari SK");
+    assert.equal(sesudah?.mkgBulan, 0);
+    assert.equal(new Date(sesudah!.tmtKgbBerikutnya!).getTime(), tgl(2026, 12).getTime());
+    // Jejak audit memakai hitungan, bukan masa kerja mentah dari SK.
+    if (hasil.ok) assert.match(hasil.ringkasPerubahan, /Masa kerja golongan \(tahun\)? ?7 → 2|7 → 2/);
+  });
+});

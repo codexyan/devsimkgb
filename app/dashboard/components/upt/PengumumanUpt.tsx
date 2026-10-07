@@ -16,7 +16,8 @@ import {
 } from "@/lib/pengumumanUpt";
 
 /* Pop-up pengumuman perubahan untuk Admin UPT (ADR-073, ADR-074, ADR-075): nama menu baru dan pegawai baru yang kini tampil di
-   tabel Pegawai Satker, lalu tombol Lapor KP/PI/PMK beserta peringatan dan kabar disetujuinya. Adegan bergerak yang
+   tabel Pegawai Satker, lalu tombol Lapor KP/PI/PMK beserta peringatan dan kabar disetujuinya, lalu formulir usulan yang
+   memisahkan SK KGB terakhir dari SK sesudahnya beserta pratinjau SK KGB (ADR-078). Adegan bergerak yang
    berganti sendiri, dapat dijeda, dilewati, atau dibuka lagi lewat tombol "Apa yang baru". Tiap adegan milik satu
    pengumuman; yang tampil otomatis hanya adegan dari pengumuman yang belum dilihat akun itu. Penanda "sudah dilihat"
    dicatat per akun di server (ADR-075), supaya pengumuman tampil di login pertama akun itu saja, di perangkat mana pun;
@@ -28,7 +29,7 @@ import {
    elemen bergerak menempati keadaan akhirnya bila animasi dimatikan, jadi pilihan "Kurangi animasi" tetap
    menampilkan isi yang utuh tanpa gerak. */
 
-type Gambar = "menu" | "tabel" | "aman" | "lapor" | "kabar";
+type Gambar = "menu" | "tabel" | "aman" | "lapor" | "kabar" | "skPisah" | "pratinjauSk";
 
 const ADEGAN: readonly { pengumuman: IdPengumumanUpt; gambar: Gambar; judul: string; teks: string }[] = [
   {
@@ -60,6 +61,18 @@ const ADEGAN: readonly { pengumuman: IdPengumumanUpt; gambar: Gambar; judul: str
     gambar: "kabar",
     judul: "Ada peringatan sebelum kirim, dan kabar saat disetujui",
     teks: "Bila KGB pegawai sedang diproses Kanwil, Anda diberi tahu dampaknya sebelum mengirim. Setelah Kanwil menyetujui laporan, kabarnya muncul di Notifikasi. Isian Anda tidak pernah ditimpa isian bersama.",
+  },
+  {
+    pengumuman: "sk-usulan-2026-10",
+    gambar: "skPisah",
+    judul: "SK KGB terakhir dan SK sesudahnya kini diisi terpisah",
+    teks: "Di formulir usulan, bagian pangkat berisi golongan dan masa kerja pada SK KGB terakhir. Golongan baru dan masa kerja menurut SK kenaikan pangkat, PI, atau PMK diisi di bagian SK-nya. Sistem menghitung gaji pokok dan KGB berikutnya seperti persetujuan Kanwil, lalu mencocokkan masa kerjanya dengan SK. Isian SK tidak hilang bila jawaban Ada dan Tidak ada berganti.",
+  },
+  {
+    pengumuman: "sk-usulan-2026-10",
+    gambar: "pratinjauSk",
+    judul: "Pratinjau SK KGB sebelum mengajukan",
+    teks: "Tombol Pratinjau SK KGB di formulir usulan menyusun SK KGB berikutnya dari isian Anda saat itu juga, bertanda air pratinjau. Periksa pangkat, gaji pokok, masa kerja, dan TMT-nya sebelum mengajukan. SK yang kelak dibuat Kanwil tetap Anda periksa sebelum dicetak.",
   },
 ];
 
@@ -241,6 +254,8 @@ export default function PengumumanUpt() {
             {putar[adegan].gambar === "aman" && <AdeganAman />}
             {putar[adegan].gambar === "lapor" && <AdeganLapor />}
             {putar[adegan].gambar === "kabar" && <AdeganKabar />}
+            {putar[adegan].gambar === "skPisah" && <AdeganSkPisah />}
+            {putar[adegan].gambar === "pratinjauSk" && <AdeganPratinjauSk />}
           </div>
         </div>
 
@@ -492,6 +507,77 @@ function AdeganKabar() {
           </span>
         </span>
       </div>
+    </div>
+  );
+}
+
+/* ── Adegan 6: SK KGB terakhir dan SK sesudahnya dipisah (ADR-078) ─────── */
+
+function AdeganSkPisah() {
+  return (
+    <div className="pmn-tabel">
+      <div className="pmn-kepala-tabel">
+        <span>Bagian formulir</span>
+        <span>Isian dan hitungan</span>
+      </div>
+      <div className="pmn-baris">
+        <span className="pmn-nama">SK KGB terakhir</span>
+        <span className="pmn-hitungan">
+          <small>TMT 1 Des 2024</small>
+          II/b · 7 thn 0 bln
+        </span>
+      </div>
+      <div className="pmn-baris" data-baru="" style={gaya("1.0s")}>
+        <span className="pmn-nama">SK PI TMT 1 Feb 2026</span>
+        <span className="pmn-hitungan">
+          <small>menurut SK</small>
+          <span>
+            III/a · 3 thn 2 bln <i className="pmn-tag">cocok</i>
+          </span>
+        </span>
+      </div>
+      <div className="pmn-baris" data-baru="" style={gaya("1.9s")}>
+        <span className="pmn-nama">Dihitung sistem</span>
+        <span className="pmn-hitungan">
+          <small>masa kerja dipotong 5 tahun</small>
+          KGB berikutnya 1 Des 2026
+        </span>
+      </div>
+      <div className="pmn-kaki-lapor">
+        <span>Isian SK tetap ada saat jawaban berganti</span>
+        <span className="pmn-tekan pmn-tekan-kirim">Ada</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Adegan 7: pratinjau SK KGB dari isian usulan (ADR-078) ─────────────── */
+
+function AdeganPratinjauSk() {
+  return (
+    <div className="pmn-tabel pmn-sk">
+      <div className="pmn-bar">
+        <span className="pmn-tombol-g">Batal</span>
+        <span className="pmn-tekan pmn-tekan-lapor">Pratinjau SK KGB</span>
+        <span className="pmn-tombol-g">Simpan draf</span>
+      </div>
+      <div className="pmn-baris">
+        <span className="pmn-nama">Pangkat/golongan</span>
+        <span>Penata Muda (III/a)</span>
+      </div>
+      <div className="pmn-baris" data-baru="" style={gaya("1.1s")}>
+        <span className="pmn-nama">Gaji pokok baru</span>
+        <span>Rp2.964.000 · 4 thn 0 bln</span>
+      </div>
+      <div className="pmn-baris" data-baru="" style={gaya("1.7s")}>
+        <span className="pmn-nama">TMT KGB</span>
+        <span>1 Desember 2026</span>
+      </div>
+      <div className="pmn-kaki-lapor">
+        <span>Atas dasar SK PI, belum diajukan</span>
+        <span className="pmn-tag">Pratinjau</span>
+      </div>
+      <span className="pmn-sk-air" aria-hidden="true">PRATINJAU USULAN</span>
     </div>
   );
 }

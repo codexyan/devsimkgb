@@ -202,6 +202,12 @@ export interface UsulanPegawaiRow {
   dasarBaruNomorSk: string | null; dasarBaruTanggalSk: Date | null;
   /** TMT pangkat untuk "kp", TMT PMK untuk "pmk". */
   dasarBaruTmt: Date | null; dasarBaruPenetap: string | null;
+  /**
+   * Golongan dan masa kerja golongan pada SK acuan (SK KGB terakhir atau SK CPNS), diisi hanya bila usulan melaporkan
+   * SK kenaikan pangkat atau PMK sesudahnya (ADR-078). Golongan dan masa kerja pada kolom utama usulan itu adalah yang
+   * tertulis di SK yang dilaporkan. Kosong pada usulan lama: golongan dan masa kerjanya saja yang tersalin dari SK itu.
+   */
+  golonganAcuan?: string | null; mkgTahunAcuan?: number | null; mkgBulanAcuan?: number | null;
   hukdisAda: boolean; hukdisJenis: string | null; hukdisNomorSk: string | null;
   hukdisTmtMulai: Date | null; hukdisTmtBerakhir: Date | null; hukdisKeterangan: string | null;
   catatanUpt: string | null;
@@ -269,6 +275,7 @@ export const defs = {
       s("dasarBaruJenis"), s("dasarBaruJenisKp"), s("dasarBaruNomorSk"),
       d("dasarBaruTanggalSk"), d("dasarBaruTmt"), s("dasarBaruPenetap"),
       s("pathSkPmk"),
+      s("golonganAcuan"), i("mkgTahunAcuan"), i("mkgBulanAcuan"),
     ],
   },
   RiwayatKGB: {

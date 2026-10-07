@@ -8,7 +8,8 @@ import { notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
 import { pegawaiSatker } from "@/lib/aksesUpt";
 import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgb, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan } from "@/lib/bawaanUsulan";
-import { bacaDasarBaru, bacaIsianUsulan, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
+import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
+import { tulisDenganAcuan } from "@/lib/acuanUsulanServer";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
@@ -99,6 +100,11 @@ export async function GET(req: Request) {
               penetap: u.dasarBaruPenetap ?? "",
             }
           : null,
+        // Keadaan pada SK KGB terakhir yang ditulis bersama SK sesudahnya (ADR-078); null pada usulan lama.
+        acuan:
+          DIPEGANG_UPT.includes(u.status) && u.golonganAcuan?.trim()
+            ? { golongan: u.golonganAcuan.trim(), mkgTahun: String(u.mkgTahunAcuan ?? 0), mkgBulan: String(u.mkgBulanAcuan ?? 0) }
+            : null,
         hukdis: DIPEGANG_UPT.includes(u.status)
           ? {
               ada: !!u.hukdisAda,
@@ -214,20 +220,25 @@ export async function POST(req: Request) {
 
   // Sebab perubahan golongan atau masa kerja golongan beserta SK-nya (ADR-030).
   const dasarBaru = bacaDasarBaru(teks);
-  const isian = isiHitungan(dibaca.isian, dasar, dasarBaru);
+  // Golongan dan masa kerja pada SK KGB terakhir, bila SK sesudahnya dilaporkan (ADR-078).
+  const acuan = bacaAcuan(teks, dasarBaru);
+  const isian = isiHitungan(dibaca.isian, dasar, { ...dasarBaru, ...acuan });
   const hukdisAda = teks("hukdisAda") === "true";
 
   // Berkas yang sudah disetujui Kanwil untuk pegawai ini ikut terbawa bila tidak diunggah ulang (ADR-017).
   const bawaan = dasar
     ? bawaanPegawai(dasar, (await db.usulanPegawai.findMany({ where: { pegawaiId: dasar.id, status: "disetujui" } })) as UsulanPegawaiRow[])
     : null;
-  const pernah = pernahKgb(isian.mkgTahun ?? dasar?.mkgTahun, isian.mkgBulan ?? dasar?.mkgBulan);
+  const pernah = acuan.golonganAcuan
+    ? pernahKgb(acuan.mkgTahunAcuan, acuan.mkgBulanAcuan)
+    : pernahKgb(isian.mkgTahun ?? dasar?.mkgTahun, isian.mkgBulan ?? dasar?.mkgBulan);
 
   if (!draf) {
     const kurang = kekuranganUsulan(
       {
         ...denganBerkasBawaan(isian, bawaan ?? { nomorSkTerakhir: null, tanggalSkTerakhir: null, berkas: {} }),
         ...dasarBaru,
+        ...acuan,
         // Berkas yang diunggah bersama permintaan ini dihitung ada; objeknya baru disimpan setelah semua lolos.
         ...Object.fromEntries(
           BERKAS_USULAN.filter((b) => { const f = form.get(b.medan); return f instanceof File && f.size > 0; }).map((b) => [b.kunci, b.medan]),
@@ -298,10 +309,11 @@ export async function POST(req: Request) {
     ditinjauAt: null,
     alasanTolak: null,
     ...dasarBaru,
+    ...acuan,
     ...isian,
   };
 
-  await db.usulanPegawai.create(baris);
+  await tulisDenganAcuan(baris, (isi) => db.usulanPegawai.create(isi));
 
   if (!draf) {
     // Notifikasi dibuat di sini, bukan menunggu pemeriksaan berkala, supaya Tim SDM Kanwil melihat usulan
