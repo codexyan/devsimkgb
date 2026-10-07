@@ -8,7 +8,7 @@
 //
 // Murni: tanpa akses data, supaya dapat diuji dan dicocokkan dengan persetujuan.
 
-import { hitungDasarSkUsulan, hitungSkPegawaiBaru } from "./dasarSkUsulan";
+import { KOLOM_DITENTUKAN_SK, hitungSkPegawaiBaru, rencanaSkUsulan, type SkTercatat } from "./dasarSkUsulan";
 import { rencanaSiklusBerikutnya, type RencanaSiklusKgb } from "./jadwalKgb";
 import { susunLinimasaDasar, type KgbUntukLinimasa, type SkGaji, type SkPenetapGaji } from "./linimasaDasarSk";
 import { kunciNomorSk } from "./nomorSurat";
@@ -35,7 +35,12 @@ type Hasil<T> = { ok: true; nilai: T } | { ok: false; pesan: string };
  * Keadaan dasar gaji sesudah usulan disetujui, dengan hitungan persetujuan Kanwil: SK kenaikan pangkat atau PMK yang
  * dilaporkan dihitung terhadap data tercatat (pegawai lama) atau keadaan pada SK KGB terakhir (pegawai baru).
  */
-export function keadaanSesudahUsulan(usulan: Partial<UsulanPegawaiRow>, pegawaiLama: PegawaiRow | null): Hasil<KeadaanSesudahUsulan> {
+export function keadaanSesudahUsulan(
+  usulan: Partial<UsulanPegawaiRow>,
+  pegawaiLama: PegawaiRow | null,
+  /** SK yang dilaporkan dan sudah tercatat pada riwayat pegawai (ADR-079). */
+  tercatat: SkTercatat | null = null,
+): Hasil<KeadaanSesudahUsulan> {
   // SK yang dilaporkan tetapi belum lengkap tidak dihitung saat disetujui; golongan dan masa kerja menurut SK-nya akan
   // terbaca sebagai angka mentah. Pratinjaunya ditahan, bukan disusun dengan angka keliru.
   const jenisSk = usulan.dasarBaruJenis?.trim();
@@ -46,15 +51,19 @@ export function keadaanSesudahUsulan(usulan: Partial<UsulanPegawaiRow>, pegawaiL
     };
   if (pegawaiLama) {
     const nilaiBaru = perubahanPegawai(usulan);
-    const sk = hitungDasarSkUsulan(pegawaiLama, usulan, nilaiBaru);
-    if (sk.berlaku && !sk.ok) return { ok: false, pesan: `SK yang dilaporkan belum dapat dihitung: ${sk.pesan}.` };
+    // Rencana yang sama dengan persetujuan Kanwil: dasar tercatat atau yang dibetulkan UPT, dan SK yang sudah tercatat
+    // tidak dihitung dua kali (ADR-079).
+    const rencana = rencanaSkUsulan(pegawaiLama, usulan, nilaiBaru, tercatat);
+    if (rencana.jenis === "galat") return { ok: false, pesan: `SK yang dilaporkan belum dapat dihitung: ${rencana.pesan}.` };
+    const tanpaSk: Partial<PegawaiRow> = { ...nilaiBaru };
+    if (rencana.jenis !== "tanpa") for (const kolom of KOLOM_DITENTUKAN_SK) delete (tanpaSk as Record<string, unknown>)[kolom];
     // Tanpa SK, kolom hitungannya dari isian usulan seperti saat disimpan (lib/usulanFormulir.ts).
-    const hitungan = sk.berlaku ? null : isiHitungan(usulan, pegawaiLama, null);
+    const hitungan = rencana.jenis === "tanpa" ? isiHitungan(usulan, pegawaiLama, null) : null;
     const p: Partial<PegawaiRow> = {
       ...pegawaiLama,
-      ...nilaiBaru,
+      ...tanpaSk,
       ...(hitungan ? { pangkat: hitungan.pangkat ?? undefined, gajiPokok: hitungan.gajiPokok ?? undefined, tmtKgbBerikutnya: hitungan.tmtKgbBerikutnya ?? null } : {}),
-      ...(sk.berlaku && sk.ok ? sk.nilai : {}),
+      ...(rencana.jenis === "hitung" ? { ...rencana.dasar, ...rencana.sk.nilai, tmtKgbBerikutnya: rencana.sk.nilai.tmtKgbBerikutnya ?? rencana.dasar.tmtKgbBerikutnya } : {}),
     };
     const golongan = String(p.golonganRuang ?? "");
     return {

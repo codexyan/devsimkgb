@@ -185,18 +185,36 @@ export default function UsulanPage() {
     }
   }
 
-  /** Setujui seluruh usulan pada satu surat lewat satu permintaan. */
+  /**
+   * Setujui seluruh usulan pada satu surat, dikirim bertahap beberapa usulan per permintaan: satu permintaan
+   * untuk puluhan pegawai melampaui batas CPU Worker dan terputus di tengah jalan (ADR-079).
+   */
   async function setujuiSurat(sasaran: { nomorSurat: string; isi: UsulanKanwil[] }) {
     setSibuk(true);
     setGalat("");
     try {
-      const res = await fetch("/api/usulan/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: sasaran.isi.map((u) => u.id) }),
-      });
-      const d = (await res.json().catch(() => ({}))) as { error?: string; berhasil?: number; gagal?: number; galat?: string[] };
-      if (!res.ok) { setGalat(d.error ?? "Persetujuan gagal disimpan"); return; }
+      const ids = sasaran.isi.map((u) => u.id);
+      const d = { berhasil: 0, gagal: 0, galat: [] as string[] };
+      for (let i = 0; i < ids.length; i += 3) {
+        if (ids.length > 3) beriKabar(`Menyetujui ${Math.min(i + 3, ids.length)} dari ${ids.length} usulan…`, 60000);
+        const res = await fetch("/api/usulan/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: ids.slice(i, i + 3) }),
+        });
+        const h = (await res.json().catch(() => ({}))) as { error?: string; berhasil?: number; gagal?: number; galat?: string[] };
+        if (!res.ok) {
+          setGalat(
+            `${h.error ?? "Persetujuan gagal disimpan"}` +
+              (d.berhasil ? ` (${d.berhasil} usulan sudah disetujui; tekan Setujui lagi untuk sisanya.)` : ""),
+          );
+          if (d.berhasil) void muat();
+          return;
+        }
+        d.berhasil += h.berhasil ?? 0;
+        d.gagal += h.gagal ?? 0;
+        d.galat.push(...(h.galat ?? []));
+      }
       beriKabar(
         `${d.berhasil ?? 0} usulan pada surat ${sasaran.nomorSurat} disetujui dan diterapkan ke data pegawai.` +
           (d.gagal ? ` ${d.gagal} gagal: ${(d.galat ?? []).slice(0, 3).join("; ")}` : ""),

@@ -8,7 +8,7 @@
 // Hitungan intinya (hitungSkDilaporkan) juga dipakai formulir UPT untuk pratinjau "Dihitung sistem" dan pratinjau SK
 // KGB, sehingga yang dilihat UPT sebelum mengajukan sama dengan yang diterapkan Kanwil (ADR-078).
 
-import { hitungKenaikanPangkat, type HasilKenaikanPangkat } from "./kenaikanPangkat";
+import { hitungKenaikanPangkat, peringkatGolongan, type HasilKenaikanPangkat } from "./kenaikanPangkat";
 import { hitungPmk, type HasilPmk } from "./pmk";
 import {
   bulanKeKgbBerikutnya,
@@ -21,7 +21,8 @@ import {
 } from "./tabelGaji";
 import { isJenisDasarBaru } from "./dasarBaruUsulan";
 import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
-import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
+import { kunciNomorSk } from "./nomorSurat";
+import type { PegawaiRow, RiwayatPangkatRow, RiwayatPmkRow, UsulanPegawaiRow } from "./sheets/tables";
 
 /** Kolom pegawai yang nilainya ditentukan SK, bukan angka yang diketik UPT. */
 export const KOLOM_DITENTUKAN_SK = ["golonganRuang", "pangkat", "mkgTahun", "mkgBulan", "gajiPokok", "tmtGolongan", "tmtKgbBerikutnya"] as const;
@@ -224,12 +225,190 @@ export function usulanMenurutSk(
   pegawaiLama: PegawaiRow,
   usulan: UsulanPegawaiRow,
   nilaiBaru: Partial<PegawaiRow>,
+  /** SK yang dilaporkan dan sudah tercatat pada riwayat pegawai (cariSkTercatat); null bila belum. */
+  tercatat: SkTercatat | null = null,
 ): UsulanPegawaiRow {
-  const sk = hitungDasarSkUsulan(pegawaiLama, usulan, nilaiBaru);
-  if (!sk.berlaku || !sk.ok) return usulan;
+  const rencana = rencanaSkUsulan(pegawaiLama, usulan, nilaiBaru, tercatat);
   const hasil: Record<string, unknown> = { ...usulan };
-  for (const kolom of KOLOM_DITENTUKAN_SK) hasil[kolom] = (sk.nilai as Record<string, unknown>)[kolom] ?? null;
+  // SK yang sudah diterapkan: kolom yang ditentukan SK tidak berubah lagi oleh usulan ini.
+  if (rencana.jenis === "sudah") {
+    for (const kolom of KOLOM_DITENTUKAN_SK) hasil[kolom] = null;
+    return hasil as unknown as UsulanPegawaiRow;
+  }
+  if (rencana.jenis !== "hitung") return usulan;
+  const nilai: Record<string, unknown> = { ...rencana.sk.nilai };
+  // Keadaan sebelum SK yang dibetulkan UPT ikut berubah: TMT golongan (PMK) dan jadwal KGB (kenaikan pangkat).
+  if (rencana.koreksi) {
+    nilai.tmtGolongan ??= rencana.dasar.tmtGolongan;
+    nilai.tmtKgbBerikutnya ??= rencana.dasar.tmtKgbBerikutnya;
+  }
+  for (const kolom of KOLOM_DITENTUKAN_SK) hasil[kolom] = nilai[kolom] ?? null;
   return hasil as unknown as UsulanPegawaiRow;
+}
+
+/** Koreksi keadaan sebelum SK yang diajukan UPT bersama SK sesudahnya (ADR-079): [tercatat, dibetulkan]. */
+export interface KoreksiDasar {
+  golongan: [string, string] | null;
+  mkg: [MasaKerja, MasaKerja] | null;
+  tmtKgbTerakhir: [Date | null, Date | null] | null;
+  tmtGolongan: [Date | null, Date | null] | null;
+}
+
+const samaTanggal = (a: Date | null, b: Date | null) => (a?.getTime() ?? null) === (b?.getTime() ?? null);
+
+/**
+ * Keadaan sebelum SK yang dipakai menghitung usulan pegawai tercatat (ADR-079). Bawaannya data tercatat. Bila UPT
+ * membetulkan golongan, masa kerja golongan, TMT golongan, atau TMT KGB terakhir di bagian atas formulir bersama SK yang
+ * dilaporkan, keadaan yang dibetulkan itulah dasarnya; jadwal KGB-nya dihitung ulang dari isian itu bila golongan, masa
+ * kerja, atau TMT KGB terakhirnya berubah.
+ */
+export function dasarSebelumSk(
+  pegawaiLama: PegawaiRow,
+  usulan: Partial<UsulanPegawaiRow>,
+): { pegawai: PegawaiRow; koreksi: KoreksiDasar | null } {
+  const jenis = usulan.dasarBaruJenis?.trim();
+  const acuan = acuanUsulan(usulan);
+  if ((jenis !== "kp" && jenis !== "pmk") || !acuan || acuan.mkgTahun === null || !isGolonganDikenal(acuan.golongan))
+    return { pegawai: pegawaiLama, koreksi: null };
+
+  const mkgLama: MasaKerja = { tahun: pegawaiLama.mkgTahun ?? 0, bulan: pegawaiLama.mkgBulan ?? 0 };
+  const mkgBaru: MasaKerja = { tahun: acuan.mkgTahun, bulan: acuan.mkgBulan };
+  const tmtLama = tanggalKalender(pegawaiLama.tmtKgbTerakhir);
+  const tmtBaru = tanggalKalender(usulan.tmtKgbTerakhir) ?? tmtLama;
+  const golLama = tanggalKalender(pegawaiLama.tmtGolongan);
+  const golBaru = tanggalKalender(usulan.tmtGolongan) ?? golLama;
+  const bedaGolongan = acuan.golongan !== pegawaiLama.golonganRuang;
+  const bedaMkg = mkgLama.tahun * 12 + mkgLama.bulan !== mkgBaru.tahun * 12 + mkgBaru.bulan;
+  const bedaTmt = !samaTanggal(tmtLama, tmtBaru);
+  const bedaTmtGolongan = !samaTanggal(golLama, golBaru);
+  if (!bedaGolongan && !bedaMkg && !bedaTmt && !bedaTmtGolongan) return { pegawai: pegawaiLama, koreksi: null };
+
+  const jadwalUlang = bedaGolongan || bedaMkg || bedaTmt;
+  return {
+    pegawai: {
+      ...pegawaiLama,
+      golonganRuang: acuan.golongan,
+      pangkat: getPangkat(acuan.golongan) || pegawaiLama.pangkat,
+      mkgTahun: mkgBaru.tahun,
+      mkgBulan: mkgBaru.bulan,
+      gajiPokok: getGajiPokok(acuan.golongan, mkgBaru.tahun, mkgBaru.bulan),
+      tmtKgbTerakhir: tmtBaru,
+      tmtGolongan: golBaru,
+      tmtKgbBerikutnya:
+        jadwalUlang && tmtBaru
+          ? tambahBulan(tmtBaru, bulanKeKgbBerikutnya(acuan.golongan, mkgBaru.tahun, mkgBaru.bulan))
+          : pegawaiLama.tmtKgbBerikutnya,
+    },
+    koreksi: {
+      golongan: bedaGolongan ? [pegawaiLama.golonganRuang, acuan.golongan] : null,
+      mkg: bedaMkg ? [mkgLama, mkgBaru] : null,
+      tmtKgbTerakhir: bedaTmt ? [tmtLama, tmtBaru] : null,
+      tmtGolongan: bedaTmtGolongan ? [golLama, golBaru] : null,
+    },
+  };
+}
+
+/** Kalimat koreksi keadaan sebelum SK, untuk tinjauan dan jejak audit. */
+export function teksKoreksiDasar(k: KoreksiDasar): string {
+  const tgl = (d: Date | null) => (d ? formatTanggalId(d) : "-");
+  return [
+    k.golongan ? `golongan ${k.golongan[0]} → ${k.golongan[1]}` : null,
+    k.mkg ? `masa kerja ${teksMasaKerja(k.mkg[0])} → ${teksMasaKerja(k.mkg[1])}` : null,
+    k.tmtKgbTerakhir ? `TMT KGB terakhir ${tgl(k.tmtKgbTerakhir[0])} → ${tgl(k.tmtKgbTerakhir[1])}` : null,
+    k.tmtGolongan ? `TMT golongan ${tgl(k.tmtGolongan[0])} → ${tgl(k.tmtGolongan[1])}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/**
+ * SK yang dilaporkan usulan dan sudah tercatat pada riwayat pegawai, dikenali dari nomornya: tercatat oleh percobaan
+ * persetujuan yang terputus di tengah jalan, atau dilaporkan ulang (ADR-079).
+ */
+export interface SkTercatat {
+  jenis: "kp" | "pmk";
+  id: string;
+  tmt: Date | null;
+  /** Kenaikan pangkat: golongan sebelum dan sesudahnya menurut riwayat. */
+  golonganLama: string | null;
+  golonganBaru: string | null;
+  /** PMK: masa kerja pada data pegawai sebelum dan sesudah PMK menurut riwayat. */
+  mkgDasarLama: MasaKerja | null;
+  mkgDasarBaru: MasaKerja | null;
+}
+
+export function cariSkTercatat(
+  usulan: Partial<UsulanPegawaiRow>,
+  riwayat: { pangkat?: readonly RiwayatPangkatRow[]; pmk?: readonly RiwayatPmkRow[] },
+): SkTercatat | null {
+  const jenis = usulan.dasarBaruJenis?.trim();
+  const kunci = kunciNomorSk(usulan.dasarBaruNomorSk);
+  if (!kunci || (jenis !== "kp" && jenis !== "pmk")) return null;
+  if (jenis === "kp") {
+    const r = (riwayat.pangkat ?? []).find((x) => kunciNomorSk(x.nomorSK) === kunci);
+    return r
+      ? { jenis, id: r.id, tmt: tanggalKalender(r.tmtPangkat), golonganLama: r.golonganLama || null, golonganBaru: r.golonganBaru || null, mkgDasarLama: null, mkgDasarBaru: null }
+      : null;
+  }
+  const r = (riwayat.pmk ?? []).find((x) => kunciNomorSk(x.nomorSK) === kunci);
+  return r
+    ? {
+        jenis,
+        id: r.id,
+        tmt: tanggalKalender(r.tmtPmk),
+        golonganLama: null,
+        golonganBaru: null,
+        mkgDasarLama: { tahun: r.mkgTahunDasarLama ?? 0, bulan: r.mkgBulanDasarLama ?? 0 },
+        mkgDasarBaru: { tahun: r.mkgTahunDasarBaru ?? 0, bulan: r.mkgBulanDasarBaru ?? 0 },
+      }
+    : null;
+}
+
+/**
+ * true bila SK yang tercatat sudah ikut mengubah data pegawai. Kenaikan pangkat: golongan pegawai sudah setinggi golongan
+ * barunya. PMK: masa kerja pegawai tidak lagi sama dengan masa kerja sebelum PMK. Yang belum berarti pencatatannya
+ * terputus sesudah riwayatnya tersimpan.
+ */
+export function skSudahDiterapkan(sk: SkTercatat, pegawai: Pick<PegawaiRow, "golonganRuang" | "mkgTahun" | "mkgBulan">): boolean {
+  if (sk.jenis === "kp") return !!sk.golonganBaru && peringkatGolongan(pegawai.golonganRuang) >= peringkatGolongan(sk.golonganBaru);
+  if (!sk.mkgDasarLama || !sk.mkgDasarBaru) return true;
+  const sekarang = (pegawai.mkgTahun ?? 0) * 12 + (pegawai.mkgBulan ?? 0);
+  const lama = sk.mkgDasarLama.tahun * 12 + sk.mkgDasarLama.bulan;
+  const baru = sk.mkgDasarBaru.tahun * 12 + sk.mkgDasarBaru.bulan;
+  return !(sekarang === lama && lama !== baru);
+}
+
+/** Apa yang terjadi pada SK usulan pegawai tercatat bila disetujui (ADR-030, ADR-078, ADR-079). */
+export type RencanaSkUsulan =
+  /** Tidak ada SK kenaikan pangkat atau PMK yang lengkap. */
+  | { jenis: "tanpa" }
+  /** SK-nya sudah tercatat dan sudah mengubah data pegawai; tidak dicatat dan tidak dihitung lagi. */
+  | { jenis: "sudah"; tercatat: SkTercatat }
+  | { jenis: "galat"; pesan: string }
+  /** Hitung dari `dasar`; `tercatat` terisi bila riwayatnya sudah ada dan cukup dilengkapi, bukan dicatat dua kali. */
+  | {
+      jenis: "hitung";
+      dasar: PegawaiRow;
+      koreksi: KoreksiDasar | null;
+      tercatat: SkTercatat | null;
+      sk: Extract<DasarSkUsulan, { ok: true }>;
+    };
+
+export function rencanaSkUsulan(
+  pegawaiLama: PegawaiRow,
+  usulan: Partial<UsulanPegawaiRow>,
+  nilaiBaru: Partial<PegawaiRow>,
+  tercatat: SkTercatat | null,
+): RencanaSkUsulan {
+  const jenis = usulan.dasarBaruJenis?.trim();
+  if (jenis !== "kp" && jenis !== "pmk") return { jenis: "tanpa" };
+  const { pegawai: dasar, koreksi } = dasarSebelumSk(pegawaiLama, usulan);
+  if (tercatat && !koreksi && skSudahDiterapkan(tercatat, pegawaiLama)) return { jenis: "sudah", tercatat };
+  // SK yang sudah tercatat dihitung dengan TMT pada riwayatnya, yang mungkin sudah dibetulkan Kanwil.
+  const sk = hitungDasarSkUsulan(dasar, tercatat?.tmt ? { ...usulan, dasarBaruTmt: tercatat.tmt } : usulan, nilaiBaru);
+  if (!sk.berlaku) return { jenis: "tanpa" };
+  if (!sk.ok) return { jenis: "galat", pesan: sk.pesan };
+  return { jenis: "hitung", dasar, koreksi, tercatat, sk };
 }
 
 /**
@@ -406,7 +585,12 @@ export function usulanBaruMenurutSk<T extends Partial<UsulanPegawaiRow>>(usulan:
  * Catatan untuk peninjau Kanwil tentang SK yang dilaporkan: keadaan pada SK acuan, masa kerja yang tertulis pada SK,
  * dan apakah cocok dengan hitungan sistem (ADR-078). null bila tidak ada yang perlu dicatat.
  */
-export function catatanSkDilaporkan(usulan: UsulanPegawaiRow, pegawai: PegawaiRow | null | undefined): string | null {
+export function catatanSkDilaporkan(
+  usulan: UsulanPegawaiRow,
+  pegawai: PegawaiRow | null | undefined,
+  /** SK yang dilaporkan dan sudah tercatat pada riwayat pegawai (ADR-079). */
+  tercatat: SkTercatat | null = null,
+): string | null {
   const jenis = usulan.dasarBaruJenis?.trim();
   if (jenis !== "kp" && jenis !== "pmk") return null;
   const acuan = acuanUsulan(usulan);
@@ -429,11 +613,24 @@ export function catatanSkDilaporkan(usulan: UsulanPegawaiRow, pegawai: PegawaiRo
   }
 
   // Pegawai tercatat: masa kerja menurut SK kenaikan pangkat baru ikut tersimpan sejak ADR-078, ditandai golongan acuan.
-  if (!pegawai || jenis !== "kp" || !acuan) return null;
-  const sk = hitungDasarSkUsulan(pegawai, usulan, perubahanDariUsulan(usulan));
-  if (!sk.berlaku || !sk.ok) return null;
-  const cek = cocokMkgSk(sk.mkgPadaTmtSk, { tahun: usulan.mkgTahun, bulan: usulan.mkgBulan });
-  return teksCocok(label, formatTanggalId(usulan.dasarBaruTmt), cek);
+  if (!pegawai) return null;
+  const rencana = rencanaSkUsulan(pegawai, usulan, perubahanDariUsulan(usulan), tercatat);
+  const bagian: string[] = [];
+  if (rencana.jenis === "hitung" && rencana.koreksi)
+    bagian.push(`UPT juga membetulkan keadaan sebelum SK: ${teksKoreksiDasar(rencana.koreksi)}. SK dihitung dari keadaan yang dibetulkan itu.`);
+  if (tercatat)
+    bagian.push(
+      rencana.jenis === "sudah"
+        ? `${label} ini sudah tercatat dan sudah diterapkan pada data pegawai; persetujuan tidak mencatatnya lagi.`
+        : rencana.jenis === "hitung" && rencana.koreksi
+          ? `${label} ini sudah tercatat pada riwayat; persetujuan menghitung ulang riwayat itu dari keadaan yang dibetulkan, tanpa mencatatnya dua kali.`
+          : `${label} ini sudah tercatat pada riwayat, tetapi data pegawainya belum ikut berubah (penerapan sebelumnya terputus). Persetujuan melengkapinya tanpa mencatat dua kali.`,
+    );
+  if (acuan && jenis === "kp" && rencana.jenis === "hitung") {
+    const cek = cocokMkgSk(rencana.sk.mkgPadaTmtSk, { tahun: usulan.mkgTahun, bulan: usulan.mkgBulan });
+    bagian.push(teksCocok(label, formatTanggalId(rencana.tercatat?.tmt ?? usulan.dasarBaruTmt), cek));
+  }
+  return bagian.length > 0 ? bagian.join(" ") : null;
 }
 
 function teksCocok(label: string, tmt: string, cek: ReturnType<typeof cocokMkgSk>): string {

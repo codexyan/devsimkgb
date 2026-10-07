@@ -340,3 +340,144 @@ test("pegawai tercatat ber-acuan: masa kerja menurut SK tidak ditulis, yang ditu
     if (hasil.ok) assert.match(hasil.ringkasPerubahan, /Masa kerja golongan \(tahun\)? ?7 → 2|7 → 2/);
   });
 });
+
+/** Pegawai tercatat dan usulan KP-nya untuk uji penerapan yang terputus (ADR-079). */
+function kasusTerputus(over: Partial<Record<string, unknown>> = {}) {
+  const pegawai = {
+    id: "p5", nip: "199812242017122009", nama: "PEGAWAI TERPUTUS", tempatLahir: null, tanggalLahir: null,
+    jenisKelamin: null, pendidikanTerakhir: null, jabatan: "Penjaga Tahanan", pangkat: "Pengatur Muda Tingkat I",
+    golonganRuang: "II/b", unitKerja: "Lembaga Pemasyarakatan Perempuan Kelas IIA Martapura", eselon: null, jenisJabatan: null,
+    tmtGolongan: tgl(2022, 4), mkgTahun: 7, mkgBulan: 0, gajiPokok: 2537600,
+    tmtKgbTerakhir: tgl(2024, 12), tmtKgbBerikutnya: tgl(2026, 12), statusHukdis: false,
+    tanggalHukdisBerakhir: null, jenisHukdis: null, keteranganHukdis: null, aktif: true,
+    createdAt: new Date(), updatedAt: new Date(), konfirmasiUptTmt: null, konfirmasiUptAt: null,
+    konfirmasiUptOleh: null, satkerTugas: null, berhentiTmt: null, berhentiAlasan: null,
+    nomorSkDasar: "W19.PAS17.KP.04.04-2611", tanggalSkDasar: tgl(2024, 10, 3), penetapSkDasar: "Kepala Kantor Wilayah",
+    ...((over.pegawai as object) ?? {}),
+  };
+  const usulan = {
+    id: "u20", pegawaiId: "p5", satker: "lapas-perempuan-martapura", status: "menunggu", jenis: "perubahan", nip: null,
+    unitKerja: null, nomorSurat: "WP.19.PAS.17-SA.04.04-2", tanggalSurat: tgl(2026, 10, 6), pathBerkas: null, pathSkTerakhir: "a",
+    pathSyaratCpns: null, pathSkPangkat: "b", pathSkCpns: null, pathSkPmk: null, nama: null, tempatLahir: null, tanggalLahir: null,
+    jenisKelamin: null, pendidikanTerakhir: null, jabatan: null, pangkat: null, golonganRuang: "III/a", eselon: null,
+    jenisJabatan: null, tmtGolongan: tgl(2022, 4), mkgTahun: 3, mkgBulan: 2, gajiPokok: null, tmtKgbTerakhir: tgl(2024, 12),
+    tmtKgbBerikutnya: null, nomorSkTerakhir: null, tanggalSkTerakhir: null, hukdisAda: false,
+    hukdisJenis: null, hukdisNomorSk: null, hukdisTmtMulai: null, hukdisTmtBerakhir: null, hukdisKeterangan: null,
+    catatanUpt: null, diajukanOleh: "UPT", diajukanAt: new Date(), ditinjauOleh: null, ditinjauAt: null, alasanTolak: null,
+    dasarBaruJenis: "kp", dasarBaruJenisKp: "penyesuaian_ijazah", dasarBaruNomorSk: "SEK-2156.SA.04.05 TAHUN 2026",
+    dasarBaruTanggalSk: tgl(2026, 1, 29), dasarBaruTmt: tgl(2026, 2), dasarBaruPenetap: "Sekretaris Jenderal",
+    golonganAcuan: "II/b", mkgTahunAcuan: 7, mkgBulanAcuan: 0,
+    ...((over.usulan as object) ?? {}),
+  };
+  const riwayat = {
+    id: "r5", pegawaiId: "p5", jenisKp: "penyesuaian_ijazah", nomorSK: "SEK-2156.SA.04.05 TAHUN 2026", tanggalSK: tgl(2026, 1, 29),
+    tmtPangkat: tgl(2026, 2), golonganLama: "II/b", golonganBaru: "III/a", mkgTahunLama: 7, mkgBulanLama: 0,
+    mkgTahunBaru: 2, mkgBulanBaru: 0, gajiPokokLama: 2537600, gajiPokokBaru: 2873500, keterangan: "Dari usulan UPT",
+    createdAt: new Date(), createdBy: "u1", penetapSK: "Sekretaris Jenderal",
+    ...((over.riwayat as object) ?? {}),
+  };
+  return { pegawai, usulan, riwayat };
+}
+
+test("penerapan yang terputus (SK sudah tercatat, data pegawai belum ikut) dilanjutkan tanpa mencatat dua kali (ADR-079)", async () => {
+  await denganDataLokal(async () => {
+    const { db } = await import("./db");
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+    const { pegawai, usulan, riwayat } = kasusTerputus();
+    await db.pegawai.create(pegawai);
+    await db.usulanPegawai.create(usulan);
+    await db.riwayatPangkat.create(riwayat);
+    const hasil = await setujuiUsulan(usulan as never, await db.pegawai.findUnique({ id: "p5" }), "Peninjau", new Date(), "u1");
+    assert.equal(hasil.ok, true, JSON.stringify(hasil));
+    const sesudah = await db.pegawai.findUnique({ id: "p5" });
+    assert.equal(sesudah?.golonganRuang, "III/a");
+    assert.equal(sesudah?.mkgTahun, 2);
+    assert.equal(new Date(sesudah!.tmtKgbBerikutnya!).getTime(), tgl(2026, 12).getTime());
+    const daftar = await db.riwayatPangkat.findMany({ where: { pegawaiId: "p5" } });
+    assert.equal(daftar.length, 1, "tidak dicatat dua kali");
+    assert.equal((await db.usulanPegawai.findUnique({ id: "u20" }))?.status, "disetujui");
+    if (hasil.ok) assert.match(hasil.dasarBaru ?? "", /sudah tercatat dilengkapi/);
+  });
+});
+
+test("SK yang sudah tercatat dan sudah diterapkan: disetujui tanpa mencatat ulang dan tanpa menimpa masa kerja dengan angka SK", async () => {
+  await denganDataLokal(async () => {
+    const { db } = await import("./db");
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+    const { pegawai, usulan, riwayat } = kasusTerputus({
+      pegawai: { golonganRuang: "III/a", pangkat: "Penata Muda", mkgTahun: 2, mkgBulan: 0, gajiPokok: 2873500, tmtGolongan: tgl(2026, 2) },
+      usulan: { golonganAcuan: "III/a", mkgTahunAcuan: 2, mkgBulanAcuan: 0, tmtGolongan: tgl(2026, 2), jabatan: "Penjaga Tahanan Utama" },
+    });
+    await db.pegawai.create(pegawai);
+    await db.usulanPegawai.create(usulan);
+    await db.riwayatPangkat.create(riwayat);
+    const hasil = await setujuiUsulan(usulan as never, await db.pegawai.findUnique({ id: "p5" }), "Peninjau", new Date(), "u1");
+    assert.equal(hasil.ok, true, JSON.stringify(hasil));
+    const sesudah = await db.pegawai.findUnique({ id: "p5" });
+    assert.equal(sesudah?.golonganRuang, "III/a");
+    assert.equal(sesudah?.mkgTahun, 2, "bukan 3 tahun 2 bulan dari SK");
+    assert.equal(sesudah?.jabatan, "Penjaga Tahanan Utama", "isian lain tetap diterapkan");
+    assert.equal((await db.riwayatPangkat.findMany({ where: { pegawaiId: "p5" } })).length, 1);
+  });
+});
+
+test("data tercatat dibetulkan bersama SK yang sudah tercatat: SK dihitung ulang dari keadaan yang dibetulkan (ADR-079)", async () => {
+  await denganDataLokal(async () => {
+    const { db } = await import("./db");
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+    // Tercatat III/a 5 thn 10 bln (hitungan mundur lama); UPT membetulkan dasar ke II/b 7 thn sesuai SK KGB terakhir.
+    const { pegawai, usulan, riwayat } = kasusTerputus({
+      pegawai: { golonganRuang: "III/a", pangkat: "Penata Muda", mkgTahun: 5, mkgBulan: 10, gajiPokok: 2964000, tmtGolongan: tgl(2026, 2), tmtKgbBerikutnya: tgl(2025, 2) },
+      riwayat: { golonganLama: "", mkgTahunLama: 5, mkgBulanLama: 10, mkgTahunBaru: 5, mkgBulanBaru: 10 },
+    });
+    await db.pegawai.create(pegawai);
+    await db.usulanPegawai.create(usulan);
+    await db.riwayatPangkat.create(riwayat);
+    const hasil = await setujuiUsulan(usulan as never, await db.pegawai.findUnique({ id: "p5" }), "Peninjau", new Date(), "u1");
+    assert.equal(hasil.ok, true, JSON.stringify(hasil));
+    const sesudah = await db.pegawai.findUnique({ id: "p5" });
+    assert.equal(sesudah?.golonganRuang, "III/a");
+    assert.deepEqual([sesudah?.mkgTahun, sesudah?.mkgBulan], [2, 0]);
+    assert.equal(new Date(sesudah!.tmtKgbBerikutnya!).getTime(), new Date(2026, 11, 1).getTime(), "jadwal dari keadaan yang dibetulkan");
+    const daftar = await db.riwayatPangkat.findMany({ where: { pegawaiId: "p5" } });
+    assert.equal(daftar.length, 1);
+    assert.equal(daftar[0].golonganLama, "II/b");
+    assert.equal(daftar[0].mkgTahunLama, 7);
+    assert.equal(daftar[0].mkgTahunBaru, 2);
+  });
+});
+
+test("pegawai baru yang sudah terbentuk oleh persetujuan yang terputus: usulannya ditautkan, bukan ditolak NIP ganda", async () => {
+  await denganDataLokal(async () => {
+    const { db } = await import("./db");
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+    const dibuat = new Date(Date.UTC(2026, 9, 7, 2, 7));
+    const { pegawai } = kasusTerputus({
+      pegawai: { id: "p6", nip: "199101012020121777", nama: "PEGAWAI BARU TERPUTUS", createdAt: dibuat, konfirmasiUptAt: dibuat, konfirmasiUptOleh: "UPT" },
+    });
+    await db.pegawai.create(pegawai);
+    const usulan = {
+      ...kasusTerputus().usulan, id: "u21", pegawaiId: null, jenis: "baru", nip: "199101012020121777", nama: "PEGAWAI BARU TERPUTUS",
+      jabatan: "Penjaga Tahanan", unitKerja: "Lembaga Pemasyarakatan Perempuan Kelas IIA Martapura",
+    };
+    await db.usulanPegawai.create(usulan);
+    const hasil = await setujuiUsulan(usulan as never, null, "Peninjau", new Date(), "u1");
+    assert.equal(hasil.ok, true, JSON.stringify(hasil));
+    assert.equal((await db.pegawai.findMany({ where: { nip: "199101012020121777" } })).length, 1);
+    const u = await db.usulanPegawai.findUnique({ id: "u21" });
+    assert.equal(u?.status, "disetujui");
+    assert.equal(u?.pegawaiId, "p6");
+    const p = await db.pegawai.findUnique({ id: "p6" });
+    assert.equal(p?.golonganRuang, "III/a");
+    assert.equal(p?.mkgTahun, 2);
+    assert.equal((await db.riwayatPangkat.findMany({ where: { pegawaiId: "p6" } })).length, 1);
+
+    // Pegawai yang dicatat Kanwil sendiri (bukan dari persetujuan usulan) tetap ditolak.
+    const lain = { ...pegawai, id: "p7", nip: "199101012020121778", createdAt: dibuat, konfirmasiUptAt: null };
+    await db.pegawai.create(lain);
+    const u2 = { ...usulan, id: "u22", nip: "199101012020121778" };
+    await db.usulanPegawai.create(u2);
+    const tolak = await setujuiUsulan(u2 as never, null, "Peninjau", new Date(), "u1");
+    assert.equal(tolak.ok, false);
+  });
+});

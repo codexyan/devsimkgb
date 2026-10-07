@@ -9,7 +9,7 @@ import { BATAS_UNGGAH_BYTE, pesanBerkasTerlaluBesar } from "./batasUnggah";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
 import { KURANG_JAWABAN_SK_BARU, jawabanSkBaru, kekuranganDasarBaru, perluDasarBaru } from "./dasarBaruUsulan";
-import { hitungSkPegawaiBaru } from "./dasarSkUsulan";
+import { hitungSkPegawaiBaru, rencanaSkUsulan } from "./dasarSkUsulan";
 import { bulanKeKgbBerikutnya, getGajiPokok, getPangkat, isGolonganDikenal, tambahBulan } from "./tabelGaji";
 
 export type StatusUsulan = "draf" | "menunggu" | "revisi" | "disetujui" | "ditolak";
@@ -425,10 +425,21 @@ export function kekuranganUsulan(
   // hitungannya diperiksa di atas.
   if (jenis !== "baru" && pegawai) {
     const jenisSk = usulan.dasarBaruJenis?.trim();
-    if (jenisSk === "kp" && !perubahan.some((p) => p.kunci === "golonganRuang"))
-      kurang.push("golongan baru menurut SK kenaikan pangkat");
-    if (jenisSk === "pmk" && !perubahan.some((p) => p.kunci === "mkgTahun" || p.kunci === "mkgBulan"))
-      kurang.push("masa kerja golongan menurut SK PMK");
+    if (acuan && (jenisSk === "kp" || jenisSk === "pmk")) {
+      // Keadaan sebelum SK ditulis UPT (ADR-078) dan boleh dibetulkannya (ADR-079): SK-nya harus dapat dihitung dari situ.
+      const rencana = rencanaSkUsulan(pegawai as PegawaiRow, usulan, perubahanPegawai(usulan), null);
+      if (rencana.jenis === "galat")
+        kurang.push(
+          jenisSk === "kp"
+            ? "golongan baru menurut SK kenaikan pangkat yang lebih tinggi dari golongan sebelum SK (bila SK ini sudah tercatat, jawab Tidak ada)"
+            : `masa kerja golongan menurut SK PMK (${rencana.pesan.replace(/\.$/, "")})`,
+        );
+    } else {
+      if (jenisSk === "kp" && !perubahan.some((p) => p.kunci === "golonganRuang"))
+        kurang.push("golongan baru menurut SK kenaikan pangkat");
+      if (jenisSk === "pmk" && !perubahan.some((p) => p.kunci === "mkgTahun" || p.kunci === "mkgBulan"))
+        kurang.push("masa kerja golongan menurut SK PMK");
+    }
   }
   // Formulir yang memisahkan keadaan pada SK KGB terakhir dari SK sesudahnya juga menagih masa kerja golongan menurut SK
   // kenaikan pangkat, pembanding hitungan sistem (ADR-078). Laporan lama dan unggahan Excel tidak memuatnya.
