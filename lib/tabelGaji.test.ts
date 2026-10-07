@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  getGajiPokok,
   bulanKeKgbBerikutnya,
   hitungDeadlineSDM,
   hitungUnlockDate,
@@ -19,14 +20,31 @@ import { hariIniWita } from "./waktu";
 const tanggal = (tahun: number, bulan: number, hari = 1) => new Date(tahun, bulan - 1, hari);
 const sama = (a: Date, b: Date) => assert.equal(a.toDateString(), b.toDateString());
 
-test("langkah ke KGB berikutnya dibaca dari tabel gaji", () => {
-  assert.equal(bulanKeKgbBerikutnya("II/a", 0, 0), 12, "II/a MKG 0 naik di MKG 1");
+test("jarak ke KGB berikutnya: KGB pertama menurut tabel gaji, sesudahnya selalu 24 bulan (ADR-080)", () => {
+  assert.equal(bulanKeKgbBerikutnya("II/a", 0, 0), 12, "CPNS II/a MKG 0 naik di MKG 1");
+  assert.equal(bulanKeKgbBerikutnya("III/a", 0, 0), 24, "CPNS III/a MKG 0 naik di MKG 2");
+  assert.equal(bulanKeKgbBerikutnya("II/c", 3, 0), 24, "CPNS II/c: tabel II/c dimulai MKG 3");
   assert.equal(bulanKeKgbBerikutnya("II/a", 1, 0), 24, "II/a MKG 1 naik di MKG 3");
-  assert.equal(bulanKeKgbBerikutnya("II/a", 2, 0), 12, "II/a MKG 2 naik di MKG 3");
   assert.equal(bulanKeKgbBerikutnya("II/b", 3, 0), 24);
-  assert.equal(bulanKeKgbBerikutnya("III/a", 0, 0), 24);
-  assert.equal(bulanKeKgbBerikutnya("III/a", 4, 6), 18, "masa kerja bulanan dihitung sampai langkah berikutnya");
+  assert.equal(bulanKeKgbBerikutnya("II/a", 2, 0), 24, "masa kerja tidak pada langkah tabel tidak memendekkan periode");
+  assert.equal(bulanKeKgbBerikutnya("III/a", 4, 6), 24, "masa kerja berbulan karena PMK tidak menggeser periode");
   assert.equal(bulanKeKgbBerikutnya("II/a", 33, 0), 24, "di atas langkah terakhir tetap siklus 2 tahun");
+});
+
+test("KGB tertunda 12 bulan karena hukdis: masa kerja dihitung penuh, lalu kembali ke siklusnya (ADR-080)", () => {
+  // Terjadwal 1 Januari 2026, tertunda ke 1 Januari 2027.
+  const hasil = kalkulasiKGB({ golonganRuang: "III/a", mkgTahun: 4, mkgBulan: 0, tmtKgbBerikutnya: tanggal(2027, 1), tmtKgbTerakhir: tanggal(2024, 1) });
+  assert.equal(hasil.mkgTahunBaru, 7);
+  assert.equal(hasil.gajiPokokBaru, getGajiPokok("III/a", 6, 0));
+  sama(hasil.tmtKgbBerikutnya, tanggal(2028, 1));
+});
+
+test("sesudah PMK berbulan, KGB tetap pada siklusnya dan jaraknya 24 bulan (ADR-080)", () => {
+  // KGB terakhir 1 Des 2024 MKG 4 th; PMK TMT 1 Apr 2026 menjadikan 6 th 10 bln, jadi MKG tersimpan 5 th 6 bln.
+  const hasil = kalkulasiKGB({ golonganRuang: "III/a", mkgTahun: 5, mkgBulan: 6, tmtKgbBerikutnya: tanggal(2026, 12), tmtKgbTerakhir: tanggal(2024, 12) });
+  assert.deepEqual([hasil.mkgTahunBaru, hasil.mkgBulanBaru], [7, 6]);
+  assert.equal(hasil.gajiPokokBaru, getGajiPokok("III/a", 6, 0), "langkah 6 tahun sudah dicapai lewat PMK");
+  sama(hasil.tmtKgbBerikutnya, tanggal(2028, 12));
 });
 
 test("tambahBulan menggeser tanggal per bulan", () => {

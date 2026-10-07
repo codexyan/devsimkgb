@@ -66,6 +66,12 @@ export function bacaDasarBaru(teks: (kunci: string) => string): DasarBaruUsulan 
   };
 }
 
+/** Pilihan UPT "pernah" atau "belum" pernah KGB (ADR-080); selain itu kosong. */
+export function bacaKeadaanKgb(teks: (kunci: string) => string): "pernah" | "belum" | null {
+  const v = teks("keadaanKgb");
+  return v === "pernah" || v === "belum" ? v : null;
+}
+
 /** Golongan dan masa kerja golongan pada SK acuan (ADR-078); ditulis sekaligus seperti kolom SK baru. */
 export type AcuanUsulan = Pick<UsulanPegawaiRow, "golonganAcuan" | "mkgTahunAcuan" | "mkgBulanAcuan">;
 

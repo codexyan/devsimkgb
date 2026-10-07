@@ -6,6 +6,10 @@
 // Di sini simpanannya diulang tanpa acuan. Usulan tanpa acuan tetap sah: golongan dan masa kerja pada kolom utamanya
 // adalah yang tertulis pada SK yang dilaporkan, dan dihitung seperti usulan lama (lib/dasarSkUsulan.ts).
 
+//
+// Kolom keadaan_kgb (ADR-080, migrasi 20261008090000_usulan_keadaan_kgb.sql) diperlakukan sama: bila belum ada,
+// simpanannya diulang tanpa pilihan itu, dan keadaannya kembali ditebak dari masa kerja golongan.
+
 import { GalatSupabase } from "./db/supabase/rest";
 import { KOSONG_ACUAN, type AcuanUsulan } from "./usulanFormulir";
 
@@ -14,19 +18,32 @@ export function kolomAcuanBelumAda(e: unknown): boolean {
   return e instanceof GalatSupabase && e.kode === "PGRST204" && /_acuan'/.test(e.message);
 }
 
-/** Tulis isian usulan; bila kolom acuan belum ada, tulis ulang tanpa acuan. */
-export async function tulisDenganAcuan<T extends Partial<AcuanUsulan>>(
+/** true bila galatnya karena kolom keadaan_kgb belum ada di tabel usulan_pegawai. */
+export function kolomKeadaanKgbBelumAda(e: unknown): boolean {
+  return e instanceof GalatSupabase && e.kode === "PGRST204" && /'keadaan_kgb'/.test(e.message);
+}
+
+/** Tulis isian usulan; kolom yang belum dimigrasikan (acuan, keadaan KGB) dilepas lalu ditulis ulang. */
+export async function tulisDenganAcuan<T extends Partial<AcuanUsulan> & { keadaanKgb?: string | null }>(
   isi: T,
   tulis: (isi: T) => Promise<unknown>,
 ): Promise<{ acuanTersimpan: boolean }> {
-  try {
-    await tulis(isi);
-    return { acuanTersimpan: true };
-  } catch (e) {
-    if (!kolomAcuanBelumAda(e)) throw e;
-    console.warn("[usulan] kolom SK acuan belum ada; usulan disimpan tanpa acuan. Jalankan migrasi 20261007120000_usulan_sk_acuan.sql.");
-    await tulis({ ...isi, ...KOSONG_ACUAN });
-    return { acuanTersimpan: false };
+  let sekarang = isi;
+  let acuanTersimpan = true;
+  for (let coba = 0; ; coba++) {
+    try {
+      await tulis(sekarang);
+      return { acuanTersimpan };
+    } catch (e) {
+      if (coba < 2 && kolomAcuanBelumAda(e)) {
+        console.warn("[usulan] kolom SK acuan belum ada; usulan disimpan tanpa acuan. Jalankan migrasi 20261007120000_usulan_sk_acuan.sql.");
+        sekarang = { ...sekarang, ...KOSONG_ACUAN };
+        acuanTersimpan = false;
+      } else if (coba < 2 && kolomKeadaanKgbBelumAda(e)) {
+        console.warn("[usulan] kolom keadaan_kgb belum ada; pilihan pernah KGB tidak disimpan. Jalankan migrasi 20261008090000_usulan_keadaan_kgb.sql.");
+        sekarang = { ...sekarang, keadaanKgb: null };
+      } else throw e;
+    }
   }
 }
 

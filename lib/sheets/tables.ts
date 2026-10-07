@@ -208,6 +208,8 @@ export interface UsulanPegawaiRow {
    * tertulis di SK yang dilaporkan. Kosong pada usulan lama: golongan dan masa kerjanya saja yang tersalin dari SK itu.
    */
   golonganAcuan?: string | null; mkgTahunAcuan?: number | null; mkgBulanAcuan?: number | null;
+  /** "pernah" atau "belum" pernah KGB menurut pilihan UPT (ADR-080); kosong pada usulan lama dan unggahan. */
+  keadaanKgb?: string | null;
   hukdisAda: boolean; hukdisJenis: string | null; hukdisNomorSk: string | null;
   hukdisTmtMulai: Date | null; hukdisTmtBerakhir: Date | null; hukdisKeterangan: string | null;
   catatanUpt: string | null;
@@ -276,6 +278,7 @@ export const defs = {
       d("dasarBaruTanggalSk"), d("dasarBaruTmt"), s("dasarBaruPenetap"),
       s("pathSkPmk"),
       s("golonganAcuan"), i("mkgTahunAcuan"), i("mkgBulanAcuan"),
+      s("keadaanKgb"),
     ],
   },
   RiwayatKGB: {

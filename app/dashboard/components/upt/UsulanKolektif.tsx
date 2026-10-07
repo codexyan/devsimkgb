@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { BATAS_BERKAS_USULAN_BYTE, PESAN_BERKAS_TERLALU_BESAR, berkasDasarBaru, berkasUntukKeadaan, pernahKgb } from "@/lib/usulanPegawai";
+import { BATAS_BERKAS_USULAN_BYTE, PESAN_BERKAS_TERLALU_BESAR, berkasDasarBaru, berkasUntukKeadaan } from "@/lib/usulanPegawai";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
 import {
   KETERANGAN_DASAR_BARU,
@@ -24,8 +24,10 @@ import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
 import {
   asalAtasDasar,
   hitungFormulirUsulan,
+  isianMkgAwal,
   isianUntukDisimpan,
   jawabSkBaru,
+  pernahKgbAwal,
   koreksiAtas,
   mkgPadaSkTercatat,
   pisahkanIsianSk,
@@ -84,6 +86,8 @@ interface DrafUpt {
   dasarBaru: { jenis: string; jenisKp: string; nomorSk: string; tanggalSk: string; tmt: string; penetap: string } | null;
   /** Golongan dan masa kerja pada SK KGB terakhir, bila disimpan bersama SK sesudahnya (ADR-078). */
   acuan?: { golongan: string; mkgTahun: string; mkgBulan: string } | null;
+  /** Pilihan "pernah" atau "belum" pernah KGB yang tersimpan (ADR-080); null pada draf lama. */
+  keadaanKgb?: string | null;
   berkas: { medan: string; label: string; nama?: string | null }[];
   kekurangan: string[];
 }
@@ -149,7 +153,8 @@ function barisDari(p: PegawaiUpt | null, d: DrafUpt | null): Baris {
     nip: p?.nip ?? d?.nip ?? "-",
     awal,
     isian: { ...awal },
-    pernah: pernahKgb(awal.mkgTahun, awal.mkgBulan),
+    // Pilihan yang tersimpan, atau tebakan dari riwayat dan masa kerja golongan (ADR-080).
+    pernah: pernahKgbAwal(d?.keadaanKgb, p?.dasarKgb, awal),
     berkas: {},
     tersimpan: d?.berkas ?? [],
     bawaan: p?.bawaan?.berkas ?? [],
@@ -247,6 +252,7 @@ function isianBaris(b: Baris): Record<string, string> {
   if (b.pegawaiId && b.jenis === "perubahan") hasil.pegawaiId = b.pegawaiId;
   for (const bidang of BIDANG_DIISI) hasil[bidang.kunci] = nilai[bidang.kunci] ?? "";
   Object.assign(hasil, acuan);
+  hasil.keadaanKgb = b.pernah ? "pernah" : "belum";
   hasil.nomorSkTerakhir = b.isian.nomorSkTerakhir ?? "";
   hasil.tanggalSkTerakhir = b.isian.tanggalSkTerakhir ?? "";
   hasil.catatanUpt = b.catatanUpt;
@@ -517,7 +523,15 @@ export default function UsulanKolektif() {
   }
 
   function isi(kunci: string, kolom: string, nilai: string) {
-    ubahBaris(kunci, (b) => ({ ...b, isian: { ...b.isian, [kolom]: nilai } }));
+    ubahBaris(kunci, (b) => ({
+      ...b,
+      isian: {
+        ...b.isian,
+        [kolom]: nilai,
+        // Belum pernah KGB: masa kerja golongan mengikuti langkah awal tabel golongannya (II/c: 3 tahun, ADR-080).
+        ...(kolom === "golonganRuang" && !b.pernah ? isianMkgAwal(nilai) : {}),
+      },
+    }));
   }
 
   function pilihBerkas(kunci: string, medan: string, file: File | null) {
@@ -968,7 +982,11 @@ export default function UsulanKolektif() {
                 b={barisAktif}
                 urut={`Pegawai ${indeksNav + 1} dari ${navBaris.length}${navTersaring ? " yang tampil" : ""}`}
                 onKeadaan={(pernah) =>
-                  ubahBaris(barisAktif.kunci, (x) => ({ ...x, pernah, isian: pernah ? x.isian : { ...x.isian, mkgTahun: "0", mkgBulan: "0" } }))
+                  ubahBaris(barisAktif.kunci, (x) => ({
+                    ...x,
+                    pernah,
+                    isian: pernah ? x.isian : { ...x.isian, ...isianMkgAwal(x.isian.golonganRuang ?? "") },
+                  }))
                 }
                 onIsi={(kolom, nilai) => isi(barisAktif.kunci, kolom, nilai)}
                 onCatatan={(teks) => ubahBaris(barisAktif.kunci, (x) => ({ ...x, catatanUpt: teks }))}
@@ -1425,7 +1443,7 @@ function DetailBaris({
             <p className="kol-catatan-kecil">
               {b.dasar.jenis === "kp"
                 ? `Golongan dan masa kerja di tabel adalah keadaan pada ${skAcuan}. Golongan baru dan masa kerja golongan pada TMT pangkat disalin dari SK kenaikan pangkat apa adanya; sistem mencocokkan masa kerjanya dengan hitungannya sendiri.`
-                : `Golongan dan masa kerja di tabel adalah keadaan pada ${skAcuan}. Masa kerja golongan pada TMT PMK disalin dari SK PMK apa adanya; jadwal KGB berikutnya dapat maju. Pindaian SK PMK ditagih di bagian berkas.`}
+                : `Golongan dan masa kerja di tabel adalah keadaan pada ${skAcuan}. Masa kerja golongan pada TMT PMK disalin dari SK PMK apa adanya; gaji naik, jadwal KGB berikutnya tidak bergeser. Pindaian SK PMK ditagih di bagian berkas.`}
             </p>
             {skSudahTercatat && (
               <p className="kol-kurang">

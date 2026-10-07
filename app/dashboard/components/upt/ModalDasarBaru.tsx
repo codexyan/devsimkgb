@@ -165,7 +165,7 @@ export default function ModalDasarBaru({
       <Catatan>
         {jenis === "kp"
           ? "Salin golongan baru dan masa kerja golongan dari SK kenaikan pangkat beserta SK-nya. Sistem menghitung masa kerja dan gaji pokok dari data tercatat seperti Kanwil saat menyetujui (naik jenjang golongan memotong masa kerja), lalu mencocokkannya dengan masa kerja di SK."
-          : "Isi masa kerja golongan sebagaimana tertulis pada SK PMK. Kanwil menghitung ulang gaji pokok dan jadwal KGB berikutnya dari angka itu saat menyetujui."}{" "}
+          : "Isi masa kerja golongan sebagaimana tertulis pada SK PMK. Kanwil menghitung gaji pokok dari angka itu saat menyetujui; jadwal KGB berikutnya tidak bergeser."}{" "}
         Laporan SK tidak menumpang surat usulan: SK-nya sudah terbit dan pindaiannya ikut terkirim, jadi
         begitu berkasnya lengkap, kartu ini langsung mengirimkannya ke Kanwil.
       </Catatan>

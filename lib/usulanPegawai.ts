@@ -10,7 +10,7 @@ import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
 import { KURANG_JAWABAN_SK_BARU, jawabanSkBaru, kekuranganDasarBaru, perluDasarBaru } from "./dasarBaruUsulan";
 import { hitungSkPegawaiBaru, rencanaSkUsulan } from "./dasarSkUsulan";
-import { bulanKeKgbBerikutnya, getGajiPokok, getPangkat, isGolonganDikenal, tambahBulan } from "./tabelGaji";
+import { bulanKeKgbBerikutnya, getGajiPokok, getPangkat, isGolonganDikenal, mkgAwalGolongan, tambahBulan } from "./tabelGaji";
 
 export type StatusUsulan = "draf" | "menunggu" | "revisi" | "disetujui" | "ditolak";
 
@@ -168,11 +168,31 @@ export const BERKAS_USULAN = [
 }[];
 
 /**
- * Pegawai sudah pernah KGB bila masa kerja golongannya lebih dari nol. Aturan yang sama dipakai formulir
- * untuk memilih keadaan awalnya, dan tombol "Belum pernah KGB" di sana mengisi masa kerja 0 tahun 0 bulan.
+ * Tebakan "sudah pernah KGB" dari masa kerja golongan, bila UPT belum memilihnya: masa kerja melewati langkah awal tabel
+ * golongannya. Tanpa golongan, langkah awalnya 0. CPNS II/c bermasa kerja 3 tahun karenanya belum pernah KGB (ADR-080).
  */
-export function pernahKgb(mkgTahun: unknown, mkgBulan: unknown): boolean {
-  return Number(mkgTahun ?? 0) > 0 || Number(mkgBulan ?? 0) > 0;
+export function pernahKgb(mkgTahun: unknown, mkgBulan: unknown, golongan?: string | null): boolean {
+  const mkg = Number(mkgTahun ?? 0) * 12 + Number(mkgBulan ?? 0);
+  const awal = golongan ? mkgAwalGolongan(golongan) : { tahun: 0, bulan: 0 };
+  return mkg > awal.tahun * 12 + awal.bulan;
+}
+
+/**
+ * Sudah atau belum pernah KGB menurut usulan (ADR-080): pilihan UPT bila tersimpan, selain itu tebakan dari keadaan pada
+ * SK acuan (usulan ber-acuan, ADR-078) atau dari isian utamanya.
+ */
+export function pernahKgbUsulan(
+  usulan: Partial<Pick<UsulanPegawaiRow, "keadaanKgb" | "golonganAcuan" | "mkgTahunAcuan" | "mkgBulanAcuan" | "golonganRuang" | "mkgTahun" | "mkgBulan">>,
+  pegawai?: Partial<Pick<PegawaiRow, "golonganRuang" | "mkgTahun" | "mkgBulan">> | null,
+): boolean {
+  if (usulan.keadaanKgb === "pernah") return true;
+  if (usulan.keadaanKgb === "belum") return false;
+  if (usulan.golonganAcuan?.trim()) return pernahKgb(usulan.mkgTahunAcuan, usulan.mkgBulanAcuan, usulan.golonganAcuan.trim());
+  return pernahKgb(
+    usulan.mkgTahun ?? pegawai?.mkgTahun,
+    usulan.mkgBulan ?? pegawai?.mkgBulan,
+    usulan.golonganRuang ?? pegawai?.golonganRuang,
+  );
 }
 
 /** Berkas yang diminta formulir tiap pegawai untuk satu keadaan, urut seperti di formulir. */
@@ -405,11 +425,11 @@ export function kekuranganUsulan(
 
   const perubahan = pegawai ? bandingkanUsulan(pegawai, usulan) : [];
   const perluBerkas = jenis === "baru" || perubahan.some((p) => KOLOM_DASAR_GAJI.includes(p.kunci));
-  // Keadaan KGB (sudah atau belum pernah) dibaca dari SK acuan: masa kerja pada kolom utama usulan ber-acuan adalah yang
-  // tertulis pada SK kenaikan pangkat atau PMK sesudahnya (ADR-078).
+  // Keadaan KGB (sudah atau belum pernah): pilihan UPT, atau tebakan dari SK acuan, sebab masa kerja pada kolom utama
+  // usulan ber-acuan adalah yang tertulis pada SK kenaikan pangkat atau PMK sesudahnya (ADR-078, ADR-080).
   const acuan = usulan.golonganAcuan?.trim() ? usulan : null;
   if (perluBerkas) {
-    const pernah = acuan ? pernahKgb(acuan.mkgTahunAcuan, acuan.mkgBulanAcuan) : pernahKgb(nilai("mkgTahun"), nilai("mkgBulan"));
+    const pernah = pernahKgbUsulan(usulan, pegawai);
     for (const b of berkasUntukKeadaan(pernah)) {
       if (b.wajib && !usulan[b.kunci]) kurang.push(b.label);
     }

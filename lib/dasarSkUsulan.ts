@@ -82,7 +82,8 @@ export type HasilSkDilaporkan =
 
 /**
  * Akibat satu SK kenaikan pangkat atau PMK pada keadaan sebelumnya. Kenaikan pangkat memotong masa kerja golongan
- * menurut lompatan golongan dan tidak menggeser jadwal KGB; PMK mempertahankan golongan dan dapat memajukan jadwal.
+ * menurut lompatan golongan; PMK mempertahankan golongan dan menambah masa kerja. Keduanya tidak menggeser jadwal KGB
+ * (ADR-080).
  */
 export function hitungSkDilaporkan(lama: KeadaanSebelumSk, sk: SkDilaporkan): HasilSkDilaporkan {
   const mkgTahunLama = lama.mkgTahun ?? 0;
@@ -119,6 +120,7 @@ export function hitungSkDilaporkan(lama: KeadaanSebelumSk, sk: SkDilaporkan): Ha
     mkgTahun: mkgTahunLama,
     mkgBulan: mkgBulanLama,
     tmtKgbTerakhir: lama.tmtKgbTerakhir,
+    tmtKgbBerikutnya: lama.tmtKgbBerikutnya,
     tmtPmk: sk.tmt,
     mkgTahunSk: sk.mkgTahunSk,
     mkgBulanSk: sk.mkgBulanSk,
@@ -565,7 +567,8 @@ export function hitungSkPegawaiBaru(usulan: Partial<UsulanPegawaiRow>): SkPegawa
             mkgTahun: d.tahun,
             mkgBulan: d.bulan,
             gajiPokok: getGajiPokok(golongan, sk.tahun, sk.bulan),
-            tmtKgbBerikutnya: tambahBulan(tmtSk, bulanKeKgbBerikutnya(golongan, sk.tahun, sk.bulan)),
+            // PMK tidak menggeser periode KGB (ADR-080).
+            tmtKgbBerikutnya: tambahBulan(tmtTerakhir, bulanKeKgbBerikutnya(golongan, d.tahun, d.bulan)),
           },
     acuan: null,
   };

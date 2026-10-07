@@ -5,7 +5,7 @@ import { newId } from "@/lib/sheets/id";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { TIPE_NOTIFIKASI, notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
-import { DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgb } from "@/lib/usulanPegawai";
+import { DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgbUsulan } from "@/lib/usulanPegawai";
 import { laporanSkDasar } from "@/lib/dasarBaruUsulan";
 import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan, type BawaanUsulan } from "@/lib/bawaanUsulan";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
@@ -163,10 +163,7 @@ export async function POST(req: Request) {
           berkasPerluDisalin(
             u,
             bawaan,
-            pernahKgb(
-              u.golonganAcuan ? u.mkgTahunAcuan : (u.mkgTahun ?? pegawai?.mkgTahun),
-              u.golonganAcuan ? u.mkgBulanAcuan : (u.mkgBulan ?? pegawai?.mkgBulan),
-            ),
+            pernahKgbUsulan(u, pegawai),
           ),
           kode,
         )

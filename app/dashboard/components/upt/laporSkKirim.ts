@@ -24,9 +24,11 @@ export function nilaiTercatat(pegawai: PegawaiUntukUsulan, draf: DrafUsulanUpt |
 export function keadaanTercatat(pegawai: PegawaiUntukUsulan, draf: DrafUsulanUpt | null): KeadaanTercatat {
   const nilai = nilaiTercatat(pegawai, draf);
   const acuan = draf?.acuan;
-  return acuan
+  const keadaan = acuan
     ? keadaanDari({ ...nilai, golonganRuang: acuan.golongan, mkgTahun: acuan.mkgTahun, mkgBulan: acuan.mkgBulan })
     : keadaanDari(nilai);
+  // Pilihan sudah atau belum pernah KGB yang tersimpan pada draf (ADR-080).
+  return draf?.keadaanKgb === "pernah" || draf?.keadaanKgb === "belum" ? { ...keadaan, pernah: draf.keadaanKgb === "pernah" } : keadaan;
 }
 
 /**
@@ -80,7 +82,8 @@ export function isianDariDraf(draf: DrafUsulanUpt | null, jenisBawaan: JenisLapo
  * (ADR-030). Dikumpulkan di satu tempat supaya satu jendela cukup.
  */
 export function berkasDiminta(sekarang: KeadaanTercatat, jenis: JenisLaporSk) {
-  return [...berkasUntukKeadaan(pernahKgb(sekarang.mkgTahun, sekarang.mkgBulan)), ...berkasDasarBaru(jenis)];
+  const pernah = sekarang.pernah ?? pernahKgb(sekarang.mkgTahun, sekarang.mkgBulan, sekarang.golongan);
+  return [...berkasUntukKeadaan(pernah), ...berkasDasarBaru(jenis)];
 }
 
 /** Berkas yang sudah ada untuk satu medan: unggahan pada draf, atau salinan dari usulan yang disetujui. */

@@ -348,7 +348,16 @@ export default async function IsiPanduan({
                 <h3 className="pub-h3">Selang waktu KGB</h3>
                 <p>
                   KGB diberikan setiap 2 tahun sekali; PNS yang pertama kali diangkat dalam golongan II/a menerima KGB
-                  pertama setelah mempunyai masa kerja 1 tahun, lalu setiap 2 tahun berikutnya.
+                  pertama setelah mempunyai masa kerja 1 tahun, lalu setiap 2 tahun berikutnya. CPNS III/a menerima KGB
+                  pertama setelah 2 tahun, dan CPNS II/c (masa kerja awal 3 tahun, kolom pertama tabel II/c) juga setelah 2
+                  tahun.
+                </p>
+                <p>
+                  <strong>Periode KGB tidak bergeser.</strong> Sesudah KGB pertama, jarak antar-KGB selalu 24 bulan. SK
+                  kenaikan pangkat, penyesuaian ijazah, atau PMK hanya mengubah masa kerja golongan (dan gaji pokoknya
+                  sejak TMT SK), bukan jadwal KGB. Masa kerja tambahan dari PMK ikut terbawa ke KGB berikutnya. KGB yang
+                  tertunda karena hukuman disiplin tetap menghitung masa kerja selama tertunda, lalu kembali ke
+                  siklusnya: tertunda 12 bulan berarti KGB berikutnya 12 bulan kemudian.
                 </p>
                 <p>
                   Menurut PP 5/2024, gaji pokok golongan II berubah pada masa kerja golongan (MKG) ganjil (1, 3, 5, dan
@@ -700,9 +709,10 @@ export default async function IsiPanduan({
                 <p>
                   PMK adalah SK yang menambah masa kerja golongan yang diakui, misalnya dengan memperhitungkan masa
                   kerja sebelum CPNS, dan karena itu menetapkan gaji pokok baru. Bedanya dengan kenaikan pangkat:
-                  golongan ruangnya tidak berubah, tetapi <strong>jadwal KGB dapat maju</strong>. Masa kerja golongan
-                  bertambah sebesar tambahan pada SK PMK, sehingga langkah berikutnya di tabel gaji tercapai lebih
-                  cepat; TMT KGB berikutnya dihitung ulang dari TMT PMK.
+                  golongan ruangnya tidak berubah. Masa kerja golongan bertambah sebesar tambahan pada SK PMK dan gaji
+                  pokok naik sejak TMT PMK, tetapi <strong>jadwal KGB tidak bergeser</strong>: KGB berikutnya tetap
+                  pada jadwalnya, dan jarak antar-KGB tetap 24 bulan. Masa kerja tambahan itu ikut terbawa pada KGB
+                  berikutnya.
                 </p>
                 <p>
                   SK PMK juga menggantikan SK KGB terakhir sebagai dasar SK KGB berikutnya. SK PMK yang TMT-nya lebih
@@ -962,8 +972,10 @@ export default async function IsiPanduan({
                 <ol>
                   <li>
                     <strong>Pilih dulu keadaan pegawainya.</strong> <em>Belum pernah KGB</em> hanya meminta TMT CPNS,
-                    dan masa kerjanya 0 tahun 0 bulan. <em>Sudah pernah KGB</em> meminta TMT dan masa kerja golongan
-                    yang tertulis pada SK KGB terakhir.
+                    dan masa kerjanya mengikuti langkah awal tabel golongannya: 0 tahun bagi II/a dan III/a, 3 tahun bagi
+                    II/c. <em>Sudah pernah KGB</em> meminta TMT dan masa kerja golongan yang tertulis pada SK KGB
+                    terakhir. Pilihan ini ikut tersimpan, dan menentukan SK mana yang ditagih: SK CPNS atau SK KGB
+                    terakhir.
                   </li>
                   <li>
                     <strong>Golongan dan masa kerja golongan disalin dari SK, bukan dihitung sendiri.</strong> Bagian
@@ -1556,7 +1568,7 @@ export default async function IsiPanduan({
                       itu menjadi Atas dasar SK KGB berikutnya, sama seperti Catat kenaikan pangkat dan Catat PMK di
                       halaman pegawai. Masa kerja golongan dan gaji pokoknya dihitung sistem, bukan diambil apa adanya
                       dari angka yang diketik UPT: naik dari golongan II ke III tetap memotong masa kerja 5 tahun, dan
-                      PMK tetap menghitung pergeseran jadwal KGB-nya. Bila sebabnya koreksi salah ketik, nilainya
+                      PMK menambah masa kerja tanpa menggeser jadwal KGB. Bila sebabnya koreksi salah ketik, nilainya
                       dipakai apa adanya dan dasar KGB berikutnya tidak berpindah.
                     </p>
                     <p>

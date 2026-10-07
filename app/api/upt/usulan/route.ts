@@ -7,9 +7,9 @@ import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
 import { pegawaiSatker } from "@/lib/aksesUpt";
-import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgb, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgbUsulan, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan } from "@/lib/bawaanUsulan";
-import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
+import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, bacaKeadaanKgb, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
 import { tulisDenganAcuan } from "@/lib/acuanUsulanServer";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
@@ -104,6 +104,8 @@ export async function GET(req: Request) {
           DIPEGANG_UPT.includes(u.status) && u.golonganAcuan?.trim()
             ? { golongan: u.golonganAcuan.trim(), mkgTahun: String(u.mkgTahunAcuan ?? 0), mkgBulan: String(u.mkgBulanAcuan ?? 0) }
             : null,
+        // Pilihan UPT sudah atau belum pernah KGB (ADR-080); null pada usulan lama.
+        keadaanKgb: u.keadaanKgb === "pernah" || u.keadaanKgb === "belum" ? u.keadaanKgb : null,
         hukdis: DIPEGANG_UPT.includes(u.status)
           ? {
               ada: !!u.hukdisAda,
@@ -228,9 +230,9 @@ export async function POST(req: Request) {
   const bawaan = dasar
     ? bawaanPegawai(dasar, (await db.usulanPegawai.findMany({ where: { pegawaiId: dasar.id, status: "disetujui" } })) as UsulanPegawaiRow[])
     : null;
-  const pernah = acuan.golonganAcuan
-    ? pernahKgb(acuan.mkgTahunAcuan, acuan.mkgBulanAcuan)
-    : pernahKgb(isian.mkgTahun ?? dasar?.mkgTahun, isian.mkgBulan ?? dasar?.mkgBulan);
+  // Pilihan UPT sudah atau belum pernah KGB (ADR-080); kosong berarti ditebak dari masa kerja golongan.
+  const keadaanKgb = bacaKeadaanKgb(teks);
+  const pernah = pernahKgbUsulan({ ...isian, ...acuan, keadaanKgb }, dasar);
 
   if (!draf) {
     const kurang = kekuranganUsulan(
@@ -309,6 +311,7 @@ export async function POST(req: Request) {
     alasanTolak: null,
     ...dasarBaru,
     ...acuan,
+    keadaanKgb,
     ...isian,
   };
 
