@@ -215,6 +215,7 @@ export class Table<T extends object = Row> {
   async findMany(opts?: {
     where?: Where;
     orderBy?: { field: keyof T & string; dir?: "asc" | "desc" };
+    batas?: number;
   }): Promise<T[]> {
     const rows = await this.readAll();
     let result = rows.map((r) => r.record).filter((r) => matches(r as Row, opts?.where));
@@ -230,7 +231,12 @@ export class Table<T extends object = Row> {
         return dir === "desc" ? -cmp : cmp;
       });
     }
-    return result;
+    return opts?.batas !== undefined ? result.slice(0, Math.max(0, opts.batas)) : result;
+  }
+
+  async findKolom<K extends keyof T & string>(kolom: readonly K[], opts?: { where?: Where }): Promise<Pick<T, K>[]> {
+    const rows = await this.findMany(opts);
+    return rows.map((r) => Object.fromEntries(kolom.map((k) => [k, r[k]])) as Pick<T, K>);
   }
 
   async findUnique(where: Where): Promise<T | null> {

@@ -57,7 +57,21 @@ tersendiri untuk SK yang menunggu review UPT.
    UPT (ADR-077), dengan jumlahnya di kepala kolom. Sebelumnya kartu ini bercampur dengan draf di Perlu dikerjakan.
    Kotak cari papan pindah ke kepala panel dan berlaku untuk semua kolom (nama atau NIP), bukan hanya Perlu dikerjakan;
    kepala kolom menunjukkan jumlah yang cocok dari seluruhnya, dan kolom yang diciutkan terbuka sendiri bila ada yang cocok.
-5. **Penelusuran data produksi** (`docs/sql/telusur-usulan-terputus.sql`): kueri baca saja untuk SQL Editor Supabase yang
+5. **Membaca data satu satker, bukan seluruh Kanwil.** Error 1102 (`exceededResources`) berasal dari batas CPU Worker:
+   7 Oktober 2026, 81 dari ±12.350 permintaan terhenti tepat di 10 ms, sementara permintaan yang berhasil memakai CPU
+   median 14 ms dan p90 120 ms. Pengguna memilih Workers Paid (US$5 per bulan) dengan pemakaian dijaga di dalam kuota
+   yang sudah termasuk. Rute yang paling sering dan paling berat tidak lagi mengurai seluruh tabel:
+   - `lib/dataSatker.ts`: id pegawai satu satker dicari dari kolom id dan unit kerja saja (`findKolom`), lalu baris
+     lengkap dan riwayatnya diambil menurut id (`cariDalam`, 150 id per permintaan). Dipakai `/api/upt`,
+     `/api/upt/riwayat-kgb`, `/api/upt/hukdis`, dan notifikasi Admin UPT.
+   - `/api/upt/usulan` dan `/api/usulan`: pegawai hanya yang disebut usulannya; riwayat KGB, surat, dan SK hanya untuk
+     usulan yang menunggu; lencana jumlah memakai `count`.
+   - `/api/kgb`: saringan status, pegawai, dan rapelan ditetapkan dikerjakan basis data bila tidak ada entri virtual;
+     pegawai cukup kolom yang dipakai; surat hanya milik KGB terpilih. Antrian Keuangan dimuat ulang tiap menit.
+   - `/api/keuangan/gaji-web-upt`: hanya KGB yang mungkin tampil, satker tiap pegawai dicocokkan sekali.
+   - Notifikasi selain Admin UPT hanya membaca `limit` baris terbaru (`batas` pada `findMany`).
+   Keluaran ke-36 kombinasi rute dan peran identik dengan sebelumnya pada data uji lokal.
+6. **Penelusuran data produksi** (`docs/sql/telusur-usulan-terputus.sql`): kueri baca saja untuk SQL Editor Supabase yang
    menemukan SK tercatat dengan data pegawai belum ikut, pegawai baru tanpa usulan disetujui, penghapusan hari itu, dan
    usulan yang belum selesai.
 

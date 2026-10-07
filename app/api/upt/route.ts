@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, type Where } from "@/lib/db";
+import { cariDalam, idPegawaiSatker, pegawaiMenurutId } from "@/lib/dataSatker";
 import { auth } from "@/auth";
 import { hariIniWita, tanggalKalender } from "@/lib/waktu";
 import { penandaHukdisBerlaku, hukdisMasihBerlaku } from "@/lib/hukdisKedaluwarsa";
@@ -50,21 +51,29 @@ export async function GET() {
   const satker = SATKER.find((s) => s.kode === kode)!;
 
   const hariIni = hariIniWita();
-  const [semuaPegawai, semuaKgb, semuaSurat, semuaHukdis, usulanBerjalan, usulanDisetujui, semuaPangkat, semuaPmk] =
+  // Hanya data pegawai satker ini, bukan seluruh Kanwil (lib/dataSatker.ts, ADR-079).
+  const idSatkerList = await idPegawaiSatker(kode);
+  const dariPegawai = <T>(ambil: (where: Where) => Promise<T[]>, whereLain?: Where) =>
+    cariDalam(ambil, "pegawaiId", idSatkerList, whereLain);
+  const [semuaPegawai, semuaKgb, semuaHukdis, usulanBerjalan, usulanDisetujui, semuaPangkat, semuaPmk] =
     await Promise.all([
-      db.pegawai.findMany(),
-      db.riwayatKGB.findMany(),
-      db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
-      db.riwayatHukdis.findMany() as Promise<HukdisBaris[]>,
+      pegawaiMenurutId(idSatkerList),
+      dariPegawai((where) => db.riwayatKGB.findMany({ where })),
+      dariPegawai((where) => db.riwayatHukdis.findMany({ where }) as Promise<HukdisBaris[]>),
       // Usulan yang sedang berjalan: menyiapkan atau mengirim usulan sudah menjadi pernyataan UPT
       // tentang pegawai itu, sehingga konfirmasi terpisah tidak diminta lagi.
       db.usulanPegawai.findMany({ where: { satker: kode, status: { in: BELUM_SELESAI } } }),
       // Sumber SK dasar dan berkas yang terbawa ke usulan perbaikan berikutnya (lib/bawaanUsulan.ts).
-      db.usulanPegawai.findMany({ where: { status: "disetujui" } }) as Promise<UsulanPegawaiRow[]>,
+      dariPegawai((where) => db.usulanPegawai.findMany({ where }) as Promise<UsulanPegawaiRow[]>, { status: "disetujui" }),
       // SK yang menetapkan gaji pokok sesudah KGB terakhir, untuk dasar KGB berikutnya (ADR-030).
-      db.riwayatPangkat.findMany() as Promise<RiwayatPangkatRow[]>,
-      db.riwayatPmk.findMany() as Promise<RiwayatPmkRow[]>,
+      dariPegawai((where) => db.riwayatPangkat.findMany({ where }) as Promise<RiwayatPangkatRow[]>),
+      dariPegawai((where) => db.riwayatPmk.findMany({ where }) as Promise<RiwayatPmkRow[]>),
     ]);
+  const semuaSurat = await cariDalam(
+    (where) => db.suratKGB.findMany({ where }) as Promise<SuratKgbTersimpan[]>,
+    "kgbId",
+    semuaKgb.map((k) => k.id),
+  );
   const pangkatPerPegawai = new Map<string, SkPenetapGaji[]>();
   for (const r of semuaPangkat)
     pangkatPerPegawai.set(r.pegawaiId, [

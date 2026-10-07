@@ -80,24 +80,40 @@ export class SupabaseTable<T extends object = Row> implements Repo<T> {
     return `${snake}.${orderBy.dir === "desc" ? "desc" : "asc"}.nullslast,${bawaan}`;
   }
 
-  async findMany(opts?: { where?: Where; orderBy?: OrderBy<T> }): Promise<T[]> {
-    const kondisi = this.kondisi(opts?.where);
-    if (kondisi.jenis === "salah") return [];
-    const order = this.urutan(opts?.orderBy);
+  async findMany(opts?: { where?: Where; orderBy?: OrderBy<T>; batas?: number }): Promise<T[]> {
+    const baris = await this.ambilHalaman(this.kondisi(opts?.where), "*", this.urutan(opts?.orderBy), opts?.batas);
+    return baris.map((b) => this.keRecord(b));
+  }
+
+  async findKolom<K extends keyof T & string>(kolom: readonly K[], opts?: { where?: Where }): Promise<Pick<T, K>[]> {
+    const info = this.kolom.filter((k) => (kolom as readonly string[]).includes(k.nama));
+    if (info.length === 0) return [];
+    const baris = await this.ambilHalaman(this.kondisi(opts?.where), info.map((k) => k.snake).join(","), this.urutan());
+    return baris.map((b) => {
+      const record: Row = {};
+      for (const k of info) record[k.nama] = dariJson(b[k.snake], k.type);
+      return record as Pick<T, K>;
+    });
+  }
+
+  /** Seluruh baris yang cocok (atau `batas` baris pertama), per halaman UKURAN_HALAMAN. */
+  private async ambilHalaman(kondisi: Kondisi, select: string, order: string, batas = Infinity): Promise<Row[]> {
+    if (kondisi.jenis === "salah" || batas <= 0) return [];
     const hasil: Row[] = [];
     let total: number | null = null;
     for (;;) {
+      const sisa = Math.min(UKURAN_HALAMAN, batas - hasil.length);
       const res = await rest(
-        this.path(kondisi, { select: "*", order, offset: String(hasil.length), limit: String(UKURAN_HALAMAN) }),
+        this.path(kondisi, { select, order, offset: String(hasil.length), limit: String(sisa) }),
         { prefer: total === null ? ["count=exact"] : [] },
       );
       if (total === null) total = totalDariContentRange(res.headers.get("content-range"));
       const halaman = (await res.json()) as Row[];
       hasil.push(...halaman);
-      const selesai = total !== null ? hasil.length >= total : halaman.length < UKURAN_HALAMAN;
-      if (halaman.length === 0 || selesai) break;
+      const selesai = total !== null ? hasil.length >= total : halaman.length < sisa;
+      if (halaman.length === 0 || selesai || hasil.length >= batas) break;
     }
-    return hasil.map((baris) => this.keRecord(baris));
+    return hasil;
   }
 
   async findUnique(where: Where): Promise<T | null> {
