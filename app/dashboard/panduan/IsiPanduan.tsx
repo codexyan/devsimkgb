@@ -1221,11 +1221,13 @@ export default async function IsiPanduan({
                   <p>
                     <strong>Banyak pegawai naik pangkat atau menerima SK PMK pada periode yang sama?</strong> Tekan{" "}
                     <strong>Lapor KP/PI/PMK</strong> di bagian atas Pegawai Satker, di samping Usul KGB Kolektif.
-                    Cari dan tambahkan pegawainya; tiap pegawai mendapat satu kartu berisi jenis SK (kenaikan pangkat
+                    Cari dan tambahkan pegawainya di panel kiri; tiap pegawai mendapat satu kartu berisi jenis SK (kenaikan pangkat
                     atau penyesuaian ijazah, atau PMK), golongan baru dan masa kerja menurut SK, nomor, tanggal, TMT,
                     pejabat penetap, hasil hitungannya, dan pindaian SK yang masih kurang. Tanggal SK, TMT, dan
-                    penetap yang sama untuk semua pegawai dapat diisi sekali di atas; isian itu hanya dipakai bila
-                    kolom di kartunya kosong dan <strong>tidak pernah menimpa isian kartu</strong>. Tombol{" "}
+                    penetap yang sama untuk semua pegawai dapat diisi sekali di <em>Isian bersama</em>; isian itu hanya dipakai bila
+                    kolom di kartunya kosong dan <strong>tidak pernah menimpa isian kartu</strong>. Di layar lebar panel kiri
+                    tetap terlihat selama kartu digulir, dan daftar <em>Di laporan</em> menunjukkan keadaan tiap pegawai;
+                    tekan namanya untuk melompat ke kartunya. Tombol{" "}
                     <strong>Simpan semua sebagai draf</strong> menyimpan seluruhnya tanpa mengirim;{" "}
                     <strong>Kirim ke Kanwil</strong> mengirim kartu yang sudah lengkap. Kartu yang belum lengkap atau
                     gagal tidak menghentikan kartu lain dan tidak kehilangan isiannya. Pegawai yang usulannya sedang

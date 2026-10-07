@@ -3432,12 +3432,31 @@ html[data-gerak="kurangi"] .pmn-percik, html[data-gerak="kurangi"] .pmn-cincin {
 }
 
 /* ── Lapor KP/PI/PMK massal UPT (ADR-074): satu kartu per pegawai; kelas kol-* dipakai ulang untuk isian dan hitungan ── */
-.lsk-panel { overflow: visible; }
-.lsk-alat { display: grid; gap: 14px; padding: 14px 16px; }
-.lsk-cari { max-width: 460px; }
-.lsk-umum { display: grid; gap: 8px; }
+/* Tata letak (ADR-079): panel kiri menempel dan menggulir sendiri di layar lebar; kartu mengikuti gulir halaman. */
+.lsk-kerja { display: grid; gap: 14px; align-items: start; }
+.lsk-samping { display: flex; flex-direction: column; overflow: hidden; }
+.lsk-blok { display: grid; gap: 8px; padding: 14px 16px; }
+.lsk-blok + .lsk-blok { border-top: 1px solid var(--ln2); }
+.lsk-blok-judul { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; font-weight: 650; color: var(--dtn); }
+.lsk-blok-judul small { font-size: 11.5px; font-weight: 500; color: var(--dt5); }
+.lsk-no { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border: 1px solid var(--ln1); border-radius: 99px;
+  background: var(--tint-navy); font-size: 11px; font-weight: 700; color: var(--dtn); }
+.lsk-jumlah { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--dt4); font-variant-numeric: tabular-nums; }
+.lsk-umum-kisi { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.lsk-umum-kisi > :last-child { grid-column: 1 / -1; }
+.lsk-ringkas { display: grid; gap: 2px; margin: 0 -6px; padding: 0; list-style: none; }
+.lsk-ringkas button { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 8px; width: 100%; padding: 6px;
+  border: 0; border-radius: 8px; background: none; font: inherit; text-align: left; cursor: pointer; }
+.lsk-ringkas button:hover { background: var(--sub); }
+.lsk-ringkas button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.lsk-ringkas-nama { overflow: hidden; font-size: 12.5px; font-weight: 600; color: var(--dtn); text-overflow: ellipsis; white-space: nowrap; }
+.lsk-ringkas small { grid-column: 2; font-size: 11px; color: var(--dt5); }
+.lsk-utama { min-width: 0; }
+.lsk-sub { margin: 0 0 -4px; font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--dt5); }
+.lsk-baris { scroll-margin-top: var(--bantal, 12px); }
 .lsk-kisi { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 10px 12px; }
-.lsk-calon { margin: 0; padding: 6px; border-top: 1px solid var(--ln2); list-style: none; background: var(--sub); border-radius: 0 0 12px 12px; }
+.lsk-calon { max-height: 320px; margin: 0; padding: 4px; overflow-y: auto; border: 1px solid var(--ln1); border-radius: 10px; list-style: none;
+  background: var(--sub); scrollbar-width: thin; }
 .lsk-calon button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 8px 10px; border: 1px solid transparent;
   border-radius: 10px; background: transparent; font: inherit; text-align: left; cursor: pointer; color: var(--dt2); }
 .lsk-calon button:hover:not(:disabled) { background: var(--card); border-color: var(--ln1); }
@@ -3448,7 +3467,18 @@ html[data-gerak="kurangi"] .pmn-percik, html[data-gerak="kurangi"] .pmn-cincin {
 .lsk-calon em { flex: none; font-size: 11.5px; font-style: normal; font-weight: 600; color: var(--st-blue); }
 .lsk-calon button:disabled em { color: var(--dt5); }
 .lsk-kosong { padding: 10px; font-size: 12.5px; color: var(--dt5); }
-.lsk-kosong-besar { padding: 28px 16px; text-align: center; }
+/* Laporan kosong: gambar, langkah, dan tombol ke kotak cari. */
+.lsk-kosong-besar { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 20px; border: 1.5px dashed var(--ln1);
+  border-radius: 14px; background: var(--card); text-align: center; }
+.lsk-kosong-besar svg { width: 132px; height: auto; color: var(--dt4); }
+.lsk-kosong-besar[data-memuat] svg { opacity: .55; }
+.lsk-kosong-besar h2 { margin: 4px 0 0; font-family: var(--huruf-judul); font-size: 19px; font-weight: 500; letter-spacing: -.01em; color: var(--dtn); }
+.lsk-kosong-besar > p { max-width: 470px; margin: 0; font-size: 13px; line-height: 1.55; color: var(--dt4); }
+.lsk-langkah { display: grid; gap: 8px; width: min(100%, 440px); margin: 6px 0 4px; padding: 0; list-style: none; text-align: left; }
+.lsk-langkah li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--ln2); border-radius: 10px;
+  background: var(--sub); font-size: 12.5px; line-height: 1.45; color: var(--dt2); }
+.lsk-langkah li > span { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 99px; background: var(--accent);
+  font-size: 11.5px; font-weight: 700; color: var(--card); }
 .lsk-daftar { display: grid; gap: 12px; margin: 0; padding: 0 0 12px; list-style: none; }
 .lsk-baris { border: 1px solid var(--ln1); border-radius: 14px; background: var(--card); overflow: hidden; }
 .lsk-baris[data-keadaan="terkirim"] { border-color: var(--tint-green-ln); background: var(--tint-green-bg); }
@@ -3467,10 +3497,31 @@ html[data-gerak="kurangi"] .pmn-percik, html[data-gerak="kurangi"] .pmn-cincin {
 .lsk-dampak[data-nada="merah"] strong { color: var(--st-red); }
 .lsk-pesan { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--dt3); }
 .lsk-pesan[data-nada="merah"] { color: var(--st-red); }
-.lsk-kaki { margin-top: 4px; }
+/* Kaki menempel hanya selama ada kartu; berdiri sendiri, jadi bersudut penuh. */
+.lsk-kaki { border: 1px solid var(--ln1); border-radius: 12px; }
+.lsk-kaki-ringkas { display: grid; flex: 1 1 280px; gap: 6px; min-width: 0; }
+.lsk-kemajuan { display: block; max-width: 360px; height: 4px; overflow: hidden; border-radius: 99px; background: var(--ln2); }
+.lsk-kemajuan > span { display: block; height: 100%; border-radius: inherit; background: var(--st-green); transition: width .3s; }
+@media (min-width: 1024px) {
+  .lsk-kerja { grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); }
+  .lsk-samping { position: sticky; top: calc(-1 * var(--bantal, 0px)); max-height: calc(100dvh - var(--bantal, 0px) - var(--kol-kaki, 0px) - 4px);
+    overflow-y: auto; scrollbar-width: thin; }
+  .lsk-kosong-besar { justify-content: center; min-height: 440px; }
+}
+@media (max-width: 1023px) {
+  /* Di layar sempit kartu langsung di bawah panel; daftar ringkas tidak diperlukan. */
+  .lsk-blok-daftar { display: none; }
+}
 @media (max-width: 640px) {
   .lsk-kepala, .lsk-isi { padding-left: 12px; padding-right: 12px; }
-  .lsk-alat { padding: 12px; }
+  .lsk-blok { padding: 12px; }
+  .lsk-kosong-besar { padding: 28px 14px; }
+  /* Kaki ringkas di ponsel: dua tombol sebaris dengan label pendek. */
+  .lsk-kaki .kol-kaki-tombol { flex-wrap: nowrap; }
+  .lsk-lebar { display: none; }
+}
+@media (min-width: 641px) {
+  .lsk-sempit { display: none; }
 }
 
 /* ── Pengumuman ADR-078: pratinjau SK dengan tanda air ── */
