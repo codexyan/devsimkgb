@@ -67,6 +67,15 @@ masa kerja, pratinjau SK di formulir dengan review Kanwil (ADR-077) tetap berlak
    *PRATINJAU USULAN · BELUM DIAJUKAN*. Tidak menulis apa pun. Nomor surat, tanggal, dan penandatangannya ditetapkan Kanwil;
    review SK oleh UPT sesudah Kanwil membuat SK (ADR-077) tetap berlaku sebagai pemeriksaan akhir.
 9. **Apa yang baru** untuk Admin UPT: pengumuman `sk-usulan-2026-10` dengan dua adegan. Panduan diperbarui.
+10. **Lapor KP/PI/PMK** (kartu *Laporkan* per pegawai dan halaman massal, `lib/laporSk.ts`, `laporSkKirim.ts`): kenaikan
+    pangkat kini juga menagih masa kerja golongan menurut SK, dan kotak *Dihitung sistem* mencocokkannya dengan hitungan
+    pada TMT pangkat (peringatan bila berbeda). Laporan menyimpan keadaan induk (data tercatat) sebagai acuan, sehingga
+    Kanwil melihat catatan pencocokan yang sama. Draf laporan lama yang belum memuat masa kerja menurut SK dibuka dengan
+    isian itu kosong.
+11. **Unggah daftar (Excel)** (`lib/imporUsulanUpt.ts`, templat `.xlsx`): tiga kolom opsional `golonganAcuan`,
+    `mkgTahunAcuan`, `mkgBulanAcuan` untuk pegawai baru yang melaporkan SK kp atau pmk. Bila diisi, hitungannya dari SK KGB
+    terakhir dan masa kerja di SK dicocokkan; bila kosong, masa kerja pada SK dihitung mundur seperti ADR-065. Golongan acuan
+    yang salah tulis menolak barisnya. Pada pegawai yang sudah tercatat ketiganya diabaikan, sebab data tercatatlah acuannya.
 
 ## Akibat
 
@@ -75,6 +84,6 @@ masa kerja, pratinjau SK di formulir dengan review Kanwil (ADR-077) tetap berlak
 - UPT menyalin dua angka masa kerja dari dua SK, sesuai dokumennya, dan salah salin terdeteksi sebelum diajukan.
 - Usulan pegawai tercatat tidak dapat sekaligus mengoreksi golongan atau masa kerja tercatat dan melaporkan SK; koreksinya
   diajukan lebih dulu. Sebelumnya perubahan seperti itu diabaikan diam-diam saat disetujui.
-- Lapor KP/PI/PMK dan unggahan Excel belum menanyakan masa kerja menurut SK kenaikan pangkat; usulannya tetap dihitung dari
-  data tercatat tanpa pencocokan.
+- Lapor KP/PI/PMK kini menuntut satu isian lagi untuk kenaikan pangkat (masa kerja menurut SK). Unggahan Excel tetap dapat
+  memakai cara lama tanpa kolom acuan.
 - Kolom acuan berlaku setelah migrasi dijalankan.

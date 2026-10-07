@@ -6,7 +6,8 @@ import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { BELUM_SELESAI, nilaiUsulan } from "@/lib/usulanPegawai";
 import { ringkasDasarBaru } from "@/lib/dasarBaruUsulan";
-import { isiHitungan } from "@/lib/usulanFormulir";
+import { KOSONG_ACUAN, isiHitungan } from "@/lib/usulanFormulir";
+import { tulisBanyakDenganAcuan } from "@/lib/acuanUsulanServer";
 import {
   BATAS_BARIS_IMPOR,
   dapatDisimpan,
@@ -96,12 +97,18 @@ export async function POST(req: Request) {
         kurang: h.kurang,
         namaTercatat: h.namaTercatat,
         beda: h.beda.map((b) => ({ label: b.label, sekarang: b.sekarang, diusulkan: b.diusulkan })),
-        // SK sebab perubahan yang disebut baris ini, satu kalimat siap tampil; null bila tidak disebut.
-        dasarBaru: ringkasDasarBaru(h.dasarBaru ?? {}),
+        // SK sebab perubahan yang disebut baris ini, satu kalimat siap tampil; null bila tidak disebut. Keadaan pada SK
+        // KGB terakhir ikut disebut bila barisnya mengisinya (ADR-078).
+        dasarBaru: [
+          ringkasDasarBaru(h.dasarBaru ?? {}),
+          h.acuan ? `pada SK KGB terakhir ${h.acuan.golonganAcuan}, ${h.acuan.mkgTahunAcuan ?? "?"} tahun ${h.acuan.mkgBulanAcuan ?? 0} bulan` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || null,
         // Nilai yang benar-benar akan tersimpan, sudah lewat pembacaan tanggal dan hitungan sistem.
         // Inilah yang diperiksa operator: tanggal yang salah tafsir terlihat di sini, bukan setelah tersimpan.
         nilai: h.isian
-          ? nilaiUsulan(isiHitungan(h.isian, pegawaiSatkerIni.get(h.nip) ?? null, h.dasarBaru)).map((n) => ({
+          ? nilaiUsulan(isiHitungan(h.isian, pegawaiSatkerIni.get(h.nip) ?? null, { ...h.dasarBaru, ...h.acuan })).map((n) => ({
               label: n.label,
               nilai: n.nilai,
             }))
@@ -162,6 +169,8 @@ export async function POST(req: Request) {
       dasarBaruTanggalSk: h.dasarBaru?.dasarBaruTanggalSk ?? null,
       dasarBaruTmt: h.dasarBaru?.dasarBaruTmt ?? null,
       dasarBaruPenetap: h.dasarBaru?.dasarBaruPenetap ?? null,
+      // Keadaan pada SK KGB terakhir bagi pegawai baru yang melaporkan SK sesudahnya (ADR-078).
+      ...(h.acuan ?? KOSONG_ACUAN),
       hukdisAda: false,
       hukdisJenis: null,
       hukdisNomorSk: null,
@@ -174,12 +183,12 @@ export async function POST(req: Request) {
       ditinjauOleh: null,
       ditinjauAt: null,
       alasanTolak: null,
-      ...isiHitungan(h.isian!, tercatat, h.dasarBaru),
+      ...isiHitungan(h.isian!, tercatat, { ...h.dasarBaru, ...h.acuan }),
     };
   };
 
   const rows = disimpan.map(barisUsulan);
-  if (rows.length > 0) await db.usulanPegawai.createMany(rows);
+  if (rows.length > 0) await tulisBanyakDenganAcuan(rows, (isi) => db.usulanPegawai.createMany(isi));
 
   const jumlahBaru = disimpan.filter((h) => h.hasil === "baru").length;
   const jumlahPerubahan = disimpan.length - jumlahBaru;

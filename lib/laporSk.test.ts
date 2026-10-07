@@ -53,12 +53,14 @@ test("PMK: pratinjau menghitung masa kerja dan jadwal, dan menolak TMT yang mend
 });
 
 test("kekurangan laporan disebut satu per satu menurut jenisnya", () => {
-  assert.deepEqual(kekuranganLaporSk(kosong), ["golongan baru menurut SK", "nomor SK kenaikan pangkat", "tanggal SK", "TMT pangkat"]);
+  assert.deepEqual(kekuranganLaporSk(kosong), [
+    "golongan baru menurut SK", "masa kerja golongan menurut SK kenaikan pangkat", "nomor SK kenaikan pangkat", "tanggal SK", "TMT pangkat",
+  ]);
   assert.deepEqual(kekuranganLaporSk({ ...kosong, jenis: "pmk" }), [
     "masa kerja golongan menurut SK PMK", "nomor SK peninjauan masa kerja", "tanggal SK", "TMT PMK",
   ]);
   assert.deepEqual(
-    kekuranganLaporSk({ ...kosong, golonganBaru: "III/a", nomorSk: " SK-1 ", tanggalSk: "2026-01-29", tmt: "2026-02-01" }),
+    kekuranganLaporSk({ ...kosong, golonganBaru: "III/a", mkgTahunSk: "3", mkgBulanSk: "2", nomorSk: " SK-1 ", tanggalSk: "2026-01-29", tmt: "2026-02-01" }),
     [],
   );
 });
@@ -71,4 +73,21 @@ test("peringatan dampak: KGB diproses dihitung ulang; SK yang sudah ditandatanga
   assert.equal(ttd?.nada, "merah");
   assert.match(ttd?.teks ?? "", /sudah ditandatangani.*membatalkan KGB/);
   for (const s of ["selesai", "belum_diproses", null, undefined, ""]) assert.equal(peringatanDampakKgb(s, "2026-12-01"), null, String(s));
+});
+
+test("kenaikan pangkat: masa kerja menurut SK dicocokkan dengan hitungan sistem pada TMT pangkat (ADR-078)", () => {
+  // KGB terakhir 1 Des 2024 di II/b 7 tahun; PI ke III/a TMT 1 Feb 2026, di SK 3 tahun 2 bulan.
+  const lama: KeadaanTercatat = { golongan: "II/b", mkgTahun: 7, mkgBulan: 0, tmtKgbTerakhir: "2024-12-01" };
+  const isi = { ...kosong, golonganBaru: "III/a", mkgTahunSk: "3", mkgBulanSk: "2", tmt: "2026-02-01" };
+  const cocok = pratayangLaporSk(lama, isi);
+  assert.ok(cocok && cocok.ok);
+  assert.ok(cocok.baris.some(([k, v]) => k === "Pada TMT pangkat" && v === "3 thn 2 bln, sesuai SK"), JSON.stringify(cocok.baris));
+  assert.equal(cocok.peringatan ?? null, null);
+  const keliru = pratayangLaporSk(lama, { ...isi, mkgTahunSk: "7", mkgBulanSk: "0" });
+  assert.ok(keliru && keliru.ok);
+  assert.match(keliru.peringatan ?? "", /menurut SK 7 thn 0 bln, sedangkan hitungan sistem 3 thn 2 bln/);
+  // Tanpa TMT pangkat belum dicocokkan, tetapi hitungan golongannya tetap tampil.
+  const tanpaTmt = pratayangLaporSk(lama, { ...isi, tmt: "" });
+  assert.ok(tanpaTmt && tanpaTmt.ok);
+  assert.ok(!tanpaTmt.baris.some(([k]) => k === "Pada TMT pangkat"));
 });

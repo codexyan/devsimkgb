@@ -29,3 +29,19 @@ export async function tulisDenganAcuan<T extends Partial<AcuanUsulan>>(
     return { acuanTersimpan: false };
   }
 }
+
+/** Seperti tulisDenganAcuan, untuk banyak baris sekaligus (unggah daftar). */
+export async function tulisBanyakDenganAcuan<T extends Partial<AcuanUsulan>>(
+  baris: T[],
+  tulis: (baris: T[]) => Promise<unknown>,
+): Promise<{ acuanTersimpan: boolean }> {
+  try {
+    await tulis(baris);
+    return { acuanTersimpan: true };
+  } catch (e) {
+    if (!kolomAcuanBelumAda(e)) throw e;
+    console.warn("[usulan] kolom SK acuan belum ada; unggahan disimpan tanpa acuan. Jalankan migrasi 20261007120000_usulan_sk_acuan.sql.");
+    await tulis(baris.map((b) => ({ ...b, ...KOSONG_ACUAN })));
+    return { acuanTersimpan: false };
+  }
+}

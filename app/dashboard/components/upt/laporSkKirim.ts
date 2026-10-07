@@ -16,9 +16,17 @@ export function nilaiTercatat(pegawai: PegawaiUntukUsulan, draf: DrafUsulanUpt |
   return draf?.nilai ?? pegawai.dataSekarang ?? {};
 }
 
-/** Keadaan menurut isian draf, bila ada: dasar berkas yang ditagih, sebab server memeriksa usulan dengan nilai yang sama. */
+/**
+ * Keadaan menurut isian draf, bila ada: dasar berkas yang ditagih, sebab server memeriksa usulan dengan nilai yang sama.
+ * Draf yang menyimpan keadaan pada SK KGB terakhir (ADR-078) dibaca dari situ, sebab golongan dan masa kerja pada isian
+ * utamanya adalah yang tertulis pada SK yang dilaporkan.
+ */
 export function keadaanTercatat(pegawai: PegawaiUntukUsulan, draf: DrafUsulanUpt | null): KeadaanTercatat {
-  return keadaanDari(nilaiTercatat(pegawai, draf));
+  const nilai = nilaiTercatat(pegawai, draf);
+  const acuan = draf?.acuan;
+  return acuan
+    ? keadaanDari({ ...nilai, golonganRuang: acuan.golongan, mkgTahun: acuan.mkgTahun, mkgBulan: acuan.mkgBulan })
+    : keadaanDari(nilai);
 }
 
 /**
@@ -50,12 +58,15 @@ export function isianDariDraf(draf: DrafUsulanUpt | null, jenisBawaan: JenisLapo
   const d = draf?.dasarBaru;
   if (!d || (d.jenis !== "kp" && d.jenis !== "pmk")) return kosong;
   const jenis: JenisLaporSk = d.jenis;
+  // Masa kerja menurut SK kenaikan pangkat baru tersimpan sejak ADR-078 (draf ber-acuan); pada draf lama isian utamanya
+  // masih masa kerja tercatat, jadi dibiarkan kosong untuk diisi dari SK.
+  const adaMkgSk = jenis === "pmk" || !!draf?.acuan;
   return {
     jenis,
     jenisKp: d.jenisKp || "reguler",
     golonganBaru: jenis === "kp" ? draf?.nilai?.golonganRuang ?? "" : "",
-    mkgTahunSk: jenis === "pmk" ? draf?.nilai?.mkgTahun ?? "" : "",
-    mkgBulanSk: jenis === "pmk" ? draf?.nilai?.mkgBulan ?? "" : "",
+    mkgTahunSk: adaMkgSk ? draf?.nilai?.mkgTahun ?? "" : "",
+    mkgBulanSk: adaMkgSk ? draf?.nilai?.mkgBulan ?? "" : "",
     nomorSk: d.nomorSk ?? "",
     tanggalSk: d.tanggalSk ?? "",
     tmt: d.tmt ?? "",
@@ -114,13 +125,17 @@ export async function simpanLaporSk(p: {
 
   // Seluruh isian draf dikirim ulang apa adanya; rute menulis semua kolom, jadi yang tidak ikut akan terhapus. Yang
   // berubah hanya kolom yang memang ditetapkan SK ini.
+  // Golongan dan masa kerja pada isian utama adalah yang tertulis pada SK yang dilaporkan; keadaan sebelum SK (data
+  // induk, yang dipakai Kanwil) ikut dikirim sebagai acuan, supaya masa kerja menurut SK dicocokkan (ADR-078).
   const nilai: Record<string, string> = { ...nilaiTercatat(pegawai, draf) };
   if (isian.jenis === "kp") nilai.golonganRuang = isian.golonganBaru;
-  else {
-    nilai.mkgTahun = String(angkaLapor(isian.mkgTahunSk));
-    nilai.mkgBulan = String(angkaLapor(isian.mkgBulanSk));
-  }
+  nilai.mkgTahun = String(angkaLapor(isian.mkgTahunSk));
+  nilai.mkgBulan = String(angkaLapor(isian.mkgBulanSk));
   for (const bidang of BIDANG_DIISI) form.set(bidang.kunci, nilai[bidang.kunci] ?? "");
+  const induk = keadaanInduk(pegawai, draf);
+  form.set("golonganAcuan", induk.golongan);
+  form.set("mkgTahunAcuan", String(induk.mkgTahun));
+  form.set("mkgBulanAcuan", String(induk.mkgBulan));
 
   // SK dasar gaji pokok dan catatan pada draf dipertahankan, sebab rute menuliskannya juga.
   form.set("nomorSkTerakhir", draf?.surat?.nomorSkTerakhir ?? pegawai.bawaan?.nomorSkTerakhir ?? "");

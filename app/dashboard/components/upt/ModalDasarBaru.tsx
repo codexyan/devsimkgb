@@ -12,9 +12,9 @@ import {
   berkasBelumAda,
   berkasDiminta,
   berkasTersedia,
+  isianDariDraf,
   keadaanInduk,
   keadaanTercatat,
-  nilaiTercatat,
   simpanLaporSk,
 } from "./laporSkKirim";
 import { formatTanggalId } from "@/lib/waktu";
@@ -50,14 +50,11 @@ export default function ModalDasarBaru({
   onTutup: () => void;
   onSelesai: (pesan: string) => void;
 }) {
-  const sekarang = nilaiTercatat(pegawai, draf);
   const tercatat = keadaanTercatat(pegawai, draf);
   // Pratinjau dan keterangan "Tercatat sekarang" bertolak dari data induk, seperti Kanwil saat menyetujui; draf yang
   // sudah memuat golongan baru dari laporan ini bukan golongan lama (ADR-074).
   const induk = keadaanInduk(pegawai, draf);
   const golonganSekarang = induk.golongan;
-  const mkgTahunSekarang = tercatat.mkgTahun;
-  const mkgBulanSekarang = tercatat.mkgBulan;
   const tmtKgbTerakhir = induk.tmtKgbTerakhir;
 
   // Draf yang sudah menyebut sebab yang sama isinya dipakai kembali; yang menyebut sebab lain dibiarkan
@@ -67,10 +64,13 @@ export default function ModalDasarBaru({
   const drafSebabLain =
     draf?.dasarBaru?.jenis && draf.dasarBaru.jenis !== jenis && draf.dasarBaru.jenis !== TANPA_SK_BARU ? draf.dasarBaru.jenis : null;
 
-  const [golonganBaru, setGolonganBaru] = useState(jenis === "kp" ? (drafSama ? sekarang.golonganRuang ?? "" : "") : "");
+  // Isian SK yang sudah tersimpan pada draf, termasuk masa kerja menurut SK kenaikan pangkat bila drafnya menyimpannya
+  // (ADR-078); sama dengan halaman Lapor KP/PI/PMK massal.
+  const awal = drafSama ? isianDariDraf(draf, jenis) : null;
+  const [golonganBaru, setGolonganBaru] = useState(awal?.golonganBaru ?? "");
   const [jenisKp, setJenisKp] = useState(drafSama?.jenisKp || "reguler");
-  const [mkgTahunSk, setMkgTahunSk] = useState(jenis === "pmk" && drafSama ? String(mkgTahunSekarang) : "");
-  const [mkgBulanSk, setMkgBulanSk] = useState(jenis === "pmk" && drafSama ? String(mkgBulanSekarang) : "");
+  const [mkgTahunSk, setMkgTahunSk] = useState(awal?.mkgTahunSk ?? "");
+  const [mkgBulanSk, setMkgBulanSk] = useState(awal?.mkgBulanSk ?? "");
   const [nomorSk, setNomorSk] = useState(drafSama?.nomorSk ?? "");
   const [tanggalSk, setTanggalSk] = useState(drafSama?.tanggalSk ?? "");
   const [tmt, setTmt] = useState(drafSama?.tmt ?? "");
@@ -164,7 +164,7 @@ export default function ModalDasarBaru({
 
       <Catatan>
         {jenis === "kp"
-          ? "Isi golongan baru beserta SK-nya. Masa kerja golongan dan gaji pokok dihitung Kanwil saat menyetujui; naik jenjang golongan memotong masa kerja, jadi keduanya tidak diketik di sini."
+          ? "Salin golongan baru dan masa kerja golongan dari SK kenaikan pangkat beserta SK-nya. Sistem menghitung masa kerja dan gaji pokok dari data tercatat seperti Kanwil saat menyetujui (naik jenjang golongan memotong masa kerja), lalu mencocokkannya dengan masa kerja di SK."
           : "Isi masa kerja golongan sebagaimana tertulis pada SK PMK. Kanwil menghitung ulang gaji pokok dan jadwal KGB berikutnya dari angka itu saat menyetujui."}{" "}
         Laporan SK tidak menumpang surat usulan: SK-nya sudah terbit dan pindaiannya ikut terkirim, jadi
         begitu berkasnya lengkap, kartu ini langsung mengirimkannya ke Kanwil.
@@ -189,7 +189,7 @@ export default function ModalDasarBaru({
         {tmtKgbTerakhir ? ` · TMT KGB terakhir ${formatTanggalId(tmtKgbTerakhir)}` : ""}
       </p>
 
-      {jenis === "kp" ? (
+      {jenis === "kp" && (
         <div className="kgbm-grid2">
           <label className="kgbm-label">
             <span className="kgbm-wajib">Jenis kenaikan pangkat</span>
@@ -213,30 +213,34 @@ export default function ModalDasarBaru({
             </select>
           </label>
         </div>
-      ) : (
-        <div className="kgbm-grid2">
-          <label className="kgbm-label">
-            <span className="kgbm-wajib">Masa kerja pada SK (tahun)</span>
-            <input
-              className="kgbm-input"
-              inputMode="numeric"
-              value={mkgTahunSk}
-              onChange={(e) => setMkgTahunSk(e.target.value.replace(/\D/g, ""))}
-            />
-            <span className="kgbm-bantuan">Masa kerja golongan pada TMT PMK, sebagaimana tertulis pada SK.</span>
-          </label>
-          <label className="kgbm-label">
-            Masa kerja pada SK (bulan)
-            <input
-              className="kgbm-input"
-              inputMode="numeric"
-              value={mkgBulanSk}
-              onChange={(e) => setMkgBulanSk(e.target.value.replace(/\D/g, ""))}
-            />
-            <span className="kgbm-bantuan">0 sampai 11.</span>
-          </label>
-        </div>
       )}
+      {/* Kenaikan pangkat juga menanyakan masa kerja menurut SK, untuk dicocokkan dengan hitungan sistem (ADR-078). */}
+      <div className="kgbm-grid2">
+        <label className="kgbm-label">
+          <span className="kgbm-wajib">Masa kerja pada SK (tahun)</span>
+          <input
+            className="kgbm-input"
+            inputMode="numeric"
+            value={mkgTahunSk}
+            onChange={(e) => setMkgTahunSk(e.target.value.replace(/\D/g, ""))}
+          />
+          <span className="kgbm-bantuan">
+            {jenis === "kp"
+              ? "Masa kerja golongan pada TMT pangkat, sebagaimana tertulis pada SK."
+              : "Masa kerja golongan pada TMT PMK, sebagaimana tertulis pada SK."}
+          </span>
+        </label>
+        <label className="kgbm-label">
+          Masa kerja pada SK (bulan)
+          <input
+            className="kgbm-input"
+            inputMode="numeric"
+            value={mkgBulanSk}
+            onChange={(e) => setMkgBulanSk(e.target.value.replace(/\D/g, ""))}
+          />
+          <span className="kgbm-bantuan">0 sampai 11.</span>
+        </label>
+      </div>
 
       <div className="kgbm-grid2">
         <label className="kgbm-label">
@@ -274,6 +278,7 @@ export default function ModalDasarBaru({
               ))}
             </dl>
             <p className="kgbm-hitungan-ket">{pratayang.catatan}</p>
+            {pratayang.peringatan && <p className="kgbm-hitungan-ingat">{pratayang.peringatan}</p>}
           </div>
         )
       )}

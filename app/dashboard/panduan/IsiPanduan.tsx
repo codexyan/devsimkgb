@@ -842,7 +842,11 @@ export default async function IsiPanduan({
                   menulis masa kerja 7 tahun 1 bulan. Barisnya ditulis III/a, masa kerja 7 tahun 1 bulan, TMT KGB
                   terakhir 1 Desember 2024, dengan SK penyesuaian ijazah itu di kolom dasarBaru. Sistem menghitung mundur
                   masa kerjanya ke TMT KGB terakhir menjadi 6 tahun, sehingga KGB berikutnya jatuh 1 Desember 2026 dan SK
-                  penyesuaian ijazah itulah dasarnya.
+                  penyesuaian ijazah itulah dasarnya. Bila keadaan pada SK KGB terakhir diketahui, isi juga kolom{" "}
+                  <code>golonganAcuan</code>, <code>mkgTahunAcuan</code>, dan <code>mkgBulanAcuan</code> (pada contoh ini II/d,
+                  11 tahun, 0 bulan): sistem lalu menghitung dari SK KGB terakhir seperti pegawai yang sudah tercatat dan
+                  mencocokkan masa kerja yang tertulis pada SK penyesuaian ijazah. Ketiga kolom itu diabaikan pada pegawai
+                  yang sudah tercatat.
                 </p>
 
                 <h4 className="pub-h3" id="kolom-dasar-baru">Enam kolom dasarBaru: sebab golongan atau masa kerja berubah</h4>
@@ -1185,11 +1189,13 @@ export default async function IsiPanduan({
                     menggeser masa kerja golongan sekaligus menjadi dasar SK KGB berikutnya. Laporkan lewat{" "}
                     <strong>Laporkan kenaikan pangkat</strong> atau <strong>Laporkan peninjauan masa kerja</strong>{" "}
                     pada baris pegawainya. Masing-masing membuka jendelanya sendiri yang hanya memuat apa yang
-                    tertulis di SK itu: golongan baru atau masa kerja menurut SK, nomor, tanggal, TMT, pejabat
-                    penetapnya, dan <strong>pindaian SK-nya</strong>. Akibat SK itu langsung terlihat di kotak
-                    <em> Dihitung sistem</em> sebelum disimpan. Masa kerja golongan dan gaji pokoknya dihitung Kanwil
-                    saat menyetujui; naik dari golongan II ke III tetap memotong masa kerja 5 tahun, sehingga angka
-                    yang Anda ketik tidak pernah diam-diam menggeser uang.
+                    tertulis di SK itu: golongan baru (kenaikan pangkat), masa kerja golongan menurut SK, nomor,
+                    tanggal, TMT, pejabat penetapnya, dan <strong>pindaian SK-nya</strong>. Akibat SK itu langsung
+                    terlihat di kotak <em> Dihitung sistem</em> sebelum disimpan. Masa kerja golongan dan gaji pokoknya
+                    dihitung dari data tercatat seperti Kanwil saat menyetujui; naik dari golongan II ke III tetap
+                    memotong masa kerja 5 tahun, sehingga angka yang Anda ketik tidak pernah diam-diam menggeser uang.
+                    Pada kenaikan pangkat, masa kerja yang Anda salin dari SK dicocokkan dengan hitungan itu pada TMT
+                    pangkat; bila berbeda, kotaknya memperingatkan sebelum dikirim.
                   </p>
                   <p>
                     Laporan SK <strong>tidak menumpang surat usulan Srikandi</strong>: SK-nya sudah terbit dan
@@ -1208,7 +1214,7 @@ export default async function IsiPanduan({
                     <strong>Banyak pegawai naik pangkat atau menerima SK PMK pada periode yang sama?</strong> Tekan{" "}
                     <strong>Lapor KP/PI/PMK</strong> di bagian atas Pegawai Satker, di samping Usul KGB Kolektif.
                     Cari dan tambahkan pegawainya; tiap pegawai mendapat satu kartu berisi jenis SK (kenaikan pangkat
-                    atau penyesuaian ijazah, atau PMK), golongan baru atau masa kerja menurut SK, nomor, tanggal, TMT,
+                    atau penyesuaian ijazah, atau PMK), golongan baru dan masa kerja menurut SK, nomor, tanggal, TMT,
                     pejabat penetap, hasil hitungannya, dan pindaian SK yang masih kurang. Tanggal SK, TMT, dan
                     penetap yang sama untuk semua pegawai dapat diisi sekali di atas; isian itu hanya dipakai bila
                     kolom di kartunya kosong dan <strong>tidak pernah menimpa isian kartu</strong>. Tombol{" "}

@@ -12,7 +12,7 @@
 // ditagih saat diajukan; menolaknya di sini berarti memaksa operator menyempurnakan seluruh berkas di
 // Excel lebih dulu, padahal dokumennya sering baru terkumpul belakangan.
 
-import { BIDANG_DIISI, bacaDasarBaru, bacaIsianBaris, type DasarBaruUsulan } from "./usulanFormulir";
+import { BIDANG_DIISI, KOSONG_ACUAN, bacaAcuan, bacaDasarBaru, bacaIsianBaris, type AcuanUsulan, type DasarBaruUsulan } from "./usulanFormulir";
 import { keBerkasCsv } from "./csv";
 import { TANPA_SK_BARU, isNilaiDasarBaru } from "./dasarBaruUsulan";
 import { JENIS_KP, isJenisKp } from "./kenaikanPangkat";
@@ -20,7 +20,7 @@ import { bandingkanUsulan, kekuranganUsulan, type PerubahanUsulan } from "./usul
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "./dataPegawai";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR } from "./pilihanPegawai";
 import { periksaNip } from "./nipPns";
-import { GOLONGAN_PANGKAT } from "./tabelGaji";
+import { GOLONGAN_PANGKAT, isGolonganDikenal } from "./tabelGaji";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 
 /** Lembar templat Excel yang dibaca saat berkasnya diunggah; lembar lain hanya untuk dibaca operator. */
@@ -221,6 +221,36 @@ export const KOLOM_TEMPLAT_UPT: readonly KolomTemplatUpt[] = [
     keterangan: "Jabatan pejabat yang menandatangani SK tersebut, misalnya Kepala Kantor Wilayah.",
     contoh: "",
   },
+  // Keadaan pada SK KGB terakhir bagi pegawai baru yang melaporkan SK sesudahnya (ADR-078). Boleh kosong: tanpa itu masa
+  // kerja pada SK dihitung mundur ke TMT KGB terakhir seperti sebelumnya (ADR-065).
+  {
+    kolom: "golonganAcuan",
+    label: "Golongan pada SK KGB terakhir",
+    peran: "opsional",
+    jenis: "teks",
+    keterangan:
+      "Hanya pegawai baru yang dasarBaruJenis-nya kp atau pmk: golongan/ruang pada SK KGB terakhir (atau SK CPNS). Bila diisi bersama " +
+      "masa kerjanya, sistem menghitung dari SK KGB terakhir seperti pegawai yang sudah tercatat, lalu mencocokkan masa kerja yang tertulis " +
+      "pada SK kenaikan pangkat. Pegawai yang sudah tercatat: kosongkan, sebab data tercatatlah yang dipakai.",
+    contoh: "",
+    pilihan: Object.keys(GOLONGAN_PANGKAT),
+  },
+  {
+    kolom: "mkgTahunAcuan",
+    label: "Masa kerja pada SK KGB terakhir (tahun)",
+    peran: "opsional",
+    jenis: "angka",
+    keterangan: "Pasangan golonganAcuan: masa kerja golongan pada SK KGB terakhir, disalin apa adanya. 0 bagi CPNS yang belum pernah KGB.",
+    contoh: "",
+  },
+  {
+    kolom: "mkgBulanAcuan",
+    label: "Masa kerja pada SK KGB terakhir (bulan)",
+    peran: "opsional",
+    jenis: "angka",
+    keterangan: "Sisa bulan masa kerja golongan pada SK KGB terakhir, 0 sampai 11.",
+    contoh: "",
+  },
 ];
 
 /** Satu keadaan pegawai beserta isian keenam kolom dasarBaru dan kolom golongan pada barisnya. */
@@ -269,7 +299,9 @@ export const PANDUAN_DASAR_BARU: readonly ContohDasarBaru[] = [
     },
     barisLain:
       "Golongan, TMT golongan, dan masa kerja golongan disalin dari SK kenaikan pangkat itu apa adanya (III/b, 3 tahun 1 bulan). TMT KGB terakhir " +
-      "tetap dari SK KGB terakhir. Sistem menghitung mundur masa kerjanya ke TMT KGB terakhir (2 tahun), dan SK ini menjadi dasar SK KGB berikutnya.",
+      "tetap dari SK KGB terakhir. Sistem menghitung mundur masa kerjanya ke TMT KGB terakhir (2 tahun), dan SK ini menjadi dasar SK KGB berikutnya. " +
+      "Bila diketahui, isi juga golonganAcuan III/a, mkgTahunAcuan 2, mkgBulanAcuan 0 (keadaan pada SK KGB terakhir): sistem lalu menghitung dari situ " +
+      "dan mencocokkan masa kerja di SK.",
   },
   {
     keadaan: "Pegawai baru; sesudah SK KGB terakhir menerima SK PMK",
@@ -284,7 +316,8 @@ export const PANDUAN_DASAR_BARU: readonly ContohDasarBaru[] = [
     },
     barisLain:
       "Masa kerja golongan disalin dari SK PMK (5 tahun 9 bulan); golongan dan TMT KGB terakhir dari SK KGB terakhir. Sistem menghitung mundur " +
-      "masa kerjanya ke TMT KGB terakhir dan menghitung jadwal KGB berikutnya dari TMT PMK. Pindaian SK PMK ditagih saat diajukan.",
+      "masa kerjanya ke TMT KGB terakhir dan menghitung jadwal KGB berikutnya dari TMT PMK. Bila diketahui, isi juga golonganAcuan III/a dan " +
+      "mkgTahunAcuan 2 (keadaan pada SK KGB terakhir). Pindaian SK PMK ditagih saat diajukan.",
   },
   {
     keadaan: "Sudah tercatat; golongan dan masa kerja golongan tidak berubah",
@@ -347,6 +380,7 @@ export const ATURAN_DASAR_BARU: readonly string[] = [
   "SK KGB terakhir (atau SK CPNS bila belum pernah KGB) adalah acuan jadwal KGB: TMT KGB terakhir diambil darinya, dan nomor serta tanggalnya diisi saat draf dilengkapi di Usul KGB Kolektif. Keenam kolom ini melaporkan SK yang terbit sesudahnya, yaitu kenaikan pangkat, penyesuaian ijazah, atau PMK, yang belum tercatat di SIM-KGB.",
   "dasarBaruJenis wajib dijawab tiap baris, juga untuk pegawai baru: tidak bila tidak ada SK seperti itu, kp atau pmk bila ada. Golongan dan masa kerja golongan disalin dari SK yang paling baru apa adanya; pada pegawai baru, sistem menghitung mundur masa kerja pada SK itu ke TMT KGB terakhir. Bagi pegawai yang sudah tercatat, kolom ini sekaligus menjawab mengapa golongan atau masa kerja golongannya berbeda dari yang tercatat; koreksi bila yang tercatat salah ketik.",
   "Satu baris hanya menyebut satu SK, yaitu SK dengan TMT paling baru. SK itulah yang tercetak sebagai dasar pada SK KGB berikutnya.",
+  "Pegawai baru yang melaporkan SK kp atau pmk boleh mengisi golonganAcuan, mkgTahunAcuan, dan mkgBulanAcuan: golongan dan masa kerja pada SK KGB terakhir. Dengan itu sistem menghitung dari SK KGB terakhir seperti pegawai yang sudah tercatat dan mencocokkan masa kerja yang tertulis pada SK kenaikan pangkat. Bagi pegawai yang sudah tercatat, ketiganya diabaikan.",
   "Untuk kp pada pegawai yang sudah tercatat, sistem menghitung sendiri masa kerja golongan, gaji pokok, dan TMT golongan dari data tercatat dan SK-nya; jadwal KGB tidak bergeser.",
   "Untuk pmk, golongan tetap dan masa kerja golongan mengikuti SK PMK; jadwal KGB dapat maju.",
   `Isian kosong atau belum lengkap tidak menolak baris; yang kurang, termasuk dasarBaruJenis yang belum dijawab, ditagih saat diajukan di Usul KGB Kolektif. Isian yang salah tulis (misalnya "KP" atau "naik pangkat") menolak barisnya. Tanggal ditulis ${FORMAT_TANGGAL_DITERIMA}.`,
@@ -604,6 +638,8 @@ export interface HasilBarisImpor {
   beda: PerubahanUsulan[];
   /** SK sebab perubahan golongan atau masa kerja golongan yang disebut baris ini (ADR-030). */
   dasarBaru: DasarBaruUsulan | null;
+  /** Keadaan pada SK KGB terakhir bagi pegawai baru yang melaporkan SK sesudahnya (ADR-078); null bila tidak diisi. */
+  acuan: AcuanUsulan | null;
 }
 
 function teks(baris: Record<string, unknown>, kunci: string): string {
@@ -665,6 +701,7 @@ export function periksaImporUpt(
       namaTercatat: null,
       beda: [] as PerubahanUsulan[],
       dasarBaru: null,
+      acuan: null,
     };
     const tolak = (galat: string): HasilBarisImpor => ({ ...dasar, hasil: "ditolak", galat });
 
@@ -713,13 +750,20 @@ export function periksaImporUpt(
     const dasarBaru = bacaDasarBaru((kunci) => teks(seragam.row, kunci));
 
     if (!tercatat) {
+      // Keadaan pada SK KGB terakhir (ADR-078), hanya bersama SK kp atau pmk; golongan yang salah tulis menolak barisnya.
+      const golonganAcuan = teks(seragam.row, "golonganAcuan");
+      if (golonganAcuan && !isGolonganDikenal(golonganAcuan))
+        return tolak(`Kolom golonganAcuan berisi golongan/ruang seperti II/b atau III/a; tertulis "${golonganAcuan}"`);
+      const isiAcuan = bacaAcuan((kunci) => teks(seragam.row, kunci), dasarBaru);
+      const acuan = isiAcuan.golonganAcuan ? isiAcuan : null;
       return {
         ...dasar,
         hasil: "baru",
         galat: null,
         isian: dibaca.isian,
         dasarBaru,
-        kurang: kekuranganUsulan({ ...dibaca.isian, ...dasarBaru, nip, nama }, "baru"),
+        acuan,
+        kurang: kekuranganUsulan({ ...dibaca.isian, ...dasarBaru, ...(acuan ?? KOSONG_ACUAN), nip, nama }, "baru"),
       };
     }
 
