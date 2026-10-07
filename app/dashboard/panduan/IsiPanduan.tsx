@@ -1033,7 +1033,10 @@ export default async function IsiPanduan({
                   Usulan tidak langsung mengubah data. Super Admin atau Tim SDM KGB meninjaunya lebih dulu, lalu memilih{" "}
                   <strong>Setujui</strong> atau <strong>Kembalikan</strong> untuk revisi dengan catatan. Usulan yang
                   dikembalikan muncul lagi di Perlu dikerjakan beserta catatannya: perbaiki, lalu ajukan ulang; nomor
-                  surat yang lama sudah terisi di jendela Ajukan ke Kanwil. Selama usulan menunggu tinjauan, proses KGB
+                  surat yang lama sudah terisi di jendela Ajukan ke Kanwil. Kanwil juga dapat mengembalikan usulan yang
+                  <em>sudah disetujui</em>, misalnya bila belakangan ketahuan datanya keliru. Data pegawai tidak berubah:
+                  yang tampil di Perlu dikerjakan adalah usulan perbaikan baru yang sudah terisi sesuai data pegawai saat
+                  ini beserta catatan Kanwil; perbaiki yang keliru lalu ajukan ulang seperti biasa. Selama usulan menunggu tinjauan, proses KGB
                   pegawainya (Input KGB, Buat SK, Unggah SK TTE) tertahan agar SK dibuat dari data yang sudah
                   diperbarui. Hasil tinjauan tercatat di <strong>Riwayat → Usulan dan laporan</strong>. Satu pegawai
                   hanya boleh punya satu usulan yang belum selesai, agar antrian tinjauan tidak berisi dua versi yang
@@ -1475,10 +1478,27 @@ export default async function IsiPanduan({
                       Tim SDM KGB atau Super Admin, menu Usulan UPT atau tombol Tinjau usulan UPT di Antrian kerja KGB
                     </p>
                     <p>
+                      Di Dashboard, usulan yang menunggu diringkas satu baris per UPT: jumlah usulan, jumlah surat, dan
+                      umur usulan tertua. Tombol <strong>Tinjau</strong> pada baris itu membuka menu Usulan UPT yang sudah
+                      tersaring ke UPT tersebut, tempat tiap pegawai ditinjau dan seluruh usulan pada satu surat dapat
+                      disetujui sekaligus.
+                    </p>
+                    <p>
                       Daftar berisi satu nama per pegawai, dikelompokkan per UPT dan dapat disaring per UPT; usulan lain
                       pegawai yang sama ada di Riwayat usulan pada detailnya. Periksa perbedaan isian dengan data yang tercatat, berkas SK dasar,
                       dan dampaknya pada KGB yang sedang berjalan, lalu pilih Setujui atau Kembalikan. Kembalikan wajib
                       disertai catatan; UPT memperbaikinya lalu mengajukan ulang dengan surat yang sama.
+                    </p>
+                    <p>
+                      <strong>Usulan yang sudah disetujui pun dapat dikembalikan.</strong> Buka tab Selesai, pilih usulannya,
+                      lalu tekan <strong>Kembalikan ke UPT</strong> dengan catatan yang wajib diisi. Data pegawai tidak ditarik
+                      kembali: UPT menerima usulan perbaikan baru yang sudah terisi sesuai data pegawai saat ini (termasuk yang
+                      sudah Anda betulkan langsung di Data Pegawai), lalu memperbaiki dan mengirim ulang. Data baru berubah
+                      setelah perbaikan itu Anda setujui, dan yang diterapkan hanya selisihnya. Usulan lama tetap tercatat
+                      Selesai, sehingga dokumen dan riwayatnya tidak hilang. SK kenaikan pangkat atau PMK yang sudah tercatat
+                      tidak dicatat ulang; betulkan lewat Ubah data SK di tab Pangkat &amp; PMK. Tombolnya tidak aktif selama
+                      pegawai itu masih punya usulan lain yang menunggu atau sedang diperbaiki UPT, dan ditolak bila
+                      pegawainya sudah pindah satker.
                     </p>
                     <p>
                       Usulan yang mengubah golongan ruang atau masa kerja golongan wajib menyebut sebabnya, dan panel
