@@ -11,7 +11,13 @@ export interface OrderBy<T> {
 }
 
 export interface Repo<T extends object> {
-  findMany(opts?: { where?: Where; orderBy?: OrderBy<T> }): Promise<T[]>;
+  /** `batas`: paling banyak sekian baris pertama menurut urutannya. */
+  findMany(opts?: { where?: Where; orderBy?: OrderBy<T>; batas?: number }): Promise<T[]>;
+  /**
+   * Hanya kolom yang disebut, dengan urutan yang sama seperti findMany. Jauh lebih ringan untuk tabel besar yang hanya
+   * perlu disaring, misalnya id dan unit kerja seluruh pegawai untuk menemukan pegawai satu satker (ADR-079).
+   */
+  findKolom<K extends keyof T & string>(kolom: readonly K[], opts?: { where?: Where }): Promise<Pick<T, K>[]>;
   /** Record pertama yang cocok, menurut urutan data dimasukkan. */
   findUnique(where: Where): Promise<T | null>;
   count(where?: Where): Promise<number>;

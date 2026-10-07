@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { cariDalam, idPegawaiSatker } from "@/lib/dataSatker";
 import { auth } from "@/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { TIPE_NOTIFIKASI, bolehLihatNotifikasi, tipeNotifikasiUntukRole } from "@/lib/generateNotifikasi";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
-import { pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
+import { satkerAkunUpt } from "@/lib/aksesUpt";
 import { ROLES } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
@@ -37,28 +38,39 @@ export async function GET(req: NextRequest) {
   if (dibacaFilter !== null && dibacaFilter !== "") where.dibaca = dibacaFilter === "true";
   if (prioritasFilter) where.prioritas = prioritasFilter;
 
-  const all = await db.notifikasi.findMany({ where, orderBy: { field: "createdAt", dir: "desc" } });
+  // Selain untuk Admin UPT (yang disaring per satker sesudahnya), hanya `limit` notifikasi terbaru yang dikirim, jadi
+  // hanya itu yang dibaca (ADR-079).
+  const untukUpt = session.user.role === ROLES.ADMIN_UPT;
+  const all = await db.notifikasi.findMany({
+    where,
+    orderBy: { field: "createdAt", dir: "desc" },
+    ...(untukUpt ? {} : { batas: limit }),
+  });
 
   // Admin UPT hanya menerima notifikasi tentang pegawai satkernya sendiri.
-  if (session.user.role === ROLES.ADMIN_UPT) {
+  if (untukUpt) {
     // Satker dibaca dari baris pengguna, bukan token, agar perubahan oleh Super Admin langsung berlaku.
     const pengguna = await penggunaLogin(session);
     const kode = pengguna ? satkerAkunUpt({ role: pengguna.role, satker: pengguna.satker }) : null;
     if (!kode) return NextResponse.json([]);
-    const idPegawai = new Set(pegawaiSatker(await db.pegawai.findMany(), kode).map((p) => p.id));
+    // Id saja, dari unit kerja seluruh pegawai; baris lengkapnya tidak diperlukan (lib/dataSatker.ts).
+    const idPegawaiList = await idPegawaiSatker(kode);
+    const idPegawai = new Set(idPegawaiList);
     // Riwayat KGB hanya dibaca bila memang ada notifikasi yang menunjuk ke KGB, bukan ke pegawai.
     // Kabar SK terbit dan permintaan review SK (ADR-077) menunjuk ke KGB-nya.
     const menunjukKeKgb = (tipe: string) => tipe === "sk_terbit" || tipe === TIPE_NOTIFIKASI.REVIEW_SK;
     const adaSkTerbit = all.some((n) => menunjukKeKgb(n.tipe));
     const idKgb = adaSkTerbit
-      ? new Set((await db.riwayatKGB.findMany()).filter((k) => idPegawai.has(k.pegawaiId)).map((k) => k.id))
+      ? new Set(
+          (await cariDalam((where) => db.riwayatKGB.findKolom(["id"], { where }), "pegawaiId", idPegawaiList)).map((k) => k.id),
+        )
       : new Set<string>();
     // Usulan yang dikembalikan menunjuk ke usulannya, bukan ke pegawainya, sebab usulan pegawai baru
     // belum punya pegawai sampai disetujui. Satkernya karena itu dibaca dari baris usulan.
     const menunjukKeUsulan = (tipe: string) => tipe === TIPE_NOTIFIKASI.USULAN_REVISI || tipe === TIPE_NOTIFIKASI.USULAN_DISETUJUI;
     const adaUsulanRevisi = all.some((n) => menunjukKeUsulan(n.tipe));
     const idUsulan = adaUsulanRevisi
-      ? new Set((await db.usulanPegawai.findMany({ where: { satker: kode } })).map((u) => u.id))
+      ? new Set((await db.usulanPegawai.findKolom(["id"], { where: { satker: kode } })).map((u) => u.id))
       : new Set<string>();
     const milikSatker = all.filter((n) => {
       const ref = n.referenceId ?? "";

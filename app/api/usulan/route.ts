@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, type Where } from "@/lib/db";
+import { cariDalam, pegawaiMenurutId } from "@/lib/dataSatker";
 import { auth } from "@/auth";
 import { canProcessKGB } from "@/lib/auth";
 import { BERKAS_USULAN, bandingkanUsulan, nilaiUsulan, perubahanPegawai, ringkasHukdisUsulan, namaAsliBerkas } from "@/lib/usulanPegawai";
@@ -34,19 +35,30 @@ export async function GET(req: Request) {
   // Lencana sidebar hanya perlu angkanya, dan sidebar ikut pada setiap halaman. Tanpa jalan pintas ini
   // satu lencana menarik seluruh pegawai, riwayat KGB, dan surat hanya untuk dihitung panjangnya.
   if (params.get("ringkas") === "1") {
-    const menunggu = (await db.usulanPegawai.findMany({ where: saring })) as UsulanPegawaiRow[];
-    return NextResponse.json({ jumlah: menunggu.length });
+    return NextResponse.json({ jumlah: await db.usulanPegawai.count(saring) });
   }
 
-  const [semuaUsulan, semuaPegawai, semuaKgb, semuaSurat, semuaPangkat, semuaPmk] = await Promise.all([
-    db.usulanPegawai.findMany({ where: saring }) as Promise<UsulanPegawaiRow[]>,
-    db.pegawai.findMany(),
-    db.riwayatKGB.findMany() as Promise<RiwayatKGBRow[]>,
-    db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
+  const semuaUsulan = (await db.usulanPegawai.findMany({ where: saring })) as UsulanPegawaiRow[];
+  // Data induk lengkap dan riwayatnya hanya dibutuhkan usulan yang menunggu; usulan lain cukup nama dan NIP. Seluruh
+  // tabel tidak lagi dibaca untuk setiap pembukaan daftar (ADR-079).
+  const idMenunggu = [
+    ...new Set(semuaUsulan.filter((u) => u.status === "menunggu" && u.pegawaiId).map((u) => u.pegawaiId as string)),
+  ];
+  const dariPegawai = <T>(ambil: (where: Where) => Promise<T[]>) => cariDalam(ambil, "pegawaiId", idMenunggu);
+  const [namaPegawai, semuaPegawai, semuaKgb, semuaPangkat, semuaPmk] = await Promise.all([
+    db.pegawai.findKolom(["id", "nama", "nip"]),
+    pegawaiMenurutId(idMenunggu),
+    dariPegawai((where) => db.riwayatKGB.findMany({ where }) as Promise<RiwayatKGBRow[]>),
     // SK yang dilaporkan dan sudah tercatat: hasil persetujuan yang terputus, atau laporan ulang (ADR-079).
-    db.riwayatPangkat.findMany() as Promise<RiwayatPangkatRow[]>,
-    db.riwayatPmk.findMany() as Promise<RiwayatPmkRow[]>,
+    dariPegawai((where) => db.riwayatPangkat.findMany({ where }) as Promise<RiwayatPangkatRow[]>),
+    dariPegawai((where) => db.riwayatPmk.findMany({ where }) as Promise<RiwayatPmkRow[]>),
   ]);
+  const semuaSurat = await cariDalam(
+    (where) => db.suratKGB.findMany({ where }) as Promise<SuratKgbTersimpan[]>,
+    "kgbId",
+    semuaKgb.map((k) => k.id),
+  );
+  const namaById = new Map(namaPegawai.map((p) => [p.id, p]));
   const pangkatPerPegawai = new Map<string, RiwayatPangkatRow[]>();
   for (const r of semuaPangkat) pangkatPerPegawai.set(r.pegawaiId, [...(pangkatPerPegawai.get(r.pegawaiId) ?? []), r]);
   const pmkPerPegawai = new Map<string, RiwayatPmkRow[]>();
@@ -71,7 +83,9 @@ export async function GET(req: Request) {
 
   const daftar = semuaUsulan
     .map((u) => {
+      // Baris lengkap hanya untuk usulan yang menunggu; nama dan NIP untuk semuanya.
       const p = u.pegawaiId ? pegawaiById.get(u.pegawaiId) : null;
+      const n = u.pegawaiId ? namaById.get(u.pegawaiId) : null;
       const tercatat =
         p && u.status === "menunggu"
           ? cariSkTercatat(u, { pangkat: pangkatPerPegawai.get(p.id), pmk: pmkPerPegawai.get(p.id) })
@@ -80,8 +94,8 @@ export async function GET(req: Request) {
         id: u.id,
         pegawaiId: u.pegawaiId,
         jenis: u.jenis,
-        nama: p?.nama ?? u.nama ?? "-",
-        nip: p?.nip ?? u.nip ?? "-",
+        nama: n?.nama ?? u.nama ?? "-",
+        nip: n?.nip ?? u.nip ?? "-",
         unitKerja: namaSatker.get(u.satker) ?? u.satker,
         status: u.status,
         nomorSurat: u.nomorSurat,

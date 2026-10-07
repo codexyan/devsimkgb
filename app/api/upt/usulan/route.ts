@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { pegawaiMenurutId } from "@/lib/dataSatker";
 import { auth } from "@/auth";
 import { newId } from "@/lib/sheets/id";
 import { akunUpt } from "@/lib/auth/akunUpt";
@@ -42,15 +43,13 @@ export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
   if (params.get("ringkas") === "1") {
     const status = params.get("status") ?? "revisi";
-    const daftar = (await db.usulanPegawai.findMany({
-      where: { satker: akun.kode, status },
-    })) as UsulanPegawaiRow[];
-    return NextResponse.json({ jumlah: daftar.length });
+    return NextResponse.json({ jumlah: await db.usulanPegawai.count({ satker: akun.kode, status }) });
   }
 
-  const [semuaUsulan, semuaPegawai] = await Promise.all([
-    db.usulanPegawai.findMany({ where: { satker: akun.kode } }) as Promise<UsulanPegawaiRow[]>,
-    db.pegawai.findMany(),
+  const semuaUsulan = (await db.usulanPegawai.findMany({ where: { satker: akun.kode } })) as UsulanPegawaiRow[];
+  // Hanya pegawai yang disebut usulan satker ini, bukan seluruh Kanwil (ADR-079).
+  const semuaPegawai = await pegawaiMenurutId([
+    ...new Set(semuaUsulan.map((u) => u.pegawaiId).filter((id): id is string => !!id)),
   ]);
   const pegawaiById = new Map(semuaPegawai.map((p) => [p.id, p]));
 

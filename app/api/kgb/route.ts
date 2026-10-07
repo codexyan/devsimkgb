@@ -1,6 +1,7 @@
 import { statusKonfirmasiUpt } from "@/lib/konfirmasiUpt";
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, type Where } from "@/lib/db";
+import { cariDalam } from "@/lib/dataSatker";
 import { pesanUsulanMenahan, usulanMenahan } from "@/lib/usulanMenahan";
 import { makeRiwayatKGB } from "@/lib/sheets/tables";
 import { auth } from "@/auth";
@@ -55,10 +56,21 @@ export async function GET(req: Request) {
     ? new Date(hariIni.getFullYear(), hariIni.getMonth() + jumlahBulanDeadline + 2, 1)
     : null;
 
-  const [semuaKgb, semuaPegawai, suratList] = await Promise.all([
-    db.riwayatKGB.findMany(),
-    db.pegawai.findMany(),
-    db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
+  // Entri virtual "Belum Diproses" butuh seluruh KGB aktif sebagai pembanding; tanpa entri virtual, saringan status,
+  // pegawai, dan rapelan dikerjakan basis data. Pegawai cukup kolom yang dipakai di sini, dan surat hanya milik KGB
+  // yang terpilih, supaya antrian Keuangan yang dimuat ulang tiap menit tidak mengurai seluruh tabel (ADR-079).
+  const includeVirtual = !pegawaiId && !rapelanDitetapkan && (!status || status === "belum_diproses");
+  const saringKgb: Where = {
+    ...(pegawaiId ? { pegawaiId } : {}),
+    ...(status && !includeVirtual ? { status } : {}),
+    ...(rapelanDitetapkan ? { rapelanDitetapkan: true } : {}),
+  };
+  const [semuaKgb, semuaPegawai] = await Promise.all([
+    db.riwayatKGB.findMany({ where: saringKgb }),
+    db.pegawai.findKolom([
+      "id", "nama", "nip", "unitKerja", "jabatan", "aktif", "tmtKgbBerikutnya", "golonganRuang", "gajiPokok",
+      "mkgTahun", "mkgBulan", "konfirmasiUptTmt", "konfirmasiUptOleh",
+    ]),
   ]);
   // Keuangan Kanwil hanya memegang pegawai Kanwil; pegawai UPT ditindaklanjuti keuangan satkernya sendiri
   // (ADR-009). Antrian, rekap, dan dasar Gaji Web di modul Keuangan semuanya berasal dari daftar ini;
@@ -67,7 +79,6 @@ export async function GET(req: Request) {
   const pegawaiList = hanyaKanwil ? semuaPegawai.filter((p) => dipegangKeuanganKanwil(p.unitKerja)) : semuaPegawai;
   const pegById = new Map(pegawaiList.map((p) => [p.id, p]));
   const allKgb = hanyaKanwil ? semuaKgb.filter((k) => pegById.has(k.pegawaiId)) : semuaKgb;
-  const suratByKgb = new Map(suratList.map((sRow) => [sRow.kgbId, sRow]));
   const searchLc = search.toLowerCase();
 
   const hasPegFilter = rapelan === "1" || !!deadlineCutoff || !!search;
@@ -106,6 +117,11 @@ export async function GET(req: Request) {
   });
 
   filtered.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  const suratList =
+    filtered.length <= 600
+      ? await cariDalam((where) => db.suratKGB.findMany({ where }) as Promise<SuratKgbTersimpan[]>, "kgbId", filtered.map((k) => k.id))
+      : ((await db.suratKGB.findMany()) as SuratKgbTersimpan[]);
+  const suratByKgb = new Map(suratList.map((sRow) => [sRow.kgbId, sRow]));
 
   // Review SK pegawai UPT oleh Admin UPT (ADR-077); tidak aktif selama tabelnya belum ada.
   const reviewSk = await muatSemuaReviewSk();
@@ -130,7 +146,6 @@ export async function GET(req: Request) {
 
   // Entri virtual "Belum Diproses" untuk pegawai aktif tanpa riwayat aktif. Filter rapelan ditetapkan
   // hanya memuat KGB yang sudah dikonfirmasi keuangan, jadi tanpa entri virtual.
-  const includeVirtual = !pegawaiId && !rapelanDitetapkan && (!status || status === "belum_diproses");
   let virtualEntries: object[] = [];
   if (includeVirtual) {
     const activeStatus = ["belum_diproses", "sedang_diproses", "menunggu_keuangan"];

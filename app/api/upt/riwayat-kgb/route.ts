@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { cariDalam, idPegawaiSatker, pegawaiMenurutId } from "@/lib/dataSatker";
 import { auth } from "@/auth";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
 import { bolehUnduhSkUpt, pegawaiSatker, satkerAkunUpt } from "@/lib/aksesUpt";
@@ -36,17 +37,23 @@ export async function GET() {
     );
   const satker = SATKER.find((s) => s.kode === kode)!;
 
-  const [semuaPegawai, semuaKgb, semuaSurat, semuaPangkat, semuaPmk] = await Promise.all([
-    db.pegawai.findMany(),
-    db.riwayatKGB.findMany(),
-    db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
+  // Hanya data pegawai satker ini (lib/dataSatker.ts, ADR-079).
+  const idSatkerList = await idPegawaiSatker(kode);
+  const [semuaPegawai, semuaKgb, semuaPangkat, semuaPmk] = await Promise.all([
+    pegawaiMenurutId(idSatkerList),
+    cariDalam((where) => db.riwayatKGB.findMany({ where }), "pegawaiId", idSatkerList),
     // SK yang menetapkan gaji pokok di luar KGB. Sesudah SK KGB terakhir pun masih mungkin terbit SK
     // kenaikan pangkat atau PMK, dan SK itulah yang menggeser masa kerja golongan sekaligus menjadi dasar
     // SK KGB berikutnya (ADR-020, ADR-021). UPT diminta mengonfirmasi dasar itu, jadi ia perlu melihat
     // daftarnya, bukan hanya satu barisnya yang terakhir.
-    db.riwayatPangkat.findMany() as Promise<RiwayatPangkatRow[]>,
-    db.riwayatPmk.findMany() as Promise<RiwayatPmkRow[]>,
+    cariDalam((where) => db.riwayatPangkat.findMany({ where }) as Promise<RiwayatPangkatRow[]>, "pegawaiId", idSatkerList),
+    cariDalam((where) => db.riwayatPmk.findMany({ where }) as Promise<RiwayatPmkRow[]>, "pegawaiId", idSatkerList),
   ]);
+  const semuaSurat = await cariDalam(
+    (where) => db.suratKGB.findMany({ where }) as Promise<SuratKgbTersimpan[]>,
+    "kgbId",
+    semuaKgb.map((k) => k.id),
+  );
 
   const milikSatker = pegawaiSatker(semuaPegawai, kode);
   const pegawaiById = new Map(milikSatker.map((p) => [p.id, p]));

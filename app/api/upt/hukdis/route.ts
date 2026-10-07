@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { cariDalam, idPegawaiSatker, pegawaiMenurutId } from "@/lib/dataSatker";
 import { auth } from "@/auth";
 import { newId } from "@/lib/sheets/id";
 import { akunUpt } from "@/lib/auth/akunUpt";
@@ -43,10 +44,12 @@ export async function GET() {
   const akun = await akunUpt(await auth(), PESAN_BUKAN_UPT);
   if ("galat" in akun) return akun.galat;
 
-  const [semuaPegawai, semuaJenis, semuaHukdis] = await Promise.all([
-    db.pegawai.findMany() as Promise<PegawaiRow[]>,
+  // Hanya data pegawai satker ini (lib/dataSatker.ts, ADR-079).
+  const idSatkerList = await idPegawaiSatker(akun.kode);
+  const [pegawaiSatkerIni, semuaJenis, semuaHukdis] = await Promise.all([
+    pegawaiMenurutId(idSatkerList),
     db.hukdisJenis.findMany() as Promise<JenisBaris[]>,
-    db.riwayatHukdis.findMany() as Promise<HukdisBaris[]>,
+    cariDalam((where) => db.riwayatHukdis.findMany({ where }) as Promise<HukdisBaris[]>, "pegawaiId", idSatkerList),
   ]);
   let laporan: LaporanHukdisRow[] = [];
   let aktif = true;
@@ -57,6 +60,12 @@ export async function GET() {
     aktif = false;
   }
 
+  // Laporan yang menunjuk pegawai yang sudah pindah satker tetap bernama.
+  const idSatkerSet = new Set(idSatkerList);
+  const semuaPegawai: PegawaiRow[] = [
+    ...pegawaiSatkerIni,
+    ...(await pegawaiMenurutId([...new Set(laporan.map((l) => l.pegawaiId).filter((id) => !!id && !idSatkerSet.has(id)))])),
+  ];
   const milikSatker = pegawaiSatker(semuaPegawai, akun.kode);
   const pegawaiById = new Map(semuaPegawai.map((p) => [p.id, p]));
   const idSatker = new Set(milikSatker.map((p) => p.id));

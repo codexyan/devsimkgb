@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { cariDalam } from "@/lib/dataSatker";
+import { kodeSatkerPegawai } from "@/lib/rekapSatker";
 import { auth } from "@/auth";
 import { canViewKGB } from "@/lib/auth";
-import { SATKER_UPT, pegawaiSatker, waktuUnggahSk } from "@/lib/aksesUpt";
+import { SATKER_UPT, waktuUnggahSk } from "@/lib/aksesUpt";
 import { hariIniWita, isoTanggalLokal } from "@/lib/waktu";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
 
@@ -24,17 +26,29 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canViewKGB(session.user.role ?? "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const [semuaKgb, semuaPegawai, semuaSurat] = await Promise.all([
-    db.riwayatKGB.findMany(),
-    db.pegawai.findMany(),
-    db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
-  ]);
-  const suratByKgb = new Map(semuaSurat.map((s) => [s.kgbId, s]));
   const sekarang = Date.now();
   const batasLama = sekarang - HARI_SK_LAMA * HARI_MS;
+  // Hanya KGB yang mungkin tampil, pegawai cukup nama dan unit kerjanya, dan surat hanya milik KGB itu (ADR-079).
+  const [semuaKgb, semuaPegawai] = await Promise.all([
+    db.riwayatKGB.findMany({
+      where: {
+        inputGajiWebAt: null,
+        OR: [{ status: "menunggu_keuangan" }, { status: "selesai", konfirmasiKeuanganAt: { gte: new Date(batasLama) } }],
+      },
+    }),
+    db.pegawai.findKolom(["id", "nama", "nip", "unitKerja"]),
+  ]);
+  const semuaSurat = await cariDalam(
+    (where) => db.suratKGB.findMany({ where }) as Promise<SuratKgbTersimpan[]>,
+    "kgbId",
+    semuaKgb.map((k) => k.id),
+  );
+  const suratByKgb = new Map(semuaSurat.map((s) => [s.kgbId, s]));
+  // Satker tiap pegawai dicocokkan sekali, bukan sekali per satker.
+  const kodePegawai = new Map(semuaPegawai.map((p) => [p.id, kodeSatkerPegawai(p.unitKerja)]));
 
   const satker = SATKER_UPT.map((st) => {
-    const pegawaiById = new Map(pegawaiSatker(semuaPegawai, st.kode).map((p) => [p.id, p]));
+    const pegawaiById = new Map(semuaPegawai.filter((p) => kodePegawai.get(p.id) === st.kode).map((p) => [p.id, p]));
     const sk = semuaKgb
       .filter((k) => pegawaiById.has(k.pegawaiId) && !k.isArsip && !k.inputGajiWebAt)
       .filter(
