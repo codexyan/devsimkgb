@@ -5,6 +5,8 @@
 import type { DokumenPegawai } from "./dokumenPegawai";
 import { BATAS_UKURAN_SK_BYTE, PESAN_SK_TERLALU_BESAR } from "./prosesKgb";
 import type { DataSuratKGB } from "./generateSuratKGB";
+import { TEKS_DRAF_KANWIL, TEKS_DRAF_UPT, type InfoReviewSk } from "./reviewSkUpt";
+import { tanggalKalender } from "./waktu";
 
 export type HasilAksi<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -90,24 +92,40 @@ async function kirimJson<T>(url: string, init: RequestInit, cadangan: string): P
   }
 }
 
+/** PDF SK beserta keadaan review UPT-nya (ADR-077). */
+export interface PdfSk {
+  blob: Blob;
+  /** PDF bertanda air DRAF: SK pegawai UPT yang belum disetujui Admin UPT. */
+  draf: boolean;
+  /** Keadaan review UPT; null untuk pegawai Kanwil atau selama review belum aktif. */
+  reviewSk: InfoReviewSk | null;
+  /** Isi surat yang dicetak; tahun surat dipakai nama berkas unduhan. */
+  surat: DataSuratKGB;
+}
+
+const PESAN_PDF_GAGAL = "PDF surat gagal disusun di peramban. Muat ulang halaman, lalu coba lagi.";
+
 /**
  * Server memeriksa dan mengirim isi surat; PDF-nya disusun di peramban. Pustaka PDF (±1 MB) dimuat
- * hanya saat surat pertama diminta, bukan bersama halaman dashboard.
+ * hanya saat surat pertama diminta, bukan bersama halaman dashboard. Server juga menentukan apakah SK-nya masih
+ * bertanda air DRAF (ADR-077), sehingga setiap jalur unduhan memakai keputusan yang sama.
  */
-async function kirimPdf(
-  url: string,
-  init: RequestInit,
-  srikandi: boolean,
-  cadangan: string,
-): Promise<HasilAksi<Blob>> {
-  const hasil = await kirimJson<{ surat: DataSuratKGB }>(url, init, cadangan);
+async function ambilPdf(url: string, init: RequestInit, srikandi: boolean, cadangan: string): Promise<HasilAksi<PdfSk>> {
+  const hasil = await kirimJson<{ surat: DataSuratKGB; draf?: boolean; reviewSk?: InfoReviewSk | null }>(url, init, cadangan);
   if (!hasil.ok) return hasil;
   try {
     const { buatPdfSuratKgb } = await import("./generateSuratKGB");
-    return { ok: true, data: await buatPdfSuratKgb(hasil.data.surat, srikandi) };
+    const draf = hasil.data.draf === true;
+    const blob = await buatPdfSuratKgb(hasil.data.surat, srikandi, { draf: draf ? TEKS_DRAF_KANWIL : null });
+    return { ok: true, data: { blob, draf, reviewSk: hasil.data.reviewSk ?? null, surat: hasil.data.surat } };
   } catch {
-    return { ok: false, error: "PDF surat gagal disusun di peramban. Muat ulang halaman, lalu coba lagi." };
+    return { ok: false, error: PESAN_PDF_GAGAL };
   }
+}
+
+async function kirimPdf(url: string, init: RequestInit, srikandi: boolean, cadangan: string): Promise<HasilAksi<Blob>> {
+  const hasil = await ambilPdf(url, init, srikandi, cadangan);
+  return hasil.ok ? { ok: true, data: hasil.data.blob } : hasil;
 }
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -329,6 +347,96 @@ export function buatPdfSk(
 /** Unduh ulang SK yang pernah dibuat di SIM-KGB, apa adanya (tanpa nomor dan tanggal baru). */
 export function unduhUlangSk(kgbId: string): Promise<HasilAksi<Blob>> {
   return kirimPdf(`/api/kgb/${encodeURIComponent(kgbId)}/pdf?preview=true`, { method: "POST" }, false, "SK gagal diunduh.");
+}
+
+/**
+ * Buat SK (mencatat surat) dan kembalikan keadaan review-nya: untuk pegawai UPT, Buat SK sekaligus meminta review ke
+ * Admin UPT (ADR-077), dan PDF-nya bertanda air DRAF sampai UPT menyetujuinya.
+ */
+export function buatSkDenganReview(kgbId: string, skBaru: { nomorSurat: string; tanggalSurat: string }): Promise<HasilAksi<PdfSk>> {
+  return ambilPdf(
+    `/api/kgb/${encodeURIComponent(kgbId)}/pdf`,
+    { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(skBaru) },
+    false,
+    "SK gagal dibuat.",
+  );
+}
+
+/**
+ * Cetak SK yang sudah dibuat: unduh SK biasa (untuk tanda tangan basah) dan versi Srikandi sekaligus, tanpa tanda air.
+ * Ditolak bila SK pegawai UPT masih menunggu review atau diminta diperbaiki, supaya tidak ada SK DRAF yang tercetak
+ * untuk ditandatangani (ADR-077).
+ */
+export async function cetakSk(kgbId: string, pegawai: { nama: string }): Promise<HasilAksi<{ jumlah: number }>> {
+  const url = `/api/kgb/${encodeURIComponent(kgbId)}/pdf?preview=true`;
+  const biasa = await ambilPdf(url, { method: "POST" }, false, "SK gagal diunduh.");
+  if (!biasa.ok) return biasa;
+  if (biasa.data.draf)
+    return {
+      ok: false,
+      error:
+        biasa.data.reviewSk?.status === "perbaikan"
+          ? "UPT meminta perbaikan SK ini. Perbaiki SK lalu tunggu persetujuan UPT sebelum mencetak."
+          : "SK ini masih menunggu review Admin UPT, jadi belum dapat dicetak untuk ditandatangani.",
+    };
+  const srikandi = await ambilPdf(url, { method: "POST" }, true, "SK versi Srikandi gagal diunduh.");
+  const tahun = tanggalKalender(biasa.data.surat.tanggalSurat)?.getFullYear() ?? null;
+  unduhBlob(biasa.data.blob, namaFileSk({ nama: pegawai.nama, tahun, versi: "biasa" }));
+  if (!srikandi.ok) return { ok: false, error: `SK biasa sudah diunduh, tetapi versi Srikandi gagal (${srikandi.error}).` };
+  unduhBlob(srikandi.data.blob, namaFileSk({ nama: pegawai.nama, versi: "srikandi" }));
+  return { ok: true, data: { jumlah: 2 } };
+}
+
+/** Minta review SK ke Admin UPT untuk SK yang dibuat sebelum review aktif (ADR-077). */
+export function mintaReviewSkUpt(kgbId: string): Promise<HasilAksi<{ reviewSk: InfoReviewSk | null }>> {
+  return kirimJson(
+    `/api/kgb/${encodeURIComponent(kgbId)}/review-sk`,
+    { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ aksi: "minta" }) },
+    "Permintaan review gagal dikirim.",
+  );
+}
+
+/** Super Admin melanjutkan SK tanpa menunggu review UPT, dengan alasan yang tercatat (ADR-077). */
+export function lewatiReviewSkUpt(kgbId: string, alasan: string): Promise<HasilAksi<{ reviewSk: InfoReviewSk | null }>> {
+  return kirimJson(
+    `/api/kgb/${encodeURIComponent(kgbId)}/review-sk`,
+    { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ aksi: "lewati", alasan }) },
+    "Review gagal dilewati.",
+  );
+}
+
+/** Isi SK yang diminta direview, untuk Admin UPT (GET /api/upt/review-sk/[kgbId]). */
+export interface ReviewSkUntukUpt {
+  surat: DataSuratKGB;
+  reviewSk: InfoReviewSk | null;
+  pegawai: { nama: string; nip: string; jabatan: string };
+}
+
+export function ambilReviewSkUpt(kgbId: string): Promise<HasilAksi<ReviewSkUntukUpt>> {
+  return kirimJson(`/api/upt/review-sk/${encodeURIComponent(kgbId)}`, { cache: "no-store" }, "SK gagal dimuat.");
+}
+
+/** PDF pratinjau review untuk Admin UPT, selalu bertanda air DRAF. */
+export async function pdfReviewSkUpt(surat: DataSuratKGB): Promise<HasilAksi<Blob>> {
+  try {
+    const { buatPdfSuratKgb } = await import("./generateSuratKGB");
+    return { ok: true, data: await buatPdfSuratKgb(surat, false, { draf: TEKS_DRAF_UPT }) };
+  } catch {
+    return { ok: false, error: PESAN_PDF_GAGAL };
+  }
+}
+
+/** Tanggapan Admin UPT: SK sudah benar, atau minta perbaikan dengan catatan. */
+export function tanggapiReviewSkUpt(
+  kgbId: string,
+  keputusan: "setuju" | "perbaikan",
+  catatan: string,
+): Promise<HasilAksi<{ reviewSk: InfoReviewSk | null }>> {
+  return kirimJson(
+    `/api/upt/review-sk/${encodeURIComponent(kgbId)}`,
+    { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ keputusan, catatan }) },
+    "Tanggapan gagal dikirim.",
+  );
 }
 
 /** Tautan berkas SK yang tersimpan (SK bertanda tangan atau berkas arsip). */

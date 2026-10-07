@@ -26,12 +26,13 @@ interface HasilPeriksa {
 
 /* Server hanya mengirim tipe notifikasi yang boleh dilihat peran pengguna (GET /api/notifikasi),
    jadi daftar saringan disusun dari notifikasi yang benar-benar diterima. */
-type KunciKategori = "tinjau" | "usulan" | "hasil" | "kgb" | "rapelan" | "sk" | "followup" | "hukdis";
+type KunciKategori = "tinjau" | "usulan" | "hasil" | "review" | "kgb" | "rapelan" | "sk" | "followup" | "hukdis";
 
 const KATEGORI: { key: KunciKategori; label: string; tipe: readonly string[]; nada: string }[] = [
   { key: "tinjau", label: "Perlu ditinjau", tipe: ["kgb_perlu_ditinjau"], nada: "merah" },
   { key: "usulan", label: "Usulan UPT", tipe: ["usulan_upt"], nada: "kuning" },
   { key: "hasil", label: "Hasil usulan", tipe: ["usulan_disetujui", "usulan_revisi"], nada: "hijau" },
+  { key: "review", label: "Review SK", tipe: ["review_sk", "review_sk_hasil"], nada: "ungu" },
   { key: "rapelan", label: "KGB terlambat", tipe: ["rapelan"], nada: "merah" },
   { key: "kgb", label: "Jatuh tempo", tipe: ["kgb_jatuh_tempo"], nada: "navy" },
   { key: "sk", label: "SK & keuangan", tipe: ["sk_menunggu_keuangan", "sk_terbit"], nada: "ungu" },
@@ -43,6 +44,8 @@ const NADA_TIPE: Record<string, string> = {
   kgb_perlu_ditinjau: "merah",
   usulan_upt: "kuning",
   usulan_disetujui: "hijau",
+  review_sk: "ungu",
+  review_sk_hasil: "ungu",
   usulan_revisi: "kuning",
   rapelan: "merah",
   kgb_jatuh_tempo: "navy",
@@ -72,6 +75,9 @@ function IkonTipe({ tipe }: { tipe: string }) {
       return <svg {...umum}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>;
     case "followup_keuangan":
       return <svg {...umum}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>;
+    case "review_sk":
+    case "review_sk_hasil":
+      return <svg {...umum}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><circle cx="11.5" cy="14.5" r="2.5" /><line x1="13.3" y1="16.3" x2="15.5" y2="18.5" /></svg>;
     case "usulan_disetujui":
       return <svg {...umum}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>;
     case "sk_terbit":

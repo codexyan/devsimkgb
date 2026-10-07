@@ -24,6 +24,8 @@ import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/
 import type { Satker } from "@/lib/satker";
 import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
 import PengingatUsulan from "@/app/dashboard/components/upt/PengingatUsulan";
+import ModalReviewSk from "@/app/dashboard/components/upt/ModalReviewSk";
+import { LABEL_REVIEW_SK, type InfoReviewSk } from "@/lib/reviewSkUpt";
 
 /** Satu baris "Dasar KGB berikutnya": SK yang gaji pokoknya dipakai SK KGB berikutnya (ADR-030). */
 function teksDasarKgb(dasar: DasarKgbBerikutnya | null | undefined): string | null {
@@ -70,6 +72,8 @@ interface PegawaiUpt {
   dataSekarang: Record<string, string>;
   /** SK dasar dan berkas yang sudah disetujui Kanwil; terbawa ke usulan perbaikan berikutnya. */
   bawaan?: PegawaiUntukUsulan["bawaan"];
+  /** Permintaan review SK dari Kanwil untuk KGB yang sedang diproses (ADR-077). */
+  reviewSk?: (InfoReviewSk & { kgbId: string }) | null;
 }
 
 /**
@@ -195,7 +199,13 @@ function keadaan(p: PegawaiUpt): { teks: string; nada?: Nada } {
   if (p.statusKGB === "selesai") return { teks: "Selesai", nada: "hijau" };
   // Sejak SK diunggah Tim SDM, keuangan UPT sendiri yang menindaklanjutinya (ADR-009).
   if (p.statusKGB === "menunggu_keuangan") return { teks: "SK terbit, rekam di Gaji Web", nada: "hijau" };
-  if (p.statusKGB === "sedang_diproses") return { teks: "Sedang diproses Kanwil", nada: "navy" };
+  if (p.statusKGB === "sedang_diproses") {
+    // SK yang sudah dibuat Kanwil menunggu review satker ini lebih dulu (ADR-077).
+    const r = p.reviewSk?.status;
+    if (r === "menunggu") return { teks: LABEL_REVIEW_SK.menunggu.upt, nada: "kuning" };
+    if (r) return { teks: LABEL_REVIEW_SK[r].upt, nada: r === "disetujui" ? "hijau" : "navy" };
+    return { teks: "Sedang diproses Kanwil", nada: "navy" };
+  }
   if (p.terkunci) return { teks: "Belum masuk jadwal" };
   if (p.terlambat) return { teks: "Lewat batas input Kanwil", nada: "merah" };
   return { teks: "Menunggu diproses Kanwil", nada: "kuning" };
@@ -321,6 +331,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   }, []);
 
   const [kabar, setKabar] = useState<string | null>(null);
+  /** SK yang sedang diperiksa Admin UPT (ADR-077). */
+  const [reviewDibuka, setReviewDibuka] = useState<{ kgbId: string; nama: string } | null>(null);
 
   // Data pegawai UPT disiapkan dulu sebagai draf, baru diajukan: satu surat usulan lazimnya memuat
   // beberapa pegawai, dan datanya dilengkapi bertahap dari SK yang tidak selalu ada di meja.
@@ -1195,23 +1207,53 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           />
         ),
       })),
-    ...sedangDiproses.map((p) => ({
-      kolom: "kanwil" as const,
-      kunci: `proses:${p.id}`,
-      pegawaiId: p.id,
-      nip: p.nip,
-      nama: p.nama,
-      waktu: null,
-      ringkas: "SK sedang dibuat Kanwil",
-      render: (lain: string[]) => (
-        <KartuUpt
-          lain={lain}
-          nama={p.nama}
-          sub={`${p.nip} · ${tmtSingkat(p.tmtKgb)}`}
-          tanda={{ teks: "SK sedang dibuat Kanwil", nada: "biru" }}
-        />
-      ),
-    })),
+    ...sedangDiproses.map((p) => {
+      // SK yang sudah dibuat Kanwil diperiksa satker ini sebelum dicetak dan ditandatangani (ADR-077).
+      const review = p.reviewSk ?? null;
+      const minta = review?.status === "menunggu";
+      const tanda: { teks: string; nada?: Nada } =
+        review?.status === "menunggu"
+          ? { teks: review.versi > 1 ? "SK diperbaiki, periksa lagi" : "Review SK KGB", nada: "kuning" }
+          : review?.status === "perbaikan"
+            ? { teks: LABEL_REVIEW_SK.perbaikan.upt, nada: "ungu" }
+            : review?.status === "disetujui"
+              ? { teks: LABEL_REVIEW_SK.disetujui.upt, nada: "hijau" }
+              : review?.status === "dilewati"
+                ? { teks: LABEL_REVIEW_SK.dilewati.upt, nada: "biru" }
+                : { teks: "SK sedang dibuat Kanwil", nada: "biru" };
+      return {
+        kolom: minta ? ("kerja" as const) : ("kanwil" as const),
+        kunci: `proses:${p.id}`,
+        pegawaiId: p.id,
+        nip: p.nip,
+        nama: p.nama,
+        waktu: review?.dimintaAt ?? null,
+        ringkas: minta ? "SK KGB menunggu review Anda" : tanda.teks.toLowerCase(),
+        render: (lain: string[]) => (
+          <KartuUpt
+            lain={lain}
+            nama={p.nama}
+            sub={`${p.nip} · ${tmtSingkat(p.tmtKgb)}`}
+            tanda={tanda}
+            catatan={
+              minta
+                ? `SK ${review?.nomorSurat ?? ""} dari Kanwil${review?.dimintaAt ? `, ${fmtTgl(review.dimintaAt)}` : ""}. Periksa sebelum dicetak dan ditandatangani`
+                : review?.status === "perbaikan"
+                  ? `Catatan Anda: ${review.catatan ?? "-"}`
+                  : null
+            }
+            petunjuk={minta ? "Buka SK, periksa isinya, lalu nyatakan sudah benar atau minta perbaikan." : undefined}
+            aksi={
+              minta && review ? (
+                <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => setReviewDibuka({ kgbId: review.kgbId, nama: p.nama })}>
+                  Periksa SK
+                </button>
+              ) : undefined
+            }
+          />
+        ),
+      };
+    }),
     ...laporan
       .filter((l) => l.status === "menunggu")
       .map((l) => ({
@@ -1664,6 +1706,20 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           draf={formulir.draf}
           onTutup={() => setFormulir(null)}
           onSelesai={selesaiFormulir}
+        />
+      )}
+
+      {reviewDibuka && (
+        <ModalReviewSk
+          kgbId={reviewDibuka.kgbId}
+          nama={reviewDibuka.nama}
+          onTutup={() => setReviewDibuka(null)}
+          onSelesai={(pesan) => {
+            setReviewDibuka(null);
+            setKabar(pesan);
+            setTimeout(() => setKabar(null), 7000);
+            muat();
+          }}
         />
       )}
 

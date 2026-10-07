@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { ambilDrafSk, buatPdfSk, namaFileSk, simpanDasarSk, simpanDrafSkServer, unduhBlob, type DataDasarSk } from "@/lib/kgbAksi";
+import { ambilDrafSk, buatPdfSk, buatSkDenganReview, namaFileSk, simpanDasarSk, simpanDrafSkServer, unduhBlob, type DataDasarSk } from "@/lib/kgbAksi";
+import type { InfoReviewSk } from "@/lib/reviewSkUpt";
 import type { SkGaji } from "@/lib/linimasaDasarSk";
 import { alasanTolakBuatSk } from "@/lib/prosesKgb";
 import { formatTanggalId, hariIniWita, isoTanggalLokal, type NilaiTanggal } from "@/lib/waktu";
@@ -60,6 +61,11 @@ interface PropsModalBuatSk {
   dasarAwal?: DasarSkAwal | null;
   /** Nomor dan tanggal SK baru yang sudah pernah dibuat; tanggal bawaan hari ini (WITA). */
   skBaruAwal?: { nomorSurat?: string | null; tanggalSurat?: NilaiTanggal } | null;
+  /**
+   * Review SK oleh Admin UPT (ADR-077); null untuk pegawai Kanwil atau selama review belum aktif. Bila ada, Buat SK
+   * mengirim permintaan review dan tidak mengunduh SK; SK bersih dicetak setelah UPT menyetujui.
+   */
+  reviewUpt?: InfoReviewSk | null;
   onTutup: () => void;
   onBerhasil: (pesan: string) => void;
 }
@@ -71,6 +77,7 @@ export default function ModalBuatSk({
   ringkasan,
   dasarAwal,
   skBaruAwal,
+  reviewUpt = null,
   onTutup,
   onBerhasil,
 }: PropsModalBuatSk) {
@@ -352,6 +359,34 @@ export default function ModalBuatSk({
       return;
     }
     const isi = isiSkBaru();
+    // Pegawai UPT (ADR-077): Buat SK mencatat surat dan meminta review ke Admin UPT. SK tidak diunduh di sini, sebab yang
+    // dicetak untuk ditandatangani adalah SK yang sudah disetujui UPT, lewat Cetak SK.
+    if (reviewUpt) {
+      const dibuat = await buatSkDenganReview(kgbId, isi);
+      if (!dibuat.ok) {
+        setSibuk(false);
+        setGalat(dibuat.error);
+        return;
+      }
+      perubahan.current = "sk";
+      belumTersimpan.current = false;
+      hapusDrafSk(kgbId);
+      if (dibuat.data.reviewSk?.status === "menunggu") {
+        setSibuk(false);
+        onBerhasil(
+          `SK KGB ${pegawai.nama} dibuat dan dikirim ke Admin UPT untuk direview. Setelah UPT menyetujui, tekan Cetak SK ` +
+            "untuk mengunduh SK biasa dan versi Srikandi tanpa tanda air, lalu tanda tangani dan kirim lewat Srikandi.",
+        );
+        return;
+      }
+      // Review ternyata belum aktif di server: perilaku lama, SK biasa dan versi Srikandi diunduh sekarang.
+      const srikandiLama = await buatPdfSk(kgbId, isi, { pratinjau: true, srikandi: true });
+      setSibuk(false);
+      unduhBlob(dibuat.data.blob, namaFileSk({ nama: pegawai.nama, tahun: tahunTanggalInput(isi.tanggalSurat), versi: "biasa" }));
+      if (srikandiLama.ok) unduhBlob(srikandiLama.data, namaFileSk({ nama: pegawai.nama, versi: "srikandi" }));
+      onBerhasil(`SK KGB ${pegawai.nama} dibuat dan diunduh. Setelah SK ditandatangani, pilih Unggah SK TTE.`);
+      return;
+    }
     // Hanya SK biasa yang mencatat surat; versi Srikandi diminta sebagai pratinjau agar tidak tercatat dua kali.
     const [biasa, srikandi] = await Promise.all([
       buatPdfSk(kgbId, isi, { pratinjau: false, srikandi: false }),
@@ -465,7 +500,7 @@ export default function ModalBuatSk({
               {skSudahDibuat ? "Simpan draf perbaikan" : "Simpan draf"}
             </button>
             <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk || !!memuatVersi || ditahan}>
-              {sibuk ? "Membuat SK..." : "Buat dan Unduh SK"}
+              {sibuk ? "Membuat SK..." : reviewUpt ? "Buat SK dan minta review UPT" : "Buat dan Unduh SK"}
             </button>
           </>
         )
@@ -476,6 +511,13 @@ export default function ModalBuatSk({
       ) : (
         <div className="kgbm-sk-grid">
           <div className="kgbm-kolom" ref={refKolomForm}>
+            {/* Catatan UPT pada SK yang diminta diperbaiki, supaya yang dibetulkan tepat sasaran (ADR-077). */}
+            {reviewUpt?.status === "perbaikan" && (
+              <Catatan nada="merah">
+                <strong>UPT meminta perbaikan:</strong> {reviewUpt.catatan || "tanpa catatan"}. Buat SK sesudah dibetulkan
+                mengirim permintaan review ulang ke UPT.
+              </Catatan>
+            )}
             {linimasa?.basi && (
               <Catatan nada="merah">
                 <strong>SK belum dapat dibuat.</strong> {linimasa.basi}
@@ -705,8 +747,9 @@ export default function ModalBuatSk({
               </div>
             )}
             <p className="kgbm-petunjuk">
-              Pratinjau dan Simpan draf menyimpan data SK terakhir, tetapi SK baru baru tercatat setelah Buat dan Unduh SK
-              dipilih. SK biasa dan versi Srikandi (dengan tempat TTE) diunduh bersamaan.
+              {reviewUpt
+                ? "Pegawai UPT: SK direview Admin UPT lebih dulu. Pratinjau bertanda air DRAF; Buat SK mencatat SK dan mengirim permintaan review. Setelah UPT menyetujui, Cetak SK pada kartu pegawai mengunduh SK biasa dan versi Srikandi tanpa tanda air."
+                : "Pratinjau dan Simpan draf menyimpan data SK terakhir, tetapi SK baru baru tercatat setelah Buat dan Unduh SK dipilih. SK biasa dan versi Srikandi (dengan tempat TTE) diunduh bersamaan."}
             </p>
           </div>
         </div>

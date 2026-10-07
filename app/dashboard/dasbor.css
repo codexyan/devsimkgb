@@ -1963,6 +1963,7 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
   color: var(--st-green);
   pointer-events: auto;
 }
+.dsb-toast[data-nada="merah"] { border-color: var(--tint-red-ln); color: var(--st-red); }
 
 
 /* ── Kerangka muat ─────────────────────────────────────────────────────── */

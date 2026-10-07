@@ -4,40 +4,22 @@ import { pesanUsulanMenahan, usulanMenahan } from "@/lib/usulanMenahan";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
-import type { DataSuratKGB } from "@/lib/generateSuratKGB";
 import { canProcessKGB, canViewKGB } from "@/lib/auth";
 import { tentukanPenandatangan, type JenisPenandatangan } from "@/lib/penandatangan";
-import { PENETAP_KANWIL } from "@/lib/penetapSk";
 import { cariSatker, SATKER_KANWIL } from "@/lib/satker";
 import { muatKppnSatker } from "@/lib/muatKppnSatker";
 import { tanggalKalender } from "@/lib/waktu";
-import { getPangkat } from "@/lib/tabelGaji";
 import { alasanTolakBuatSk, bacaTanggalInput, type SuratKgbTersimpan } from "@/lib/prosesKgb";
 import type { HukdisUntukKgb } from "@/lib/prosesKgb";
 import { periksaUlangKgb, pesanKgbBasi } from "@/lib/pemeriksaanUlangKgb";
 import { hariIniWita, type NilaiTanggal } from "@/lib/waktu";
 import { nomorSkBentrok } from "@/lib/nomorSkBentrok";
-import { templateUntuk } from "@/lib/templateSurat";
-import { muatVersiTemplate } from "@/lib/templateSuratServer";
+import { susunDataSuratKgb } from "@/lib/dataSuratKgbServer";
+import { infoReviewSk, pegawaiPerluReviewSk, skBolehDicetak } from "@/lib/reviewSkUpt";
+import { mintaReviewSk, muatReviewSk } from "@/lib/reviewSkUptServer";
 
 export const runtime = "nodejs";
 
-/** Teks peraturan gaji: nilai lengkap dipakai apa adanya, nomor polos digabung dengan tahunnya. */
-function teksDasarHukum(nomorPP?: string | null, tahunPP?: string | null): string {
-  const nomor = nomorPP?.trim() ?? "";
-  const tahun = tahunPP?.trim() || "2024";
-  if (!nomor) return `Nomor 5 Tahun ${tahun}`;
-  return /^\d+$/.test(nomor) ? `Nomor ${nomor} Tahun ${tahun}` : nomor;
-}
-
-/**
- * "Penata (III/c)" untuk golongan KGB baru. Nama pangkat diambil dari tabel golongan; pangkat yang
- * tercatat pada pegawai hanya dipakai bila golongannya sama dan tabel tidak mengenalnya.
- */
-function teksPangkatGolongan(golongan: string, pegawai: { pangkat: string; golonganRuang: string }): string {
-  const pangkat = getPangkat(golongan) || (golongan === pegawai.golonganRuang ? pegawai.pangkat?.trim() : "");
-  return pangkat ? `${pangkat} (${golongan})` : golongan;
-}
 
 export async function POST(
   req: Request,
@@ -96,14 +78,13 @@ export async function POST(
     );
   }
 
-  const [pegawai, suratList, daftarPenandatangan, kanwil] = await Promise.all([
+  const [pegawai, suratList, daftarPenandatangan] = await Promise.all([
     db.pegawai.findUnique({ id: kgb.pegawaiId }),
     db.suratKGB.findMany({
       where: { kgbId: id },
       orderBy: { field: "tanggalSurat", dir: "desc" },
     }) as Promise<SuratKgbTersimpan[]>,
     db.penandatangan.findMany(),
-    db.konfigurasiKanwil.findUnique({ id: "default" }) as Promise<{ nomorPP?: string | null; tahunPP?: string | null } | null>,
   ]);
   if (!pegawai)
     return NextResponse.json({ error: "Data pegawai tidak ditemukan" }, { status: 404 });
@@ -150,7 +131,6 @@ export async function POST(
       { status: 422 },
     );
   }
-  const kppn = satker.kppn;
 
   let nomorSurat: string;
   let tanggalSurat: Date;
@@ -201,52 +181,32 @@ export async function POST(
   }
 
   // PDF disusun di peramban (lib/generateSuratKGB.tsx); di sini hanya isinya, karena menyusun PDF
-  // di Worker memakan ±1 detik CPU per surat.
-  const surat: DataSuratKGB = {
-    nomorSurat,
-    tanggalSurat,
-    kppn,
-    satker: { nama: satker.nama, kanwil: satker.jenis === "kanwil" },
-    // Pangkat dan golongan diambil dari data KGB, sama dengan gaji pokok dan masa kerjanya (ADR-056). Data pegawai
-    // dapat sudah berubah sesudah Input KGB (kenaikan pangkat yang dicatat belakangan, koreksi golongan), sehingga
-    // satu SK mencetak dua golongan yang berbeda.
-    pegawai: {
-      nama: pegawai.nama,
-      nip: pegawai.nip,
-      pangkat:
-        getPangkat(kgb.golonganLama) ||
-        (kgb.golonganLama === pegawai.golonganRuang ? pegawai.pangkat : "") ||
-        pegawai.pangkat,
-      golonganRuang: kgb.golonganLama || pegawai.golonganRuang,
-    },
-    kgb: {
-      gajiPokokLama: kgb.gajiPokokLama,
-      nomorSK: kgb.nomorSK,
-      tanggalSK: kgb.tanggalSK,
-      tmtSK: kgb.tmtSK,
-      // Surat lama (sebelum kolom ini ada) selalu mencetak penetap Kanwil.
-      penetapSkDasar: kgb.penetapSkDasar?.trim() || PENETAP_KANWIL,
-      mkgTahunLama: kgb.mkgTahunLama,
-      mkgBulanLama: kgb.mkgBulanLama,
-      gajiPokokBaru: kgb.gajiPokokBaru,
-      mkgTahunBaru: kgb.mkgTahunBaru,
-      mkgBulanBaru: kgb.mkgBulanBaru,
-      pangkatGolonganBaru: teksPangkatGolongan(kgb.golonganBaru, pegawai),
-      tmtKgbBaru: kgb.tmtKgbBaru,
-      tmtKgbBerikutnya: kgb.tmtKgbBerikutnya,
-    },
-    penandatangan: {
-      jenis: penandatangan.jenis,
-      jabatan: penandatangan.jabatan,
-      nama: penandatangan.nama,
-    },
-    dasarHukum: teksDasarHukum(kanwil?.nomorPP, kanwil?.tahunPP),
-    // Versi template yang berlaku pada tanggal surat (ADR-019): SK lama tetap tercetak dengan format ketika terbit.
-    template: templateUntuk((await muatVersiTemplate()).versi, tanggalSurat),
-  };
+  // di Worker memakan ±1 detik CPU per surat. Isinya disusun lib/dataSuratKgbServer.ts, yang juga dipakai
+  // pratinjau review Admin UPT, sehingga yang direview UPT sama persis dengan yang dicetak (ADR-077).
+  const surat = await susunDataSuratKgb({ kgb, pegawai, satker, nomorSurat, tanggalSurat, penandatangan });
+
+  // SK pegawai UPT direview Admin UPT sebelum dicetak dan diunggah TTE (ADR-077). Selama tabel review belum ada,
+  // review belum aktif dan alur lama berlaku.
+  const perluReview = pegawaiPerluReviewSk(pegawai.unitKerja);
+  const reviewAwal = perluReview ? await muatReviewSk(id) : { aktif: false, review: null };
+  let reviewAkhir = reviewAwal.review;
 
   // Preview mode hanya mengirim isi surat. Status sudah Sedang Diproses (dijaga di atas), jadi tidak diubah.
   if (!isPreview) {
+    // SK yang dibuat atau diperbaiki adalah SK yang belum pernah dilihat UPT: review diminta (ulang) lebih dulu. Bila
+    // permintaan gagal, surat tidak disimpan, sehingga persetujuan untuk SK lama tidak terbawa ke SK yang baru.
+    if (perluReview && reviewAwal.aktif) {
+      const minta = await mintaReviewSk({
+        kgb,
+        pegawai,
+        nomorSurat,
+        tanggalSurat,
+        oleh: `${userLogin.nama} (${userLogin.nip})`,
+        sekarang: new Date(),
+      });
+      if (minta.aktif) reviewAkhir = minta.review;
+    }
+
     // Salinan penandatangan diperbarui setiap kali surat dibuat, agar unduhan ulang sama persis.
     const salinanPenandatangan = {
       namaKepalaKanwil: penandatangan.nama,
@@ -280,10 +240,18 @@ export async function POST(
     logAudit({
       userId: userLogin.id,
       aksi: "generate_surat",
-      detail: `Generate surat KGB ${pegawai.nama} (${pegawai.nip}), No. Surat: ${nomorSurat}, penandatangan: ${penandatangan.jabatan} ${penandatangan.nama}`,
+      detail:
+        `Generate surat KGB ${pegawai.nama} (${pegawai.nip}), No. Surat: ${nomorSurat}, penandatangan: ${penandatangan.jabatan} ${penandatangan.nama}` +
+        (perluReview && reviewAwal.aktif ? `; review diminta ke ${satker.nama}` : ""),
       targetNama: pegawai.nama,
     });
   }
 
-  return NextResponse.json({ surat });
+  // Tanda air DRAF selama SK pegawai UPT belum boleh ditandatangani: belum disetujui UPT (atau dilewati Super Admin),
+  // dan pratinjau dengan nomor baru, yang memang belum pernah direview. SK yang sudah diunggah tidak lagi bertanda.
+  const reviewSk = infoReviewSk(reviewAkhir, { aktif: reviewAwal.aktif, unitKerja: pegawai.unitKerja });
+  const pratinjauBaru = isPreview && !unduhUlang;
+  const draf = !!reviewSk && kgb.status === "sedang_diproses" && (pratinjauBaru || !skBolehDicetak(reviewSk));
+
+  return NextResponse.json({ surat, draf, reviewSk });
 }

@@ -6,6 +6,7 @@ import {
   type NotifikasiRow,
   type PegawaiRow,
   type PengumumanDilihatRow,
+  type ReviewSkUptRow,
   type PenandatanganRow,
   type RiwayatKGBRow,
   type RiwayatPangkatRow,
@@ -42,5 +43,6 @@ export const supabase = {
   regulasi: new SupabaseTable(defs.Regulasi),
   auditLog: new SupabaseTable<AuditLogRow>(defs.AuditLog),
   pengumumanDilihat: new SupabaseTable<PengumumanDilihatRow>(defs.PengumumanDilihat),
+  reviewSkUpt: new SupabaseTable<ReviewSkUptRow>(defs.ReviewSkUpt),
   rekonBulanan: new SupabaseTable(defs.RekonBulanan),
 };

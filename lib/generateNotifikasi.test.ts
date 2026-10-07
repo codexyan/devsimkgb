@@ -225,7 +225,7 @@ test("SK yang baru dikonfirmasi keuangan dikabarkan sekali", () => {
 
 test("Admin UPT hanya menerima pengingat KGB, kabar SK terbit, dan yang dikembalikan kepadanya", () => {
   assert.deepEqual(tipeNotifikasiUntukRole("admin_upt"), [
-    "kgb_jatuh_tempo", "rapelan", "sk_terbit", "usulan_revisi", "usulan_disetujui", "mutasi_dikembalikan", "hukdis_dikembalikan",
+    "kgb_jatuh_tempo", "rapelan", "sk_terbit", "review_sk", "usulan_revisi", "usulan_disetujui", "mutasi_dikembalikan", "hukdis_dikembalikan",
   ]);
   // Laporan hukdis yang masih menunggu adalah urusan SDM Hukdis Kanwil (ADR-016).
   assert.equal(bolehLihatNotifikasi("admin_upt", "hukdis_upt"), false);

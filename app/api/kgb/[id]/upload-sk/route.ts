@@ -17,6 +17,8 @@ import {
 } from "@/lib/prosesKgb";
 import { hariIniWita, isoTanggalLokal } from "@/lib/waktu";
 import { notifikasiSkDiunggah } from "@/lib/generateNotifikasi";
+import { alasanTolakTanpaReview, infoReviewSk, pegawaiPerluReviewSk } from "@/lib/reviewSkUpt";
+import { muatReviewSk } from "@/lib/reviewSkUptServer";
 
 export const runtime = "nodejs";
 
@@ -55,6 +57,13 @@ export async function POST(
   // SK TTE tidak diunggah selama usulan UPT pegawai ini belum ditinjau (ADR-014); arsip lama tidak tertahan.
   if (izin.jenis === "unggah" && pegawai && (await usulanMenahan(pegawai.id)))
     return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama) }, { status: 409 });
+  // SK pegawai UPT baru boleh diunggah TTE-nya setelah disetujui Admin UPT atau dilewati Super Admin (ADR-077). SK yang
+  // dibuat sebelum review aktif tidak punya permintaan review, jadi tidak tertahan.
+  if (izin.jenis === "unggah" && pegawai && pegawaiPerluReviewSk(pegawai.unitKerja)) {
+    const { aktif, review } = await muatReviewSk(id);
+    const alasan = alasanTolakTanpaReview(infoReviewSk(review, { aktif, unitKerja: pegawai.unitKerja }), pegawai.nama);
+    if (alasan) return NextResponse.json({ error: alasan }, { status: 409 });
+  }
 
   // Ukuran menurut header diperiksa sebelum isi permintaan dibaca ke memori; ruang tambahan untuk
   // bagian formulir selain berkas.
