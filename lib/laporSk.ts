@@ -6,9 +6,10 @@
 //
 // Murni: tanpa React, tanpa jaringan.
 
+import { cocokMkgSk, hitungSkDilaporkan } from "./dasarSkUsulan";
 import { hitungKenaikanPangkat } from "./kenaikanPangkat";
 import { hitungPmk } from "./pmk";
-import { formatTanggalId } from "./waktu";
+import { formatTanggalId, tanggalKalender } from "./waktu";
 
 export type JenisLaporSk = "kp" | "pmk";
 
@@ -18,7 +19,10 @@ export interface IsianLaporSk {
   /** Hanya kenaikan pangkat. */
   jenisKp: string;
   golonganBaru: string;
-  /** Hanya PMK: masa kerja golongan pada TMT PMK, sebagaimana tertulis pada SK. */
+  /**
+   * Masa kerja golongan pada TMT SK, sebagaimana tertulis pada SK. PMK menghitung darinya; kenaikan pangkat hanya
+   * mencocokkannya dengan hitungan sistem (ADR-078).
+   */
   mkgTahunSk: string;
   mkgBulanSk: string;
   nomorSk: string;
@@ -37,7 +41,8 @@ export interface KeadaanTercatat {
 
 /** Pratayang akibat SK: baris siap tampil, atau sebab mengapa belum dapat dihitung. */
 export type PratayangLaporSk =
-  | { ok: true; baris: [string, string][]; catatan: string }
+  /** `peringatan`: masa kerja menurut SK kenaikan pangkat yang tidak cocok dengan hitungan sistem (ADR-078). */
+  | { ok: true; baris: [string, string][]; catatan: string; peringatan?: string | null }
   | { ok: false; galat: string }
   | null;
 
@@ -71,6 +76,17 @@ export function pratayangLaporSk(sekarang: KeadaanTercatat, isian: IsianLaporSk)
       golonganBaru: isian.golonganBaru,
     });
     if (!h.ok) return { ok: false, galat: h.pesan };
+    // Masa kerja pada TMT pangkat menurut hitungan sistem, pembanding yang tertulis di SK (ADR-078). Butuh TMT pangkat.
+    const tmt = tanggalKalender(isian.tmt);
+    const sk = tmt
+      ? hitungSkDilaporkan(
+          { golonganRuang: sekarang.golongan, mkgTahun: sekarang.mkgTahun, mkgBulan: sekarang.mkgBulan, tmtKgbTerakhir: sekarang.tmtKgbTerakhir, tmtKgbBerikutnya: null },
+          { jenis: "kp", golonganBaru: isian.golonganBaru, mkgTahunSk: angkaLapor(isian.mkgTahunSk), mkgBulanSk: angkaLapor(isian.mkgBulanSk), tmt },
+        )
+      : null;
+    const hitungan = sk?.ok ? sk.mkgPadaTmtSk : null;
+    const diisi = isian.mkgTahunSk !== "" || isian.mkgBulanSk !== "";
+    const cek = diisi ? cocokMkgSk(hitungan, { tahun: angkaLapor(isian.mkgTahunSk), bulan: angkaLapor(isian.mkgBulanSk) }) : null;
     return {
       ok: true,
       baris: [
@@ -79,8 +95,17 @@ export function pratayangLaporSk(sekarang: KeadaanTercatat, isian: IsianLaporSk)
           "Masa kerja golongan",
           `${teksMasaKerja(sekarang.mkgTahun, sekarang.mkgBulan)} → ${teksMasaKerja(h.hasil.mkgTahunBaru, h.hasil.mkgBulanBaru)}`,
         ],
+        ...(hitungan
+          ? ([["Pada TMT pangkat", `${teksMasaKerja(hitungan.tahun, hitungan.bulan)}${cek?.cocok ? ", sesuai SK" : ""}`]] as [string, string][])
+          : []),
         ["Gaji pokok", tampilGaji(h.hasil.gajiPokokBaru)],
       ],
+      peringatan:
+        cek && !cek.cocok
+          ? `Masa kerja menurut SK ${teksMasaKerja(cek.menurutSk.tahun, cek.menurutSk.bulan)}, sedangkan hitungan sistem ` +
+            `${teksMasaKerja(cek.hitungan.tahun, cek.hitungan.bulan)}. Periksa golongan baru, TMT pangkat, dan masa kerja di SK; ` +
+            "Kanwil menghitung dari data tercatat."
+          : null,
       catatan:
         peringatanGaji(h.hasil.golonganBaru, h.hasil.gajiPokokBaru) +
         (h.hasil.potonganMkgTahun > 0
@@ -120,6 +145,7 @@ export function kekuranganLaporSk(isian: IsianLaporSk): string[] {
   const label = isian.jenis === "kp" ? "SK kenaikan pangkat" : "SK peninjauan masa kerja";
   const perlu: string[] = [];
   if (isian.jenis === "kp" && !isian.golonganBaru) perlu.push("golongan baru menurut SK");
+  if (isian.jenis === "kp" && !isian.mkgTahunSk && !isian.mkgBulanSk) perlu.push("masa kerja golongan menurut SK kenaikan pangkat");
   if (isian.jenis === "pmk" && !isian.mkgTahunSk && !isian.mkgBulanSk) perlu.push("masa kerja golongan menurut SK PMK");
   if (!isian.nomorSk.trim()) perlu.push(`nomor ${label}`);
   if (!isian.tanggalSk) perlu.push("tanggal SK");

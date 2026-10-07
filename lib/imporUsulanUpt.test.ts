@@ -407,6 +407,10 @@ test("templat Excel: lembar isiannya kosong selain judul kolom, dan ketiga baris
   // TMT April 2025). Dihitung mundur ke TMT KGB terakhir menjadi 4 tahun, jadi KGB berikutnya dua tahun sesudahnya.
   const hitung = isiHitungan(hasil[1].isian!, null, hasil[1].dasarBaru);
   assert.ok(samaTanggalKalender(hitung.tmtKgbBerikutnya as Date, "2026-03-01"));
+  // Contoh kedua juga mengisi keadaan pada SK KGB terakhir (II/c, 9 tahun); hitungannya dari situ sama hasilnya (ADR-078).
+  assert.equal(hasil[1].acuan?.golonganAcuan, "II/c");
+  const hitungAcuan = isiHitungan(hasil[1].isian!, null, { ...hasil[1].dasarBaru, ...hasil[1].acuan });
+  assert.ok(samaTanggalKalender(hitungAcuan.tmtKgbBerikutnya as Date, "2026-03-01"));
   assert.ok(!hasil[1].kurang.some((k) => /jawaban|dilaporkan|sebab|nomor SK/.test(k)), hasil[1].kurang.join(", "));
 });
 
@@ -545,4 +549,31 @@ test("pratinjau berkas: isian kolom berpilihan yang di luar pilihan templat dihi
     { kolom: "jenisKelamin", jumlah: 3, contoh: ["L", "P"] },
     { kolom: "pendidikanTerakhir", jumlah: 2, contoh: ["S-1", "SMA"] },
   ]);
+});
+
+test("pegawai baru dengan keadaan pada SK KGB terakhir (ADR-078): dihitung dari situ; golongan salah tulis ditolak; pegawai tercatat mengabaikannya", () => {
+  // KGB terakhir 1 Des 2024 di II/b 7 tahun; PI ke III/a TMT 1 Feb 2026, di SK 3 tahun 2 bulan.
+  const isi = {
+    nip: "199001012015031001", golonganRuang: "III/a", mkgTahun: "3", mkgBulan: "2", tmtKgbTerakhir: "2024-12-01",
+    dasarBaruJenis: "kp", dasarBaruJenisKp: "penyesuaian_ijazah", dasarBaruNomorSk: "SK-PI-1", dasarBaruTanggalSk: "2026-01-29",
+    dasarBaruTmt: "2026-02-01", golonganAcuan: "II/b", mkgTahunAcuan: "7", mkgBulanAcuan: "0",
+  };
+  const [h] = periksaImporUpt([baris(isi)], kosong);
+  assert.equal(h.hasil, "baru");
+  assert.deepEqual(h.acuan, { golonganAcuan: "II/b", mkgTahunAcuan: 7, mkgBulanAcuan: 0 });
+  assert.ok(!h.kurang.some((k) => /SK KGB terakhir \(|masa kerja golongan pada SK|golongan baru/.test(k)), h.kurang.join(", "));
+  const hitung = isiHitungan(h.isian!, null, { ...h.dasarBaru, ...h.acuan });
+  assert.ok(samaTanggalKalender(hitung.tmtKgbBerikutnya as Date, "2026-12-01"));
+
+  const [salah] = periksaImporUpt([baris({ ...isi, golonganAcuan: "2b" })], kosong);
+  assert.equal(salah.hasil, "ditolak");
+  assert.match(salah.galat ?? "", /golonganAcuan/);
+
+  // Tanpa SK yang dilaporkan, kolom acuan tidak berarti apa-apa dan tidak disimpan.
+  const [tanpaSk] = periksaImporUpt([baris({ ...isi, dasarBaruJenis: "tidak" })], kosong);
+  assert.equal(tanpaSk.acuan, null);
+
+  // Pegawai yang sudah tercatat: data tercatat yang menjadi acuan, kolomnya diabaikan.
+  const [tercatat] = periksaImporUpt([baris({ golonganRuang: "II/b", golonganAcuan: "II/a", mkgTahunAcuan: "1" })], satkerIni);
+  assert.equal(tercatat.acuan, null);
 });

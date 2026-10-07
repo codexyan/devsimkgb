@@ -484,17 +484,17 @@ export default function LaporSkMassal() {
                             </select>
                           </label>
                         </>
-                      ) : (
-                        <div className="kol-label">
-                          <span className="kol-wajib">Masa kerja pada SK</span>
-                          <span className="kol-mkg">
-                            <input className="kol-isi" inputMode="numeric" aria-label="Tahun" value={n.isian.mkgTahunSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { mkgTahunSk: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
-                            <span>tahun</span>
-                            <input className="kol-isi" inputMode="numeric" aria-label="Bulan" value={n.isian.mkgBulanSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { mkgBulanSk: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
-                            <span>bulan</span>
-                          </span>
-                        </div>
-                      )}
+                      ) : null}
+                      {/* Kenaikan pangkat juga menanyakan masa kerja menurut SK, untuk dicocokkan dengan hitungan sistem (ADR-078). */}
+                      <div className="kol-label">
+                        <span className="kol-wajib">Masa kerja pada SK</span>
+                        <span className="kol-mkg">
+                          <input className="kol-isi" inputMode="numeric" aria-label="Tahun" value={n.isian.mkgTahunSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { mkgTahunSk: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
+                          <span>tahun</span>
+                          <input className="kol-isi" inputMode="numeric" aria-label="Bulan" value={n.isian.mkgBulanSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { mkgBulanSk: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
+                          <span>bulan</span>
+                        </span>
+                      </div>
                       <label className="kol-label">
                         <span className="kol-wajib">Nomor SK</span>
                         <input className="kol-isi" value={b.isian.nomorSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { nomorSk: e.target.value })} placeholder="Sesuai SK" />
@@ -525,6 +525,7 @@ export default function LaporSkMassal() {
                             </div>
                           ))}
                           <p data-ket="">{n.hitung.catatan}</p>
+                          {n.hitung.peringatan && <p>{n.hitung.peringatan}</p>}
                         </div>
                       )
                     )}
