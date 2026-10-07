@@ -10,7 +10,7 @@ import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiSaatIni } from "@/lib/pilihanPegawai";
 import { formatTanggalId } from "@/lib/waktu";
 import { kunciNomorSk } from "@/lib/nomorSurat";
-import { KETERANGAN_DASAR_BARU, LABEL_DASAR_BARU, jawabanSkBaru, perluDasarBaru, type JenisDasarBaru } from "@/lib/dasarBaruUsulan";
+import { KETERANGAN_DASAR_BARU, LABEL_DASAR_BARU, jawabanSkBaru, kekuranganDasarBaru, perluDasarBaru, type JenisDasarBaru } from "@/lib/dasarBaruUsulan";
 import { JENIS_KP } from "@/lib/kenaikanPangkat";
 import { pratinjauAtasDasarUsulan } from "@/lib/linimasaDasarSk";
 import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
@@ -28,6 +28,8 @@ import {
   teksAtasDasar,
 } from "./skSesudahAcuan";
 import ModalPratinjauSkUsulan from "./ModalPratinjauSkUsulan";
+import { GarisLangkah, RingkasanLangkah } from "./GarisLangkah";
+import { LANGKAH_ISIAN, cekIsianPegawai, langkahAwal, type NomorLangkah } from "./langkahIsian";
 
 /* Formulir data pegawai UPT: dipakai untuk menyiapkan pegawai baru maupun mengusulkan perbaikan data
    pegawai yang sudah tercatat. Isiannya selalu disimpan sebagai draf lebih dulu; pengirimannya ke
@@ -91,13 +93,13 @@ const BERKAS_PEGAWAI = BERKAS_USULAN.filter((b) => b.keadaan !== "pengajuan");
 const SK_KOSONG = { nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" };
 
 /** Isian identitas; sisanya dikelompokkan sendiri karena punya pemandu. */
-const BIDANG_IDENTITAS = new Set(["nama", "tempatLahir", "tanggalLahir", "jenisKelamin", "pendidikanTerakhir"]);
+export const BIDANG_IDENTITAS = new Set(["nama", "tempatLahir", "tanggalLahir", "jenisKelamin", "pendidikanTerakhir"]);
 
 /**
  * Isian yang nilainya terbatas, ditawarkan sebagai pilihan agar seragam dengan data Kanwil. Mengetik
  * bebas membuat "Non Eselon", "non eselon", dan "Eselon IV" hidup berdampingan pada kolom yang sama.
  */
-const PILIHAN_BIDANG: Record<string, readonly string[]> = {
+export const PILIHAN_BIDANG: Record<string, readonly string[]> = {
   jenisKelamin: JENIS_KELAMIN,
   pendidikanTerakhir: PENDIDIKAN_TERAKHIR,
   jenisJabatan: JENIS_JABATAN,
@@ -298,6 +300,55 @@ export default function FormulirUsulan({
   const skSudahTercatat =
     adaSkBaru && !!pegawai?.dasarKgb?.nomorSK && !!dasar.nomorSk.trim() && kunciNomorSk(dasar.nomorSk) === kunciNomorSk(pegawai.dasarKgb.nomorSK);
 
+  // Langkah isian (ADR-083): syarat kelengkapan yang sama dengan Usul KGB Kolektif, ditandai langkahnya.
+  const adaBerkas = (medan: string) =>
+    !!berkas[medan] ||
+    (!hapusTersimpan.has(medan) &&
+      (!!draf?.berkas.some((x) => x.medan === medan) || !!bawaan?.berkas.some((x) => x.medan === medan)));
+  const cek = cekIsianPegawai({
+    jenis,
+    nama: isian.nama ?? "",
+    nip: isian.nip ?? "",
+    jabatan: isian.jabatan ?? "",
+    pernah: pernahKgb,
+    golongan: isian.golonganRuang ?? "",
+    mkgTahun: isian.mkgTahun ?? "",
+    tmtAcuan: isian.tmtKgbTerakhir ?? "",
+    nomorSkAcuan: sk.nomorSkTerakhir,
+    tanggalSkAcuan: sk.tanggalSkTerakhir,
+    jawaban,
+    perluSebab,
+    kurangDasar: kekuranganDasarBaru(
+      {
+        dasarBaruJenis: dasar.jenis,
+        dasarBaruJenisKp: dasar.jenisKp,
+        dasarBaruNomorSk: dasar.nomorSk,
+        dasarBaruTanggalSk: dasar.tanggalSk,
+        dasarBaruTmt: dasar.tmt,
+      },
+      perluSebab,
+    ),
+    dasarJenis: dasar.jenis,
+    golonganSk: dasar.golongan,
+    mkgTahunSk: dasar.mkgTahun,
+    galatSesudahSk: sesudahSk && !sesudahSk.ok ? sesudahSk.pesan : null,
+    berkas: [
+      ...berkasUntukKeadaan(pernahKgb).filter((b) => b.wajib).map((b) => ({ label: b.label, langkah: 3 as const, ada: adaBerkas(b.medan) })),
+      ...berkasDasarBaru(dasar.jenis).filter((b) => b.wajib).map((b) => ({ label: b.label, langkah: 4 as const, ada: adaBerkas(b.medan) })),
+    ],
+  });
+  // Pegawai baru mulai dari langkah 1; draf dan perbaikan data langsung dibuka di langkah yang masih kurang.
+  const [langkah, setLangkahAktif] = useState<NomorLangkah>(() => (jenis === "baru" && !draf ? 1 : langkahAwal(cek)));
+  // Formulir pegawai baru yang masih kosong: langkah yang belum dibuka tidak ditandai kurang. Draf dan perbaikan data
+  // menandai semuanya, sebab isinya sudah ada.
+  const [dikunjungi, setDikunjungi] = useState<Set<number>>(() =>
+    jenis === "baru" && !draf ? new Set([1]) : new Set([1, 2, 3, 4, 5]),
+  );
+  const setLangkah = (n: NomorLangkah) => {
+    setDikunjungi((lama) => new Set([...lama, langkah, n]));
+    setLangkahAktif(n);
+  };
+
   /** Jawaban pertanyaan SK sesudah SK acuan. Isian yang sudah diketik, di bagian atas maupun bagian SK, tidak berubah. */
   function jawabSk(ada: boolean) {
     setDasar((d) => jawabSkBaru(d, ada));
@@ -321,6 +372,41 @@ export default function FormulirUsulan({
     hasil.dasarBaruTmt = dasar.tmt;
     hasil.dasarBaruPenetap = dasar.penetap;
     return hasil;
+  }
+
+  /** Kotak unggah untuk berkas pada satu langkah: SK acuan di langkah 3, SK yang dilaporkan di langkah 4 (ADR-083). */
+  function daftarBerkas(daftar: readonly (typeof BERKAS_USULAN)[number][]) {
+    return daftar.map((b) => {
+      const simpanan = draf?.berkas.find((x) => x.medan === b.medan) ?? null;
+      // Tanpa berkas sendiri, berkas terakhir yang disetujui Kanwil ikut terbawa saat disimpan.
+      const dariBawaan = simpanan ? null : (bawaan?.berkas.find((x) => x.medan === b.medan) ?? null);
+      return (
+        <KolomBerkas
+          key={b.medan}
+          label={b.label}
+          wajib={b.wajib}
+          bantuan={b.keterangan}
+          dipilih={berkas[b.medan] ?? null}
+          urlTersimpan={
+            draf && simpanan
+              ? `/api/usulan/${draf.id}/berkas?berkas=${b.medan}`
+              : dariBawaan
+                ? `/api/usulan/${dariBawaan.usulanId}/berkas?berkas=${b.medan}`
+                : null
+          }
+          namaTersimpan={simpanan?.nama ?? (dariBawaan ? `${dariBawaan.nama ?? b.label} · dari usulan yang disetujui` : null)}
+          ditandaiHapus={hapusTersimpan.has(b.medan)}
+          onPilih={(f) => {
+            setBerkas((lama) => ({ ...lama, [b.medan]: f }));
+            // Berkas pengganti menggantikan yang tersimpan; tanda hapusnya tidak diperlukan lagi.
+            if (f) tandaiHapus(b.medan, false);
+          }}
+          onHapusTersimpan={() => tandaiHapus(b.medan, true)}
+          onBatalHapus={() => tandaiHapus(b.medan, false)}
+          onPratinjau={(judul, url, lokal) => setPratinjau({ judul, url, lokal })}
+        />
+      );
+    });
   }
 
   function tandaiHapus(medan: string, hapus: boolean) {
@@ -404,19 +490,39 @@ export default function FormulirUsulan({
       ukuran="lg"
       sibuk={mengirim}
       onTutup={tutup}
-      onKirim={() => void simpan()}
+      // Enter pada langkah 1 sampai 4 berpindah ke langkah berikutnya; di langkah terakhir menyimpan.
+      onKirim={() => (langkah < 5 ? setLangkah((langkah + 1) as NomorLangkah) : void simpan())}
       kaki={
         <>
-          <button type="button" className="kgbm-tombol kgbm-kedua" onClick={tutup} disabled={mengirim}>
-            Batal
-          </button>
-          {/* Pratinjau SK KGB dari isian ini, sebelum disimpan atau diajukan (ADR-078). */}
-          <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setPratinjauSk(isianKirim())} disabled={mengirim}>
-            Pratinjau SK KGB
-          </button>
-          <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
-            {mengirim ? "Menyimpan…" : dikembalikan ? "Simpan perbaikan" : "Simpan draf usulan"}
-          </button>
+          {langkah > 1 ? (
+            <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setLangkah((langkah - 1) as NomorLangkah)} disabled={mengirim}>
+              ← {LANGKAH_ISIAN.find((l) => l.n === langkah - 1)?.judul}
+            </button>
+          ) : (
+            <button type="button" className="kgbm-tombol kgbm-kedua" onClick={tutup} disabled={mengirim}>
+              Batal
+            </button>
+          )}
+          {langkah < 5 ? (
+            <>
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => void simpan()} disabled={mengirim}>
+                {mengirim ? "Menyimpan…" : "Simpan draf"}
+              </button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
+                {LANGKAH_ISIAN.find((l) => l.n === langkah + 1)?.judul} →
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Pratinjau SK KGB dari isian ini, sebelum disimpan atau diajukan (ADR-078). */}
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setPratinjauSk(isianKirim())} disabled={mengirim}>
+                Pratinjau SK KGB
+              </button>
+              <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengirim}>
+                {mengirim ? "Menyimpan…" : dikembalikan ? "Simpan perbaikan" : "Simpan draf usulan"}
+              </button>
+            </>
+          )}
         </>
       }
     >
@@ -427,20 +533,18 @@ export default function FormulirUsulan({
           disebut lalu simpan; usulannya belum kembali ke Kanwil sampai dikirim ulang lewat Ajukan ke Kanwil di daftar Perlu dikerjakan.
         </Catatan>
       )}
+      <GarisLangkah aktif={langkah} cek={cek} onPilih={setLangkah} dikunjungi={dikunjungi} />
+      {langkah === 1 && (
       <Catatan>
         {jenis === "baru"
           ? "Data disimpan dulu sebagai draf usulan milik satker: belum dikirim ke Kanwil dan belum tercatat di SIM-KGB. Setelah semua pegawai yang akan diusulkan lengkap, ajukan sekaligus dengan satu surat usulan; pegawai ini tercatat di SIM-KGB setelah Kanwil menyetujuinya. Selama itu ia tampil di Pegawai Satker sebagai baris bertanda."
           : "Isian sudah diisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; yang dikosongkan berarti tidak diusulkan berubah. Yang disimpan di sini draf usulan: data pegawai di SIM-KGB baru berubah setelah usulannya diajukan dan disetujui Kanwil."}
       </Catatan>
-      <p className="kgbm-legenda">
-        Isian dan berkas bertanda <i>*</i> wajib. Daftarnya berubah menurut keadaan pegawai:{" "}
-        <b>{pernahKgb ? "sudah pernah KGB" : "belum pernah KGB"}</b>
-        {pernahKgb
-          ? " menuntut TMT KGB terakhir, masa kerja golongan yang disalin dari SK KGB itu, serta lampiran SK KGB terakhir dan SK kenaikan pangkat terakhir."
-          : " menuntut TMT CPNS, masa kerja golongan 0 tahun 0 bulan, serta nomor, tanggal, dan lampiran SK CPNS sebagai acuan pertama; SK pengangkatan PNS dilampirkan bila sudah terbit."}{" "}
-        Pilihannya diatur pada bagian Pangkat, gaji pokok, dan KGB di bawah.
-      </p>
+      )}
 
+
+      {langkah === 1 && (
+        <>
       {/* ── Identitas ─────────────────────────────────────────────────── */}
       <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
         <div className="kgbm-bagian-kepala">
@@ -498,6 +602,11 @@ export default function FormulirUsulan({
         </div>
       </div>
 
+        </>
+      )}
+
+      {langkah === 2 && (
+        <>
       {/* ── Jabatan ───────────────────────────────────────────────────── */}
       <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
         <div className="kgbm-bagian-kepala">
@@ -530,6 +639,11 @@ export default function FormulirUsulan({
         </div>
       </div>
 
+        </>
+      )}
+
+      {langkah === 3 && (
+        <>
       {/* ── Pangkat, gaji, dan KGB: bagian yang paling mudah keliru ───── */}
       <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
         <div className="kgbm-bagian-kepala">
@@ -701,6 +815,23 @@ export default function FormulirUsulan({
         </div>
       </div>
 
+      <p className="kgbm-legenda">
+        Isian dan berkas bertanda <i>*</i> wajib. Sudah pernah KGB: TMT dan masa kerja golongan pada SK KGB terakhir, beserta
+        pindaiannya. Belum pernah KGB (CPNS baru): TMT, nomor, dan tanggal SK CPNS beserta pindaiannya; SK pengangkatan PNS
+        bila sudah terbit.
+      </p>
+      <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
+        <div className="kgbm-bagian-kepala">
+          <p className="kgbm-bagian-judul">Berkas {skAcuan}</p>
+          <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 500 KB</p>
+        </div>
+        <div className="kgbm-bagian-isi">{daftarBerkas(berkasUntukKeadaan(pernahKgb))}</div>
+      </div>
+        </>
+      )}
+
+      {langkah === 4 && (
+        <>
       {/* ── SK sesudah SK KGB terakhir: pertanyaan wajib, lalu Atas dasar (ADR-030, ADR-065) ───── */}
       <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
         <div className="kgbm-bagian-kepala">
@@ -905,57 +1036,43 @@ export default function FormulirUsulan({
         </p>
       )}
 
-      {/* ── Berkas ────────────────────────────────────────────────────── */}
-      <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
-        <div className="kgbm-bagian-kepala">
-          <p className="kgbm-bagian-judul">Berkas pendukung</p>
-          <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 500 KB</p>
+      {berkasDasarBaru(dasar.jenis).length > 0 && (
+        <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
+          <div className="kgbm-bagian-kepala">
+            <p className="kgbm-bagian-judul">Berkas SK yang dilaporkan</p>
+            <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: paling besar 500 KB</p>
+          </div>
+          <div className="kgbm-bagian-isi">{daftarBerkas(berkasDasarBaru(dasar.jenis))}</div>
         </div>
-        <div className="kgbm-bagian-isi">
-          {/* SK kenaikan pangkat dan SK PMK hanya diminta bila SK itu dilaporkan (ADR-045, ADR-081). */}
-          {[...berkasUntukKeadaan(pernahKgb), ...berkasDasarBaru(dasar.jenis)].map((b) => {
-            const wajib = b.wajib;
-            const simpanan = draf?.berkas.find((x) => x.medan === b.medan) ?? null;
-            // Tanpa berkas sendiri, berkas terakhir yang disetujui Kanwil ikut terbawa saat disimpan.
-            const dariBawaan = simpanan ? null : (bawaan?.berkas.find((x) => x.medan === b.medan) ?? null);
-            return (
-              <KolomBerkas
-                key={b.medan}
-                label={b.label}
-                wajib={wajib}
-                bantuan={b.keterangan}
-                dipilih={berkas[b.medan] ?? null}
-                urlTersimpan={
-                  draf && simpanan
-                    ? `/api/usulan/${draf.id}/berkas?berkas=${b.medan}`
-                    : dariBawaan
-                      ? `/api/usulan/${dariBawaan.usulanId}/berkas?berkas=${b.medan}`
-                      : null
-                }
-                namaTersimpan={simpanan?.nama ?? (dariBawaan ? `${dariBawaan.nama ?? b.label} · dari usulan yang disetujui` : null)}
-                ditandaiHapus={hapusTersimpan.has(b.medan)}
-                onPilih={(f) => {
-                  setBerkas((lama) => ({ ...lama, [b.medan]: f }));
-                  // Berkas pengganti menggantikan yang tersimpan; tanda hapusnya tidak diperlukan lagi.
-                  if (f) tandaiHapus(b.medan, false);
-                }}
-                onHapusTersimpan={() => tandaiHapus(b.medan, true)}
-                onBatalHapus={() => tandaiHapus(b.medan, false)}
-                onPratinjau={(judul, url, lokal) => setPratinjau({ judul, url, lokal })}
+      )}
+        </>
+      )}
+
+      {/* ── Langkah 5: periksa dan simpan (ADR-083) ───────────────────── */}
+      {langkah === 5 && (
+        <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
+          <div className="kgbm-bagian-kepala">
+            <p className="kgbm-bagian-judul">Periksa sebelum menyimpan</p>
+            <p className="kgbm-bagian-ket">Tekan langkah yang masih kurang untuk melengkapinya</p>
+          </div>
+          <div className="kgbm-bagian-isi">
+            <RingkasanLangkah cek={cek} onPilih={setLangkah} />
+            <p className="kgbm-legenda">
+              Draf boleh disimpan walau belum lengkap. Ajukan ke Kanwil setelah semua langkah bertanda ✓, bersama pegawai lain
+              dalam satu surat usulan. Periksa hitungannya lewat <strong>Pratinjau SK KGB</strong>.
+            </p>
+            <label className="kgbm-label">
+              Catatan untuk Kanwil
+              <textarea
+                className="kgbm-input"
+                rows={2}
+                value={sk.catatanUpt}
+                onChange={(e) => setSk((f) => ({ ...f, catatanUpt: e.target.value }))}
               />
-            );
-          })}
-          <label className="kgbm-label">
-            Catatan untuk Kanwil
-            <textarea
-              className="kgbm-input"
-              rows={2}
-              value={sk.catatanUpt}
-              onChange={(e) => setSk((f) => ({ ...f, catatanUpt: e.target.value }))}
-            />
-          </label>
+            </label>
+          </div>
         </div>
-      </div>
+      )}
       {pratinjauSk && (
         <ModalPratinjauSkUsulan isian={pratinjauSk} nama={isian.nama || pegawai?.nama || "Pegawai"} onTutup={() => setPratinjauSk(null)} />
       )}

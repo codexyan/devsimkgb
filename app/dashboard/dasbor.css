@@ -1636,6 +1636,45 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 .upt-papan-ket { flex-basis: 100%; font-size: 11.5px; font-weight: 400; color: var(--dt5); }
 .upt-papan-kaki { flex: none; padding: 8px; border-top: 1px solid var(--ln2); }
 /* Pencarian di Perlu dikerjakan; menempel di atas saat kolomnya digulir (ADR-060). */
+/* Garis langkah isian data pegawai (ADR-083): formulir per pegawai dan Usul KGB Kolektif. */
+.lgk { display: grid; gap: 8px; margin: 2px 0 4px; }
+.lgk ol { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+.lgk li { position: relative; }
+/* Garis penghubung dari langkah sebelumnya; hijau bila langkah sebelumnya lengkap. */
+.lgk li + li::before { content: ""; position: absolute; top: 13px; left: calc(-50% + 16px); right: calc(50% + 16px); height: 2px;
+  border-radius: 99px; background: var(--ln1); }
+.lgk li[data-keadaan="lengkap"] + li::before { background: var(--st-green); }
+.lgk button { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 100%; padding: 0; border: 0;
+  background: none; font: inherit; color: var(--dt4); cursor: pointer; }
+.lgk-bulat { position: relative; z-index: 1; display: grid; place-items: center; flex: none; width: 28px; height: 28px;
+  border: 2px solid var(--ln1); border-radius: 99px; background: var(--card); font-size: 12px; font-weight: 700; color: var(--dt4);
+  transition: background .15s, border-color .15s, box-shadow .15s; }
+.lgk li[data-keadaan="lengkap"] .lgk-bulat { border-color: var(--st-green); background: var(--st-green); color: #fff; }
+.lgk li[data-keadaan="kurang"] .lgk-bulat { border-color: var(--st-amber); color: var(--st-amber); }
+.lgk li[data-aktif] .lgk-bulat { border-color: var(--accent); background: var(--accent); color: var(--card); box-shadow: 0 0 0 4px var(--accent-bg); }
+.lgk button:hover .lgk-bulat { border-color: var(--accent); }
+.lgk button:focus-visible { outline: none; }
+.lgk button:focus-visible .lgk-bulat { box-shadow: var(--focus-ring); }
+.lgk-judul { font-size: 11.5px; font-weight: 600; line-height: 1.25; text-align: center; }
+.lgk li[data-aktif] .lgk-judul { color: var(--dtn); }
+.lgk-ket { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--tint-navy); font-size: 12.5px; line-height: 1.5; color: var(--dt3); }
+.lgk-ket strong { color: var(--dtn); }
+.lgk-ringkas { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.lgk-ringkas button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 1px solid var(--ln1);
+  border-radius: 10px; background: var(--card); font: inherit; text-align: left; cursor: pointer; }
+.lgk-ringkas button:hover { border-color: var(--accent); }
+.lgk-ringkas li[data-keadaan="lengkap"] .lgk-bulat { border-color: var(--st-green); background: var(--st-green); color: #fff; }
+.lgk-ringkas li[data-keadaan="kurang"] .lgk-bulat { border-color: var(--st-amber); color: var(--st-amber); }
+.lgk-ringkas li[data-keadaan="kurang"] button { border-color: var(--tint-amber-ln); background: var(--tint-amber-bg); }
+.lgk-ringkas strong { display: block; font-size: 13px; color: var(--dtn); }
+.lgk-ringkas small { display: block; font-size: 12px; line-height: 1.45; color: var(--dt4); }
+.kol-isian-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px 12px; }
+.lgk-nav { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding-top: 4px; }
+@media (max-width: 640px) {
+  /* Di ponsel judul tiap langkah disembunyikan; keterangan di bawahnya menyebut langkah yang aktif. */
+  .lgk-judul { display: none; }
+  .lgk li + li::before { left: calc(-50% + 15px); right: calc(50% + 15px); }
+}
 /* Garis tahap KGB pada kartu papan UPT (ADR-082). */
 .upt-tahap { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .upt-tahap ol { display: flex; gap: 3px; margin: 0; padding: 0; list-style: none; }

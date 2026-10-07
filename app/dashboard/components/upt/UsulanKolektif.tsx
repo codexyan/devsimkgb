@@ -36,6 +36,10 @@ import {
   type IsianSkBaru,
 } from "./skSesudahAcuan";
 import ModalPratinjauSkUsulan from "./ModalPratinjauSkUsulan";
+import { GarisLangkah, RingkasanLangkah } from "./GarisLangkah";
+import { LANGKAH_ISIAN, cekIsianPegawai, langkahAwal, type CekIsian, type NomorLangkah } from "./langkahIsian";
+import { BIDANG_IDENTITAS, PILIHAN_BIDANG } from "./FormulirUsulan";
+import { denganNilaiSaatIni } from "@/lib/pilihanPegawai";
 
 /* Usul KGB Kolektif Admin UPT (ADR-015, ADR-029): usul KGB beberapa pegawai dalam satu surat Srikandi. Halaman dibuka
    pada pegawai jatuh tempo periode ini; perbaikan data dan draf pegawai baru hasil Unggah daftar hanya ikut bila
@@ -180,8 +184,7 @@ const berubah = (b: Baris) =>
 
 /* ── Kelengkapan satu baris: dihitung di peramban untuk lingkar kemajuan dan daftar kekurangan. Server tetap
    menjadi penentu akhir (kekurangan draf dari /api/upt/usulan) saat diajukan. ─────────────────────────────── */
-function kelengkapan(b: Baris): { selesai: number; total: number; kurang: string[] } {
-  const kurang: string[] = [];
+function kelengkapan(b: Baris): { selesai: number; total: number; kurang: string[]; cek: CekIsian[] } {
   // Golongan dan masa kerja golongan hanya berubah karena kenaikan pangkat, PMK, atau salah ketik (ADR-030).
   const perluSebab =
     b.jenis !== "baru" &&
@@ -190,46 +193,45 @@ function kelengkapan(b: Baris): { selesai: number; total: number; kurang: string
         .filter((k) => (b.isian[k] ?? "") !== (b.awal[k] ?? ""))
         .map((kunci) => ({ kunci })),
     );
-  const kurangDasar = kekuranganDasarBaru(
-    {
-      dasarBaruJenis: b.dasar.jenis,
-      dasarBaruJenisKp: b.dasar.jenisKp,
-      dasarBaruNomorSk: b.dasar.nomorSk,
-      dasarBaruTanggalSk: b.dasar.tanggalSk,
-      dasarBaruTmt: b.dasar.tmt,
-    },
-    perluSebab,
-  );
-  // Pertanyaan SK sesudah SK KGB terakhir wajib dijawab (ADR-065); isian SK yang dilaporkan, atau sebab koreksi bila
-  // golongan atau masa kerja berubah tanpa SK, ditagih sesudahnya.
   const jawaban = jawabanSkBaru(b.dasar.jenis);
-  const cek: [boolean, string][] = [
-    [!!jawaban, `jawaban SK sesudah ${b.pernah ? "SK KGB terakhir" : "SK CPNS"}`],
-    ...(jawaban === "ada" || (jawaban === "tidak" && perluSebab)
-      ? ([[kurangDasar.length === 0, jawaban === "ada" ? "isian SK yang dilaporkan" : "sebab golongan atau masa kerja berubah"]] as [boolean, string][])
-      : []),
-    [!!b.isian.golonganRuang, "golongan"],
-    [!b.pernah || /^\d+$/.test(b.isian.mkgTahun ?? ""), "masa kerja"],
-    [!!b.isian.tmtKgbTerakhir, b.pernah ? "TMT KGB terakhir" : "TMT CPNS"],
-    [!!b.isian.nomorSkTerakhir?.trim(), b.pernah ? "nomor SK KGB terakhir" : "nomor SK CPNS"],
-    [!!b.isian.tanggalSkTerakhir, b.pernah ? "tanggal SK KGB terakhir" : "tanggal SK CPNS"],
-  ];
-  // SK yang dilaporkan menuntut isiannya sendiri di bagian SK: golongan baru untuk kenaikan pangkat dan masa kerja golongan
-  // menurut SK. Tanpa itu persetujuan Kanwil gagal menghitung SK-nya; server menagih hal yang sama (ADR-065, ADR-078).
-  if (jawaban === "ada") {
-    if (b.dasar.jenis === "kp") cek.push([!!b.dasar.golongan, "golongan baru menurut SK kenaikan pangkat"]);
-    cek.push([b.dasar.mkgTahun !== "", b.dasar.jenis === "kp" ? "masa kerja golongan menurut SK kenaikan pangkat" : "masa kerja golongan menurut SK PMK"]);
-    // Hitungan sesudah SK harus dapat dijalankan, sama dengan saat Kanwil menyetujui.
-    const h = hitunganBaris(b).sesudahSk;
-    if (h && !h.ok) cek.push([false, h.pesan.replace(/\.$/, "")]);
-  }
-  // Pindaian SK PMK ditagih bersama berkas lain bila sebabnya PMK (ADR-045), sama dengan formulir perorangan.
-  for (const jenis of [...berkasUntukKeadaan(b.pernah), ...berkasDasarBaru(b.dasar.jenis)].filter((j) => j.wajib)) {
-    const ada = !!b.berkas[jenis.medan] || b.tersimpan.some((t) => t.medan === jenis.medan) || b.bawaan.some((t) => t.medan === jenis.medan);
-    cek.push([ada, jenis.label]);
-  }
-  for (const [ok, label] of cek) if (!ok) kurang.push(label);
-  return { selesai: cek.length - kurang.length, total: cek.length, kurang };
+  const sesudahSk = jawaban === "ada" ? hitunganBaris(b).sesudahSk : null;
+  const ada = (medan: string) =>
+    !!b.berkas[medan] || b.tersimpan.some((t) => t.medan === medan) || b.bawaan.some((t) => t.medan === medan);
+  // Syarat yang sama dengan formulir per pegawai, ditandai langkahnya (ADR-083).
+  const cek = cekIsianPegawai({
+    jenis: b.jenis,
+    nama: b.isian.nama ?? b.nama,
+    nip: b.isian.nip ?? b.nip,
+    jabatan: b.isian.jabatan ?? "",
+    pernah: b.pernah,
+    golongan: b.isian.golonganRuang ?? "",
+    mkgTahun: b.isian.mkgTahun ?? "",
+    tmtAcuan: b.isian.tmtKgbTerakhir ?? "",
+    nomorSkAcuan: b.isian.nomorSkTerakhir ?? "",
+    tanggalSkAcuan: b.isian.tanggalSkTerakhir ?? "",
+    jawaban,
+    perluSebab,
+    kurangDasar: kekuranganDasarBaru(
+      {
+        dasarBaruJenis: b.dasar.jenis,
+        dasarBaruJenisKp: b.dasar.jenisKp,
+        dasarBaruNomorSk: b.dasar.nomorSk,
+        dasarBaruTanggalSk: b.dasar.tanggalSk,
+        dasarBaruTmt: b.dasar.tmt,
+      },
+      perluSebab,
+    ),
+    dasarJenis: b.dasar.jenis,
+    golonganSk: b.dasar.golongan,
+    mkgTahunSk: b.dasar.mkgTahun,
+    galatSesudahSk: sesudahSk && !sesudahSk.ok ? sesudahSk.pesan : null,
+    berkas: [
+      ...berkasUntukKeadaan(b.pernah).filter((j) => j.wajib).map((j) => ({ label: j.label, langkah: 3 as const, ada: ada(j.medan) })),
+      ...berkasDasarBaru(b.dasar.jenis).filter((j) => j.wajib).map((j) => ({ label: j.label, langkah: 4 as const, ada: ada(j.medan) })),
+    ],
+  });
+  const kurang = cek.filter((c) => !c.ok).map((c) => c.label);
+  return { selesai: cek.length - kurang.length, total: cek.length, kurang, cek };
 }
 
 /** Hitungan menurut SK acuan dan sesudah SK yang dilaporkan, dengan cara persetujuan Kanwil (ADR-078). */
@@ -1226,6 +1228,8 @@ function DetailBaris({
   onBerikut?: () => void;
 }) {
   const k = kelengkapan(b);
+  // Langkah yang dibuka: yang pertama masih kurang. Panel dipasang ulang tiap berganti pegawai (key), jadi mulai baru.
+  const [langkah, setLangkah] = useState<NomorLangkah>(() => langkahAwal(k.cek));
   const perluSebab =
     b.jenis !== "baru" &&
     perluDasarBaru(
@@ -1274,16 +1278,55 @@ function DetailBaris({
 
       <div className="kol-md-isi">
         {b.keadaan === "galat" && b.pesan && <p className="pmh-galat">{b.pesan}</p>}
-        {k.kurang.length > 0 ? (
-          <p className="kol-kurang">
-            <span aria-hidden="true">!</span> Belum lengkap: {k.kurang.join(", ")}.
-          </p>
-        ) : (
-          <p className="kol-kurang" data-lengkap="">
-            <span aria-hidden="true">✓</span> Data dan berkas wajib sudah lengkap.
-          </p>
+        <GarisLangkah aktif={langkah} cek={k.cek} onPilih={setLangkah} />
+
+        {/* ── Langkah 1: identitas; 2: jabatan (ADR-083) ── */}
+        {(langkah === 1 || langkah === 2) && (
+          <div className="kol-bagian">
+            <div className="kol-isian-grid">
+              {(langkah === 1
+                ? ["nip", ...BIDANG_DIISI.filter((x) => BIDANG_IDENTITAS.has(x.kunci)).map((x) => x.kunci)]
+                : ["jabatan", "jenisJabatan", "eselon"]
+              ).map((kunci) => {
+                const bidang = BIDANG_DIISI.find((x) => x.kunci === kunci);
+                const judul = kunci === "nip" ? "NIP (18 digit)" : (bidang?.label ?? kunci);
+                const wajib = b.jenis === "baru" && (kunci === "nip" || kunci === "nama" || kunci === "jabatan");
+                const pilihan = PILIHAN_BIDANG[kunci];
+                const nilai = b.isian[kunci] ?? "";
+                return (
+                  <label key={kunci} className="kol-label">
+                    <span className={wajib ? "kol-wajib" : undefined}>{judul}</span>
+                    {pilihan ? (
+                      <select className="kol-isi" data-beda={beda(kunci)} value={nilai} onChange={(e) => onIsi(kunci, e.target.value)}>
+                        <option value="">Belum diisi</option>
+                        {denganNilaiSaatIni(pilihan, nilai).map((x) => (
+                          <option key={x} value={x}>{x}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        className="kol-isi"
+                        data-beda={beda(kunci)}
+                        type={bidang?.jenis === "tanggal" ? "date" : "text"}
+                        inputMode={kunci === "nip" ? "numeric" : undefined}
+                        value={nilai}
+                        onChange={(e) => onIsi(kunci, kunci === "nip" ? e.target.value.replace(/\D/g, "").slice(0, 18) : e.target.value)}
+                      />
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+            <p className="kol-catatan-kecil">
+              {b.jenis === "baru"
+                ? "Sesuai SK pengangkatan. Isian bertanda * wajib bagi pegawai baru."
+                : "Terisi dari data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; isian yang berubah ditandai kuning."}
+            </p>
+          </div>
         )}
 
+        {langkah === 3 && (
+        <>
         <div className="kol-bagian">
           <p className="kol-subjudul">Keadaan KGB</p>
           <div className="kol-pilihan" role="radiogroup" aria-label="Keadaan KGB">
@@ -1362,7 +1405,12 @@ function DetailBaris({
           </p>
           {pratinjauSk && <ModalPratinjauSkUsulan isian={pratinjauSk} nama={b.nama} onTutup={() => setPratinjauSk(null)} />}
         </div>
+        {daftarBerkas(berkasUntukKeadaan(b.pernah), `Berkas ${skAcuan}`)}
+        </>
+        )}
 
+        {langkah === 4 && (
+        <>
         <div className="kol-bagian">
           <p className="kol-subjudul">
             SK sesudah {skAcuan} <span>kenaikan pangkat, penyesuaian ijazah, atau PMK yang belum tercatat di SIM-KGB</span>
@@ -1530,24 +1578,22 @@ function DetailBaris({
           </div>
         )}
 
+        {daftarBerkas(berkasDasarBaru(b.dasar.jenis), "Berkas SK yang dilaporkan")}
+        </>
+        )}
+
+        {langkah === 5 && (
+        <>
         <div className="kol-bagian">
-          <p className="kol-subjudul">Berkas pendukung</p>
-          <div className="kol-berkas-daftar">
-            {[...berkasUntukKeadaan(b.pernah), ...berkasDasarBaru(b.dasar.jenis)].map((jenis) => {
-              const ada = b.tersimpan.find((t) => t.medan === jenis.medan) ?? b.bawaan.find((t) => t.medan === jenis.medan);
-              return (
-                <KotakBerkas
-                  key={jenis.medan}
-                  label={jenis.label}
-                  wajib={jenis.wajib}
-                  keterangan={jenis.keterangan}
-                  berkas={b.berkas[jenis.medan]}
-                  tersimpan={ada ? { nama: ada.nama ?? jenis.label, bawaan: !!ada.usulanId } : null}
-                  onPilih={(f) => onBerkas(jenis.medan, f)}
-                />
-              );
-            })}
-          </div>
+          <p className="kol-subjudul">
+            Periksa <span>tekan langkah yang masih kurang untuk melengkapinya</span>
+          </p>
+          <RingkasanLangkah cek={k.cek} onPilih={setLangkah} />
+          <p className="kol-catatan-kecil">
+            {k.kurang.length === 0
+              ? "Data dan berkas wajib sudah lengkap. Simpan, lalu centang pegawai ini pada langkah Ajukan."
+              : "Isian tetap tersimpan walau belum lengkap; lengkapi sebelum diajukan."}
+          </p>
         </div>
 
         <div className="kol-bagian">
@@ -1558,7 +1604,58 @@ function DetailBaris({
             <textarea className="kol-isi" rows={2} value={b.catatanUpt} onChange={(e) => onCatatan(e.target.value)} placeholder="mis. SK kenaikan pangkat terbaru masih diproses BKN" />
           </label>
         </div>
+        </>
+        )}
+
+        <div className="lgk-nav">
+          <button
+            type="button"
+            className="dsb-tombol dsb-tombol-kecil"
+            data-jenis="garis"
+            disabled={langkah === 1}
+            onClick={() => setLangkah((langkah - 1) as NomorLangkah)}
+          >
+            ← {LANGKAH_ISIAN.find((l) => l.n === langkah - 1)?.judul ?? "Sebelumnya"}
+          </button>
+          {langkah < 5 ? (
+            <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => setLangkah((langkah + 1) as NomorLangkah)}>
+              {LANGKAH_ISIAN.find((l) => l.n === langkah + 1)?.judul} →
+            </button>
+          ) : onBerikut ? (
+            <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={onBerikut}>
+              Pegawai berikutnya →
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
+
+  /** Kotak unggah berkas untuk satu langkah: SK acuan di langkah 3, SK yang dilaporkan di langkah 4 (ADR-083). */
+  function daftarBerkas(daftar: ReturnType<typeof berkasUntukKeadaan> | ReturnType<typeof berkasDasarBaru>, judul: string) {
+    if (daftar.length === 0) return null;
+    return (
+      <div className="kol-bagian">
+        <p className="kol-subjudul">
+          {judul} <span>PDF, paling besar 500 KB</span>
+        </p>
+        <div className="kol-berkas-daftar">
+          {daftar.map((jenis) => {
+            const ada = b.tersimpan.find((t) => t.medan === jenis.medan) ?? b.bawaan.find((t) => t.medan === jenis.medan);
+            return (
+              <KotakBerkas
+                key={jenis.medan}
+                label={jenis.label}
+                wajib={jenis.wajib}
+                keterangan={jenis.keterangan}
+                berkas={b.berkas[jenis.medan]}
+                tersimpan={ada ? { nama: ada.nama ?? jenis.label, bawaan: !!ada.usulanId } : null}
+                onPilih={(f) => onBerkas(jenis.medan, f)}
+              />
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 }
