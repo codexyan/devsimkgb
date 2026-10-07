@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cekSesuaiUsulan } from "@/lib/sesuaiUsulanServer";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { akunUpt } from "@/lib/auth/akunUpt";
@@ -52,8 +53,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ kgbId: 
   await muatKppnSatker();
   const isi = await dataSuratTersimpan({ kgb, pegawai, surat });
   if (!isi.ok) return NextResponse.json({ error: isi.pesan }, { status: isi.status });
+  // Mengapa SK ini perlu diperiksa: bedanya dengan usulan UPT yang disetujui (ADR-082).
+  const cek = await cekSesuaiUsulan(kgb, pegawai);
   return NextResponse.json({
     surat: isi.surat,
+    bedaUsulan: cek.sesuai ? null : { alasan: cek.alasan, beda: cek.beda },
     reviewSk: infoReviewSk(review, { aktif: true, unitKerja: pegawai.unitKerja }),
     pegawai: { nama: pegawai.nama, nip: pegawai.nip, jabatan: pegawai.jabatan },
   });

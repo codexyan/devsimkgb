@@ -1105,13 +1105,25 @@ export default async function IsiPanduan({
 
                 <h3 className="pub-h3">Sebelum SK ditandatangani: periksa SK dari Kanwil</h3>
                 <p>
-                  Setelah Kanwil membuat SK KGB pegawai satker Anda, kartu <strong>Review SK KGB</strong> muncul di kolom{" "}
-                  <strong>Periksa SK</strong> pada papan Alur KGB, disertai lonceng. Tekan <strong>Periksa SK</strong>: pratinjaunya bertanda air DRAF, dan isinya
+                  Saat Kanwil membuat SK KGB pegawai satker Anda, sistem membandingkannya dengan usulan Anda yang sudah
+                  disetujui: golongan, masa kerja, gaji pokok lama dan baru, TMT, dan Atas dasar SK. Bila semuanya sama, SK
+                  tercatat <em>sesuai usulan Anda</em> dan Kanwil langsung mencetaknya tanpa meminta review lagi, sebab hitungan
+                  itu sudah Anda lihat lewat Pratinjau SK saat mengajukan. Bila ada yang berbeda, misalnya data pegawai diubah
+                  Kanwil sesudah usulan disetujui, kartu <strong>Review SK KGB</strong> muncul di kolom{" "}
+                  <strong>Periksa SK</strong> disertai lonceng, dan jendelanya menyebut apa saja yang berbeda. Tekan{" "}
+                  <strong>Periksa SK</strong>: pratinjaunya bertanda air DRAF, dan isinya
                   sama dengan yang kelak dicetak. Periksa nama, NIP, pangkat dan golongan, gaji pokok, masa kerja, serta TMT.
                   Bila semuanya benar, centang pernyataan lalu tekan <strong>SK sudah benar</strong>; Kanwil baru mencetaknya
                   untuk ditandatangani basah, mengirimnya lewat Srikandi, dan mengunggah TTE-nya. Bila ada yang keliru, tekan{" "}
                   <strong>Minta perbaikan</strong> dan tulis apa yang harus dibetulkan; setelah Kanwil memperbaikinya,
                   permintaan review muncul lagi.
+                </p>
+                <p>
+                  <strong>Tahap pada kartu.</strong> Tiap kartu di papan Alur KGB memuat garis enam tahap: Usulan,
+                  Disetujui, SK dibuat, Diperiksa, TTE, dan Direkam. Kartu yang kembali ke kolom Di Kanwil sesudah Anda
+                  memeriksa SK tidak mundur: ia sudah berada di tahap TTE. Setelah usulan Anda disetujui, kartu tetap di Di
+                  Kanwil dengan keterangan <em>Data disetujui, menunggu Kanwil memproses KGB</em>; pegawai itu tidak perlu
+                  diusulkan lagi untuk KGB yang sama.
                 </p>
 
                 <h3 className="pub-h3">Langkah 6: Setelah SK terbit, unduh dan rekam di Gaji Web</h3>
@@ -1681,7 +1693,8 @@ export default async function IsiPanduan({
                     <p>
                       <strong>SK pegawai UPT direview Admin UPT lebih dulu.</strong> Untuk pegawai UPT, tombolnya menjadi{" "}
                       <strong>Buat SK dan minta review UPT</strong>: SK tercatat, tetapi tidak diunduh, dan Admin UPT satker
-                      itu menerima permintaan review di lonceng dan di kolom Periksa SK. Selama belum disetujui, kartu
+                      itu menerima permintaan review di lonceng dan di kolom Periksa SK, kecuali SK-nya sama dengan usulan
+                      UPT yang disetujui: SK itu langsung tercatat <em>Sesuai usulan UPT, siap cetak</em>. Selama belum disetujui, kartu
                       pegawai bertanda <em>Menunggu review UPT</em>, setiap unduhan SK bertanda air DRAF, dan Unggah SK TTE
                       ditolak. Bila UPT meminta perbaikan, kartu bertanda merah beserta catatannya; pilih Perbaiki SK, dan
                       review diminta ulang otomatis. Setelah UPT menyatakan SK sudah benar, tekan <strong>Cetak SK</strong>{" "}

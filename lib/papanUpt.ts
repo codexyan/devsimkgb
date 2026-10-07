@@ -118,3 +118,50 @@ export function kartuPerKolom<T extends SumberKartu>(
   }
   return hasil;
 }
+
+/**
+ * Tahap satu KGB dari kacamata UPT (ADR-082). Kartu menampilkannya supaya perpindahan antar-kolom terbaca sebagai maju:
+ * kartu yang kembali ke Di Kanwil sesudah Periksa SK sedang menunggu tanda tangan, bukan mundur.
+ */
+export const TAHAP_KGB_UPT = ["Usulan", "Disetujui", "SK dibuat", "Diperiksa", "TTE", "Direkam"] as const;
+
+export type KeadaanTahap =
+  | "usulan_disiapkan"
+  | "usulan_ditinjau"
+  | "menunggu_proses"
+  | "sk_dibuat"
+  | "sk_diperiksa"
+  | "sk_diperbaiki"
+  | "tte"
+  | "sk_terbit"
+  | "selesai";
+
+/** Indeks tahap yang sedang berjalan (0 sampai 5); 6 berarti semua tahap selesai. */
+export function indeksTahap(k: KeadaanTahap): number {
+  switch (k) {
+    case "usulan_disiapkan":
+      return 0;
+    case "usulan_ditinjau":
+      return 1;
+    case "menunggu_proses":
+    case "sk_dibuat":
+    case "sk_diperbaiki":
+      return 2;
+    case "sk_diperiksa":
+      return 3;
+    case "tte":
+      return 4;
+    case "sk_terbit":
+      return 5;
+    case "selesai":
+      return 6;
+  }
+}
+
+/** Keadaan tahap KGB yang sedang diproses Kanwil menurut status review SK-nya. */
+export function tahapProsesKgb(statusReview: string | null | undefined): KeadaanTahap {
+  if (statusReview === "menunggu") return "sk_diperiksa";
+  if (statusReview === "perbaikan") return "sk_diperbaiki";
+  if (statusReview === "disetujui" || statusReview === "sesuai" || statusReview === "dilewati") return "tte";
+  return "sk_dibuat";
+}

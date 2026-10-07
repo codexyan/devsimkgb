@@ -64,22 +64,24 @@ export async function mintaReviewSk(input: {
   /** "Nama (NIP)" peminta. */
   oleh: string;
   sekarang: Date;
+  /** SK sama dengan usulan UPT yang disetujui (lib/sesuaiUsulanServer.ts): tercatat "sesuai", tanpa review ulang (ADR-082). */
+  sesuaiUsulan?: boolean;
 }): Promise<{ aktif: false } | { aktif: true; review: ReviewSkUptRow }> {
-  const { kgb, pegawai, nomorSurat, tanggalSurat, oleh, sekarang } = input;
+  const { kgb, pegawai, nomorSurat, tanggalSurat, oleh, sekarang, sesuaiUsulan = false } = input;
   const ada = await muatReviewSk(kgb.id);
   if (!ada.aktif) return { aktif: false };
 
   const isi = {
     pegawaiId: pegawai.id,
     satker: kodeSatkerPegawai(pegawai.unitKerja),
-    status: "menunggu",
+    status: sesuaiUsulan ? "sesuai" : "menunggu",
     versi: (ada.review?.versi ?? 0) + 1,
     nomorSurat,
     tanggalSurat,
     dimintaAt: sekarang,
     dimintaOleh: oleh,
-    ditanggapiAt: null,
-    ditanggapiOleh: null,
+    ditanggapiAt: sesuaiUsulan ? sekarang : null,
+    ditanggapiOleh: sesuaiUsulan ? "Sistem: sesuai usulan UPT" : null,
     catatan: null,
     alasanLewati: null,
   };
@@ -89,6 +91,8 @@ export async function mintaReviewSk(input: {
 
   // Lonceng lama (permintaan dan hasil versi sebelumnya) tidak berlaku lagi untuk SK yang baru.
   await tutupLonceng(kgb.id, [TIPE_NOTIFIKASI.REVIEW_SK, TIPE_NOTIFIKASI.REVIEW_SK_HASIL]);
+  // SK yang sesuai usulan tidak meminta apa pun dari UPT, jadi tanpa lonceng.
+  if (sesuaiUsulan) return { aktif: true, review };
   try {
     await db.notifikasi.create({
       ...notifikasiReviewSk(kgb, pegawai, { nomorSurat, versi: review.versi }),

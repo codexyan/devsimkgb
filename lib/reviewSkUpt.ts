@@ -9,9 +9,10 @@
 import { dipegangKeuanganKanwil } from "./aksesUpt";
 import type { ReviewSkUptRow } from "./sheets/tables";
 
-export type StatusReviewSk = "menunggu" | "disetujui" | "perbaikan" | "dilewati";
+/** "sesuai": SK sama dengan usulan UPT yang disetujui, jadi tidak perlu direview ulang (ADR-082). */
+export type StatusReviewSk = "menunggu" | "disetujui" | "perbaikan" | "dilewati" | "sesuai";
 
-export const STATUS_REVIEW_SK: readonly StatusReviewSk[] = ["menunggu", "disetujui", "perbaikan", "dilewati"];
+export const STATUS_REVIEW_SK: readonly StatusReviewSk[] = ["menunggu", "disetujui", "perbaikan", "dilewati", "sesuai"];
 
 /** Label untuk Kanwil dan UPT; nada mengikuti penanda lain di dasbor. */
 export const LABEL_REVIEW_SK: Record<StatusReviewSk, { kanwil: string; upt: string; nada: "ungu" | "hijau" | "merah" | "kuning" }> = {
@@ -19,6 +20,7 @@ export const LABEL_REVIEW_SK: Record<StatusReviewSk, { kanwil: string; upt: stri
   disetujui: { kanwil: "Disetujui UPT, siap cetak", upt: "SK disetujui, menunggu ttd dan TTE", nada: "hijau" },
   perbaikan: { kanwil: "UPT minta perbaikan", upt: "Menunggu perbaikan SK di Kanwil", nada: "merah" },
   dilewati: { kanwil: "Review dilewati", upt: "SK dilanjutkan Kanwil tanpa review", nada: "kuning" },
+  sesuai: { kanwil: "Sesuai usulan UPT, siap cetak", upt: "SK sesuai usulan Anda, menunggu ttd dan TTE", nada: "hijau" },
 };
 
 /** Tanda air pada PDF SK yang belum boleh ditandatangani. */
@@ -73,10 +75,10 @@ export function infoReviewSk(
 
 /**
  * SK boleh dicetak bersih dan diunggah TTE-nya. Tidak wajib review (pegawai Kanwil, review belum aktif), review belum
- * pernah diminta (SK lama), sudah disetujui UPT, atau dilewati Super Admin.
+ * pernah diminta (SK lama), sudah disetujui UPT, sesuai usulan UPT (ADR-082), atau dilewati Super Admin.
  */
 export function skBolehDicetak(info: Pick<InfoReviewSk, "status"> | null | undefined): boolean {
-  return !info || info.status === null || info.status === "disetujui" || info.status === "dilewati";
+  return !info || info.status === null || info.status === "disetujui" || info.status === "sesuai" || info.status === "dilewati";
 }
 
 /** Alasan Unggah TTE ditolak karena review UPT; null bila boleh. */

@@ -222,11 +222,11 @@ export function LayarPapan() {
       keterangan={[
         "Perlu dikerjakan: draf yang belum Anda ajukan, dan usulan yang dikembalikan Kanwil beserta catatannya.",
         "Di Kanwil: sudah Anda ajukan. Datanya terkunci di sini, sebab peninjau harus melihat persis apa yang dikirim.",
-        "Periksa SK: SK KGB yang dibuat Kanwil dan menunggu Anda periksa sebelum dicetak dan ditandatangani.",
+        "Periksa SK: SK KGB yang dibuat Kanwil dan berbeda dari usulan Anda; SK yang sama dengan usulan langsung dicetak Kanwil.",
         "SK terbit: SK sudah ditandatangani. Unduh SK-nya, rekam di Gaji Web satker, lalu tandai di sini.",
         "Selesai: KGB yang SK-nya sudah Anda rekam di Gaji Web. Hanya itu; usulan yang disetujui tidak masuk ke sini.",
       ]}
-      catatan="Satu pegawai selalu satu kartu. Bila orang yang sama punya beberapa dokumen berjalan, kartunya berada di kolom yang paling perlu Anda kerjakan. Kotak cari di kepala papan mencari nama atau NIP di semua kolom sekaligus; kolom yang diciutkan terbuka sendiri bila ada yang cocok."
+      catatan="Satu pegawai selalu satu kartu. Bila orang yang sama punya beberapa dokumen berjalan, kartunya berada di kolom yang paling perlu Anda kerjakan. Kotak cari di kepala papan mencari nama atau NIP di semua kolom sekaligus; kolom yang diciutkan terbuka sendiri bila ada yang cocok. Garis tahap pada kartu (Usulan, Disetujui, SK dibuat, Diperiksa, TTE, Direkam) menunjukkan sampai mana KGB-nya."
       anak={
         <div className="lyr-papan">
           {kolom.map(([judul, nada, jumlah, ket], i) => (
