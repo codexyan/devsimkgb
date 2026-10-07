@@ -1,7 +1,7 @@
 # ADR-078: SK KGB terakhir dan SK sesudahnya dipisah di formulir UPT, serta pratinjau SK dari usulan
 
 Tanggal: 7 Oktober 2026
-Status: berlaku
+Status: berlaku; keputusan 5 (bagian atas dikunci ke data tercatat) diganti ADR-079
 
 ## Konteks
 

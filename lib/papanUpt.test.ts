@@ -116,3 +116,14 @@ test("draf terkunci kalah dari dokumen lain milik pegawai yang sama, sehingga SK
   assert.deepEqual(per.kunci.map((k) => k.kunci), ["usulan:c"]);
   assert.deepEqual(per.kerja, []);
 });
+
+test("SK KGB yang menunggu review UPT berada di kolom Periksa SK, didahulukan atas SK terbit dan Di Kanwil (ADR-079)", () => {
+  const hasil = gabungKartuUpt([
+    s({ kunci: "laporan:1", kolom: "kanwil", pegawaiId: "p3", nip: "3", ringkas: "laporan di Kanwil" }),
+    s({ kunci: "proses:p3", kolom: "periksa", pegawaiId: "p3", nip: "3", ringkas: "SK KGB menunggu review Anda" }),
+  ]);
+  assert.equal(hasil[0].kolom, "periksa");
+  const per = kartuPerKolom([s({ kunci: "proses:p4", kolom: "periksa", pegawaiId: "p4", nip: "4" })]);
+  assert.equal(per.periksa.length, 1);
+  assert.equal(per.kerja.length, 0, "tidak lagi bercampur dengan draf di Perlu dikerjakan");
+});
