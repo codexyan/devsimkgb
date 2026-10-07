@@ -186,9 +186,14 @@ export async function GET() {
         }),
         skDiUsulan: skDiUsulan.get(p.id) ?? null,
         // Pengingat pemeriksaan hanya selama perbaikan masih berguna: KGB belum diinput Kanwil dan
-        // batas inputnya belum lewat. Sesudahnya, tanpa usulan, datanya dianggap benar (lib/tugasUpt.ts).
+        // batas inputnya belum lewat. Sesudahnya, tanpa usulan, datanya dianggap benar (lib/tugasUpt.ts). Usulan yang
+        // sudah disetujui untuk siklus ini (konfirmasi berlaku) tidak ditagih lagi (ADR-082).
         perluDiperiksa:
-          !!tmt && (status === null || status === "belum_diproses") && !jendela?.flagRapelan && !jenisUsulanPegawai.has(p.id),
+          !!tmt &&
+          (status === null || status === "belum_diproses") &&
+          !jendela?.flagRapelan &&
+          !jenisUsulanPegawai.has(p.id) &&
+          statusKonfirmasiUpt(p, tmt) !== "berlaku",
         // Nilai kolom yang boleh diusulkan UPT, sebagai isian awal formulir usulan data.
         dataSekarang: Object.fromEntries(
           BIDANG_USULAN.map((bidang) => {

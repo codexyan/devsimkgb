@@ -127,6 +127,20 @@ export default function ModalReviewSk({
             Kanwil sudah membuat SK KGB pegawai ini. Periksa nama, NIP, pangkat dan golongan, gaji pokok, masa kerja, serta TMT
             sebelum SK dicetak, ditandatangani basah, dan dikirim lewat Srikandi. Pratinjau di samping bertanda air DRAF.
           </Catatan>
+          {data?.bedaUsulan && (
+            <Catatan nada="amber">
+              {data.bedaUsulan.alasan}
+              {data.bedaUsulan.beda.length > 0 && (
+                <ul className="kgbm-beda-usulan">
+                  {data.bedaUsulan.beda.map((b) => (
+                    <li key={b.label}>
+                      <strong>{b.label}</strong>: usulan Anda {b.usulan}, SK {b.sk}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Catatan>
+          )}
           {review && review.versi > 1 && (
             <Catatan nada="amber">SK ini sudah diperbaiki Kanwil sesudah permintaan perbaikan sebelumnya. Periksa lagi seluruhnya.</Catatan>
           )}

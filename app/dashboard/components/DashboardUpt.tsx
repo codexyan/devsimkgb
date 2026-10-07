@@ -12,7 +12,7 @@ import { LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasi
 import { BELUM_SELESAI, LABEL_JENIS_USULAN } from "@/lib/usulanPegawai";
 import { kunciNomorSk } from "@/lib/nomorSurat";
 import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
-import { kartuPerKolom, type KolomUpt, type SumberKartu } from "@/lib/papanUpt";
+import { TAHAP_KGB_UPT, indeksTahap, kartuPerKolom, tahapProsesKgb, type KolomUpt, type SumberKartu } from "@/lib/papanUpt";
 import { UKURAN_KIRIMAN, ajukanBertahap } from "./upt/ajukanBertahap";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
 import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
@@ -203,7 +203,7 @@ function keadaan(p: PegawaiUpt): { teks: string; nada?: Nada } {
     // SK yang sudah dibuat Kanwil menunggu review satker ini lebih dulu (ADR-077).
     const r = p.reviewSk?.status;
     if (r === "menunggu") return { teks: LABEL_REVIEW_SK.menunggu.upt, nada: "kuning" };
-    if (r) return { teks: LABEL_REVIEW_SK[r].upt, nada: r === "disetujui" ? "hijau" : "navy" };
+    if (r) return { teks: LABEL_REVIEW_SK[r].upt, nada: r === "disetujui" || r === "sesuai" ? "hijau" : "navy" };
     return { teks: "Sedang diproses Kanwil", nada: "navy" };
   }
   if (p.terkunci) return { teks: "Belum masuk jadwal" };
@@ -242,6 +242,25 @@ const KOSONG_UPT: Record<KolomUpt, string> = {
   selesai: "Belum ada KGB yang direkam di Gaji Web.",
 };
 
+/**
+ * Garis tahap KGB pada kartu (ADR-082): Usulan · Disetujui · SK dibuat · Diperiksa · TTE · Direkam. Kartu yang kembali ke
+ * Di Kanwil sesudah Periksa SK terbaca maju ke tahap TTE, bukan mundur.
+ */
+function TahapKartu({ aktif }: { aktif: number }) {
+  const label =
+    aktif >= TAHAP_KGB_UPT.length ? "Semua tahap selesai" : `Tahap ${aktif + 1} dari ${TAHAP_KGB_UPT.length}: ${TAHAP_KGB_UPT[aktif]}`;
+  return (
+    <div className="upt-tahap" title={TAHAP_KGB_UPT.join(" · ")}>
+      <ol aria-hidden="true">
+        {TAHAP_KGB_UPT.map((t, i) => (
+          <li key={t} data-keadaan={i < aktif ? "selesai" : i === aktif ? "aktif" : undefined} />
+        ))}
+      </ol>
+      <span>{label}</span>
+    </div>
+  );
+}
+
 /** Satu kartu di papan: nama, satu baris keterangan, satu label, catatan pendek, dan tombol. */
 function KartuUpt({
   nama,
@@ -254,6 +273,7 @@ function KartuUpt({
   aksi,
   lain,
   terkunci,
+  tahap,
 }: {
   nama: string;
   sub: string;
@@ -268,6 +288,8 @@ function KartuUpt({
   aksi?: React.ReactNode;
   /** Dokumen lain milik pegawai yang sama, supaya satu orang tetap satu kartu (lib/papanUpt.ts). */
   lain?: string[];
+  /** Tahap KGB yang sedang berjalan (lib/papanUpt.ts, ADR-082); kartu laporan tidak memakainya. */
+  tahap?: number;
 }) {
   return (
     <article
@@ -288,6 +310,7 @@ function KartuUpt({
         </p>
       )}
       {catatan && <p className="upt-kartu-catatan">{catatan}</p>}
+      {tahap !== undefined && <TahapKartu aktif={tahap} />}
       {lain && lain.length > 0 && (
         <p className="upt-kartu-lain">Juga: {lain.join(" · ")}</p>
       )}
@@ -1066,6 +1089,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         render: (lain: string[]) => (
           <KartuUpt
             lain={lain}
+            tahap={0}
             terkunci={!!kunci}
             nama={t.nama}
             // Kartu draf adalah usulan DATA (perbaikan atau pegawai baru), bukan usulan KGB; jenisnya disebut di sini.
@@ -1165,6 +1189,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         render: (lain: string[]) => (
           <KartuUpt
             lain={lain}
+            tahap={1}
             nama={u.nama}
             sub={`${u.nip} · dikirim ${fmtTgl(u.diajukanAt)}`}
             tanda={{ teks: `${LABEL_JENIS_USULAN[u.jenis] ?? u.jenis}: menunggu tinjauan`, nada: "kuning" }}
@@ -1188,6 +1213,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             ? { teks: LABEL_REVIEW_SK.perbaikan.upt, nada: "ungu" }
             : review?.status === "disetujui"
               ? { teks: LABEL_REVIEW_SK.disetujui.upt, nada: "hijau" }
+              : review?.status === "sesuai"
+              ? { teks: LABEL_REVIEW_SK.sesuai.upt, nada: "hijau" }
               : review?.status === "dilewati"
                 ? { teks: LABEL_REVIEW_SK.dilewati.upt, nada: "biru" }
                 : { teks: "SK sedang dibuat Kanwil", nada: "biru" };
@@ -1202,6 +1229,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         render: (lain: string[]) => (
           <KartuUpt
             lain={lain}
+            tahap={indeksTahap(tahapProsesKgb(review?.status))}
             nama={p.nama}
             sub={`${p.nip} · ${tmtSingkat(p.tmtKgb)}`}
             tanda={tanda}
@@ -1224,6 +1252,39 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         ),
       };
     }),
+    // Usulan siklus ini sudah disetujui (konfirmasi berlaku) dan KGB-nya belum diinput Kanwil: kartunya tetap di Di
+    // Kanwil, bukan kembali ke Perlu dikerjakan sebagai "Perlu diperiksa" (ADR-082).
+    ...pegawai
+      .filter(
+        (p) =>
+          p.konfirmasi === "berlaku" &&
+          (p.statusKGB === null || p.statusKGB === "belum_diproses") &&
+          !p.terkunci &&
+          !p.usulanBerjalan,
+      )
+      .map((p) => ({
+        kolom: "kanwil" as const,
+        kunci: `siap:${p.id}`,
+        pegawaiId: p.id,
+        nip: p.nip,
+        nama: p.nama,
+        waktu: p.konfirmasiAt,
+        ringkas: "data disetujui, menunggu Kanwil memproses KGB",
+        render: (lain: string[]) => (
+          <KartuUpt
+            lain={lain}
+            tahap={2}
+            nama={p.nama}
+            sub={`${p.nip} · ${tmtSingkat(p.tmtKgb)}`}
+            tanda={
+              p.terlambat
+                ? { teks: "Lewat batas input Kanwil", nada: "merah" }
+                : { teks: "Data disetujui, menunggu Kanwil memproses KGB", nada: "biru" }
+            }
+            catatan={p.konfirmasiAt ? `Usulan Anda disetujui ${fmtTgl(p.konfirmasiAt)}` : null}
+          />
+        ),
+      })),
     ...laporan
       .filter((l) => l.status === "menunggu")
       .map((l) => ({
@@ -1262,6 +1323,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         render: (lain: string[]) => (
         <KartuUpt
           lain={lain}
+          tahap={5}
           nama={sk.nama}
           sub={`TMT ${fmtTgl(sk.tmtKgbBaru)} · ${sk.golonganBaru} · ${fmtRp(sk.gajiPokokBaru)}`}
           // Berkas SK yang belum diunggah Tim SDM berarti belum dapat direkam; rapelan tetap disebut di catatan.
@@ -1316,6 +1378,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         render: (lain: string[]) => (
           <KartuUpt
             lain={lain}
+            tahap={6}
             nama={sk.nama}
             sub={`TMT ${fmtTgl(sk.tmtKgbBaru)} · ${fmtRp(sk.gajiPokokBaru)}`}
             tanda={{ teks: `Direkam di Gaji Web ${fmtTgl(sk.gajiWebAt)}`, nada: "hijau" }}

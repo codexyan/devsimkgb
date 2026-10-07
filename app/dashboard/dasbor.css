@@ -1636,6 +1636,14 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 .upt-papan-ket { flex-basis: 100%; font-size: 11.5px; font-weight: 400; color: var(--dt5); }
 .upt-papan-kaki { flex: none; padding: 8px; border-top: 1px solid var(--ln2); }
 /* Pencarian di Perlu dikerjakan; menempel di atas saat kolomnya digulir (ADR-060). */
+/* Garis tahap KGB pada kartu papan UPT (ADR-082). */
+.upt-tahap { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.upt-tahap ol { display: flex; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.upt-tahap li { width: 12px; height: 4px; border-radius: 99px; background: var(--ln1); }
+.upt-tahap li[data-keadaan="selesai"] { background: var(--st-green); }
+.upt-tahap li[data-keadaan="aktif"] { width: 20px; background: var(--accent); }
+.upt-tahap span { min-width: 0; overflow: hidden; font-size: 10.5px; color: var(--dt5); text-overflow: ellipsis; white-space: nowrap; }
+.kgbm-beda-usulan { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; }
 .upt-papan-cari { position: sticky; top: 0; z-index: 2; display: grid; gap: 4px; margin: 0 -8px; padding: 0 8px 6px;
   background: var(--sub); }
 .upt-papan-cari .dsb-cari { width: 100%; }

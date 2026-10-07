@@ -410,6 +410,8 @@ export interface ReviewSkUntukUpt {
   surat: DataSuratKGB;
   reviewSk: InfoReviewSk | null;
   pegawai: { nama: string; nip: string; jabatan: string };
+  /** Mengapa SK ini perlu diperiksa: bedanya dengan usulan UPT yang disetujui (ADR-082); null bila sesuai. */
+  bedaUsulan?: { alasan: string; beda: { label: string; usulan: string; sk: string }[] } | null;
 }
 
 export function ambilReviewSkUpt(kgbId: string): Promise<HasilAksi<ReviewSkUntukUpt>> {

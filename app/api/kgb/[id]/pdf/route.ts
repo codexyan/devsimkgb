@@ -17,6 +17,7 @@ import { nomorSkBentrok } from "@/lib/nomorSkBentrok";
 import { susunDataSuratKgb } from "@/lib/dataSuratKgbServer";
 import { infoReviewSk, pegawaiPerluReviewSk, skBolehDicetak } from "@/lib/reviewSkUpt";
 import { mintaReviewSk, muatReviewSk } from "@/lib/reviewSkUptServer";
+import { cekSesuaiUsulan } from "@/lib/sesuaiUsulanServer";
 
 export const runtime = "nodejs";
 
@@ -196,6 +197,8 @@ export async function POST(
     // SK yang dibuat atau diperbaiki adalah SK yang belum pernah dilihat UPT: review diminta (ulang) lebih dulu. Bila
     // permintaan gagal, surat tidak disimpan, sehingga persetujuan untuk SK lama tidak terbawa ke SK yang baru.
     if (perluReview && reviewAwal.aktif) {
+      // SK yang sama dengan usulan UPT yang disetujui tidak direview ulang; yang berbeda masuk Periksa SK (ADR-082).
+      const cek = await cekSesuaiUsulan(kgb, pegawai);
       const minta = await mintaReviewSk({
         kgb,
         pegawai,
@@ -203,6 +206,7 @@ export async function POST(
         tanggalSurat,
         oleh: `${userLogin.nama} (${userLogin.nip})`,
         sekarang: new Date(),
+        sesuaiUsulan: cek.sesuai,
       });
       if (minta.aktif) reviewAkhir = minta.review;
     }
