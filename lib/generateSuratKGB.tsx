@@ -57,8 +57,11 @@ export function daftarkanFontSurat(akar: string): void {
   fontTerdaftar = true;
 }
 
-/** PDF surat KGB dari data yang dikirim server. Hanya dipanggil di peramban. */
-export async function buatPdfSuratKgb(data: DataSuratKGB, srikandi: boolean): Promise<Blob> {
+/**
+ * PDF surat KGB dari data yang dikirim server. Hanya dipanggil di peramban. `draf` berisi teks tanda air untuk SK yang
+ * belum boleh ditandatangani, mis. SK pegawai UPT yang belum disetujui Admin UPT (ADR-077).
+ */
+export async function buatPdfSuratKgb(data: DataSuratKGB, srikandi: boolean, opsi: { draf?: string | null } = {}): Promise<Blob> {
   const akar = window.location.origin;
   daftarkanFontSurat(akar);
   const aset: AsetSurat = {
@@ -66,7 +69,7 @@ export async function buatPdfSuratKgb(data: DataSuratKGB, srikandi: boolean): Pr
     labelSrikandiSrc: srikandi ? `${akar}/label-srikandi.png` : null,
     logoUnggahan: (kunci) => `${akar}/api/template-surat/logo?key=${encodeURIComponent(kunci)}`,
   };
-  return pdf(<SuratKGBDocument {...data} srikandi={srikandi} aset={aset} />).toBlob();
+  return pdf(<SuratKGBDocument {...data} srikandi={srikandi} aset={aset} draf={opsi.draf ?? null} />).toBlob();
 }
 
 // Ukuran halaman, margin, kop, dan huruf berasal dari template berversi (lib/templateSurat.ts, ADR-019).
@@ -238,6 +241,8 @@ interface SuratKGBProps extends DataSuratKGB {
   srikandi?: boolean;
   /** Logo dan label Srikandi; label hanya dipakai pada versi Srikandi. */
   aset: AsetSurat;
+  /** Teks tanda air DRAF; kosong untuk SK yang boleh dicetak dan ditandatangani (ADR-077). */
+  draf?: string | null;
 }
 
 function Baris({ label, nilai, tebal }: { label: string; nilai: string; tebal?: boolean }) {
@@ -454,6 +459,52 @@ export function SuratKGBDocument(props: SuratKGBProps) {
               </View>
             ))}
           </View>
+        )}
+        {/* Tanda air DRAF: miring besar di tengah halaman dan satu baris di bawah, supaya SK yang belum disetujui UPT
+            tidak tercetak untuk ditandatangani (ADR-077). Letaknya mutlak terhadap halaman, seperti logo kop. */}
+        {props.draf && (
+          <View
+            fixed
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: lebar,
+              height: mmKePt(t.kertas.tinggiMm),
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 40,
+                fontWeight: "bold",
+                color: "#B42318",
+                opacity: 0.16,
+                transform: "rotate(-38deg)",
+                textAlign: "center",
+                lineHeight: 1.2,
+              }}
+            >
+              {props.draf}
+            </Text>
+          </View>
+        )}
+        {props.draf && (
+          <Text
+            fixed
+            style={{
+              position: "absolute",
+              left: kiri,
+              right: kanan,
+              bottom: mmKePt(6),
+              fontSize: 8,
+              color: "#B42318",
+              textAlign: "center",
+            }}
+          >
+            {`${props.draf}: belum boleh ditandatangani, dicetak untuk tanda tangan, atau dikirim lewat Srikandi.`}
+          </Text>
         )}
       </Page>
     </Document>

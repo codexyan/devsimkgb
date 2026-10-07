@@ -47,7 +47,9 @@ export async function GET(req: NextRequest) {
     if (!kode) return NextResponse.json([]);
     const idPegawai = new Set(pegawaiSatker(await db.pegawai.findMany(), kode).map((p) => p.id));
     // Riwayat KGB hanya dibaca bila memang ada notifikasi yang menunjuk ke KGB, bukan ke pegawai.
-    const adaSkTerbit = all.some((n) => n.tipe === "sk_terbit");
+    // Kabar SK terbit dan permintaan review SK (ADR-077) menunjuk ke KGB-nya.
+    const menunjukKeKgb = (tipe: string) => tipe === "sk_terbit" || tipe === TIPE_NOTIFIKASI.REVIEW_SK;
+    const adaSkTerbit = all.some((n) => menunjukKeKgb(n.tipe));
     const idKgb = adaSkTerbit
       ? new Set((await db.riwayatKGB.findMany()).filter((k) => idPegawai.has(k.pegawaiId)).map((k) => k.id))
       : new Set<string>();
@@ -60,7 +62,7 @@ export async function GET(req: NextRequest) {
       : new Set<string>();
     const milikSatker = all.filter((n) => {
       const ref = n.referenceId ?? "";
-      if (n.tipe === "sk_terbit") return idKgb.has(ref);
+      if (menunjukKeKgb(n.tipe)) return idKgb.has(ref);
       if (menunjukKeUsulan(n.tipe)) return idUsulan.has(ref);
       return idPegawai.has(ref);
     });

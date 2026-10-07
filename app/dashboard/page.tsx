@@ -8,6 +8,8 @@ import dynamic from "next/dynamic";
 import type { KartuPapan, KolomPapan } from "@/app/dashboard/components/PapanAntrian";
 import type { UsulanMenunggu } from "@/app/dashboard/components/ModalUsulanUpt";
 import { keteranganRingkasan, nadaUmurUsulan, ringkasUsulanPerUpt } from "@/lib/ringkasUsulanUpt";
+import { LABEL_REVIEW_SK, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
+import { cetakSk, mintaReviewSkUpt } from "@/lib/kgbAksi";
 
 /* Satu akun hanya memakai satu dashboard peran. Memuatnya sesuai kebutuhan menekan kerja server per
    permintaan dan biaya mulai isolate; tampilan sementaranya memakai kerangka yang sama dengan panel lain. */
@@ -36,6 +38,7 @@ import {
   ModalBatalkanKgb,
   ModalBuatSk,
   ModalInputKgb,
+  ModalLewatiReview,
   ModalRiwayatKgb,
   ModalUnggahSk,
   dasarAwalInputKgb,
@@ -74,6 +77,8 @@ interface PegawaiJatuhTempo {
   penetapSkDasar: string | null;
   /** SK sudah dibuat di SIM-KGB; syarat Unggah SK TTE. */
   skSudahDibuat: boolean;
+  /** Review SK oleh Admin UPT (ADR-077); null untuk pegawai Kanwil atau selama review belum aktif. */
+  reviewSk?: InfoReviewSk | null;
   suratNomorSurat: string | null;
   /** Tanggal SK baru yang tersimpan; tanpa nilai ini Buat SK memakai tanggal hari ini. */
   suratTanggalSurat?: string | null;
@@ -158,8 +163,10 @@ type ModalAksi =
       dasarAwal: DasarSkAwal;
       nomorSkBaru: string | null;
       tanggalSkBaru: string | null;
+      reviewUpt: InfoReviewSk | null;
     }
   | { jenis: "unggah_sk"; kgbId: string; status: string; pegawai: PegawaiModal }
+  | { jenis: "lewati_review"; kgbId: string; pegawai: PegawaiModal; reviewSk: InfoReviewSk | null }
   | { jenis: "batalkan"; kgbId: string; pegawai: PegawaiModal }
   | { jenis: "riwayat"; pegawai: PegawaiModal };
 
@@ -242,6 +249,9 @@ function DashboardMain() {
   const [usulanPerPegawai, setUsulanPerPegawai] = useState<Map<string, UsulanMenunggu>>(() => new Map());
   const [usulanDibuka, setUsulanDibuka] = useState<UsulanMenunggu | null>(null);
   const [pesanBerhasil, setPesanBerhasil] = useState<string | null>(null);
+  // Galat aksi langsung dari kartu (Cetak SK, Minta review UPT) dan KGB yang sedang dikerjakan aksinya (ADR-077).
+  const [pesanGagal, setPesanGagal] = useState<string | null>(null);
+  const [sibukSk, setSibukSk] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
@@ -298,6 +308,11 @@ function DashboardMain() {
     const t = setTimeout(() => setPesanBerhasil(null), 8000);
     return () => clearTimeout(t);
   }, [pesanBerhasil]);
+  useEffect(() => {
+    if (!pesanGagal) return;
+    const t = setTimeout(() => setPesanGagal(null), 12000);
+    return () => clearTimeout(t);
+  }, [pesanGagal]);
 
   // Usulan UPT yang menunggu dimuat ulang setiap dasbor disegarkan.
   useEffect(() => {
@@ -496,6 +511,36 @@ function DashboardMain() {
       aksi: { label: "Rincian", onClick: bukaRapelan },
     });
 
+  // Review SK oleh Admin UPT (ADR-077): yang diminta diperbaiki menunggu Kanwil, yang disetujui siap dicetak dan
+  // ditandatangani. Yang masih menunggu UPT bukan pekerjaan Kanwil, jadi cukup tampil sebagai penanda kartu.
+  const skDiprosesUpt = pegawaiJatuhTempo.filter((p) => p.statusKGB === "sedang_diproses" && p.skSudahDibuat && p.reviewSk);
+  const skPerbaikan = skDiprosesUpt.filter((p) => p.reviewSk?.status === "perbaikan");
+  if (skPerbaikan.length > 0)
+    tindakan.push({
+      id: "review-perbaikan",
+      nada: "merah",
+      isi: (
+        <>
+          <strong>{skPerbaikan.length} SK diminta diperbaiki UPT</strong>
+          {skPerbaikan.length === 1 ? ` (${skPerbaikan[0].nama})` : ""}. Perbaiki SK; review diminta ulang otomatis.
+        </>
+      ),
+      aksi: { label: "Tampilkan", onClick: bukaAntrian("perlu") },
+    });
+  const skSiapCetak = skDiprosesUpt.filter((p) => p.reviewSk?.status === "disetujui");
+  if (skSiapCetak.length > 0)
+    tindakan.push({
+      id: "review-disetujui",
+      nada: "hijau",
+      isi: (
+        <>
+          <strong>{skSiapCetak.length} SK disetujui UPT</strong>, siap dicetak, ditandatangani, dikirim lewat Srikandi, lalu
+          diunggah TTE.
+        </>
+      ),
+      aksi: { label: "Tampilkan", onClick: bukaAntrian("perlu") },
+    });
+
   // Usulan data UPT yang menunggu tinjauan: ditinjau langsung dari kartu atau baris (ADR-011).
   // Yang menentukan mendesaknya adalah usulan terlama, bukan jumlahnya: selama usulan perbaikan
   // menunggu, proses KGB pegawainya tertahan. Ambangnya memakai yang sudah dipakai di dasbor ini
@@ -597,7 +642,36 @@ function DashboardMain() {
       dasarAwal: { nomorSK: p.nomorSK, tanggalSK: p.tanggalSK, tmtSK: p.tmtSK, penetapSkDasar: p.penetapSkDasar },
       nomorSkBaru: p.suratNomorSurat,
       tanggalSkBaru: p.suratTanggalSurat ?? null,
+      reviewUpt: p.reviewSk ?? null,
     });
+  }
+
+  /** Cetak SK: SK biasa untuk tanda tangan basah dan versi Srikandi, tanpa tanda air (ADR-077). */
+  async function cetakSkPegawai(p: PegawaiJatuhTempo) {
+    if (!p.kgbId || sibukSk) return;
+    setSibukSk(p.kgbId);
+    setPesanGagal(null);
+    const hasil = await cetakSk(p.kgbId, { nama: p.nama });
+    setSibukSk(null);
+    if (!hasil.ok) {
+      setPesanGagal(hasil.error);
+      return;
+    }
+    setPesanBerhasil(`SK ${p.nama} diunduh: SK biasa untuk tanda tangan basah dan versi Srikandi. Setelah ditandatangani, pilih Unggah TTE.`);
+  }
+
+  /** Minta review UPT untuk SK yang dibuat sebelum review aktif (ADR-077). */
+  async function mintaReviewPegawai(p: PegawaiJatuhTempo) {
+    if (!p.kgbId || sibukSk) return;
+    setSibukSk(p.kgbId);
+    setPesanGagal(null);
+    const hasil = await mintaReviewSkUpt(p.kgbId);
+    setSibukSk(null);
+    if (!hasil.ok) {
+      setPesanGagal(hasil.error);
+      return;
+    }
+    aksiBerhasil(`Permintaan review SK ${p.nama} dikirim ke Admin UPT. Cetak SK tersedia setelah UPT menyetujui.`);
   }
 
   /** Kartu papan: isi yang sama dengan baris daftar, ditambah kolom tujuan yang boleh untuk diseret. */
@@ -619,11 +693,24 @@ function DashboardMain() {
     }
     if (kolom === "proses" && p.kgbId) {
       // Sesudah diunggah, SK pegawai UPT ditindaklanjuti keuangan UPT, bukan keuangan Kanwil (ADR-009).
-      pindah[dipegangKeuanganKanwil(p.unitKerja) ? "keuangan" : "rekam_upt"] = p.skSudahDibuat ? "Unggah SK TTE" : "Buat SK dulu";
+      // SK pegawai UPT yang belum disetujui UPT tidak dapat diseret ke unggah TTE (ADR-077).
+      if (!p.skSudahDibuat || skBolehDicetak(p.reviewSk))
+        pindah[dipegangKeuanganKanwil(p.unitKerja) ? "keuangan" : "rekam_upt"] = p.skSudahDibuat ? "Unggah SK TTE" : "Buat SK dulu";
       pindah.input = "Batalkan proses";
     }
     const tanda: NonNullable<KartuPapan["tanda"]> = [];
-    if (kolom === "proses") tanda.push(p.skSudahDibuat ? { teks: "SK dibuat, tunggu TTE", nada: "navy" } : { teks: "Perlu buat SK" });
+    if (kolom === "proses") {
+      const review = p.skSudahDibuat ? p.reviewSk?.status ?? null : null;
+      tanda.push(
+        !p.skSudahDibuat
+          ? { teks: "Perlu buat SK" }
+          : review === "perbaikan"
+            ? { teks: `${LABEL_REVIEW_SK.perbaikan.kanwil}${p.reviewSk?.catatan ? `: ${p.reviewSk.catatan}` : ""}`, nada: "merah" }
+            : review
+              ? { teks: LABEL_REVIEW_SK[review].kanwil, nada: LABEL_REVIEW_SK[review].nada }
+              : { teks: "SK dibuat, tunggu TTE", nada: "navy" },
+      );
+    }
     if (dibatalkan) tanda.push({ teks: "Dibatalkan", nada: "merah" });
     // Kartu yang lewat batas sudah menyebutnya di baris TMT; penanda rapelan hanya untuk yang sudah berjalan.
     if (p.flagRapelan && pos !== "selesai" && pos !== "lewat") tanda.push({ teks: "Berpotensi rapelan", nada: "kuning" });
@@ -721,19 +808,57 @@ function DashboardMain() {
               {/* SK yang sudah dibuat masih mungkin keliru isinya, misalnya ketika Keuangan
                   mengembalikannya (ADR-047). Buat SK dapat mencatat ulang nomor, tanggal, dan isinya, tetapi
                   sebelum ini pintunya tertutup begitu SK pertama jadi: satu-satunya tombol yang tersisa
-                  justru mengunggah SK yang salah itu (ADR-049). */}
+                  justru mengunggah SK yang salah itu (ADR-049). SK pegawai UPT dicetak dan diunggah TTE
+                  setelah Admin UPT menyetujuinya; Perbaiki SK meminta review ulang (ADR-077). */}
               <button
                 type="button"
                 className="dsb-tombol dsb-tombol-kecil"
-                data-jenis="garis"
+                data-jenis={p.reviewSk?.status === "perbaikan" ? undefined : "garis"}
                 onClick={() => bukaBuatSk(p)}
                 title="Buat ulang SK: nomor, tanggal, dan isinya dicatat ulang"
               >
                 Perbaiki SK
               </button>
-              <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" onClick={() => setModal({ jenis: "unggah_sk", kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) })}>
-                Unggah TTE
-              </button>
+              {p.reviewSk && p.reviewSk.status === null && (
+                <button
+                  type="button"
+                  className="dsb-tombol dsb-tombol-kecil"
+                  data-jenis="garis"
+                  disabled={sibukSk === kgbId}
+                  onClick={() => void mintaReviewPegawai(p)}
+                  title="SK ini dibuat sebelum review UPT aktif. Minta Admin UPT memeriksanya sebelum dicetak."
+                >
+                  Minta review UPT
+                </button>
+              )}
+              {!skBolehDicetak(p.reviewSk) && role === ROLES.SUPER_ADMIN && (
+                <button
+                  type="button"
+                  className="dsb-tombol dsb-tombol-kecil"
+                  data-jenis="garis"
+                  onClick={() => setModal({ jenis: "lewati_review", kgbId, pegawai: pegawaiModal(p), reviewSk: p.reviewSk ?? null })}
+                  title="Lanjutkan tanpa menunggu UPT, dengan alasan yang tercatat"
+                >
+                  Lewati review
+                </button>
+              )}
+              {skBolehDicetak(p.reviewSk) && (
+                <>
+                  <button
+                    type="button"
+                    className="dsb-tombol dsb-tombol-kecil"
+                    data-jenis="garis"
+                    disabled={sibukSk === kgbId}
+                    onClick={() => void cetakSkPegawai(p)}
+                    title="Unduh SK biasa (tanda tangan basah) dan versi Srikandi tanpa tanda air"
+                  >
+                    {sibukSk === kgbId ? "Menyiapkan..." : "Cetak SK"}
+                  </button>
+                  <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" onClick={() => setModal({ jenis: "unggah_sk", kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) })}>
+                    Unggah TTE
+                  </button>
+                </>
+              )}
             </>
           ) : (
             <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => bukaBuatSk(p)}>
@@ -1105,6 +1230,16 @@ function DashboardMain() {
           ringkasan={modal.ringkasan}
           dasarAwal={modal.dasarAwal}
           skBaruAwal={{ nomorSurat: modal.nomorSkBaru, tanggalSurat: modal.tanggalSkBaru }}
+          reviewUpt={modal.reviewUpt}
+          onTutup={tutupModal}
+          onBerhasil={aksiBerhasil}
+        />
+      )}
+      {modal?.jenis === "lewati_review" && (
+        <ModalLewatiReview
+          kgbId={modal.kgbId}
+          pegawai={modal.pegawai}
+          reviewSk={modal.reviewSk}
           onTutup={tutupModal}
           onBerhasil={aksiBerhasil}
         />
@@ -1125,6 +1260,15 @@ function DashboardMain() {
 
       {/* Pesan hasil aksi. Wadah live region selalu ada agar pesan baru dibacakan pembaca layar. */}
       <div role="status" aria-live="polite" className="fixed bottom-4 left-4 right-4 sm:left-auto sm:max-w-sm z-40 pointer-events-none">
+        {pesanGagal && (
+          <div className="dsb-toast" data-nada="merah" style={{ marginBottom: 8 }}>
+            <p className="flex-1">{pesanGagal}</p>
+            <button type="button" onClick={() => setPesanGagal(null)} aria-label="Tutup pesan"
+              className="shrink-0 opacity-60 hover:opacity-100 transition" style={{ color: "var(--st-red)" }}>
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          </div>
+        )}
         {pesanBerhasil && (
           <div className="dsb-toast">
             <p className="flex-1">{pesanBerhasil}</p>

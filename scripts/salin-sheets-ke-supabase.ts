@@ -51,6 +51,7 @@ const DEF: Record<Kunci, TableDef> = {
   regulasi: defs.Regulasi,
   auditLog: defs.AuditLog,
   pengumumanDilihat: defs.PengumumanDilihat,
+  reviewSkUpt: defs.ReviewSkUpt,
   rekonBulanan: defs.RekonBulanan,
 };
 
@@ -66,6 +67,7 @@ const WAJIB: Partial<Record<Kunci, string[]>> = {
   user: ["nip", "password", "role"],
   profileChangeRequest: ["userId", "status"],
   pengumumanDilihat: ["userId", "pengumumanId"],
+  reviewSkUpt: ["pegawaiId", "satker", "status", "versi"],
   pegawai: ["nip", "nama"],
   riwayatKGB: ["pegawaiId", "status"],
   penandatangan: ["jenis", "nama", "nip", "jabatan", "berlakuMulai"],

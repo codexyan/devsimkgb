@@ -16,6 +16,8 @@ import { berhakKgb } from "@/lib/mutasiPegawai";
 import { muatKppnSatker } from "@/lib/muatKppnSatker";
 import { dasarKgbBerikutnya, type SkPenetapGaji } from "@/lib/dasarKgbBerikutnya";
 import type { SuratKgbTersimpan } from "@/lib/prosesKgb";
+import { infoReviewSk } from "@/lib/reviewSkUpt";
+import { muatSemuaReviewSk } from "@/lib/reviewSkUptServer";
 import type { RiwayatPangkatRow, RiwayatPmkRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
 
 /** Kolom hukdis yang dipakai di sini; sisanya sengaja tidak dibaca agar tidak ikut terkirim. */
@@ -104,6 +106,8 @@ export async function GET() {
 
   const kgbPerPegawai = new Map<string, typeof semuaKgb>();
   for (const k of kgbSatker) kgbPerPegawai.set(k.pegawaiId, [...(kgbPerPegawai.get(k.pegawaiId) ?? []), k]);
+  // Review SK yang diminta Kanwil untuk pegawai satker ini (ADR-077); kosong selama tabelnya belum ada.
+  const reviewSatker = await muatSemuaReviewSk({ satker: kode });
 
   const pegawai = milikSatker
     .filter((p) => p.aktif && berhakKgb(p, p.tmtKgbBerikutnya))
@@ -145,6 +149,13 @@ export async function GET() {
         deadlineSDM: isoTanggalKalender(jendela?.deadlineSDM ?? null),
         terkunci: status === null && !!jendela?.isLocked,
         statusKGB: status,
+        // Permintaan review SK dari Kanwil untuk KGB yang sedang diproses (ADR-077).
+        reviewSk: (() => {
+          if (!kgbBerjalan || status !== "sedang_diproses") return null;
+          const review = reviewSatker.perKgb.get(kgbBerjalan.id);
+          const info = review ? infoReviewSk(review, { aktif: reviewSatker.aktif, unitKerja: p.unitKerja }) : null;
+          return info ? { kgbId: kgbBerjalan.id, ...info } : null;
+        })(),
         terlambat,
         // Hukdis hanya sebagai penanda; jenis dan keterangannya tidak dikirim ke UPT.
         kgbDitunda: kgbDitunda(hukdisRingkas, p.id),

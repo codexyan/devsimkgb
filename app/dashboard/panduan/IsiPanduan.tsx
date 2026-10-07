@@ -1057,6 +1057,17 @@ export default async function IsiPanduan({
                   dibaca sebagai &ldquo;sudah beres sampai Gaji Web&rdquo;.
                 </p>
 
+                <h3 className="pub-h3">Sebelum SK ditandatangani: periksa SK dari Kanwil</h3>
+                <p>
+                  Setelah Kanwil membuat SK KGB pegawai satker Anda, kartu <strong>Review SK KGB</strong> muncul di Perlu
+                  dikerjakan, disertai lonceng. Tekan <strong>Periksa SK</strong>: pratinjaunya bertanda air DRAF, dan isinya
+                  sama dengan yang kelak dicetak. Periksa nama, NIP, pangkat dan golongan, gaji pokok, masa kerja, serta TMT.
+                  Bila semuanya benar, centang pernyataan lalu tekan <strong>SK sudah benar</strong>; Kanwil baru mencetaknya
+                  untuk ditandatangani basah, mengirimnya lewat Srikandi, dan mengunggah TTE-nya. Bila ada yang keliru, tekan{" "}
+                  <strong>Minta perbaikan</strong> dan tulis apa yang harus dibetulkan; setelah Kanwil memperbaikinya,
+                  permintaan review muncul lagi.
+                </p>
+
                 <h3 className="pub-h3">Langkah 6: Setelah SK terbit, unduh dan rekam di Gaji Web</h3>
                 <p>
                   Tiap UPT adalah satuan kerja tersendiri dengan daftar isian pelaksanaan anggaran, bagian keuangan, dan
@@ -1647,6 +1658,19 @@ export default async function IsiPanduan({
                       SK ditujukan kepada Kepala KPPN mitra satker menurut Unit Kerja pegawai. Bila Unit Kerja belum sesuai
                       daftar satker, SK tidak dapat dibuat atau diunduh ulang sampai Data Pegawai diperbarui.
                     </p>
+                    <p>
+                      <strong>SK pegawai UPT direview Admin UPT lebih dulu.</strong> Untuk pegawai UPT, tombolnya menjadi{" "}
+                      <strong>Buat SK dan minta review UPT</strong>: SK tercatat, tetapi tidak diunduh, dan Admin UPT satker
+                      itu menerima permintaan review di lonceng dan di Perlu dikerjakan. Selama belum disetujui, kartu
+                      pegawai bertanda <em>Menunggu review UPT</em>, setiap unduhan SK bertanda air DRAF, dan Unggah SK TTE
+                      ditolak. Bila UPT meminta perbaikan, kartu bertanda merah beserta catatannya; pilih Perbaiki SK, dan
+                      review diminta ulang otomatis. Setelah UPT menyatakan SK sudah benar, tekan <strong>Cetak SK</strong>{" "}
+                      untuk mengunduh SK biasa (tanda tangan basah) dan versi Srikandi tanpa tanda air, kirim lewat
+                      Srikandi, lalu Unggah SK TTE. Untuk keadaan mendesak, Super Admin dapat memilih{" "}
+                      <strong>Lewati review</strong> dengan alasan yang tercatat di Log Aktivitas. SK pegawai Kanwil tidak
+                      melalui review ini, dan SK yang dibuat sebelum review aktif dapat dimintakan review lewat{" "}
+                      <strong>Minta review UPT</strong>.
+                    </p>
                   </div>
                   </li>
                   <li>
@@ -1784,7 +1808,7 @@ export default async function IsiPanduan({
                     perlu ditinjau ulang, serta usulan data dan laporan mutasi dari UPT. Tim SDM Hukdis menerima laporan
                     hukuman disiplin dari UPT dan hukuman disiplin yang segera berakhir. Keuangan Kanwil menerima SK KGB
                     menunggu konfirmasi dan KGB yang perlu ditinjau ulang. Admin UPT menerima pengingat jatuh tempo dan
-                    rapelan, SK terbit, laporan SK kenaikan pangkat atau PMK yang disetujui, serta usulan dan laporan
+                    rapelan, permintaan review SK, SK terbit, laporan SK kenaikan pangkat atau PMK yang disetujui, serta usulan dan laporan
                     yang dikembalikan, hanya untuk satkernya, dan tidak
                     dapat menandainya dibaca. Super Admin menerima semuanya. Tanda sudah dibaca pada satu notifikasi
                     berlaku untuk semua pengguna.

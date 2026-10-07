@@ -25,6 +25,8 @@ import {
 import { bacaAngkaSk, bedaArsipSk, pesanBedaArsip } from "@/lib/cocokArsipSk";
 import { pesanGajiTurun } from "@/lib/koreksiDasarGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { infoReviewSk } from "@/lib/reviewSkUpt";
+import { muatSemuaReviewSk } from "@/lib/reviewSkUptServer";
 
 export const runtime = "nodejs";
 
@@ -105,6 +107,8 @@ export async function GET(req: Request) {
 
   filtered.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
 
+  // Review SK pegawai UPT oleh Admin UPT (ADR-077); tidak aktif selama tabelnya belum ada.
+  const reviewSk = await muatSemuaReviewSk();
   const kgbListEnriched = filtered.map((k) => {
     const p = pegById.get(k.pegawaiId);
     const sRow = suratByKgb.get(k.id);
@@ -115,6 +119,7 @@ export async function GET(req: Request) {
       surat: sRow ? { id: sRow.id, nomorSurat: sRow.nomorSurat, tanggalSurat: sRow.tanggalSurat, pathFile: sRow.pathFile } : null,
       // Syarat yang sama dengan POST /api/kgb/[id]/upload-sk: Unggah SK TTE hanya setelah Buat SK.
       skSudahDibuat: suratSudahDibuat(sRow),
+      reviewSk: infoReviewSk(reviewSk.perKgb.get(k.id), { aktif: reviewSk.aktif, unitKerja: p?.unitKerja ?? null }),
       unlockDate: jendela ? isoTanggalKalender(jendela.unlockDate) : null,
       isLocked: jendela?.isLocked ?? false,
       // Konfirmasi data oleh UPT untuk siklus ini; jadi syarat sebelum SK dibuat (masukan tim keuangan).

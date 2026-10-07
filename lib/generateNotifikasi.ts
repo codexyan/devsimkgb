@@ -28,6 +28,10 @@ export const TIPE_NOTIFIKASI = {
   USULAN_UPT: "usulan_upt",
   USULAN_REVISI: "usulan_revisi",
   USULAN_DISETUJUI: "usulan_disetujui",
+  /** SK KGB pegawai UPT menunggu review Admin UPT (ADR-077). */
+  REVIEW_SK: "review_sk",
+  /** Admin UPT menyetujui atau meminta perbaikan SK; kabar untuk Kanwil (ADR-077). */
+  REVIEW_SK_HASIL: "review_sk_hasil",
   MUTASI_UPT: "mutasi_upt",
   MUTASI_DIKEMBALIKAN: "mutasi_dikembalikan",
   HUKDIS_UPT: "hukdis_upt",
@@ -45,7 +49,7 @@ export function tipeNotifikasiUntukRole(role: string | null | undefined): readon
     case "superAdminCore":
       return null;
     case "sdm_kgb":
-      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.FOLLOWUP_KEUANGAN, T.HUKDIS_BERAKHIR, T.KGB_PERLU_DITINJAU, T.USULAN_UPT, T.MUTASI_UPT];
+      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.FOLLOWUP_KEUANGAN, T.HUKDIS_BERAKHIR, T.KGB_PERLU_DITINJAU, T.USULAN_UPT, T.MUTASI_UPT, T.REVIEW_SK_HASIL];
     case "sdm_hukdis":
       // Laporan hukdis dari UPT ditinjau SDM Hukdis, bukan Tim SDM KGB (ADR-016).
       return [T.HUKDIS_BERAKHIR, T.HUKDIS_UPT];
@@ -53,7 +57,7 @@ export function tipeNotifikasiUntukRole(role: string | null | undefined): readon
       return [T.SK_MENUNGGU_KEUANGAN, T.KGB_PERLU_DITINJAU];
     case "admin_upt":
       // Disaring lagi per satker oleh GET /api/notifikasi; di sini hanya jenisnya yang dibatasi.
-      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT, T.USULAN_REVISI, T.USULAN_DISETUJUI, T.MUTASI_DIKEMBALIKAN, T.HUKDIS_DIKEMBALIKAN];
+      return [T.KGB_JATUH_TEMPO, T.RAPELAN, T.SK_TERBIT, T.REVIEW_SK, T.USULAN_REVISI, T.USULAN_DISETUJUI, T.MUTASI_DIKEMBALIKAN, T.HUKDIS_DIKEMBALIKAN];
     default:
       return [];
   }
@@ -221,6 +225,63 @@ export function notifikasiUsulanRevisi(
     linkHref: "/dashboard",
     kategori: "pegawai",
   };
+}
+
+/**
+ * Isi notifikasi permintaan review SK KGB untuk Admin UPT (ADR-077). Rujukannya id KGB, sehingga penyaringan per satker
+ * memakai jalur yang sama dengan kabar SK terbit.
+ */
+export function notifikasiReviewSk(
+  kgb: { id: string; tmtKgbBaru: Date | string | null },
+  pegawai: { nama: string | null; nip: string | null } | null | undefined,
+  surat: { nomorSurat: string | null; versi: number },
+): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
+  const nama = pegawai?.nama?.trim() || "-";
+  const nip = pegawai?.nip?.trim() || "-";
+  const ulang = surat.versi > 1;
+  return {
+    judul: `${ulang ? "SK Diperbaiki, Review Ulang" : "Review SK KGB"}: ${nama}`,
+    pesan:
+      `Kanwil ${ulang ? "sudah memperbaiki" : "sudah menyiapkan"} SK KGB ${nama} (${nip})` +
+      `${kgb.tmtKgbBaru ? ` TMT ${formatTanggalId(kgb.tmtKgbBaru)}` : ""}${surat.nomorSurat ? `, nomor ${surat.nomorSurat}` : ""}. ` +
+      "Periksa tampilannya di Perlu dikerjakan, lalu nyatakan sudah benar atau minta perbaikan. SK baru dicetak, " +
+      "ditandatangani, dan dikirim lewat Srikandi setelah Anda menyetujuinya.",
+    tipe: T.REVIEW_SK,
+    referenceId: kgb.id,
+    prioritas: "warning",
+    linkHref: "/dashboard",
+    kategori: "kgb",
+  };
+}
+
+/** Isi kabar untuk Kanwil setelah Admin UPT menanggapi review SK (ADR-077). Rujukannya id KGB. */
+export function notifikasiHasilReviewSk(
+  kgbId: string,
+  pegawai: { nama: string | null; nip: string | null } | null | undefined,
+  hasil: { keputusan: "setuju" | "perbaikan"; catatan: string | null; nomorSurat: string | null; satker: string },
+): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
+  const nama = pegawai?.nama?.trim() || "-";
+  const nip = pegawai?.nip?.trim() || "-";
+  const sk = `SK KGB ${nama} (${nip})${hasil.nomorSurat ? ` nomor ${hasil.nomorSurat}` : ""}`;
+  return hasil.keputusan === "setuju"
+    ? {
+        judul: `SK Disetujui UPT: ${nama}`,
+        pesan: `${hasil.satker} menyatakan ${sk} sudah benar. Cetak SK untuk ditandatangani dan dikirim lewat Srikandi, lalu Unggah TTE.`,
+        tipe: T.REVIEW_SK_HASIL,
+        referenceId: kgbId,
+        prioritas: "info",
+        linkHref: "/dashboard",
+        kategori: "kgb",
+      }
+    : {
+        judul: `UPT Minta Perbaikan SK: ${nama}`,
+        pesan: `${hasil.satker} meminta perbaikan ${sk}: ${hasil.catatan ?? "-"}. Perbaiki SK; review diminta ulang ke UPT secara otomatis.`,
+        tipe: T.REVIEW_SK_HASIL,
+        referenceId: kgbId,
+        prioritas: "warning",
+        linkHref: "/dashboard",
+        kategori: "kgb",
+      };
 }
 
 /**

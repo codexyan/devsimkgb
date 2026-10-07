@@ -90,6 +90,10 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
   box-shadow: 0 1px 3px rgba(15, 30, 60, .14); }
 .kgbm-pilihan button[aria-checked="true"]::before { border: 4.5px solid var(--navy-solid); }
 .kgbm-pilihan button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* Kotak centang pernyataan, mis. "sudah memeriksa isi SK" pada review UPT (ADR-077) */
+.kgbm-cek { display: flex; align-items: flex-start; gap: 8px; padding: 9px 11px; border: 1px solid var(--ln1); border-radius: 10px;
+  background: var(--sub); font-size: 12.5px; line-height: 1.45; color: var(--dt2); cursor: pointer; }
+.kgbm-cek input { flex: none; width: 15px; height: 15px; margin-top: 1px; accent-color: var(--navy-solid); }
 /* Panel hasil hitungan: angka yang tidak boleh diketik operator */
 .kgbm-hitungan { border: 1px solid var(--tint-navy-ln, var(--ln1)); border-radius: 10px; padding: 10px 12px; background: var(--tint-navy); }
 .kgbm-hitungan-judul { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--dt4); }

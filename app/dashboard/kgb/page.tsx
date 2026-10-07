@@ -21,6 +21,7 @@ import {
   ModalBatalkanKgb,
   ModalBuatSk,
   ModalInputKgb,
+  ModalLewatiReview,
   ModalRiwayatKgb,
   ModalUnggahSk,
   PesanGalat,
@@ -31,7 +32,8 @@ import {
   type RingkasanSk,
 } from "@/app/dashboard/components/kgb";
 import { BidangAlasan } from "@/app/dashboard/components/kgb/BidangForm";
-import { PESAN_GAGAL_JARINGAN, tautanBerkasSk } from "@/lib/kgbAksi";
+import { PESAN_GAGAL_JARINGAN, cetakSk, mintaReviewSkUpt, tautanBerkasSk } from "@/lib/kgbAksi";
+import { LABEL_REVIEW_SK, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { formatTanggalId, hariIniWita, type NilaiTanggal } from "@/lib/waktu";
@@ -66,6 +68,8 @@ interface KGB {
   konfirmasiUptOleh?: string | null;
   /** SK sudah dibuat di SIM-KGB (GET /api/kgb); syarat Unggah SK TTE. */
   skSudahDibuat?: boolean;
+  /** Review SK oleh Admin UPT (ADR-077); null untuk pegawai Kanwil atau selama review belum aktif. */
+  reviewSk?: InfoReviewSk | null;
 }
 
 /** Nilai tab untuk KGB belum diproses yang masa inputnya belum dibuka (bukan status tersimpan). */
@@ -100,6 +104,7 @@ type ModalAksi =
   | { jenis: "unggah_sk"; kgb: KgbTersimpan }
   | { jenis: "batalkan"; kgb: KgbTersimpan }
   | { jenis: "koreksi_arsip"; kgb: KgbTersimpan }
+  | { jenis: "lewati_review"; kgb: KgbTersimpan }
   | { jenis: "riwayat"; pegawai: PegawaiModal };
 
 const GOLONGAN = [
@@ -279,6 +284,9 @@ export default function KGBPage() {
   const [showDetail, setShowDetail] = useState<KGB | null>(null);
   const [modal, setModal] = useState<ModalAksi | null>(null);
   const [pesanBerhasil, setPesanBerhasil] = useState<string | null>(null);
+  // Galat Cetak SK dan Minta review UPT dari jendela detail (ADR-077).
+  const [galatDetail, setGalatDetail] = useState<string | null>(null);
+  const [sibukDetail, setSibukDetail] = useState(false);
 
   function paramsKgb(): URLSearchParams {
     const params = new URLSearchParams();
@@ -369,10 +377,12 @@ export default function KGBPage() {
   }, [kgbIdFromUrl, pegawaiIdFromUrl, kgbList]);
 
   function bukaDetail(k: KGB) {
+    setGalatDetail(null);
     setShowDetail(k);
   }
 
   function tutupDetail() {
+    setGalatDetail(null);
     setShowDetail(null);
   }
 
@@ -388,8 +398,35 @@ export default function KGBPage() {
   function aksiBerhasil(pesan: string) {
     setModal(null);
     setShowDetail(null);
+    setGalatDetail(null);
     setPesanBerhasil(pesan);
     void Promise.all([muatDaftar().catch(() => {}), fetchSummary()]);
+  }
+
+  /** Cetak SK: SK biasa untuk tanda tangan basah dan versi Srikandi, tanpa tanda air (ADR-077). */
+  async function cetakDariDetail(k: KgbTersimpan) {
+    setSibukDetail(true);
+    setGalatDetail(null);
+    const hasil = await cetakSk(k.id, { nama: k.pegawai.nama });
+    setSibukDetail(false);
+    if (!hasil.ok) {
+      setGalatDetail(hasil.error);
+      return;
+    }
+    setPesanBerhasil(`SK ${k.pegawai.nama} diunduh: SK biasa untuk tanda tangan basah dan versi Srikandi. Setelah ditandatangani, pilih Unggah SK TTE.`);
+  }
+
+  /** Minta review UPT untuk SK yang dibuat sebelum review aktif (ADR-077). */
+  async function mintaReviewDariDetail(k: KgbTersimpan) {
+    setSibukDetail(true);
+    setGalatDetail(null);
+    const hasil = await mintaReviewSkUpt(k.id);
+    setSibukDetail(false);
+    if (!hasil.ok) {
+      setGalatDetail(hasil.error);
+      return;
+    }
+    aksiBerhasil(`Permintaan review SK ${k.pegawai.nama} dikirim ke Admin UPT. Cetak SK tersedia setelah UPT menyetujui.`);
   }
 
   const tahunList = Array.from({ length: 7 }, (_, i) => tahunIni - 3 + i);
@@ -481,7 +518,7 @@ export default function KGBPage() {
           <button type="button" onClick={() => bukaAksi({ jenis: "buat_sk", kgb })} className="dsb-tombol dsb-tombol-kecil">
             Buat SK
           </button>
-          {skTercatat(k) && (
+          {skTercatat(k) && skBolehDicetak(k.reviewSk) && (
             <button type="button" onClick={() => bukaAksi({ jenis: "unggah_sk", kgb })} className="dsb-tombol dsb-tombol-kecil" data-nada="hijau">
               Unggah SK TTE
             </button>
@@ -504,8 +541,13 @@ export default function KGBPage() {
 
     const bisaInput = k.status === "belum_diproses" && !!jendela && !jendela.isLocked;
     const bisaBuatSk = !!kgb && k.status === "sedang_diproses";
+    // SK pegawai UPT diunggah TTE setelah disetujui Admin UPT atau dilewati Super Admin (ADR-077).
+    const reviewBoleh = skBolehDicetak(k.reviewSk);
     const bisaUnggah =
-      !!kgb && ((k.status === "sedang_diproses" && skTercatat(k)) || (k.status === "selesai" && !!k.isArsip && !pathFile));
+      !!kgb && ((k.status === "sedang_diproses" && skTercatat(k) && reviewBoleh) || (k.status === "selesai" && !!k.isArsip && !pathFile));
+    const bisaCetak = !!kgb && k.status === "sedang_diproses" && skTercatat(k) && reviewBoleh;
+    const bisaMintaReview = !!kgb && k.status === "sedang_diproses" && skTercatat(k) && !!k.reviewSk && k.reviewSk.status === null;
+    const bisaLewati = !!kgb && superAdmin && k.status === "sedang_diproses" && skTercatat(k) && !reviewBoleh;
     const bisaBatal = !!kgb && !k.isArsip && (k.status === "belum_diproses" || k.status === "sedang_diproses");
     // Input Ulang hanya untuk pembatalan terakhir: pegawai belum punya KGB aktif atau KGB yang lebih baru.
     const sudahDiganti = kgbList.some(
@@ -541,6 +583,21 @@ export default function KGBPage() {
             {bolehProses && bisaBatal && kgb && (
               <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => bukaAksi({ jenis: "batalkan", kgb })}>
                 Batalkan KGB
+              </button>
+            )}
+            {bolehProses && bisaLewati && kgb && (
+              <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => bukaAksi({ jenis: "lewati_review", kgb })}>
+                Lewati review UPT
+              </button>
+            )}
+            {bolehProses && bisaMintaReview && kgb && (
+              <button type="button" className="kgbm-tombol kgbm-kedua" disabled={sibukDetail} onClick={() => void mintaReviewDariDetail(kgb)}>
+                Minta review UPT
+              </button>
+            )}
+            {bolehProses && bisaCetak && kgb && (
+              <button type="button" className="kgbm-tombol kgbm-kedua" disabled={sibukDetail} onClick={() => void cetakDariDetail(kgb)}>
+                {sibukDetail ? "Menyiapkan..." : "Cetak SK"}
               </button>
             )}
             {bolehProses && bisaUnggah && kgb && (
@@ -608,12 +665,31 @@ export default function KGBPage() {
           </Catatan>
         )}
         {k.status === "sedang_diproses" && (
-          <Catatan>
-            {skTercatat(k)
-              ? "SK KGB sudah dibuat. Setelah SK ditandatangani secara elektronik, pilih Unggah SK TTE."
-              : "Langkah berikutnya: Buat SK. Unggah SK TTE tersedia setelah SK dibuat."}
+          <Catatan
+            nada={
+              skTercatat(k) && k.reviewSk?.status === "perbaikan"
+                ? "merah"
+                : skTercatat(k) && k.reviewSk?.status === "menunggu"
+                  ? "amber"
+                  : "netral"
+            }
+          >
+            {!skTercatat(k)
+              ? k.reviewSk
+                ? "Langkah berikutnya: Buat SK. SK pegawai UPT dikirim ke Admin UPT untuk direview sebelum dicetak dan diunggah TTE."
+                : "Langkah berikutnya: Buat SK. Unggah SK TTE tersedia setelah SK dibuat."
+              : k.reviewSk?.status === "menunggu"
+                ? "SK sudah dibuat dan menunggu review Admin UPT. Cetak SK dan Unggah SK TTE tersedia setelah UPT menyetujui; unduhan sebelum itu bertanda air DRAF."
+                : k.reviewSk?.status === "perbaikan"
+                  ? `UPT meminta perbaikan SK${k.reviewSk.catatan ? `: ${k.reviewSk.catatan}` : ""}. Pilih Buat SK untuk memperbaikinya; review diminta ulang otomatis.`
+                  : k.reviewSk?.status === "disetujui"
+                    ? "SK sudah disetujui Admin UPT. Pilih Cetak SK untuk tanda tangan basah dan versi Srikandi, lalu Unggah SK TTE setelah ditandatangani."
+                    : k.reviewSk?.status === "dilewati"
+                      ? `Review UPT dilewati Super Admin${k.reviewSk.alasanLewati ? ` (${k.reviewSk.alasanLewati})` : ""}. Cetak SK lalu Unggah SK TTE setelah ditandatangani.`
+                      : "SK KGB sudah dibuat. Setelah SK ditandatangani secara elektronik, pilih Unggah SK TTE."}
           </Catatan>
         )}
+        <PesanGalat pesan={galatDetail} />
         {penetapKosong && (
           <Catatan nada="amber">Ditetapkan oleh pada Atas Dasar SK Terakhir belum diisi. Lengkapi saat Buat SK.</Catatan>
         )}
@@ -803,6 +879,11 @@ export default function KGBPage() {
         )}
         {!k.isVirtual && k.status === "belum_diproses" && k.nomorSK === "" && (
           <span className="dsb-tag" data-garis="">Antrean otomatis</span>
+        )}
+        {k.status === "sedang_diproses" && k.skSudahDibuat && k.reviewSk?.status && (
+          <span className="dsb-tag" data-garis="" data-nada={LABEL_REVIEW_SK[k.reviewSk.status].nada} title={k.reviewSk.catatan ?? undefined}>
+            {LABEL_REVIEW_SK[k.reviewSk.status].kanwil}
+          </span>
         )}
         {!k.isVirtual && !k.isArsip && !k.penetapSkDasar &&
           (k.status === "sedang_diproses" || (k.status === "belum_diproses" && k.nomorSK !== "")) && (
@@ -1079,6 +1160,16 @@ export default function KGBPage() {
             penetapSkDasar: modal.kgb.penetapSkDasar ?? null,
           }}
           skBaruAwal={{ nomorSurat: modal.kgb.surat?.nomorSurat, tanggalSurat: modal.kgb.surat?.tanggalSurat }}
+          reviewUpt={modal.kgb.reviewSk ?? null}
+          onTutup={tutupModal}
+          onBerhasil={aksiBerhasil}
+        />
+      )}
+      {modal?.jenis === "lewati_review" && (
+        <ModalLewatiReview
+          kgbId={modal.kgb.id}
+          pegawai={pegawaiModal(modal.kgb)}
+          reviewSk={modal.kgb.reviewSk ?? null}
           onTutup={tutupModal}
           onBerhasil={aksiBerhasil}
         />

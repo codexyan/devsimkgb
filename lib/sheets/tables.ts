@@ -121,6 +121,20 @@ export interface TemplateSuratRow {
 }
 
 /**
+ * Review tampilan SK KGB pegawai UPT oleh Admin UPT sebelum Kanwil mencetak, menandatangani, dan mengunggah TTE
+ * (ADR-077). Satu baris per KGB, dengan id sama dengan id KGB-nya; versi naik setiap kali SK dibuat ulang dan review
+ * diminta lagi. Status: "menunggu" (UPT belum menanggapi), "disetujui", "perbaikan" (UPT meminta perbaikan dengan
+ * catatan), atau "dilewati" (Super Admin melanjutkan tanpa review, dengan alasan).
+ */
+export interface ReviewSkUptRow {
+  id: string; pegawaiId: string; satker: string; status: string; versi: number;
+  nomorSurat: string | null; tanggalSurat: Date | null;
+  dimintaAt: Date | null; dimintaOleh: string | null;
+  ditanggapiAt: Date | null; ditanggapiOleh: string | null;
+  catatan: string | null; alasanLewati: string | null;
+}
+
+/**
  * Penanda bahwa satu akun sudah melihat satu pengumuman "Apa yang baru" (ADR-075). Kuncinya `userId:pengumumanId`,
  * sehingga satu akun paling banyak punya satu baris per pengumuman, di perangkat mana pun ia masuk.
  */
@@ -365,6 +379,13 @@ export const defs = {
     tab: "AuditLog",
     columns: [s("id"), d("waktu"), s("aksi"), s("detail"), s("targetNama"), s("ipAddress"), s("userId")],
   },
+  ReviewSkUpt: {
+    tab: "ReviewSkUpt",
+    columns: [
+      s("id"), s("pegawaiId"), s("satker"), s("status"), i("versi"), s("nomorSurat"), d("tanggalSurat"),
+      d("dimintaAt"), s("dimintaOleh"), d("ditanggapiAt"), s("ditanggapiOleh"), s("catatan"), s("alasanLewati"),
+    ],
+  },
   PengumumanDilihat: {
     tab: "PengumumanDilihat",
     columns: [s("id"), s("userId"), s("pengumumanId"), d("dilihatAt")],
@@ -400,6 +421,7 @@ export const sheets = {
   regulasi: new Table(defs.Regulasi),
   auditLog: new Table<AuditLogRow>(defs.AuditLog),
   pengumumanDilihat: new Table<PengumumanDilihatRow>(defs.PengumumanDilihat),
+  reviewSkUpt: new Table<ReviewSkUptRow>(defs.ReviewSkUpt),
   rekonBulanan: new Table(defs.RekonBulanan),
 };
 

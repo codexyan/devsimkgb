@@ -20,6 +20,8 @@ import {
 } from "@/lib/rekapKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { berhakKgb, sudahBerhenti } from "@/lib/mutasiPegawai";
+import { infoReviewSk } from "@/lib/reviewSkUpt";
+import { muatSemuaReviewSk } from "@/lib/reviewSkUptServer";
 
 export const runtime = "nodejs";
 
@@ -47,13 +49,15 @@ export async function GET() {
     // Pipeline memuat TMT tahun ini dan TMT yang masa inputnya sudah dibuka (sebelum awal bulan ke-3 dari sekarang).
     const batasPipeline = new Date(Math.max(tahunAkhir.getTime(), new Date(tahun, bulan + 3, 1).getTime()));
 
-    const [semuaPegawai, semuaKgb, allSurat, followupRows] = await Promise.all([
+    const [semuaPegawai, semuaKgb, allSurat, followupRows, reviewSk] = await Promise.all([
       db.pegawai.findMany(),
       db.riwayatKGB.findMany(),
       db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
       bolehLihatFollowup
         ? db.notifikasi.findMany({ where: { tipe: "followup_keuangan", dibaca: false } })
         : Promise.resolve([]),
+      // Review SK pegawai UPT oleh Admin UPT (ADR-077); kosong dan tidak aktif selama tabelnya belum ada.
+      bolehLihatFollowup ? muatSemuaReviewSk() : Promise.resolve({ aktif: false, perKgb: new Map() }),
     ]);
 
     // Beranda keuangan Kanwil hanya menghitung pegawai Kanwil; pegawai UPT dipegang keuangan satkernya (ADR-009).
@@ -154,6 +158,8 @@ export async function GET() {
         penetapSkDasar: k?.penetapSkDasar ?? null,
         // Syarat yang sama dengan POST /api/kgb/[id]/upload-sk: Unggah SK TTE hanya setelah Buat SK.
         skSudahDibuat: suratSudahDibuat(k?.surat),
+        // Review tampilan SK oleh Admin UPT (ADR-077); null untuk pegawai Kanwil atau selama review belum aktif.
+        reviewSk: k?.id ? infoReviewSk(reviewSk.perKgb.get(k.id), { aktif: reviewSk.aktif, unitKerja: p.unitKerja }) : null,
         suratNomorSurat: k?.surat?.nomorSurat ?? null,
         suratTanggalSurat: isoTanggalKalender(k?.surat?.tanggalSurat),
         tanggalSK: isoTanggalKalender(k?.tanggalSK),

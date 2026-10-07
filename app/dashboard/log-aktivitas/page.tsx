@@ -58,6 +58,10 @@ const AKSI_CONFIG: Record<string, { label: string; nada: NadaAksi; kelompok: str
   setujui_usulan_massal:    { label: "Setujui satu surat",     nada: "hijau",  kelompok: "Pegawai" },
   kembalikan_usulan_pegawai:{ label: "Kembalikan ke UPT",      nada: "ungu",   kelompok: "Pegawai" },
   kembalikan_usulan_selesai:{ label: "Kembalikan usulan selesai", nada: "ungu", kelompok: "Pegawai" },
+  minta_review_sk:          { label: "Minta review SK ke UPT", nada: "ungu",  kelompok: "KGB" },
+  review_sk_setuju:         { label: "UPT setujui SK",          nada: "hijau",  kelompok: "KGB" },
+  review_sk_perbaikan:      { label: "UPT minta perbaikan SK",  nada: "merah",  kelompok: "KGB" },
+  lewati_review_sk:         { label: "Lewati review SK UPT",    nada: "kuning", kelompok: "KGB" },
   perbaiki_usulan_pegawai:  { label: "Perbaikan oleh UPT",     nada: "abu",    kelompok: "Pegawai" },
   hapus_usulan_dikembalikan:{ label: "Hapus usulan kembalian", nada: "merah",  kelompok: "Pegawai" },
   // Peninjau tidak lagi dapat menolak; labelnya tetap agar jejak lama terbaca.
