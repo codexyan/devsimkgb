@@ -82,6 +82,11 @@ export async function catatKenaikanPangkat(input: {
   keterangan?: string | null;
   /** Id pengguna pencatat, untuk createdBy riwayat. */
   userId: string;
+  /**
+   * Riwayat SK yang sama yang sudah tersimpan oleh pencatatan yang terputus (ADR-079): angka hitungannya diperbarui,
+   * bukan dicatat dua kali. Nomor, tanggal, TMT, dan penetap pada riwayat itu dibiarkan.
+   */
+  riwayatAda?: string | null;
 }): Promise<HasilCatatKp | GagalCatat> {
   const { pegawai, jenisKp, golonganBaru, nomorSK, tanggalSK, tmtPangkat, userId } = input;
   const penetapSK = input.penetapSK?.trim() || null;
@@ -92,7 +97,7 @@ export async function catatKenaikanPangkat(input: {
   // Satu SK hanya menaikkan pangkat sekali; SK yang sama dicatat dua kali membuat linimasa dan pindaiannya kembar
   // (ADR-069). Data SK-nya dibetulkan lewat Ubah data SK, bukan dicatat ulang.
   const tercatat = (await db.riwayatPangkat.findMany({ where: { pegawaiId: pegawai.id } })) as RiwayatPangkatRow[];
-  if (tercatat.some((r) => kunciNomorSk(r.nomorSK) === kunciNomorSk(nomorSK)))
+  if (!input.riwayatAda && tercatat.some((r) => kunciNomorSk(r.nomorSK) === kunciNomorSk(nomorSK)))
     return {
       ok: false,
       status: 409,
@@ -131,7 +136,21 @@ export async function catatKenaikanPangkat(input: {
     createdBy: userId,
     penetapSK,
   };
-  await db.riwayatPangkat.create(riwayat);
+  if (input.riwayatAda)
+    await db.riwayatPangkat.update(
+      { id: input.riwayatAda },
+      {
+        golonganLama: riwayat.golonganLama,
+        golonganBaru: riwayat.golonganBaru,
+        mkgTahunLama: riwayat.mkgTahunLama,
+        mkgBulanLama: riwayat.mkgBulanLama,
+        mkgTahunBaru: riwayat.mkgTahunBaru,
+        mkgBulanBaru: riwayat.mkgBulanBaru,
+        gajiPokokLama: riwayat.gajiPokokLama,
+        gajiPokokBaru: riwayat.gajiPokokBaru,
+      },
+    );
+  else await db.riwayatPangkat.create(riwayat);
 
   await db.pegawai.update(
     { id: pegawai.id },
@@ -221,6 +240,8 @@ export async function catatPmk(input: {
   penetapSK?: string | null;
   keterangan?: string | null;
   userId: string;
+  /** Riwayat SK PMK yang sama yang sudah tersimpan oleh pencatatan yang terputus (ADR-079); diperbarui, bukan digandakan. */
+  riwayatAda?: string | null;
 }): Promise<HasilCatatPmk | GagalCatat> {
   const { pegawai, nomorSK, tanggalSK, tmtPmk, mkgTahunSk, mkgBulanSk, userId } = input;
   const penetapSK = input.penetapSK?.trim() || null;
@@ -229,7 +250,7 @@ export async function catatPmk(input: {
   if (!nomorSK.trim()) return { ok: false, status: 400, pesan: "Nomor SK PMK wajib diisi" };
   // Satu SK PMK hanya dicatat sekali (ADR-069).
   const tercatat = (await db.riwayatPmk.findMany({ where: { pegawaiId: pegawai.id } })) as RiwayatPmkRow[];
-  if (tercatat.some((r) => kunciNomorSk(r.nomorSK) === kunciNomorSk(nomorSK)))
+  if (!input.riwayatAda && tercatat.some((r) => kunciNomorSk(r.nomorSK) === kunciNomorSk(nomorSK)))
     return {
       ok: false,
       status: 409,
@@ -281,7 +302,10 @@ export async function catatPmk(input: {
     createdAt: new Date(),
     createdBy: userId,
   };
-  await db.riwayatPmk.create(riwayat);
+  if (input.riwayatAda) {
+    const { id: _id, nomorSK: _n, tanggalSK: _t, tmtPmk: _tmt, penetapSK: _p, keterangan: _k, createdAt: _c, createdBy: _b, ...angka } = riwayat;
+    await db.riwayatPmk.update({ id: input.riwayatAda }, angka);
+  } else await db.riwayatPmk.create(riwayat);
 
   await db.pegawai.update(
     { id: pegawai.id },

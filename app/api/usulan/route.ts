@@ -4,10 +4,10 @@ import { auth } from "@/auth";
 import { canProcessKGB } from "@/lib/auth";
 import { BERKAS_USULAN, bandingkanUsulan, nilaiUsulan, perubahanPegawai, ringkasHukdisUsulan, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { ringkasDasarBaru } from "@/lib/dasarBaruUsulan";
-import { catatanSkDilaporkan, usulanBaruMenurutSk, usulanMenurutSk } from "@/lib/dasarSkUsulan";
+import { cariSkTercatat, catatanSkDilaporkan, usulanBaruMenurutSk, usulanMenurutSk } from "@/lib/dasarSkUsulan";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
-import type { RiwayatKGBRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
+import type { RiwayatKGBRow, RiwayatPangkatRow, RiwayatPmkRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
 import { kgbBerjalanTerbaru } from "@/lib/dataPegawai";
 import { suratSudahDibuat, type SuratKgbTersimpan } from "@/lib/prosesKgb";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
@@ -38,12 +38,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ jumlah: menunggu.length });
   }
 
-  const [semuaUsulan, semuaPegawai, semuaKgb, semuaSurat] = await Promise.all([
+  const [semuaUsulan, semuaPegawai, semuaKgb, semuaSurat, semuaPangkat, semuaPmk] = await Promise.all([
     db.usulanPegawai.findMany({ where: saring }) as Promise<UsulanPegawaiRow[]>,
     db.pegawai.findMany(),
     db.riwayatKGB.findMany() as Promise<RiwayatKGBRow[]>,
     db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
+    // SK yang dilaporkan dan sudah tercatat: hasil persetujuan yang terputus, atau laporan ulang (ADR-079).
+    db.riwayatPangkat.findMany() as Promise<RiwayatPangkatRow[]>,
+    db.riwayatPmk.findMany() as Promise<RiwayatPmkRow[]>,
   ]);
+  const pangkatPerPegawai = new Map<string, RiwayatPangkatRow[]>();
+  for (const r of semuaPangkat) pangkatPerPegawai.set(r.pegawaiId, [...(pangkatPerPegawai.get(r.pegawaiId) ?? []), r]);
+  const pmkPerPegawai = new Map<string, RiwayatPmkRow[]>();
+  for (const r of semuaPmk) pmkPerPegawai.set(r.pegawaiId, [...(pmkPerPegawai.get(r.pegawaiId) ?? []), r]);
   const pegawaiById = new Map(semuaPegawai.map((p) => [p.id, p]));
   const kgbPerPegawai = new Map<string, RiwayatKGBRow[]>();
   for (const k of semuaKgb) kgbPerPegawai.set(k.pegawaiId, [...(kgbPerPegawai.get(k.pegawaiId) ?? []), k]);
@@ -65,6 +72,10 @@ export async function GET(req: Request) {
   const daftar = semuaUsulan
     .map((u) => {
       const p = u.pegawaiId ? pegawaiById.get(u.pegawaiId) : null;
+      const tercatat =
+        p && u.status === "menunggu"
+          ? cariSkTercatat(u, { pangkat: pangkatPerPegawai.get(p.id), pmk: pmkPerPegawai.get(p.id) })
+          : null;
       return {
         id: u.id,
         pegawaiId: u.pegawaiId,
@@ -81,7 +92,7 @@ export async function GET(req: Request) {
         // Usulan pegawai baru belum punya pembanding, jadi selalu menampilkan nilai yang diusulkan.
         // Kolom dasar gaji pada laporan SK kenaikan pangkat atau PMK ditampilkan menurut hitungan SK-nya,
         // yang sama dengan yang diterapkan saat disetujui, bukan angka mentah usulan (ADR-052).
-        perubahan: u.status === "menunggu" && p ? bandingkanUsulan(p, usulanMenurutSk(p, u, perubahanPegawai(u))) : [],
+        perubahan: u.status === "menunggu" && p ? bandingkanUsulan(p, usulanMenurutSk(p, u, perubahanPegawai(u), tercatat)) : [],
         nilaiDiusulkan: u.status === "menunggu" && p ? [] : nilaiUsulan(u.jenis === "baru" ? usulanBaruMenurutSk(u) : u),
         hukdis: ringkasHukdisUsulan(u),
         // SK kenaikan pangkat atau PMK yang disebut UPT sebagai sebab perubahan dasar gaji (ADR-030).
@@ -89,7 +100,7 @@ export async function GET(req: Request) {
         // Hasil hitungan SK yang dilaporkan: pada pegawai baru, keadaan pada SK KGB terakhir atau hitungan mundurnya
         // (ADR-065); pada keduanya, masa kerja yang tertulis pada SK kenaikan pangkat dicocokkan dengan hitungan sistem
         // (ADR-078). Pegawai yang sudah disetujui tidak lagi dibandingkan, sebab data induknya sudah berubah.
-        catatanSkBaru: u.jenis === "baru" || u.status === "menunggu" ? catatanSkDilaporkan(u, p) : null,
+        catatanSkBaru: u.jenis === "baru" || u.status === "menunggu" ? catatanSkDilaporkan(u, p, tercatat) : null,
         hukdisKeterangan: u.hukdisKeterangan,
         nomorSkTerakhir: u.nomorSkTerakhir,
         tanggalSkTerakhir: u.tanggalSkTerakhir ? new Date(u.tanggalSkTerakhir).toISOString() : null,

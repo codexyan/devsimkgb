@@ -7,7 +7,7 @@ import { bacaTanggalInput } from "./prosesKgb";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { isoTanggalLokal, tanggalKalender, type NilaiTanggal } from "./waktu";
 import { TANPA_SK_BARU, isJenisDasarBaru } from "./dasarBaruUsulan";
-import { hitungDasarSkUsulan, hitungSkPegawaiBaru } from "./dasarSkUsulan";
+import { hitungSkPegawaiBaru, rencanaSkUsulan } from "./dasarSkUsulan";
 import { getPangkat, isGolonganDikenal } from "./tabelGaji";
 
 /**
@@ -157,19 +157,23 @@ export function isiHitungan(
   // Pegawai tercatat yang melaporkan SK kenaikan pangkat atau PMK: hitungan yang sama dengan persetujuan Kanwil, bukan
   // golongan baru dengan masa kerja yang tertulis di SK (ADR-078).
   if (dasar && dasarBaru && isGolonganDikenal(String(dasar.golonganRuang ?? ""))) {
-    // Draf boleh belum mencantumkan tanggal SK; hitungannya cukup dengan TMT-nya.
-    const sk = hitungDasarSkUsulan(
+    // Draf boleh belum mencantumkan tanggal SK; hitungannya cukup dengan TMT-nya. Dasarnya data tercatat, atau keadaan
+    // sebelum SK yang dibetulkan UPT (ADR-079).
+    const rencana = rencanaSkUsulan(
       dasar as PegawaiRow,
-      { ...dasarBaru, dasarBaruTanggalSk: dasarBaru.dasarBaruTanggalSk ?? dasarBaru.dasarBaruTmt },
+      { ...isian, ...dasarBaru, dasarBaruTanggalSk: dasarBaru.dasarBaruTanggalSk ?? dasarBaru.dasarBaruTmt },
       perubahanPegawai(isian),
+      null,
     );
-    if (sk.berlaku && sk.ok)
+    if (rencana.jenis === "hitung") {
+      const nilai = rencana.sk.nilai;
       return {
         ...isian,
-        pangkat: (sk.nilai.pangkat as string | undefined) || getPangkat(String(sk.nilai.golonganRuang ?? "")) || null,
-        gajiPokok: sk.nilai.gajiPokok || null,
-        tmtKgbBerikutnya: (sk.nilai.tmtKgbBerikutnya as Date | null) ?? null,
+        pangkat: (nilai.pangkat as string | undefined) || getPangkat(String(nilai.golonganRuang ?? "")) || null,
+        gajiPokok: nilai.gajiPokok || null,
+        tmtKgbBerikutnya: (nilai.tmtKgbBerikutnya as Date | null) ?? rencana.dasar.tmtKgbBerikutnya ?? null,
       };
+    }
   }
   const ambil = <K extends KunciBidangUsulan>(kunci: K) =>
     (isian[kunci] ?? dasar?.[kunci] ?? null) as UsulanPegawaiRow[K] | null;

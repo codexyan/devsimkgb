@@ -9,6 +9,7 @@ import { SATKER } from "@/lib/satker";
 import { bacaAcuan, bacaDasarBaru, bacaIsianBaris } from "@/lib/usulanFormulir";
 import { bacaTanggalInput, type SuratKgbTersimpan } from "@/lib/prosesKgb";
 import { dasarSkPratinjau, keadaanSesudahUsulan, rencanaKgbPratinjau } from "@/lib/pratinjauSkUsulan";
+import { cariSkTercatat, type SkTercatat } from "@/lib/dasarSkUsulan";
 import { satkerSurat, susunDataSuratKgb, type PenandatanganSurat } from "@/lib/dataSuratKgbServer";
 import { JABATAN_BAWAAN, tentukanPenandatangan } from "@/lib/penandatangan";
 import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
@@ -64,14 +65,10 @@ export async function POST(req: Request) {
     pegawaiLama = pegawai;
   }
 
-  const keadaan = keadaanSesudahUsulan(usulan, pegawaiLama);
-  if (!keadaan.ok) return NextResponse.json({ error: keadaan.pesan }, { status: 422 });
-  const hariIni = hariIniWita();
-  const rencana = rencanaKgbPratinjau(keadaan.nilai, hariIni);
-  if (!rencana.ok) return NextResponse.json({ error: rencana.pesan }, { status: 422 });
-
-  // Riwayat SK pegawai yang sudah tercatat menentukan Atas dasar, sama dengan Buat SK Kanwil (ADR-062).
-  let riwayat: Parameters<typeof dasarSkPratinjau>[0] = { usulan, pegawaiLama, tmtKgbBaru: rencana.nilai.tmtKgbBaru };
+  // Riwayat SK pegawai yang sudah tercatat menentukan Atas dasar, sama dengan Buat SK Kanwil (ADR-062), dan mengenali SK
+  // yang dilaporkan ulang (ADR-079).
+  let tercatat: SkTercatat | null = null;
+  let riwayatTercatat: Omit<Parameters<typeof dasarSkPratinjau>[0], "usulan" | "pegawaiLama" | "tmtKgbBaru"> = {};
   if (pegawaiLama) {
     const id = pegawaiLama.id;
     const [kgb, surat, pangkat, pmk] = await Promise.all([
@@ -80,15 +77,24 @@ export async function POST(req: Request) {
       db.riwayatPangkat.findMany({ where: { pegawaiId: id } }) as Promise<RiwayatPangkatRow[]>,
       db.riwayatPmk.findMany({ where: { pegawaiId: id } }) as Promise<RiwayatPmkRow[]>,
     ]);
+    tercatat = cariSkTercatat(usulan, { pangkat, pmk });
     const suratByKgb = new Map(surat.map((s) => [s.kgbId, s]));
-    riwayat = {
-      ...riwayat,
+    riwayatTercatat = {
       kgb: kgb.map((k) => ({ ...k, surat: suratByKgb.get(k.id) ?? null })),
       pangkat: pangkat.map((r) => ({ id: r.id, nomorSK: r.nomorSK, tanggalSK: r.tanggalSK, tmt: r.tmtPangkat, jenisKp: r.jenisKp, penetapSK: r.penetapSK })),
       pmk: pmk.map((r) => ({ id: r.id, nomorSK: r.nomorSK, tanggalSK: r.tanggalSK, tmt: r.tmtPmk, penetapSK: r.penetapSK })),
     };
   }
-  const dasar = dasarSkPratinjau(riwayat);
+
+  const keadaan = keadaanSesudahUsulan(usulan, pegawaiLama, tercatat);
+  if (!keadaan.ok) return NextResponse.json({ error: keadaan.pesan }, { status: 422 });
+  const hariIni = hariIniWita();
+  const rencana = rencanaKgbPratinjau(keadaan.nilai, hariIni);
+  if (!rencana.ok) return NextResponse.json({ error: rencana.pesan }, { status: 422 });
+
+  // SK yang sudah tercatat tidak ditambahkan lagi sebagai calon Atas dasar.
+  const usulanDasar = tercatat ? { ...usulan, dasarBaruJenis: null } : usulan;
+  const dasar = dasarSkPratinjau({ usulan: usulanDasar, pegawaiLama, tmtKgbBaru: rencana.nilai.tmtKgbBaru, ...riwayatTercatat });
 
   const unitKerja = pegawaiLama ? pegawaiLama.unitKerja : SATKER.find((s) => s.kode === akun.kode)?.nama ?? "";
   const satker = satkerSurat(unitKerja);

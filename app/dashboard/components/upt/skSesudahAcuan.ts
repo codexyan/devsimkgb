@@ -208,13 +208,14 @@ export function pisahkanIsianSk(input: {
     mkgTahun: nilai.mkgTahun ?? "",
     mkgBulan: nilai.mkgBulan ?? "",
   };
+  // Keadaan sebelum SK yang disimpan bersama SK-nya, termasuk yang dibetulkan UPT dari data tercatat (ADR-078, ADR-079).
+  if (acuan) return { atas: { ...nilai, golonganRuang: acuan.golongan, mkgTahun: acuan.mkgTahun, mkgBulan: acuan.mkgBulan }, sk: menurutSk };
   if (tercatat) {
     const atas = { ...nilai, golonganRuang: tercatat.golonganRuang ?? "", mkgTahun: tercatat.mkgTahun ?? "", mkgBulan: tercatat.mkgBulan ?? "", tmtGolongan: tercatat.tmtGolongan ?? nilai.tmtGolongan ?? "" };
     // Draf lama kenaikan pangkat tidak memuat masa kerja menurut SK: isiannya sama dengan data tercatat.
     const mkgSama = (nilai.mkgTahun ?? "") === (tercatat.mkgTahun ?? "") && (nilai.mkgBulan ?? "") === (tercatat.mkgBulan ?? "");
-    return { atas, sk: !acuan && jenisSk === "kp" && mkgSama ? { ...menurutSk, mkgTahun: "", mkgBulan: "" } : menurutSk };
+    return { atas, sk: jenisSk === "kp" && mkgSama ? { ...menurutSk, mkgTahun: "", mkgBulan: "" } : menurutSk };
   }
-  if (acuan) return { atas: { ...nilai, golonganRuang: acuan.golongan, mkgTahun: acuan.mkgTahun, mkgBulan: acuan.mkgBulan }, sk: menurutSk };
   return {
     atas: { ...nilai, golonganRuang: jenisSk === "pmk" ? nilai.golonganRuang ?? "" : "", mkgTahun: "", mkgBulan: "" },
     sk: menurutSk,
@@ -253,4 +254,27 @@ export function asalAtasDasar(p: PratinjauAtasDasar, skAcuan: string): string {
 /** Satu baris Atas dasar: label, nomor, dan TMT. */
 export function teksAtasDasar(p: PratinjauAtasDasar): string {
   return `${p.label}${p.nomorSK ? ` ${p.nomorSK}` : ""}${p.tmt ? `, TMT ${formatTanggalId(p.tmt)}` : ""}`;
+}
+
+/**
+ * Isian bagian atas yang berbeda dari data tercatat selagi SK sesudahnya dilaporkan: koreksi keadaan sebelum SK, yang
+ * dihitung Kanwil bersama SK itu (ADR-079). Kosong bila sama.
+ */
+export function koreksiAtas(
+  atas: Record<string, string>,
+  tercatat: Record<string, string> | null | undefined,
+): { label: string; lama: string; baru: string }[] {
+  if (!tercatat) return [];
+  const mkg = (t?: string, b?: string) => `${Number(t || 0)} thn ${Number(b || 0)} bln`;
+  const tgl = (v?: string) => (v ? formatTanggalId(v) : "-");
+  const hasil: { label: string; lama: string; baru: string }[] = [];
+  if ((atas.golonganRuang ?? "") !== (tercatat.golonganRuang ?? ""))
+    hasil.push({ label: "golongan", lama: tercatat.golonganRuang || "-", baru: atas.golonganRuang || "-" });
+  if (Number(atas.mkgTahun || 0) * 12 + Number(atas.mkgBulan || 0) !== Number(tercatat.mkgTahun || 0) * 12 + Number(tercatat.mkgBulan || 0))
+    hasil.push({ label: "masa kerja", lama: mkg(tercatat.mkgTahun, tercatat.mkgBulan), baru: mkg(atas.mkgTahun, atas.mkgBulan) });
+  if ((atas.tmtKgbTerakhir ?? "") !== (tercatat.tmtKgbTerakhir ?? ""))
+    hasil.push({ label: "TMT KGB terakhir", lama: tgl(tercatat.tmtKgbTerakhir), baru: tgl(atas.tmtKgbTerakhir) });
+  if ((atas.tmtGolongan ?? "") !== (tercatat.tmtGolongan ?? ""))
+    hasil.push({ label: "TMT golongan", lama: tgl(tercatat.tmtGolongan), baru: tgl(atas.tmtGolongan) });
+  return hasil;
 }

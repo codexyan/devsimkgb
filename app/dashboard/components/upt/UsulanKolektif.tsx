@@ -17,6 +17,7 @@ import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { kunciBulanTmt } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan } from "@/app/dashboard/satker/labelSatker";
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
+import { kunciNomorSk } from "@/lib/nomorSurat";
 import { pratinjauAtasDasarUsulan } from "@/lib/linimasaDasarSk";
 import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
 import {
@@ -24,6 +25,7 @@ import {
   hitungFormulirUsulan,
   isianUntukDisimpan,
   jawabSkBaru,
+  koreksiAtas,
   mkgPadaSkTercatat,
   pisahkanIsianSk,
   teksAtasDasar,
@@ -230,7 +232,10 @@ function hitunganBaris(b: Baris) {
       tmtKgbTerakhir: b.isian.tmtKgbTerakhir ?? "",
     },
     b.dasar,
-    b.dataTercatat?.tmtKgbBerikutnya ?? null,
+    // Bagian atas yang dibetulkan dari data tercatat menghitung jadwalnya sendiri, sama dengan persetujuan Kanwil (ADR-079).
+    b.dataTercatat && koreksiAtas(b.isian, b.dataTercatat).every((k) => k.label === "TMT golongan")
+      ? b.dataTercatat.tmtKgbBerikutnya ?? null
+      : null,
   );
 }
 
@@ -962,25 +967,9 @@ export default function UsulanKolektif() {
                 onIsi={(kolom, nilai) => isi(barisAktif.kunci, kolom, nilai)}
                 onCatatan={(teks) => ubahBaris(barisAktif.kunci, (x) => ({ ...x, catatanUpt: teks }))}
                 onDasar={(kolom, nilai) => ubahBaris(barisAktif.kunci, (x) => ({ ...x, dasar: { ...x.dasar, [kolom]: nilai } }))}
-                onAdaSkBaru={(ada) =>
-                  ubahBaris(barisAktif.kunci, (x) => {
-                    const dasar = jawabSkBaru(x.dasar, ada);
-                    const t = x.dataTercatat;
-                    if (!ada || !t) return { ...x, dasar };
-                    // Pegawai tercatat: keadaan sebelum SK adalah data tercatat (ADR-078). Golongan baru yang telanjur
-                    // diganti di tabel (cara lama) dipindahkan ke bagian SK.
-                    const golonganDiTabel = x.isian.golonganRuang ?? "";
-                    return {
-                      ...x,
-                      pernah: pernahKgb(t.mkgTahun, t.mkgBulan),
-                      isian: { ...x.isian, golonganRuang: t.golonganRuang ?? "", mkgTahun: t.mkgTahun ?? "", mkgBulan: t.mkgBulan ?? "" },
-                      dasar:
-                        dasar.jenis === "kp" && !dasar.golongan && golonganDiTabel && golonganDiTabel !== (t.golonganRuang ?? "")
-                          ? { ...dasar, golongan: golonganDiTabel }
-                          : dasar,
-                    };
-                  })
-                }
+                // Isian di tabel tidak diganti saat jawabannya berganti: keadaan pada SK KGB terakhir yang diketik UPT tetap
+                // menjadi dasar hitungan SK sesudahnya (ADR-079).
+                onAdaSkBaru={(ada) => ubahBaris(barisAktif.kunci, (x) => ({ ...x, dasar: jawabSkBaru(x.dasar, ada) }))}
                 onBerkas={(medan, f) => pilihBerkas(barisAktif.kunci, medan, f)}
                 onSebelum={indeksNav > 0 ? () => setAktif(navBaris[indeksNav - 1].kunci) : undefined}
                 onBerikut={indeksNav >= 0 && indeksNav < navBaris.length - 1 ? () => setAktif(navBaris[indeksNav + 1].kunci) : undefined}
@@ -1218,9 +1207,12 @@ function DetailBaris({
   const skAcuan = b.pernah ? "SK KGB terakhir" : "SK CPNS";
   const jawaban = jawabanSkBaru(b.dasar.jenis);
   const adaSkBaru = jawaban === "ada";
-  // Pegawai tercatat yang melaporkan SK: golongan dan masa kerja di tabel mengikuti data tercatat (ADR-078).
-  const kunciAtas = !!b.dataTercatat && adaSkBaru;
   const mkgSkTercatat = b.dataTercatat ? mkgPadaSkTercatat(b.dataTercatat, b.tercatat) : null;
+  // Tabel yang dibetulkan dari data tercatat selagi SK dilaporkan: koreksi yang dihitung Kanwil bersama SK itu (ADR-079).
+  const koreksi = adaSkBaru ? koreksiAtas(b.isian, b.dataTercatat) : [];
+  // SK yang dilaporkan sama dengan yang sudah menjadi dasar KGB berikutnya: tidak dicatat dua kali.
+  const skSudahTercatat =
+    adaSkBaru && !!b.tercatat?.nomorSK && !!b.dasar.nomorSk.trim() && kunciNomorSk(b.dasar.nomorSk) === kunciNomorSk(b.tercatat.nomorSK);
   const pratinjau = pratinjauAtasDasarUsulan({
     acuan: { nomorSK: b.isian.nomorSkTerakhir ?? "", tanggalSK: b.isian.tanggalSkTerakhir ?? "", tmt: b.isian.tmtKgbTerakhir ?? "", cpns: !b.pernah },
     laporan: adaSkBaru ? { jenis: b.dasar.jenis, jenisKp: b.dasar.jenisKp, nomorSk: b.dasar.nomorSk, tmt: b.dasar.tmt } : null,
@@ -1272,7 +1264,7 @@ function DetailBaris({
           <div className="kol-isian-kisi">
             <label className="kol-label">
               <span className="kol-wajib">{adaSkBaru ? `Golongan ruang pada ${skAcuan}` : "Golongan ruang"}</span>
-              <select className="kol-isi" data-beda={beda("golonganRuang")} value={b.isian.golonganRuang ?? ""} disabled={kunciAtas} onChange={(e) => onIsi("golonganRuang", e.target.value)}>
+              <select className="kol-isi" data-beda={beda("golonganRuang")} value={b.isian.golonganRuang ?? ""} onChange={(e) => onIsi("golonganRuang", e.target.value)}>
                 <option value="">Pilih golongan</option>
                 {Object.entries(GOLONGAN_PANGKAT).map(([g, p]) => (
                   <option key={g} value={g}>{g} · {p}</option>
@@ -1282,9 +1274,9 @@ function DetailBaris({
             <div className="kol-label">
               <span className={b.pernah ? "kol-wajib" : undefined}>Masa kerja golongan</span>
               <span className="kol-mkg">
-                <input className="kol-isi" data-beda={beda("mkgTahun")} inputMode="numeric" value={b.isian.mkgTahun ?? ""} disabled={!b.pernah || kunciAtas} onChange={(e) => onIsi("mkgTahun", e.target.value.replace(/\D/g, "").slice(0, 2))} aria-label="Tahun" />
+                <input className="kol-isi" data-beda={beda("mkgTahun")} inputMode="numeric" value={b.isian.mkgTahun ?? ""} disabled={!b.pernah} onChange={(e) => onIsi("mkgTahun", e.target.value.replace(/\D/g, "").slice(0, 2))} aria-label="Tahun" />
                 <span>tahun</span>
-                <input className="kol-isi" data-beda={beda("mkgBulan")} inputMode="numeric" value={b.isian.mkgBulan ?? ""} disabled={!b.pernah || kunciAtas} onChange={(e) => onIsi("mkgBulan", e.target.value.replace(/\D/g, "").slice(0, 2))} aria-label="Bulan" />
+                <input className="kol-isi" data-beda={beda("mkgBulan")} inputMode="numeric" value={b.isian.mkgBulan ?? ""} disabled={!b.pernah} onChange={(e) => onIsi("mkgBulan", e.target.value.replace(/\D/g, "").slice(0, 2))} aria-label="Bulan" />
                 <span>bulan</span>
               </span>
             </div>
@@ -1303,15 +1295,15 @@ function DetailBaris({
           </div>
           {mkgSkTercatat && (
             <p className="kol-catatan-kecil" data-mkg-sk="">
-              Masa kerja tercatat {b.isian.mkgTahun || 0} tahun {b.isian.mkgBulan || 0} bulan adalah pada TMT KGB terakhir (dasar hitungan).
+              Masa kerja tercatat {b.dataTercatat?.mkgTahun || 0} tahun {b.dataTercatat?.mkgBulan || 0} bulan adalah pada TMT KGB terakhir (dasar hitungan).
               Pada TMT {mkgSkTercatat.jenis === "kp" ? "kenaikan pangkat" : "PMK"} {formatTanggalId(mkgSkTercatat.tmt)} masa kerjanya{" "}
               {mkgSkTercatat.mkg.tahun} tahun {mkgSkTercatat.mkg.bulan} bulan, angka yang tertulis pada SK itu.
             </p>
           )}
-          {kunciAtas && (
-            <p className="kol-catatan-kecil">
-              Golongan dan masa kerja mengikuti data tercatat, yang dipakai Kanwil menghitung SK yang dilaporkan. Bila data tercatat
-              keliru, jawab Tidak ada lalu ajukan koreksinya lebih dulu.
+          {koreksi.length > 0 && (
+            <p className="kol-catatan-kecil" data-koreksi="">
+              Data tercatat ikut dibetulkan: {koreksi.map((k) => `${k.label} ${k.lama} → ${k.baru}`).join(", ")}. Kanwil menghitung SK yang
+              dilaporkan dari isian tabel ini.
             </p>
           )}
           <div className="kol-hitung">
@@ -1429,6 +1421,12 @@ function DetailBaris({
                 ? `Golongan dan masa kerja di tabel adalah keadaan pada ${skAcuan}. Golongan baru dan masa kerja golongan pada TMT pangkat disalin dari SK kenaikan pangkat apa adanya; sistem mencocokkan masa kerjanya dengan hitungannya sendiri.`
                 : `Golongan dan masa kerja di tabel adalah keadaan pada ${skAcuan}. Masa kerja golongan pada TMT PMK disalin dari SK PMK apa adanya; jadwal KGB berikutnya dapat maju. Pindaian SK PMK ditagih di bagian berkas.`}
             </p>
+            {skSudahTercatat && (
+              <p className="kol-kurang">
+                <span aria-hidden="true">!</span> SK ini sudah tercatat di SIM-KGB. Bila datanya sudah benar, jawab Tidak ada. Bila keadaan
+                sebelum SK keliru, betulkan tabel di atas ke keadaan pada {skAcuan}: Kanwil menghitung ulang SK ini tanpa mencatatnya dua kali.
+              </p>
+            )}
             {/* Keadaan sesudah SK ini, dengan hitungan persetujuan Kanwil (ADR-078). */}
             <div className="kol-hitung" data-sesudah-sk="">
               {sesudahSk?.ok ? (
