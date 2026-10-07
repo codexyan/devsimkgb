@@ -226,7 +226,7 @@ export function LayarPapan() {
         "SK terbit: SK sudah ditandatangani. Unduh SK-nya, rekam di Gaji Web satker, lalu tandai di sini.",
         "Selesai: KGB yang SK-nya sudah Anda rekam di Gaji Web. Hanya itu; usulan yang disetujui tidak masuk ke sini.",
       ]}
-      catatan="Satu pegawai selalu satu kartu. Bila orang yang sama punya beberapa dokumen berjalan, kartunya berada di kolom yang paling perlu Anda kerjakan."
+      catatan="Satu pegawai selalu satu kartu. Bila orang yang sama punya beberapa dokumen berjalan, kartunya berada di kolom yang paling perlu Anda kerjakan. Kotak cari di kepala papan mencari nama atau NIP di semua kolom sekaligus; kolom yang diciutkan terbuka sendiri bila ada yang cocok."
       anak={
         <div className="lyr-papan">
           {kolom.map(([judul, nada, jumlah, ket], i) => (

@@ -55,6 +55,8 @@ tersendiri untuk SK yang menunggu review UPT.
      kiriman gagal, yang sudah disetujui tetap disetujui dan menekan Setujui lagi melanjutkan sisanya (keputusan 1).
 4. **Kolom Periksa SK** di papan Alur KGB UPT, di antara Di Kanwil dan SK terbit: SK KGB buatan Kanwil yang menunggu review
    UPT (ADR-077), dengan jumlahnya di kepala kolom. Sebelumnya kartu ini bercampur dengan draf di Perlu dikerjakan.
+   Kotak cari papan pindah ke kepala panel dan berlaku untuk semua kolom (nama atau NIP), bukan hanya Perlu dikerjakan;
+   kepala kolom menunjukkan jumlah yang cocok dari seluruhnya, dan kolom yang diciutkan terbuka sendiri bila ada yang cocok.
 5. **Penelusuran data produksi** (`docs/sql/telusur-usulan-terputus.sql`): kueri baca saja untuk SQL Editor Supabase yang
    menemukan SK tercatat dengan data pegawai belum ikut, pegawai baru tanpa usulan disetujui, penghapusan hari itu, dan
    usulan yang belum selesai.
