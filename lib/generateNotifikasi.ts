@@ -202,12 +202,19 @@ export function notifikasiUsulanRevisi(
   usulan: { id: string; satker: string | null; nomorSurat: string | null },
   pegawai: { nama: string | null; nip: string | null } | null | undefined,
   catatan: string,
+  /**
+   * `sudahDisetujui`: usulannya sudah diterapkan ke data pegawai sebelum dikembalikan (ADR-076). Data pegawai tidak
+   * ditarik kembali, jadi pesannya menegaskan itu dan bahwa isiannya sudah sesuai data saat ini.
+   */
+  opsi: { sudahDisetujui?: boolean } = {},
 ): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
   const nama = pegawai?.nama?.trim() || "-";
   const nip = pegawai?.nip?.trim() || "-";
   return {
     judul: `Usulan Dikembalikan: ${nama}`,
-    pesan: `Kanwil mengembalikan usulan ${nama} (${nip}) pada surat ${usulan.nomorSurat ?? "-"} untuk diperbaiki: ${catatan}. Isian dan berkasnya masih utuh, tinggal dibetulkan lalu dikirim ulang.`,
+    pesan: opsi.sudahDisetujui
+      ? `Kanwil meminta perbaikan atas usulan ${nama} (${nip}) pada surat ${usulan.nomorSurat ?? "-"} yang sudah disetujui: ${catatan}. Data pegawai tidak berubah sampai perbaikannya disetujui; isiannya sudah sesuai data saat ini, tinggal dibetulkan lalu dikirim ulang.`
+      : `Kanwil mengembalikan usulan ${nama} (${nip}) pada surat ${usulan.nomorSurat ?? "-"} untuk diperbaiki: ${catatan}. Isian dan berkasnya masih utuh, tinggal dibetulkan lalu dikirim ulang.`,
     tipe: T.USULAN_REVISI,
     referenceId: usulan.id,
     prioritas: "warning",

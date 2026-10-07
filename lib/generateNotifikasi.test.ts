@@ -295,6 +295,24 @@ test("usulan data dari UPT diingatkan sekali ke Kanwil", () => {
   assert.equal(sudahDitinjau.baru.filter((n) => n.tipe === "usulan_upt").length, 0);
 });
 
+test("usulan yang sudah disetujui lalu dikembalikan memakai pesan yang menegaskan data tidak ditarik kembali", () => {
+  const n = notifikasiUsulanRevisi(
+    { id: "u9", satker: "lapas-perempuan-martapura", nomorSurat: "W.19-UJI-1" },
+    { nama: "PEGAWAI UJI", nip: "199001012015031001" },
+    "SK CPNS tidak terbaca",
+    { sudahDisetujui: true },
+  );
+  assert.equal(n.tipe, "usulan_revisi");
+  assert.equal(n.referenceId, "u9");
+  assert.match(n.pesan, /meminta perbaikan atas usulan PEGAWAI UJI/);
+  assert.match(n.pesan, /yang sudah disetujui: SK CPNS tidak terbaca/);
+  assert.match(n.pesan, /Data pegawai tidak berubah sampai perbaikannya disetujui/);
+  // Tanpa opsi, pesannya tetap yang lama (usulan yang dikembalikan sebelum disetujui).
+  const biasa = notifikasiUsulanRevisi({ id: "u9", satker: null, nomorSurat: null }, null, "x");
+  assert.match(biasa.pesan, /Kanwil mengembalikan usulan - \(-\) pada surat -/);
+  assert.doesNotMatch(biasa.pesan, /sudah disetujui/);
+});
+
 test("laporan SK yang disetujui dikabarkan ke UPT, menunjuk ke usulannya, dan menyebut hasilnya", () => {
   const n = notifikasiUsulanDisetujui(
     { id: "u7", satker: "rutan-rantau" },

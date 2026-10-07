@@ -3106,65 +3106,41 @@ html[data-gerak="kurangi"] .dsb-putar {
   .ung-panel .kol-kaki { margin: 0 -12px -12px; }
 }
 
-/* ── Panel "Usulan UPT menunggu" di dasbor Kanwil (ADR-034) ────────────────────────────────────
-   Dikelompokkan per UPT karena satu surat usulan lazim memuat beberapa pegawai satker yang sama.
-   Kisinya melebar sendiri: satu kolom di ponsel, beberapa kolom di layar lebar, tanpa gulir mendatar. */
+/* ── Panel "Usulan UPT menunggu" di dasbor Kanwil (ADR-034, ADR-076) ───────────────────────────
+   Satu baris per UPT: jumlah usulan, surat, dan umur terlama. Rincian per pegawai ada di halaman Usulan UPT, yang
+   dibuka dari tombol Tinjau sudah tersaring ke UPT itu. Daftar per pegawai dulu memenuhi dasbor, apalagi di ponsel. */
 /* Panel ini berdiri di luar .dsb-dasbor-isi, sejajar kepala halaman. Di dalam kisi itu ia akan merebut
    satu-satunya baris 1fr pada mode "muat satu layar", sehingga antrian terhimpit menjadi sesobek garis. */
 .usl-antrian-panel { flex: none; }
 
-.usl-antrian {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-  gap: 10px;
-  padding: 14px 16px;
-  /* Dibatasi tinggi supaya antrian kerja di bawahnya tetap kebagian layar saat usulan sedang menumpuk. */
-  max-height: min(340px, 30vh);
-  overflow-y: auto;
-}
-.usl-antrian-upt {
+.usl-ringkas {
   display: grid;
   gap: 6px;
-  align-content: start;
-  padding: 10px;
-  border: 1px solid var(--ln1);
-  border-radius: 12px;
-  background: var(--sub);
-}
-.usl-antrian-kepala {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  /* Paling banyak satu baris per UPT, tetapi tetap dibatasi supaya antrian kerja di bawahnya kebagian layar. Cukup untuk
+     lima baris tanpa gulir pada layar laptop umumnya. */
+  max-height: min(300px, 34vh);
+  overflow-y: auto;
 }
-.usl-antrian-kepala strong {
-  min-width: 0;
-  font-size: 12.5px;
-  font-weight: 650;
-  color: var(--dtn);
-  overflow-wrap: anywhere;
-}
-.usl-antrian-kepala .dsb-tag { margin-left: auto; font-size: 10.5px; }
-.usl-antrian ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.usl-antrian li {
+.usl-ringkas li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 9px;
+  gap: 10px;
+  padding: 6px 10px;
   border: 1px solid var(--ln2);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--card);
 }
-.usl-antrian li strong { display: block; font-size: 12.5px; font-weight: 600; color: var(--dtn); overflow-wrap: anywhere; }
-.usl-antrian li > span:first-child > span { display: block; font-size: 11px; color: var(--dt5); font-variant-numeric: tabular-nums; }
-.usl-antrian li .dsb-tag { flex-shrink: 0; font-size: 10px; }
-.usl-antrian li .dsb-tombol { flex-shrink: 0; margin-left: auto; }
+.usl-ringkas li > span:first-child { display: grid; flex: 1 1 auto; min-width: 0; }
+.usl-ringkas strong { font-size: 13px; font-weight: 650; color: var(--dtn); overflow-wrap: anywhere; }
+.usl-ringkas li > span:first-child > span { font-size: 11.5px; color: var(--dt5); font-variant-numeric: tabular-nums; }
+.usl-ringkas .dsb-tag { flex-shrink: 0; min-width: 30px; justify-content: center; font-size: 11px; font-variant-numeric: tabular-nums; }
+.usl-ringkas .dsb-tombol { flex-shrink: 0; }
 
 @media (max-width: 640px) {
-  .usl-antrian { padding: 12px; max-height: none; }
-  /* Di ponsel tag jenis pindah ke baris bawah agar nama tidak terjepit. */
-  .usl-antrian li { flex-wrap: wrap; }
-  .usl-antrian li > span:first-child { flex: 1 1 100%; }
+  .usl-ringkas { padding: 12px; max-height: min(340px, 45vh); }
 }
 
 /* ── Kartu satker di dasbor Kanwil (ADR-036) ───────────────────────────────────────────────────

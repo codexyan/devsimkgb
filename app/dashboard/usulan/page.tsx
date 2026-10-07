@@ -105,6 +105,19 @@ export default function UsulanPage() {
     return () => clearTimeout(t);
   }, [muat]);
 
+  // Dibuka dari dasbor (tombol Tinjau pada ringkasan per UPT): ?upt=<kode satker>[&tab=menunggu|revisi|selesai]. Saringan UPT
+  // yang tidak ada pada tab itu otomatis kembali ke Semua UPT (uptAktif), jadi tautan lama tidak pernah menampilkan daftar kosong.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const q = new URLSearchParams(window.location.search);
+      const kodeUpt = q.get("upt");
+      if (kodeUpt) setUpt(kodeUpt);
+      const tabAwal = q.get("tab");
+      if (tabAwal === "menunggu" || tabAwal === "revisi" || tabAwal === "selesai") setTab(tabAwal);
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+
   function beriKabar(teks: string, lama = 7000) {
     setKabar(teks);
     setTimeout(() => setKabar(null), lama);
@@ -127,6 +140,8 @@ export default function UsulanPage() {
   }
 
   async function tinjau(u: UsulanKanwil, aksi: "setujui" | "kembalikan", catatan?: string) {
+    // Usulan yang sudah disetujui dikembalikan sebagai usulan perbaikan baru (ADR-076); usulan lamanya tetap Selesai.
+    const sudahDisetujui = u.status === "disetujui";
     setSibuk(true);
     setGalat("");
     try {
@@ -145,11 +160,18 @@ export default function UsulanPage() {
       beriKabar(
         aksi === "setujui"
           ? `Usulan ${u.nama} disetujui, ${d.jumlahPerubahan ?? 0} kolom diperbarui.${d.penyesuaianKgb ? ` KGB: ${d.penyesuaianKgb}.` : ""}${d.perluCatatHukdis ? " Laporan hukuman disiplinnya masih perlu dicatat di modul Hukuman Disiplin." : ""}`
-          : `Usulan ${u.nama} dikembalikan ke ${ringkas(u.unitKerja)} dengan catatan perbaikan.`,
+          : sudahDisetujui
+            ? `Usulan ${u.nama} yang sudah disetujui dikembalikan ke ${ringkas(u.unitKerja)}. Data pegawai tidak berubah; UPT menerima usulan perbaikan beserta catatan Anda.`
+            : `Usulan ${u.nama} dikembalikan ke ${ringkas(u.unitKerja)} dengan catatan perbaikan.`,
       );
       setDialogKembali(null);
       setCatatanKembali("");
       setTerpilih(null);
+      if (sudahDisetujui) {
+        // Yang lahir adalah usulan perbaikan baru, bukan perubahan status baris ini; hanya server yang tahu id dan isinya.
+        await muat();
+        return;
+      }
       tandaiUsulan(
         u.id,
         aksi === "setujui"
@@ -311,6 +333,8 @@ export default function UsulanPage() {
     tab === "mutasi" ? null : dipilih && kunciTampil.has(kunciPegawai(dipilih)) ? dipilih : kelompok[0]?.butir[0]?.utama ?? null;
   const laporanAktif = tab === "mutasi" ? laporanTampil.find((l) => l.id === terpilih) ?? laporanTampil[0] ?? null : null;
   const riwayatAktif = usulanAktif ? riwayatPer.get(kunciPegawai(usulanAktif)) ?? [usulanAktif] : [];
+  /** Satu pegawai hanya boleh punya satu usulan yang belum selesai, jadi usulan selesai belum dapat dikembalikan selama itu ada. */
+  const usulanLainBerjalan = usulanAktif ? riwayatAktif.find((r) => r.id !== usulanAktif.id && (r.status === "menunggu" || r.status === "revisi")) : undefined;
   /** Usulan lain yang masih menunggu pada surat yang sama: dasar persetujuan sekaligus per surat. */
   const suratAktif =
     usulanAktif?.status === "menunggu" && usulanAktif.nomorSurat?.trim()
@@ -582,6 +606,26 @@ export default function UsulanPage() {
                     </button>
                   </div>
                 )}
+                {/* Usulan yang sudah diterapkan tetap dapat dikembalikan agar UPT memperbaikinya (ADR-076). */}
+                {usulanAktif.status === "disetujui" && (
+                  <div className="usl-detail-kaki">
+                    {usulanLainBerjalan && (
+                      <p className="usl-meta" style={{ marginRight: "auto" }}>
+                        Pegawai ini punya usulan lain yang {usulanLainBerjalan.status === "menunggu" ? "menunggu tinjauan" : "sedang diperbaiki UPT"}; selesaikan itu lebih dulu.
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      className="dsb-tombol"
+                      data-jenis="garis"
+                      disabled={sibuk || !!usulanLainBerjalan}
+                      title="Usulan sudah diterapkan ke data pegawai. UPT menerima usulan perbaikan baru; data pegawai tidak berubah sebelum perbaikannya disetujui."
+                      onClick={() => { setDialogKembali(usulanAktif); setCatatanKembali(""); setGalat(""); }}
+                    >
+                      Kembalikan ke UPT
+                    </button>
+                  </div>
+                )}
               </>
             ) : laporanAktif ? (
               <>
@@ -706,7 +750,7 @@ export default function UsulanPage() {
 
       {dialogKembali && (
         <KerangkaModal
-          judul="Kembalikan untuk revisi"
+          judul={dialogKembali.status === "disetujui" ? "Kembalikan usulan yang sudah disetujui" : "Kembalikan untuk revisi"}
           subjudul={`${dialogKembali.nama} · ${ringkas(dialogKembali.unitKerja)}`}
           ukuran="sm"
           sibuk={sibuk}
@@ -730,13 +774,27 @@ export default function UsulanPage() {
               rows={3}
               value={catatanKembali}
               onChange={(e) => setCatatanKembali(e.target.value)}
-              placeholder="Misalnya: gaji pokok tidak sesuai SK terakhir yang dilampirkan"
+              placeholder={
+                dialogKembali.status === "disetujui"
+                  ? "Misalnya: tanggal lahir tidak sesuai SK CPNS, atau SK yang dilampirkan bukan SK terakhir"
+                  : "Misalnya: gaji pokok tidak sesuai SK terakhir yang dilampirkan"
+              }
             />
           </label>
-          <Catatan>
-            Usulan ini kembali ke daftar kerja UPT dengan isian dan berkas yang utuh. Proses KGB pegawainya dapat
-            dilanjutkan dengan data yang ada; bila UPT mengirim ulang, prosesnya tertahan lagi sampai ditinjau.
-          </Catatan>
+          {dialogKembali.status === "disetujui" ? (
+            <Catatan>
+              Usulan ini sudah diterapkan ke data pegawai, dan data pegawai tidak ditarik kembali. UPT menerima usulan
+              perbaikan baru yang sudah terisi sesuai data pegawai saat ini (termasuk yang sudah Anda betulkan di Data
+              Pegawai), lengkap dengan catatan ini, lalu memperbaiki dan mengirim ulang. Data baru berubah setelah
+              perbaikannya Anda setujui. Usulan ini tetap tercatat Selesai. SK kenaikan pangkat atau PMK yang sudah
+              tercatat tetap dibetulkan lewat Ubah data SK di tab Pangkat &amp; PMK.
+            </Catatan>
+          ) : (
+            <Catatan>
+              Usulan ini kembali ke daftar kerja UPT dengan isian dan berkas yang utuh. Proses KGB pegawainya dapat
+              dilanjutkan dengan data yang ada; bila UPT mengirim ulang, prosesnya tertahan lagi sampai ditinjau.
+            </Catatan>
+          )}
         </KerangkaModal>
       )}
     </div>

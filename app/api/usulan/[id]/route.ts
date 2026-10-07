@@ -5,10 +5,12 @@ import { canProcessKGB } from "@/lib/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 import { setujuiUsulan } from "@/lib/setujuiUsulan";
+import { kembalikanUsulanDisetujui } from "@/lib/kembalikanUsulanDisetujui";
 import { TIPE_NOTIFIKASI, notifikasiUsulanRevisi } from "@/lib/generateNotifikasi";
 import { newId } from "@/lib/sheets/id";
 import type { PegawaiRow } from "@/lib/sheets/tables";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { SATKER } from "@/lib/satker";
 import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
@@ -25,6 +27,9 @@ export const runtime = "nodejs";
  * usulan itu berpindah kembali ke daftar kerja UPT beserta catatan peninjau. Penolakan yang dulu ada
  * di sini dihapus karena selalu berujung sama: UPT mengetik ulang seluruh usulan dari nol. Usulan yang
  * memang tidak boleh lanjut pun dikembalikan, dengan catatan agar UPT menghapusnya.
+ *
+ * Usulan yang sudah disetujui dan diterapkan juga dapat dikembalikan (ADR-076). Datanya tidak ditarik kembali;
+ * UPT menerima usulan perbaikan baru yang sudah terisi sesuai data pegawai saat ini, dan usulan lamanya tetap Selesai.
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   await muatBatasInputSdm();
@@ -39,7 +44,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const usulan = (await db.usulanPegawai.findUnique({ id })) as UsulanPegawaiRow | null;
   if (!usulan) return NextResponse.json({ error: "Usulan tidak ditemukan" }, { status: 404 });
-  if (usulan.status !== "menunggu")
+  const sudahDisetujui = usulan.status === "disetujui";
+  if (usulan.status !== "menunggu" && !sudahDisetujui)
     return NextResponse.json({ error: "Usulan ini sudah ditinjau" }, { status: 409 });
 
   let aksi = "";
@@ -53,6 +59,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   if (aksi !== "setujui" && aksi !== "kembalikan")
     return NextResponse.json({ error: "Aksi harus setujui atau kembalikan" }, { status: 400 });
+  // Yang sudah diterapkan hanya dapat dikembalikan; menyetujuinya lagi tidak ada artinya dan menggandakan penerapannya.
+  if (sudahDisetujui && aksi !== "kembalikan")
+    return NextResponse.json({ error: "Usulan ini sudah disetujui dan diterapkan" }, { status: 409 });
+
+  if (sudahDisetujui) {
+    if (!catatan) return NextResponse.json({ error: "Catatan perbaikan wajib diisi" }, { status: 400 });
+    const hasil = await kembalikanUsulanDisetujui({
+      usulan,
+      catatan,
+      oleh: `${peninjau.nama} (${peninjau.nip})`,
+      sekarang: new Date(),
+    });
+    if (!hasil.ok) return NextResponse.json({ error: hasil.pesan }, { status: hasil.status });
+    logAudit({
+      userId: peninjau.id,
+      aksi: "kembalikan_usulan_selesai",
+      detail: `Kembalikan usulan yang sudah disetujui ${hasil.nama} (${hasil.nip}) ke ${SATKER.find((s) => s.kode === usulan.satker)?.nama ?? usulan.satker} untuk diperbaiki, surat ${usulan.nomorSurat ?? "-"}: ${catatan}. Data pegawai tidak berubah.`,
+      targetNama: hasil.nama,
+    });
+    return NextResponse.json({ ok: true, status: "revisi", usulanBaruId: hasil.id });
+  }
 
   const pegawaiLama = usulan.pegawaiId ? await db.pegawai.findUnique({ id: usulan.pegawaiId }) : null;
   if (usulan.jenis !== "baru" && !pegawaiLama)
