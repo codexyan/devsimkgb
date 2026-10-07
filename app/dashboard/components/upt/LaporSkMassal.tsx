@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { JENIS_KP } from "@/lib/kenaikanPangkat";
@@ -35,7 +35,11 @@ import type { DrafUsulanUpt, PegawaiUntukUsulan } from "./FormulirUsulan";
 
    Data UPT tidak boleh hilang: isian bersama (tanggal SK, TMT, penetap) hanya cadangan bagi kolom kartu yang kosong
    dan tidak pernah menimpa isian kartu; kartu yang gagal tetap utuh beserta pindaiannya; draf yang tersimpan
-   dilanjutkan, bukan dibuat ganda; dan menutup halaman dengan isian yang belum disimpan ditanyakan dulu. */
+   dilanjutkan, bukan dibuat ganda; dan menutup halaman dengan isian yang belum disimpan ditanyakan dulu.
+
+   Tata letak (ADR-079): di layar lebar panel kiri (tambah pegawai, isian bersama, daftar pegawai di laporan) menempel
+   dan menggulir sendiri, kartu SK di kanan mengikuti gulir halaman, dan kaki ringkasan menempel di bawah selama ada
+   kartu. Laporan yang masih kosong menampilkan gambar dan langkahnya, bukan kaki dengan tombol mati. */
 
 interface PegawaiUpt {
   id: string;
@@ -108,6 +112,9 @@ export default function LaporSkMassal() {
   const [cari, setCari] = useState("");
   const [mengirim, setMengirim] = useState(false);
   const [ringkasan, setRingkasan] = useState<{ nada: "hijau" | "kuning"; teks: string } | null>(null);
+  const halamanRef = useRef<HTMLDivElement>(null);
+  const kakiRef = useRef<HTMLDivElement>(null);
+  const cariRef = useRef<HTMLInputElement>(null);
 
   async function ambil(): Promise<{ pegawai: PegawaiUpt[]; draf: DrafUpt[] }> {
     const [rp, ru] = await Promise.all([fetch("/api/upt"), fetch("/api/upt/usulan")]);
@@ -150,6 +157,23 @@ export default function LaporSkMassal() {
     return () => window.removeEventListener("beforeunload", jaga);
   }, [adaBelumTersimpan]);
 
+  // Tinggi kaki yang menempel (dua baris di layar sempit) membatasi tinggi panel kiri, agar ujungnya tidak tertutup.
+  const adaKartu = baris.length > 0;
+  useEffect(() => {
+    const akar = halamanRef.current;
+    const kaki = kakiRef.current;
+    if (!akar) return;
+    if (!kaki) {
+      akar.style.setProperty("--kol-kaki", "0px");
+      return;
+    }
+    const ukur = () => akar.style.setProperty("--kol-kaki", `${kaki.offsetHeight}px`);
+    ukur();
+    const amati = new ResizeObserver(ukur);
+    amati.observe(kaki);
+    return () => amati.disconnect();
+  }, [adaKartu]);
+
   const ubahBaris = (kunci: string, ubah: Partial<Baris> | ((b: Baris) => Partial<Baris>)) =>
     setBaris((lama) => lama.map((b) => (b.kunci === kunci ? { ...b, ...(typeof ubah === "function" ? ubah(b) : ubah) } : b)));
   const ubahIsian = (kunci: string, sebagian: Partial<IsianLaporSk>) =>
@@ -183,6 +207,20 @@ export default function LaporSkMassal() {
       dampak: peringatanDampakKgb(b.pegawai.statusKGB, b.pegawai.tmtKgb),
     };
   }
+
+  /** Keadaan singkat satu kartu untuk daftar di panel kiri. */
+  function statusKartu(b: Baris): { nada: "hijau" | "kuning" | "merah" | "biru"; teks: string } {
+    if (b.keadaan === "terkirim") return { nada: "hijau", teks: "Terkirim ke Kanwil" };
+    if (b.keadaan === "mengirim") return { nada: "biru", teks: "Mengirim…" };
+    if (b.keadaan === "galat") return { nada: "merah", teks: "Perlu diperiksa" };
+    const n = nilai(b);
+    if (n.kurang.length > 0 || n.galatHitung) return { nada: "kuning", teks: "Isian SK belum lengkap" };
+    if (n.belumBerkas.length > 0) return { nada: "kuning", teks: "Pindaian belum dilampirkan" };
+    return { nada: "hijau", teks: b.keadaan === "draf" ? "Draf, siap dikirim" : "Siap dikirim" };
+  }
+
+  const lompatKe = (kunci: string) =>
+    document.getElementById(`lsk-kartu-${kunci}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   const q = cari.trim().toLowerCase();
   const sudahDipilih = useMemo(() => new Set(baris.map((b) => b.kunci)), [baris]);
@@ -291,7 +329,7 @@ export default function LaporSkMassal() {
   }).length;
 
   return (
-    <div className="dsb-halaman kol">
+    <div ref={halamanRef} className="dsb-halaman kol lsk">
       <header className="dsb-halaman-kepala dsb-muncul">
         <div className="min-w-0">
           <p className="dsb-label">Pegawai Satker</p>
@@ -318,25 +356,69 @@ export default function LaporSkMassal() {
         </div>
       )}
 
-      <section className="dsb-panel lsk-panel dsb-muncul" aria-label="Pilih pegawai">
-        <div className="lsk-alat">
-          <label className="kol-label lsk-cari">
-            <span>Tambah pegawai ke laporan</span>
+      <div className="lsk-kerja">
+        <aside className="dsb-panel lsk-samping dsb-muncul" aria-label="Tambah pegawai dan isian bersama">
+          <section className="lsk-blok">
+            <h2 className="lsk-blok-judul">
+              <span className="lsk-no" aria-hidden="true">1</span>
+              Tambah pegawai
+            </h2>
             <input
+              ref={cariRef}
               type="search"
               className="kol-isi"
               placeholder={memuat ? "Memuat pegawai…" : "Ketik nama, NIP, atau jabatan"}
               value={cari}
               onChange={(e) => setCari(e.target.value)}
               disabled={memuat}
+              aria-label="Cari pegawai untuk ditambahkan ke laporan"
               aria-controls="lsk-calon"
             />
-          </label>
-          <div className="lsk-umum">
-            <p className="kol-catatan-kecil">
-              Isian bersama, dipakai bagi kartu yang kolom tersebut masih kosong. Tidak menimpa isian kartu.
-            </p>
-            <div className="lsk-kisi">
+            {q ? (
+            <ul id="lsk-calon" className="lsk-calon" aria-label="Hasil pencarian pegawai">
+              {calon.length === 0 ? (
+                <li className="lsk-kosong">Tidak ada pegawai yang cocok, atau pegawainya sudah ada di laporan ini.</li>
+              ) : (
+                calon.map((p) => {
+                  const ditinjau = p.usulanBerjalan === "menunggu";
+                  return (
+                    <li key={p.id}>
+                      <button type="button" disabled={ditinjau} onClick={() => tambah(p)}>
+                        <span>
+                          <strong>{p.nama}</strong>
+                          <small>{p.nip} · {p.golonganRuang} · {p.jabatan}</small>
+                        </span>
+                        <em>
+                          {ditinjau
+                            ? "Sedang ditinjau Kanwil"
+                            : p.usulanBerjalan === "draf"
+                              ? "Ada draf; dilanjutkan"
+                              : p.usulanBerjalan === "revisi"
+                                ? "Dikembalikan; diperbaiki"
+                                : "Tambahkan"}
+                        </em>
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+            ) : (
+              <p className="kol-catatan-kecil">
+                {memuat
+                  ? "Memuat daftar pegawai satker…"
+                  : `${pegawai.length} pegawai satker. Yang sedang ditinjau Kanwil tidak dapat ditambahkan.`}
+              </p>
+            )}
+          </section>
+
+          <section className="lsk-blok">
+            <h2 className="lsk-blok-judul">
+              <span className="lsk-no" aria-hidden="true">2</span>
+              Isian bersama <small>bila sama untuk semua</small>
+            </h2>
+            <p className="kol-catatan-kecil">Dipakai bagi kartu yang kolomnya masih kosong. Tidak menimpa isian kartu.</p>
+            <div className="lsk-umum-kisi">
               <label className="kol-label">
                 <span>Tanggal SK</span>
                 <input className="kol-isi" type="date" value={umum.tanggalSk} onChange={(e) => setUmum((u) => ({ ...u, tanggalSk: e.target.value }))} />
@@ -361,232 +443,267 @@ export default function LaporSkMassal() {
                 <option key={s} value={s} />
               ))}
             </datalist>
-          </div>
-        </div>
-        {q && (
-          <ul id="lsk-calon" className="lsk-calon" aria-label="Hasil pencarian pegawai">
-            {calon.length === 0 ? (
-              <li className="lsk-kosong">Tidak ada pegawai yang cocok, atau pegawainya sudah ada di laporan ini.</li>
-            ) : (
-              calon.map((p) => {
-                const ditinjau = p.usulanBerjalan === "menunggu";
+          </section>
+
+          {baris.length > 0 && (
+            <section className="lsk-blok lsk-blok-daftar">
+              <h2 className="lsk-blok-judul">
+                <span className="lsk-no" aria-hidden="true">3</span>
+                Di laporan
+                <span className="lsk-jumlah">{baris.length}</span>
+              </h2>
+              <ol className="lsk-ringkas" aria-label="Pegawai di laporan ini">
+                {baris.map((b) => {
+                  const st = statusKartu(b);
+                  return (
+                    <li key={b.kunci}>
+                      <button type="button" onClick={() => lompatKe(b.kunci)} title={`Ke kartu ${b.pegawai.nama}`}>
+                        <span className="dsb-titik" data-nada={st.nada} aria-hidden="true" />
+                        <span className="lsk-ringkas-nama">{b.pegawai.nama}</span>
+                        <small>{st.teks}</small>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          )}
+        </aside>
+
+        <div className="lsk-utama">
+          {baris.length === 0 ? (
+            <div className="lsk-kosong-besar dsb-muncul" data-memuat={memuat ? "" : undefined}>
+              <svg viewBox="0 0 120 96" aria-hidden="true">
+                <rect x="30" y="10" width="54" height="70" rx="6" transform="rotate(-8 57 45)" fill="var(--sub)" stroke="var(--ln1)" strokeWidth="1.5" />
+                <rect x="38" y="12" width="54" height="70" rx="6" fill="var(--card)" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M47 27h26M47 35h36M47 43h30M47 51h22" stroke="var(--ln1)" strokeWidth="3" strokeLinecap="round" />
+                <circle cx="79" cy="68" r="9" fill="var(--tint-navy)" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M75.5 68.5l2.5 2.5 5-5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="98" cy="22" r="11" fill="var(--accent)" />
+                <path d="M98 16.5v11M92.5 22h11" stroke="var(--card)" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+              <h2>{memuat ? "Memuat pegawai satker…" : "Belum ada pegawai di laporan ini"}</h2>
+              <p>
+                Laporan SK kenaikan pangkat, penyesuaian ijazah, atau PMK dikirim ke Kanwil tanpa surat usulan Srikandi. Kanwil
+                mencatat SK-nya saat menyetujui.
+              </p>
+              <ol className="lsk-langkah">
+                <li>
+                  <span>1</span>Cari dan tambahkan pegawai yang menerima SK.
+                </li>
+                <li>
+                  <span>2</span>Isi data SK, periksa hasil hitungannya, lalu lampirkan pindaiannya.
+                </li>
+                <li>
+                  <span>3</span>Kirim semuanya ke Kanwil sekaligus.
+                </li>
+              </ol>
+              {!memuat && (
+                <button type="button" className="dsb-tombol" onClick={() => cariRef.current?.focus()}>
+                  Cari pegawai
+                </button>
+              )}
+            </div>
+          ) : (
+            <ul className="lsk-daftar" aria-label="Pegawai yang dilaporkan">
+              {baris.map((b) => {
+                const n = nilai(b);
+                const terkunci = b.keadaan === "terkirim" || b.keadaan === "mengirim";
+                const medanDilaporkan = n.isian.jenis === "kp" ? "skPangkat" : "skPmk";
                 return (
-                  <li key={p.id}>
-                    <button type="button" disabled={ditinjau} onClick={() => tambah(p)}>
-                      <span>
-                        <strong>{p.nama}</strong>
-                        <small>{p.nip} · {p.golonganRuang} · {p.jabatan}</small>
+                  <li key={b.kunci} id={`lsk-kartu-${b.kunci}`} className="lsk-baris dsb-muncul" data-keadaan={b.keadaan}>
+                    <div className="lsk-kepala">
+                      <div className="min-w-0">
+                        <strong>{b.pegawai.nama}</strong>
+                        <small>
+                          {b.pegawai.nip} · {n.induk.golongan} · {teksMasaKerja(n.induk.mkgTahun, n.induk.mkgBulan)}
+                          {n.induk.tmtKgbTerakhir ? ` · TMT KGB terakhir ${formatTanggalId(n.induk.tmtKgbTerakhir)}` : ""}
+                        </small>
+                      </div>
+                      <span className="lsk-kanan">
+                        <span className="dsb-tag" data-garis="" data-nada={b.keadaan === "terkirim" ? "hijau" : b.keadaan === "galat" ? "merah" : b.keadaan === "draf" ? "biru" : undefined}>
+                          {LABEL_KEADAAN[b.keadaan]}
+                        </span>
+                        {!terkunci && (
+                          <button
+                            type="button"
+                            className="dsb-tombol dsb-tombol-kecil"
+                            data-jenis="garis"
+                            onClick={() => setBaris((lama) => lama.filter((x) => x.kunci !== b.kunci))}
+                            aria-label={`Keluarkan ${b.pegawai.nama} dari laporan`}
+                          >
+                            Keluarkan
+                          </button>
+                        )}
                       </span>
-                      <em>
-                        {ditinjau
-                          ? "Sedang ditinjau Kanwil"
-                          : p.usulanBerjalan === "draf"
-                            ? "Ada draf; dilanjutkan"
-                            : p.usulanBerjalan === "revisi"
-                              ? "Dikembalikan; diperbaiki"
-                              : "Tambahkan"}
-                      </em>
-                    </button>
+                    </div>
+
+                    {b.keadaan === "terkirim" ? (
+                      <p className="lsk-selesai">
+                        {n.isian.jenis === "kp" ? "Kenaikan pangkat" : "Peninjauan masa kerja"} SK {n.isian.nomorSk} terkirim ke Kanwil beserta pindaiannya.
+                      </p>
+                    ) : (
+                      <div className="lsk-isi">
+                        {n.dampak && (
+                          <p className="lsk-dampak" data-nada={n.dampak.nada}>
+                            <strong>{n.dampak.nada === "merah" ? "Laporan akan tertahan. " : "Perhatikan. "}</strong>
+                            {n.dampak.teks}
+                          </p>
+                        )}
+                        {b.draf && (
+                          <p className="kol-catatan-kecil">
+                            Pegawai ini sudah punya {b.draf.status === "revisi" ? "usulan yang dikembalikan Kanwil" : "draf usulan"}; isinya dilanjutkan dan
+                            tidak dibuat ganda. Isian lainnya pada draf itu tidak diubah.
+                          </p>
+                        )}
+                        <p className="lsk-sub">SK yang dilaporkan</p>
+                        <div className="lsk-kisi">
+                          <label className="kol-label">
+                            <span className="kol-wajib">Jenis SK</span>
+                            <select
+                              className="kol-isi"
+                              value={n.isian.jenis}
+                              disabled={terkunci}
+                              onChange={(e) => ubahIsian(b.kunci, { jenis: e.target.value === "pmk" ? "pmk" : "kp" })}
+                            >
+                              <option value="kp">Kenaikan pangkat atau PI</option>
+                              <option value="pmk">Peninjauan masa kerja (PMK)</option>
+                            </select>
+                          </label>
+                          {n.isian.jenis === "kp" ? (
+                            <>
+                              <label className="kol-label">
+                                <span className="kol-wajib">Jenis kenaikan pangkat</span>
+                                <select className="kol-isi" value={n.isian.jenisKp} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { jenisKp: e.target.value })}>
+                                  {Object.entries(JENIS_KP).map(([k, l]) => (
+                                    <option key={k} value={k}>{l}</option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="kol-label">
+                                <span className="kol-wajib">Golongan baru menurut SK</span>
+                                <select className="kol-isi" value={n.isian.golonganBaru} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { golonganBaru: e.target.value })}>
+                                  <option value="">Pilih golongan</option>
+                                  {Object.entries(GOLONGAN_PANGKAT).map(([g, p]) => (
+                                    <option key={g} value={g}>{g} · {p}</option>
+                                  ))}
+                                </select>
+                              </label>
+                            </>
+                          ) : null}
+                          {/* Kenaikan pangkat juga menanyakan masa kerja menurut SK, untuk dicocokkan dengan hitungan sistem (ADR-078). */}
+                          <div className="kol-label">
+                            <span className="kol-wajib">Masa kerja pada SK</span>
+                            <span className="kol-mkg">
+                              <input className="kol-isi" inputMode="numeric" aria-label="Tahun" value={n.isian.mkgTahunSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { mkgTahunSk: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
+                              <span>tahun</span>
+                              <input className="kol-isi" inputMode="numeric" aria-label="Bulan" value={n.isian.mkgBulanSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { mkgBulanSk: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
+                              <span>bulan</span>
+                            </span>
+                          </div>
+                          <label className="kol-label">
+                            <span className="kol-wajib">Nomor SK</span>
+                            <input className="kol-isi" value={b.isian.nomorSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { nomorSk: e.target.value })} placeholder="Sesuai SK" />
+                          </label>
+                          <label className="kol-label">
+                            <span className="kol-wajib">Tanggal SK</span>
+                            <input className="kol-isi" type="date" value={b.isian.tanggalSk || umum.tanggalSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { tanggalSk: e.target.value })} />
+                          </label>
+                          <label className="kol-label">
+                            <span className="kol-wajib">{n.isian.jenis === "kp" ? "TMT pangkat" : "TMT PMK"}</span>
+                            <input className="kol-isi" type="date" value={b.isian.tmt || umum.tmt} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { tmt: e.target.value })} />
+                          </label>
+                          <label className="kol-label">
+                            <span>Ditetapkan oleh</span>
+                            <input className="kol-isi" list="lsk-saran-penetap" value={b.isian.penetap || umum.penetap} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { penetap: e.target.value })} placeholder="Pejabat penanda tangan SK" />
+                          </label>
+                        </div>
+
+                        {n.galatHitung ? (
+                          <p className="lsk-dampak" data-nada="kuning">{n.galatHitung}</p>
+                        ) : (
+                          n.hitung?.ok && (
+                            <div className="kol-hitung">
+                              {n.hitung.baris.map(([label, nilaiBaris]) => (
+                                <div key={label}>
+                                  <span>{label}</span>
+                                  <strong>{nilaiBaris}</strong>
+                                </div>
+                              ))}
+                              <p data-ket="">{n.hitung.catatan}</p>
+                              {n.hitung.peringatan && <p>{n.hitung.peringatan}</p>}
+                            </div>
+                          )
+                        )}
+
+                        <p className="lsk-sub">Pindaian</p>
+                        <div className="lsk-kisi">
+                          {berkasDiminta(n.tercatat, n.isian.jenis)
+                            .filter((x) => x.wajib)
+                            .map((x) => {
+                              const ada = berkasTersedia(n.usulan, b.draf, x.medan);
+                              const dipilih = b.berkas[x.medan] ?? null;
+                              const sudahAda = ada.draf ?? ada.bawaan;
+                              return (
+                                <label key={x.medan} className="kol-label">
+                                  <span className={sudahAda || dipilih ? undefined : "kol-wajib"}>{x.label}</span>
+                                  <input
+                                    className="kol-isi"
+                                    type="file"
+                                    accept="application/pdf"
+                                    disabled={terkunci}
+                                    onChange={(e) => pilihBerkas(b.kunci, x.medan, e.target.files?.[0] ?? null)}
+                                  />
+                                  <span className="kol-catatan-kecil">
+                                    {dipilih
+                                      ? `Dipilih: ${dipilih.name}`
+                                      : sudahAda
+                                        ? x.medan === medanDilaporkan && ada.bawaan && !ada.draf
+                                          ? "Terlampir masih SK dari usulan sebelumnya. Bila SK yang Anda laporkan berbeda, pilih berkas baru."
+                                          : `Sudah ada: ${sudahAda.nama ?? x.label}. Pilih berkas baru untuk menggantinya.`
+                                        : "PDF, paling besar 500 KB."}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                        </div>
+                        {b.pesan && (
+                          <p className="lsk-pesan" data-nada={b.keadaan === "galat" ? "merah" : undefined} role={b.keadaan === "galat" ? "alert" : undefined}>
+                            {b.pesan}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </li>
                 );
-              })
-            )}
-          </ul>
-        )}
-      </section>
-
-      {baris.length === 0 ? (
-        <p className="dsb-kosong lsk-kosong-besar">
-          {memuat ? "Memuat pegawai…" : "Belum ada pegawai di laporan ini. Cari nama pegawai di atas untuk menambahkannya."}
-        </p>
-      ) : (
-        <ul className="lsk-daftar" aria-label="Pegawai yang dilaporkan">
-          {baris.map((b) => {
-            const n = nilai(b);
-            const terkunci = b.keadaan === "terkirim" || b.keadaan === "mengirim";
-            const medanDilaporkan = n.isian.jenis === "kp" ? "skPangkat" : "skPmk";
-            return (
-              <li key={b.kunci} className="lsk-baris dsb-muncul" data-keadaan={b.keadaan}>
-                <div className="lsk-kepala">
-                  <div className="min-w-0">
-                    <strong>{b.pegawai.nama}</strong>
-                    <small>
-                      {b.pegawai.nip} · {n.induk.golongan} · {teksMasaKerja(n.induk.mkgTahun, n.induk.mkgBulan)}
-                      {n.induk.tmtKgbTerakhir ? ` · TMT KGB terakhir ${formatTanggalId(n.induk.tmtKgbTerakhir)}` : ""}
-                    </small>
-                  </div>
-                  <span className="lsk-kanan">
-                    <span className="dsb-tag" data-garis="" data-nada={b.keadaan === "terkirim" ? "hijau" : b.keadaan === "galat" ? "merah" : b.keadaan === "draf" ? "biru" : undefined}>
-                      {LABEL_KEADAAN[b.keadaan]}
-                    </span>
-                    {!terkunci && (
-                      <button
-                        type="button"
-                        className="dsb-tombol dsb-tombol-kecil"
-                        data-jenis="garis"
-                        onClick={() => setBaris((lama) => lama.filter((x) => x.kunci !== b.kunci))}
-                        aria-label={`Keluarkan ${b.pegawai.nama} dari laporan`}
-                      >
-                        Keluarkan
-                      </button>
-                    )}
-                  </span>
-                </div>
-
-                {b.keadaan === "terkirim" ? (
-                  <p className="lsk-selesai">
-                    {n.isian.jenis === "kp" ? "Kenaikan pangkat" : "Peninjauan masa kerja"} SK {n.isian.nomorSk} terkirim ke Kanwil beserta pindaiannya.
-                  </p>
-                ) : (
-                  <div className="lsk-isi">
-                    {n.dampak && (
-                      <p className="lsk-dampak" data-nada={n.dampak.nada}>
-                        <strong>{n.dampak.nada === "merah" ? "Laporan akan tertahan. " : "Perhatikan. "}</strong>
-                        {n.dampak.teks}
-                      </p>
-                    )}
-                    {b.draf && (
-                      <p className="kol-catatan-kecil">
-                        Pegawai ini sudah punya {b.draf.status === "revisi" ? "usulan yang dikembalikan Kanwil" : "draf usulan"}; isinya dilanjutkan dan
-                        tidak dibuat ganda. Isian lainnya pada draf itu tidak diubah.
-                      </p>
-                    )}
-                    <div className="lsk-kisi">
-                      <label className="kol-label">
-                        <span className="kol-wajib">Jenis SK</span>
-                        <select
-                          className="kol-isi"
-                          value={n.isian.jenis}
-                          disabled={terkunci}
-                          onChange={(e) => ubahIsian(b.kunci, { jenis: e.target.value === "pmk" ? "pmk" : "kp" })}
-                        >
-                          <option value="kp">Kenaikan pangkat atau PI</option>
-                          <option value="pmk">Peninjauan masa kerja (PMK)</option>
-                        </select>
-                      </label>
-                      {n.isian.jenis === "kp" ? (
-                        <>
-                          <label className="kol-label">
-                            <span className="kol-wajib">Jenis kenaikan pangkat</span>
-                            <select className="kol-isi" value={n.isian.jenisKp} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { jenisKp: e.target.value })}>
-                              {Object.entries(JENIS_KP).map(([k, l]) => (
-                                <option key={k} value={k}>{l}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="kol-label">
-                            <span className="kol-wajib">Golongan baru menurut SK</span>
-                            <select className="kol-isi" value={n.isian.golonganBaru} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { golonganBaru: e.target.value })}>
-                              <option value="">Pilih golongan</option>
-                              {Object.entries(GOLONGAN_PANGKAT).map(([g, p]) => (
-                                <option key={g} value={g}>{g} · {p}</option>
-                              ))}
-                            </select>
-                          </label>
-                        </>
-                      ) : null}
-                      {/* Kenaikan pangkat juga menanyakan masa kerja menurut SK, untuk dicocokkan dengan hitungan sistem (ADR-078). */}
-                      <div className="kol-label">
-                        <span className="kol-wajib">Masa kerja pada SK</span>
-                        <span className="kol-mkg">
-                          <input className="kol-isi" inputMode="numeric" aria-label="Tahun" value={n.isian.mkgTahunSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { mkgTahunSk: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
-                          <span>tahun</span>
-                          <input className="kol-isi" inputMode="numeric" aria-label="Bulan" value={n.isian.mkgBulanSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { mkgBulanSk: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
-                          <span>bulan</span>
-                        </span>
-                      </div>
-                      <label className="kol-label">
-                        <span className="kol-wajib">Nomor SK</span>
-                        <input className="kol-isi" value={b.isian.nomorSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { nomorSk: e.target.value })} placeholder="Sesuai SK" />
-                      </label>
-                      <label className="kol-label">
-                        <span className="kol-wajib">Tanggal SK</span>
-                        <input className="kol-isi" type="date" value={b.isian.tanggalSk || umum.tanggalSk} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { tanggalSk: e.target.value })} />
-                      </label>
-                      <label className="kol-label">
-                        <span className="kol-wajib">{n.isian.jenis === "kp" ? "TMT pangkat" : "TMT PMK"}</span>
-                        <input className="kol-isi" type="date" value={b.isian.tmt || umum.tmt} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { tmt: e.target.value })} />
-                      </label>
-                      <label className="kol-label">
-                        <span>Ditetapkan oleh</span>
-                        <input className="kol-isi" list="lsk-saran-penetap" value={b.isian.penetap || umum.penetap} disabled={terkunci} onChange={(e) => ubahIsian(b.kunci, { penetap: e.target.value })} placeholder="Pejabat penanda tangan SK" />
-                      </label>
-                    </div>
-
-                    {n.galatHitung ? (
-                      <p className="lsk-dampak" data-nada="kuning">{n.galatHitung}</p>
-                    ) : (
-                      n.hitung?.ok && (
-                        <div className="kol-hitung">
-                          {n.hitung.baris.map(([label, nilaiBaris]) => (
-                            <div key={label}>
-                              <span>{label}</span>
-                              <strong>{nilaiBaris}</strong>
-                            </div>
-                          ))}
-                          <p data-ket="">{n.hitung.catatan}</p>
-                          {n.hitung.peringatan && <p>{n.hitung.peringatan}</p>}
-                        </div>
-                      )
-                    )}
-
-                    <div className="lsk-kisi">
-                      {berkasDiminta(n.tercatat, n.isian.jenis)
-                        .filter((x) => x.wajib)
-                        .map((x) => {
-                          const ada = berkasTersedia(n.usulan, b.draf, x.medan);
-                          const dipilih = b.berkas[x.medan] ?? null;
-                          const sudahAda = ada.draf ?? ada.bawaan;
-                          return (
-                            <label key={x.medan} className="kol-label">
-                              <span className={sudahAda || dipilih ? undefined : "kol-wajib"}>{x.label}</span>
-                              <input
-                                className="kol-isi"
-                                type="file"
-                                accept="application/pdf"
-                                disabled={terkunci}
-                                onChange={(e) => pilihBerkas(b.kunci, x.medan, e.target.files?.[0] ?? null)}
-                              />
-                              <span className="kol-catatan-kecil">
-                                {dipilih
-                                  ? `Dipilih: ${dipilih.name}`
-                                  : sudahAda
-                                    ? x.medan === medanDilaporkan && ada.bawaan && !ada.draf
-                                      ? "Terlampir masih SK dari usulan sebelumnya. Bila SK yang Anda laporkan berbeda, pilih berkas baru."
-                                      : `Sudah ada: ${sudahAda.nama ?? x.label}. Pilih berkas baru untuk menggantinya.`
-                                    : "PDF, paling besar 500 KB."}
-                              </span>
-                            </label>
-                          );
-                        })}
-                    </div>
-                    {b.pesan && (
-                      <p className="lsk-pesan" data-nada={b.keadaan === "galat" ? "merah" : undefined} role={b.keadaan === "galat" ? "alert" : undefined}>
-                        {b.pesan}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      <div className="kol-kaki lsk-kaki">
-        <span>
-          <strong>{baris.length}</strong> pegawai · <strong>{lengkap}</strong> isiannya lengkap · <strong>{siapKirim}</strong> siap dikirim.
-          {adaBelumTersimpan ? " Isian belum tersimpan sebelum Anda menekan Simpan atau Kirim." : ""}
-        </span>
-        <span className="kol-kaki-tombol">
-          <button type="button" className="dsb-tombol" data-jenis="garis" disabled={mengirim || aktif.length === 0} onClick={() => void proses(false)}>
-            Simpan semua sebagai draf
-          </button>
-          <button type="button" className="dsb-tombol" disabled={mengirim || aktif.length === 0} onClick={() => void proses(true)}>
-            {mengirim ? "Mengirim…" : `Kirim ${siapKirim > 0 ? siapKirim : "semua"} ke Kanwil`}
-          </button>
-        </span>
+              })}
+            </ul>
+          )}
+        </div>
       </div>
+
+      {baris.length > 0 && (
+        <div ref={kakiRef} className="kol-kaki lsk-kaki">
+          <span className="lsk-kaki-ringkas">
+            <span>
+              <strong>{baris.length}</strong> pegawai · <strong>{lengkap}</strong> isiannya lengkap · <strong>{siapKirim}</strong> siap dikirim.
+              {adaBelumTersimpan && <span className="lsk-lebar"> Isian belum tersimpan sebelum Anda menekan Simpan atau Kirim.</span>}
+            </span>
+            <span className="lsk-kemajuan" aria-hidden="true">
+              <span style={{ width: `${aktif.length > 0 ? Math.round((siapKirim / aktif.length) * 100) : 100}%` }} />
+            </span>
+          </span>
+          <span className="kol-kaki-tombol">
+            <button type="button" className="dsb-tombol" data-jenis="garis" disabled={mengirim || aktif.length === 0} onClick={() => void proses(false)}>
+              <span className="lsk-lebar">Simpan semua sebagai draf</span>
+              <span className="lsk-sempit">Simpan draf</span>
+            </button>
+            <button type="button" className="dsb-tombol" disabled={mengirim || aktif.length === 0} onClick={() => void proses(true)}>
+              {mengirim ? "Mengirim…" : <>Kirim {siapKirim > 0 ? siapKirim : <span className="lsk-lebar">semua</span>} ke Kanwil</>}
+            </button>
+          </span>
+        </div>
+      )}
     </div>
   );
 }
