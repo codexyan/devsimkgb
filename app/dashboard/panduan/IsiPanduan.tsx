@@ -960,8 +960,15 @@ export default async function IsiPanduan({
                 </p>
                 <LayarKolektif1 namaBulan={bulanTahun(TMT_KGB)} />
                 <p>
-                  Sesudah memilih, Anda melengkapi data dan berkas tiap pegawai satu per satu. Daftar di kiri
-                  menunjukkan siapa yang belum lengkap; kerjakan sampai lingkaran kelengkapannya penuh. Bila pegawainya
+                  Sesudah memilih, Anda melengkapi data dan berkas tiap pegawai satu per satu, dalam lima langkah yang
+                  sama dengan formulir <strong>Tambah pegawai</strong> dan <strong>Perbarui data</strong>:{" "}
+                  <strong>1 Identitas</strong>, <strong>2 Jabatan</strong>, <strong>3 Jenis KGB</strong> (sudah pernah KGB
+                  dengan SK KGB terakhir, atau CPNS baru dengan SK CPNS, beserta pindaiannya),{" "}
+                  <strong>4 SK sesudahnya</strong> (kenaikan pangkat, penyesuaian ijazah, atau PMK beserta pindaiannya),
+                  dan <strong>5 Periksa &amp; simpan</strong>. Garis langkah di atas isian menandai langkah yang lengkap
+                  (✓) dan yang masih kurang (!); tekan langkahnya untuk langsung ke sana. Draf yang dibuka lagi langsung
+                  menuju langkah yang masih kurang. Daftar di kiri menunjukkan siapa yang belum lengkap; kerjakan sampai
+                  lingkaran kelengkapannya penuh. Bila pegawainya
                   banyak, cari namanya atau pilih saringan <em>Kurang</em> agar yang tampil hanya yang belum lengkap.
                   Daftar dan isian bergulir sendiri-sendiri, sehingga nama pegawai yang sedang dikerjakan dan tombol
                   simpan selalu terlihat.
