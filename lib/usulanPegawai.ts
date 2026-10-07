@@ -90,11 +90,12 @@ export const BATAS_BERKAS_USULAN_BYTE = BATAS_UNGGAH_BYTE;
 export const PESAN_BERKAS_TERLALU_BESAR = pesanBerkasTerlaluBesar("tiap berkas");
 
 /**
- * Keadaan yang menentukan berkas mana yang diminta. Pegawai yang sudah pernah KGB dicocokkan dengan SK KGB
- * dan SK kenaikan pangkat terakhirnya; yang belum pernah dengan SK CPNS dan SK pengangkatan PNS-nya.
+ * Keadaan yang menentukan berkas mana yang diminta. Pegawai yang sudah pernah KGB dicocokkan dengan SK KGB terakhirnya;
+ * yang belum pernah dengan SK CPNS dan SK pengangkatan PNS-nya. SK kenaikan pangkat dan SK PMK diminta menurut SK yang
+ * dilaporkan ("kp", "pmk"; ADR-081).
  * "pengajuan" adalah surat usulan Srikandi, yang diunggah sekali untuk satu surat pada langkah Ajukan.
  */
-export type KeadaanBerkas = "pernah_kgb" | "belum_pernah_kgb" | "pengajuan" | "pmk";
+export type KeadaanBerkas = "pernah_kgb" | "belum_pernah_kgb" | "pengajuan" | "kp" | "pmk";
 
 /**
  * Berkas dasar yang menyertai usulan. Tim keuangan memintanya agar masa kerja golongan dan gaji pokok
@@ -120,11 +121,14 @@ export const BERKAS_USULAN = [
     wajib: true,
   },
   {
+    // Diminta hanya bila SK kenaikan pangkat atau penyesuaian ijazah dilaporkan sebagai SK sesudah SK KGB terakhir
+    // (ADR-081). Dulu ditagih dari setiap pegawai yang sudah pernah KGB, walau tidak ada kenaikan pangkat yang dilaporkan.
     medan: "skPangkat",
     kunci: "pathSkPangkat",
-    label: "SK kenaikan pangkat terakhir",
-    keterangan: "SK kenaikan pangkat yang terakhir diterima. Diperlukan karena kenaikan pangkat memotong masa kerja golongan.",
-    keadaan: "pernah_kgb",
+    label: "SK kenaikan pangkat",
+    keterangan:
+      "SK kenaikan pangkat atau penyesuaian ijazah yang dilaporkan sesudah SK KGB terakhir. Kanwil mencocokkan golongan dan masa kerja golongan pada SK ini sebelum menyetujui.",
+    keadaan: "kp",
     wajib: true,
   },
   {
@@ -144,7 +148,7 @@ export const BERKAS_USULAN = [
     kunci: "pathSkPmk",
     label: "SK peninjauan masa kerja",
     keterangan:
-      "SK peninjauan masa kerja yang menambah masa kerja golongan. Kanwil mencocokkan masa kerja yang tertulis pada SK ini sebelum menyetujui, sebab dari situlah jadwal KGB berikutnya dihitung ulang.",
+      "SK peninjauan masa kerja yang menambah masa kerja golongan. Kanwil mencocokkan masa kerja yang tertulis pada SK ini sebelum menyetujui, sebab dari situlah masa kerja dan gaji pokok barunya dihitung.",
     keadaan: "pmk",
     wajib: true,
   },
@@ -202,12 +206,11 @@ export function berkasUntukKeadaan(pernah: boolean) {
 }
 
 /**
- * Berkas yang diminta karena sebab perubahannya, di luar berkas dasar. Hanya PMK yang punya: kenaikan
- * pangkat sudah terwakili "SK kenaikan pangkat terakhir" pada berkas dasar, dan koreksi salah ketik tidak
- * membawa SK sama sekali.
+ * Berkas yang diminta karena SK yang dilaporkan sesudah SK KGB terakhir: SK kenaikan pangkat (termasuk penyesuaian
+ * ijazah) atau SK PMK (ADR-081). Koreksi salah ketik tidak membawa SK sama sekali.
  */
 export function berkasDasarBaru(jenis: string | null | undefined) {
-  return jenis === "pmk" ? BERKAS_USULAN.filter((b) => b.keadaan === "pmk") : [];
+  return jenis === "kp" || jenis === "pmk" ? BERKAS_USULAN.filter((b) => b.keadaan === jenis) : [];
 }
 
 /**

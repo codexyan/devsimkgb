@@ -15,7 +15,6 @@ import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
 import { kartuPerKolom, type KolomUpt, type SumberKartu } from "@/lib/papanUpt";
 import { UKURAN_KIRIMAN, ajukanBertahap } from "./upt/ajukanBertahap";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
-import ModalDasarBaru from "@/app/dashboard/components/upt/ModalDasarBaru";
 import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
 import MenuTindakan from "@/app/dashboard/components/MenuTindakan";
 import { PERISTIWA_BUKA_PENGUMUMAN_UPT } from "@/lib/pengumumanUpt";
@@ -344,12 +343,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const [formulir, setFormulir] = useState<
     { jenis: "perubahan" | "baru"; pegawai: PegawaiUntukUsulan | null; draf: DrafUsulanUpt | null } | null
   >(null);
-  /* Kartu tersendiri untuk SK yang mengubah golongan atau masa kerja golongan (ADR-045). */
-  const [dasarBaru, setDasarBaru] = useState<{
-    jenis: "kp" | "pmk";
-    pegawai: PegawaiUntukUsulan;
-    draf: DrafUsulanUpt | null;
-  } | null>(null);
   const [usulan, setUsulan] = useState<UsulanTerkirim[]>([]);
   /** Laporan mutasi satker ini beserta hasil tinjauan Kanwil. */
   const [laporan, setLaporan] = useState<LaporanUpt[]>([]);
@@ -417,19 +410,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     setFormulir({
       jenis: "perubahan",
       pegawai: { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan, dasarKgb: p.dasarKgb },
-      draf: drafPegawai(p.id),
-    });
-  }
-
-  /**
-   * Kartu SK tersendiri: satu SK, satu jendela. Jalurnya tetap usulan perbaikan yang sama; Kanwil yang
-   * mencatat riwayat KP atau PMK saat menyetujui (ADR-030), hanya isiannya dibatasi pada apa yang
-   * tertulis di SK itu, lengkap dengan pindaiannya.
-   */
-  function bukaDasarBaru(p: PegawaiUpt, jenis: "kp" | "pmk") {
-    setDasarBaru({
-      jenis,
-      pegawai: { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan, kgb: { status: p.statusKGB, tmt: p.tmtKgb } },
       draf: drafPegawai(p.id),
     });
   }
@@ -504,7 +484,9 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         }
         return;
       }
-      setKabar(`${d.jumlah} pegawai diusulkan ke Kanwil dengan surat ${suratAjukan.nomorSurat}.`);
+      setKabar(
+        `${d.jumlah} pegawai diusulkan ke Kanwil${suratAjukan.nomorSurat.trim() ? ` dengan surat ${suratAjukan.nomorSurat}` : " sebagai laporan SK, tanpa surat usulan"}.`,
+      );
       setTimeout(() => setKabar(null), 7000);
       setDialogAjukan(false);
       setPilihAjukan(new Set());
@@ -737,14 +719,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             <span className="upt-deret" style={{ marginLeft: "auto" }}>
               <Link href="/dashboard/upt/kolektif" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" title="Usul KGB banyak pegawai dalam satu surat Srikandi">
                 Usul KGB Kolektif
-              </Link>
-              <Link
-                href="/dashboard/upt/lapor-sk"
-                className="dsb-tombol dsb-tombol-kecil"
-                data-jenis="garis"
-                title="SK kenaikan pangkat, penyesuaian ijazah, atau PMK untuk satu atau banyak pegawai, tanpa surat usulan"
-              >
-                Lapor KP/PI/PMK
               </Link>
               <Link
                 href="/dashboard/upt/unggah"
@@ -1014,11 +988,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                                 data-jenis={milikSendiri ? undefined : "garis"}
                                 onClick={() => bukaUsulan(p)}
                               >
-                                {milikSendiri?.status === "revisi"
-                                  ? "Perbaiki usulan"
-                                  : milikSendiri
-                                    ? milikSendiri.kekurangan.length > 0 ? "Lengkapi draf" : "Ubah draf"
-                                    : "Usulkan perbaikan"}
+                                {/* Satu label untuk satu alur (ADR-081); keadaan drafnya tampil di kolom Status. */}
+                                Perbarui data
                               </button>
                             )}
                             <MenuTindakan
@@ -1027,20 +998,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                                 laporanBerjalan(p.id)
                                   ? []
                                   : [
-                                      {
-                                        // Golongan dan masa kerja golongan hanya berubah karena ketiga
-                                        // sebab ini. Sesudah SK KGB terakhir pun masih mungkin terbit SK
-                                        // kenaikan pangkat atau PMK, dan SK itulah yang menggeser masa
-                                        // kerja golongan sekaligus menjadi dasar SK KGB berikutnya.
-                                        label: "Laporkan kenaikan pangkat",
-                                        keterangan: "Termasuk penyesuaian ijazah; golongan naik menurut SK",
-                                        onPilih: () => bukaDasarBaru(p, "kp"),
-                                      },
-                                      {
-                                        label: "Laporkan peninjauan masa kerja",
-                                        keterangan: "SK PMK; masa kerja golongan dan gaji bertambah, jadwal KGB tetap",
-                                        onPilih: () => bukaDasarBaru(p, "pmk"),
-                                      },
+                                      // SK kenaikan pangkat, penyesuaian ijazah, atau PMK dilaporkan lewat Perbarui data, langkah
+                                      // SK sesudah SK KGB terakhir; tidak lagi lewat menu ini (ADR-081).
                                       {
                                         label: "Laporkan mutasi",
                                         keterangan: "Pindah satker, BKO, selesai BKO, atau pemberhentian",
@@ -1159,7 +1118,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 </>
               ) : p ? (
                 <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => bukaUsulan(p)}>
-                  Usulkan perbaikan
+                  Perbarui data
                 </button>
               ) : null
             }
@@ -1741,19 +1700,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         />
       )}
 
-      {dasarBaru && (
-        <ModalDasarBaru
-          jenis={dasarBaru.jenis}
-          pegawai={dasarBaru.pegawai}
-          draf={dasarBaru.draf}
-          onTutup={() => setDasarBaru(null)}
-          onSelesai={(pesan) => {
-            setDasarBaru(null);
-            selesaiFormulir(pesan);
-          }}
-        />
-      )}
-
       {dialogAjukan && (
         <KerangkaModal
           judul="Ajukan ke Kanwil"
@@ -1801,6 +1747,9 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               </li>
             ))}
           </ul>
+          <p className="kgbm-bantuan">
+            Surat wajib, kecuali semua yang diajukan hanya melaporkan SK kenaikan pangkat, penyesuaian ijazah, atau PMK.
+          </p>
           <div className="kgbm-grid2">
             <label className="kgbm-label">
               <span className="kgbm-wajib">Nomor surat</span>

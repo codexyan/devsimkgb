@@ -19,7 +19,7 @@ type BerkasUsulan = (typeof BERKAS_USULAN)[number];
  * membawanya ke usulan berikutnya akan membuat PMK kedua tampak sudah berberkas padahal yang terlampir SK
  * yang lama (ADR-045).
  */
-export type KunciBerkasPegawai = Exclude<BerkasUsulan["kunci"], "pathBerkas" | "pathSkPmk">;
+export type KunciBerkasPegawai = Exclude<BerkasUsulan["kunci"], "pathBerkas" | "pathSkPmk" | "pathSkPangkat">;
 
 export interface BerkasBawaan {
   jalur: string;
@@ -50,7 +50,8 @@ export function bawaanPegawai(
 
   const berkas: BawaanUsulan["berkas"] = {};
   for (const b of BERKAS_USULAN) {
-    if (b.kunci === "pathBerkas" || b.kunci === "pathSkPmk") continue;
+    // SK yang dilaporkan (kenaikan pangkat, PMK) milik laporan itu sendiri, jadi tidak terbawa ke usulan berikutnya (ADR-081).
+    if (b.kunci === "pathBerkas" || b.kunci === "pathSkPmk" || b.kunci === "pathSkPangkat") continue;
     const asal = disetujui.find((u) => u[b.kunci]);
     if (asal) berkas[b.kunci] = { jalur: asal[b.kunci] as string, usulanId: asal.id };
   }

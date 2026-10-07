@@ -301,3 +301,31 @@ export function pernahKgbAwal(
   if (keadaanKgb === "belum") return false;
   return dasarKgb?.jenis === "kgb" || pernahKgb(isian.mkgTahun, isian.mkgBulan, isian.golonganRuang);
 }
+
+/**
+ * Dampak SK yang dilaporkan pada KGB pegawai yang sedang berjalan (dipindah dari Lapor KP/PI/PMK, ADR-081). Laporan SK
+ * mengubah golongan atau masa kerja: KGB yang sedang diproses dihitung ulang saat disetujui dan SK-nya dibuat ulang Tim SDM;
+ * KGB yang SK-nya sudah ditandatangani dan diunggah tidak dapat diubah, jadi laporannya tertahan sampai Kanwil membatalkan
+ * KGB itu. Tidak menghalangi penyimpanan atau pengiriman.
+ */
+export function peringatanDampakKgb(
+  statusKgb: string | null | undefined,
+  tmtKgb: string | null | undefined,
+): { nada: "kuning" | "merah"; teks: string } | null {
+  const tmt = tmtKgb ? ` TMT ${formatTanggalId(tmtKgb)}` : "";
+  if (statusKgb === "sedang_diproses")
+    return {
+      nada: "kuning",
+      teks:
+        `KGB${tmt} sedang diproses Kanwil. Bila SK ini disetujui, hitungannya diperbarui dan SK KGB yang sudah dibuat ` +
+        "perlu dibuat ulang oleh Tim SDM.",
+    };
+  if (statusKgb === "menunggu_keuangan")
+    return {
+      nada: "merah",
+      teks:
+        `SK KGB${tmt} sudah ditandatangani dan diunggah, sehingga golongan dan masa kerjanya tidak dapat diubah lagi. ` +
+        "SK ini baru dapat diterapkan setelah Tim SDM Kanwil membatalkan KGB itu; hubungi mereka lebih dulu agar tidak tertahan.",
+    };
+  return null;
+}

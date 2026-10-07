@@ -15,6 +15,7 @@ import {
   BELUM_SELESAI,
   DIPEGANG_UPT,
   STATUS_USULAN,
+  berkasDasarBaru,
   berkasUntukKeadaan,
 } from "./usulanPegawai";
 import { KURANG_JAWABAN_SK_BARU } from "./dasarBaruUsulan";
@@ -234,8 +235,8 @@ test("usulan yang dikembalikan kembali dipegang UPT, tetapi tetap menutup pintu 
 
 test("berkas yang diminta bertukar menurut pernah atau belum pernah KGB", () => {
   const ringkas = (pernah: boolean) => berkasUntukKeadaan(pernah).map((b) => `${b.medan}${b.wajib ? "*" : ""}`);
-  // Sudah pernah KGB: dicocokkan dengan SK KGB terakhir dan SK kenaikan pangkat terakhir, keduanya wajib.
-  assert.deepEqual(ringkas(true), ["skTerakhir*", "skPangkat*"]);
+  // Sudah pernah KGB: SK KGB terakhir. SK kenaikan pangkat hanya bila dilaporkan (ADR-081).
+  assert.deepEqual(ringkas(true), ["skTerakhir*"]);
   // Belum pernah KGB: SK CPNS wajib; SK PNS bila sudah terbit, sebab KGB pertama dapat mendahuluinya.
   assert.deepEqual(ringkas(false), ["skCpns*", "syaratCpns"]);
 });
@@ -245,24 +246,31 @@ test("berkas wajib ditagih saat diajukan: pegawai baru selalu, perbaikan hanya b
     mkgTahun: 0, mkgBulan: 0, tmtKgbTerakhir: tgl(2025, 6), dasarBaruJenis: "tidak" };
   assert.deepEqual(kekuranganUsulan(baru, "baru"), ["SK CPNS"]);
   assert.deepEqual(kekuranganUsulan({ ...baru, pathSkCpns: "usulan/x.pdf" }, "baru"), []);
-  assert.deepEqual(kekuranganUsulan({ ...baru, mkgTahun: 2 }, "baru"), ["SK KGB terakhir", "SK kenaikan pangkat terakhir"]);
+  assert.deepEqual(kekuranganUsulan({ ...baru, mkgTahun: 2 }, "baru"), ["SK KGB terakhir"]);
 
   // Perbaikan nama saja tidak menuntut berkas; perbaikan masa kerja golongan menuntutnya, beserta
   // sebab perubahannya, sebab masa kerja hanya berubah karena kenaikan pangkat, PMK, atau salah ketik (ADR-030).
   assert.deepEqual(kekuranganUsulan({ nama: "Siti N.", dasarBaruJenis: "tidak" }, "perubahan", pegawai), []);
   assert.deepEqual(kekuranganUsulan({ mkgTahun: 2, dasarBaruJenis: "tidak" }, "perubahan", pegawai), [
     "SK KGB terakhir",
-    "SK kenaikan pangkat terakhir",
     "sebab perubahan golongan atau masa kerja golongan",
   ]);
   assert.deepEqual(
     kekuranganUsulan(
-      { mkgTahun: 2, pathSkTerakhir: "usulan/a.pdf", pathSkPangkat: "usulan/b.pdf", dasarBaruJenis: "koreksi" },
+      { mkgTahun: 2, pathSkTerakhir: "usulan/a.pdf", dasarBaruJenis: "koreksi" },
       "perubahan",
       pegawai,
     ),
     [],
   );
+});
+
+test("SK kenaikan pangkat ditagih hanya bila kenaikan pangkat atau PI dilaporkan, SK PMK hanya bila PMK (ADR-081)", () => {
+  const ringkas = (jenis: string) => berkasDasarBaru(jenis).map((b) => `${b.medan}${b.wajib ? "*" : ""}`);
+  assert.deepEqual(ringkas("kp"), ["skPangkat*"]);
+  assert.deepEqual(ringkas("pmk"), ["skPmk*"]);
+  assert.deepEqual(ringkas("tidak"), []);
+  assert.deepEqual(ringkas("koreksi"), []);
 });
 
 test("nama asli berkas usulan tersimpan di kunci R2 dan dapat dibaca kembali", async () => {

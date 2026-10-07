@@ -20,6 +20,7 @@ import {
   isianMkgAwal,
   isianUntukDisimpan,
   pernahKgbAwal,
+  peringatanDampakKgb,
   jawabSkBaru,
   koreksiAtas,
   mkgPadaSkTercatat,
@@ -390,7 +391,7 @@ export default function FormulirUsulan({
     ? "Perbaiki usulan yang dikembalikan"
     : jenis === "baru"
       ? (draf ? "Lanjutkan data pegawai baru" : "Tambah data pegawai")
-      : (draf ? "Lanjutkan usulan perbaikan data" : "Usulkan perbaikan data pegawai");
+      : "Perbarui data pegawai";
 
   return (
     <KerangkaModal
@@ -801,6 +802,10 @@ export default function FormulirUsulan({
                   <input className="kgbm-input" value={dasar.penetap} onChange={(e) => setDasar((d) => ({ ...d, penetap: e.target.value }))} placeholder="Pejabat penanda tangan SK" />
                 </label>
               </div>
+              {(() => {
+                const dampak = peringatanDampakKgb(pegawai?.kgb?.status, pegawai?.kgb?.tmt);
+                return dampak ? <Catatan nada={dampak.nada === "merah" ? "merah" : "amber"}>{dampak.teks}</Catatan> : null;
+              })()}
               {skSudahTercatat && (
                 <Catatan nada="amber">
                   SK ini sudah tercatat di SIM-KGB. Bila datanya sudah benar, jawab Tidak ada. Bila keadaan sebelum SK keliru, betulkan
@@ -907,8 +912,7 @@ export default function FormulirUsulan({
           <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 500 KB</p>
         </div>
         <div className="kgbm-bagian-isi">
-          {/* Pindaian SK PMK hanya diminta bila sebabnya memang PMK (ADR-045); usulan perbaikan biasa
-              tidak menyertakannya. Kenaikan pangkat sudah terwakili "SK kenaikan pangkat terakhir". */}
+          {/* SK kenaikan pangkat dan SK PMK hanya diminta bila SK itu dilaporkan (ADR-045, ADR-081). */}
           {[...berkasUntukKeadaan(pernahKgb), ...berkasDasarBaru(dasar.jenis)].map((b) => {
             const wajib = b.wajib;
             const simpanan = draf?.berkas.find((x) => x.medan === b.medan) ?? null;

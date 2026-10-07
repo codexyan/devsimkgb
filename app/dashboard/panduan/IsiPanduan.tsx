@@ -809,7 +809,7 @@ export default async function IsiPanduan({
                 <p>
                   Apa pun jalannya, isian Anda tersimpan sebagai <strong>draf milik satker</strong>: belum terlihat
                   Kanwil, boleh ditinggal dan dilanjutkan kapan saja, dan boleh dihapus bila keliru. NIP yang tercatat
-                  salah juga dibetulkan lewat <strong>Usulkan perbaikan data</strong>: ketik NIP yang benar, lalu Kanwil
+                  salah juga dibetulkan lewat <strong>Perbarui data</strong>: ketik NIP yang benar, lalu Kanwil
                   mencocokkannya dengan SK CPNS sebelum menyetujui.
                 </p>
 
@@ -1021,7 +1021,9 @@ export default async function IsiPanduan({
                 </ol>
                 <p>
                   Berkas yang diminta mengikuti keadaan pegawai. Yang <strong>sudah pernah KGB</strong>:{" "}
-                  <strong>SK KGB terakhir</strong> dan <strong>SK kenaikan pangkat terakhir</strong>, keduanya wajib.
+                  <strong>SK KGB terakhir</strong>, wajib. <strong>SK kenaikan pangkat</strong> hanya diminta bila Anda
+                  melaporkan kenaikan pangkat atau penyesuaian ijazah, dan <strong>SK PMK</strong> hanya bila melaporkan
+                  PMK.
                   Yang <strong>belum pernah KGB</strong>: <strong>SK CPNS</strong>, wajib karena SK inilah acuan
                   pertamanya, sebab TMT CPNS menjadi awal masa kerja golongan, dan nomor serta tanggalnya tercetak sebagai SK
                   dasar pada surat KGB pertama, dan <strong>SK pengangkatan PNS</strong> bila sudah terbit, boleh
@@ -1196,7 +1198,7 @@ export default async function IsiPanduan({
                     tanpa kotak centang, dan terbuka sendiri pada bulan kirimnya, 2 bulan sebelum TMT. Draf pegawai baru
                     dan usulan yang dikembalikan Kanwil tidak pernah dikunci. Perbaikan yang mendesak tetap dapat
                     diajukan lebih awal lewat <strong>Usul KGB Kolektif</strong>. Bila ada yang keliru, pilih{" "}
-                    <strong>Usulkan perbaikan data</strong> sebelum batas itu. Hukuman disiplin yang belum dilaporkan
+                    <strong>Perbarui data</strong> sebelum batas itu. Hukuman disiplin yang belum dilaporkan
                     disampaikan lewat menu <strong>Lapor Hukdis</strong>; pegawai yang pindah, BKO, atau berhenti
                     dilaporkan dengan <strong>Laporkan mutasi</strong> pada barisnya. Pegawai yang sedang{" "}
                     <strong>BKO</strong> tetap tampil di daftar satker Anda dengan penanda kuning{" "}
@@ -1205,57 +1207,25 @@ export default async function IsiPanduan({
                   </p>
                   <p>
                     <strong>Kenaikan pangkat, penyesuaian ijazah, dan peninjauan masa kerja.</strong> Sesudah SK
-                    KGB terakhir pun masih mungkin terbit SK kenaikan pangkat atau SK PMK, dan SK itulah yang
-                    menggeser masa kerja golongan sekaligus menjadi dasar SK KGB berikutnya. Laporkan lewat{" "}
-                    <strong>Laporkan kenaikan pangkat</strong> atau <strong>Laporkan peninjauan masa kerja</strong>{" "}
-                    pada baris pegawainya. Masing-masing membuka jendelanya sendiri yang hanya memuat apa yang
-                    tertulis di SK itu: golongan baru (kenaikan pangkat), masa kerja golongan menurut SK, nomor,
-                    tanggal, TMT, pejabat penetapnya, dan <strong>pindaian SK-nya</strong>. Akibat SK itu langsung
-                    terlihat di kotak <em> Dihitung sistem</em> sebelum disimpan. Masa kerja golongan dan gaji pokoknya
-                    dihitung dari data tercatat seperti Kanwil saat menyetujui; naik dari golongan II ke III tetap
-                    memotong masa kerja 5 tahun, sehingga angka yang Anda ketik tidak pernah diam-diam menggeser uang.
-                    Pada kenaikan pangkat, masa kerja yang Anda salin dari SK dicocokkan dengan hitungan itu pada TMT
-                    pangkat; bila berbeda, kotaknya memperingatkan sebelum dikirim.
+                    KGB terakhir pun masih mungkin terbit SK kenaikan pangkat atau SK PMK. SK itu mengubah masa kerja
+                    golongan dan gaji pokok, dan menjadi dasar SK KGB berikutnya, tetapi tidak menggeser jadwal KGB.
+                    Semuanya dilaporkan di satu tempat: langkah <em>SK sesudah SK KGB terakhir</em>. Untuk satu
+                    pegawai, tekan <strong>Perbarui data</strong> pada barisnya; untuk banyak pegawai, pakai{" "}
+                    <strong>Usul KGB Kolektif</strong>. Jawab <em>Ada</em>, pilih jenisnya, lalu salin dari SK:
+                    golongan baru (kenaikan pangkat), masa kerja golongan menurut SK, nomor, tanggal, TMT, pejabat
+                    penetapnya, dan unggah <strong>pindaian SK-nya</strong>. Kotak <em>Dihitung sistem</em> langsung
+                    menunjukkan akibatnya seperti Kanwil saat menyetujui: naik dari golongan II ke III tetap memotong
+                    masa kerja 5 tahun, dan masa kerja yang Anda salin dari SK dicocokkan dengan hitungan itu. Bila
+                    KGB pegawai itu sedang diproses Kanwil, atau SK KGB-nya sudah ditandatangani, langkah ini memberi
+                    tahu dampaknya sebelum Anda mengirim.
                   </p>
                   <p>
-                    Laporan SK <strong>tidak menumpang surat usulan Srikandi</strong>: SK-nya sudah terbit dan
-                    pindaiannya ikut terkirim, jadi yang disampaikan adalah kejadian yang sudah selesai, sama
-                    seperti laporan mutasi dan laporan hukuman disiplin. Kartunya meminta sekalian berkas lain yang
-                    akan ditagih (SK KGB terakhir dan SK kenaikan pangkat terakhir), dan begitu semuanya terlampir,
-                    tombol <strong>Kirim ke Kanwil</strong> menyalakan dirinya: satu jendela, selesai, tanpa mampir
-                    ke Usul KGB Kolektif. Berkas yang pemindaiannya belum selesai tidak membuat isian hilang; simpan
-                    sebagai draf, lalu kirim setelah lengkap. Usulan yang sekalian mengubah jabatan atau kolom lain
-                    tetap berangkat bersurat lewat Usul KGB Kolektif seperti biasa. SK
-                    yang sudah dicatat Kanwil terlihat di <strong>Riwayat KGB</strong>, pada baris pegawai yang
-                    dibuka, dan pada kolom <em>Dasar KGB berikutnya</em> baris itu bertanda <em>Dari KP/PI</em> atau{" "}
-                    <em>Dari PMK</em>.
-                  </p>
-                  <p>
-                    <strong>Banyak pegawai naik pangkat atau menerima SK PMK pada periode yang sama?</strong> Tekan{" "}
-                    <strong>Lapor KP/PI/PMK</strong> di bagian atas Pegawai Satker, di samping Usul KGB Kolektif.
-                    Cari dan tambahkan pegawainya di panel kiri; tiap pegawai mendapat satu kartu berisi jenis SK (kenaikan pangkat
-                    atau penyesuaian ijazah, atau PMK), golongan baru dan masa kerja menurut SK, nomor, tanggal, TMT,
-                    pejabat penetap, hasil hitungannya, dan pindaian SK yang masih kurang. Tanggal SK, TMT, dan
-                    penetap yang sama untuk semua pegawai dapat diisi sekali di <em>Isian bersama</em>; isian itu hanya dipakai bila
-                    kolom di kartunya kosong dan <strong>tidak pernah menimpa isian kartu</strong>. Di layar lebar panel kiri
-                    tetap terlihat selama kartu digulir, dan daftar <em>Di laporan</em> menunjukkan keadaan tiap pegawai;
-                    tekan namanya untuk melompat ke kartunya. Tombol{" "}
-                    <strong>Simpan semua sebagai draf</strong> menyimpan seluruhnya tanpa mengirim;{" "}
-                    <strong>Kirim ke Kanwil</strong> mengirim kartu yang sudah lengkap. Kartu yang belum lengkap atau
-                    gagal tidak menghentikan kartu lain dan tidak kehilangan isiannya. Pegawai yang usulannya sedang
-                    ditinjau Kanwil tidak dapat ditambahkan, dan pegawai yang sudah punya draf dilanjutkan dari
-                    drafnya, bukan dibuatkan draf kedua. Menutup halaman dengan isian yang belum disimpan
-                    ditanyakan dulu.
-                  </p>
-                  <p>
-                    <strong>Peringatan dampak ke KGB.</strong> Laporan SK mengubah golongan atau masa kerja, jadi bila
-                    KGB pegawai itu <em>sedang diproses</em> Kanwil, kartunya memberi tahu bahwa hitungannya akan
-                    diperbarui dan SK yang sudah dibuat perlu dibuat ulang oleh Tim SDM. Bila SK KGB-nya{" "}
-                    <em>sudah ditandatangani dan diunggah</em>, kartunya memberi tahu bahwa laporan baru dapat
-                    diterapkan setelah Tim SDM membatalkan KGB itu; hubungi Tim SDM lebih dulu agar laporannya tidak
-                    tertahan. Peringatan ini tidak menghalangi Anda menyimpan atau mengirim. Setelah Kanwil menyetujui
-                    laporan, muncul notifikasi <strong>Laporan SK Disetujui</strong> di menu Notifikasi, sehingga
-                    Anda tahu laporan itu sudah diterapkan tanpa membuka daftar satu per satu.
+                    Laporan SK <strong>tidak menumpang surat usulan Srikandi</strong>: bila semua yang Anda ajukan
+                    hanya melaporkan SK kenaikan pangkat, penyesuaian ijazah, atau PMK, kosongkan nomor surat saat
+                    mengajukan, baik dari Dashboard maupun dari Usul KGB Kolektif. Usulan yang sekalian mengubah
+                    jabatan atau kolom lain tetap bersurat. Setelah Kanwil menyetujui, muncul notifikasi{" "}
+                    <strong>Laporan SK Disetujui</strong>, dan SK-nya terlihat di <strong>Riwayat KGB</strong> serta
+                    pada kolom <em>Dasar KGB berikutnya</em> bertanda <em>Dari KP/PI</em> atau <em>Dari PMK</em>.
                   </p>
                   <p>
                     Untuk baris yang <strong>seharusnya tidak pernah tercatat</strong>, yaitu entri ganda, NIP salah
@@ -1420,7 +1390,7 @@ export default async function IsiPanduan({
                 <ul>
                   <li>TMT atau masa kerja golongan pada tabel usulan tidak sama dengan yang tertulis di SK.</li>
                   <li>SK dasar tidak dilampirkan, misalnya SK KGB terakhir, atau SK CPNS bagi pegawai yang belum pernah KGB.</li>
-                  <li>NIP salah ketik. Betulkan lewat Usulkan perbaikan data sebelum KGB-nya diproses.</li>
+                  <li>NIP salah ketik. Betulkan lewat Perbarui data sebelum KGB-nya diproses.</li>
                   <li>
                     Surat diterima setelah batas proses Tim SDM, sehingga SK berisiko terbit setelah TMT dan selisih gaji
                     dibayar kemudian sebagai kekurangan gaji.
@@ -2344,7 +2314,7 @@ export default async function IsiPanduan({
                     <summary>NIP pegawai tidak ditemukan di SIM-KGB</summary>
                     <p>
                       Pegawai UPT yang belum tercatat ditambahkan Admin UPT dengan Tambah pegawai atau Unggah daftar, lalu
-                      diajukan ke Kanwil. NIP yang tercatat keliru dibetulkan lewat Usulkan perbaikan data; Kanwil
+                      diajukan ke Kanwil. NIP yang tercatat keliru dibetulkan lewat Perbarui data; Kanwil
                       mencocokkannya dengan SK CPNS sebelum menyetujui.
                     </p>
                   </details>
