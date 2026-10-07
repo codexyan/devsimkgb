@@ -426,6 +426,32 @@ export async function pdfReviewSkUpt(surat: DataSuratKGB): Promise<HasilAksi<Blo
   }
 }
 
+/** Tanda air pratinjau SK dari isian usulan yang belum diajukan (ADR-078). */
+export const TEKS_PRATINJAU_USULAN = "PRATINJAU USULAN · BELUM DIAJUKAN";
+
+/** Pratinjau SK KGB berikutnya dari isian formulir usulan (POST /api/upt/usulan/pratinjau-sk). */
+export interface PratinjauSkUsulan {
+  surat: DataSuratKGB;
+  /** Hal yang perlu diketahui UPT tentang pratinjau ini, mis. penandatangan yang belum diatur. */
+  catatan: string[];
+  atasDasar: { label: string; nomorSK: string | null; tmt: string | null } | null;
+}
+
+export async function pratinjauSkUsulan(isian: Record<string, string>): Promise<HasilAksi<PratinjauSkUsulan & { pdf: Blob }>> {
+  const hasil = await kirimJson<PratinjauSkUsulan>(
+    "/api/upt/usulan/pratinjau-sk",
+    { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(isian) },
+    "Pratinjau SK gagal disusun.",
+  );
+  if (!hasil.ok) return hasil;
+  try {
+    const { buatPdfSuratKgb } = await import("./generateSuratKGB");
+    return { ok: true, data: { ...hasil.data, pdf: await buatPdfSuratKgb(hasil.data.surat, false, { draf: TEKS_PRATINJAU_USULAN }) } };
+  } catch {
+    return { ok: false, error: PESAN_PDF_GAGAL };
+  }
+}
+
 /** Tanggapan Admin UPT: SK sudah benar, atau minta perbaikan dengan catatan. */
 export function tanggapiReviewSkUpt(
   kgbId: string,

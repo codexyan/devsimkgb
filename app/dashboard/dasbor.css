@@ -3465,3 +3465,10 @@ html[data-gerak="kurangi"] .pmn-percik, html[data-gerak="kurangi"] .pmn-cincin {
   .lsk-kepala, .lsk-isi { padding-left: 12px; padding-right: 12px; }
   .lsk-alat { padding: 12px; }
 }
+
+/* ── Pengumuman ADR-078: pratinjau SK dengan tanda air ── */
+.pmn-sk { position: relative; }
+.pmn-sk-air { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%) rotate(-14deg); pointer-events: none;
+  font-size: 22px; font-weight: 800; letter-spacing: .12em; color: rgba(192, 38, 38, .16); white-space: nowrap;
+  animation: pmn-air .8s 2.3s ease-out backwards; }
+@keyframes pmn-air { from { opacity: 0 } to { opacity: 1 } }

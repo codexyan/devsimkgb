@@ -10,7 +10,7 @@
  * lama hanya mendapat adegan yang baru, dan pengguna yang belum pernah melihat apa pun mendapat semuanya berurutan
  * (ADR-074). Tombol "Apa yang baru" memutar seluruhnya.
  */
-export const PENGUMUMAN_UPT = ["nama-menu-2026-10", "lapor-sk-2026-10"] as const;
+export const PENGUMUMAN_UPT = ["nama-menu-2026-10", "lapor-sk-2026-10", "sk-usulan-2026-10"] as const;
 export type IdPengumumanUpt = (typeof PENGUMUMAN_UPT)[number];
 
 /** Id yang dikenal; rute server hanya mencatat pengumuman yang memang ada. */

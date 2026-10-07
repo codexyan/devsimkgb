@@ -28,7 +28,10 @@ export interface UsulanKanwil {
   nomorSkTerakhir: string | null;
   /** SK yang menetapkan gaji pokok baru pada usulan ini (ADR-030); null bila tidak ada. */
   dasarBaru?: string | null;
-  /** Pegawai baru: masa kerja pada SK sesudah SK KGB terakhir dan hasil hitung mundurnya (ADR-065). */
+  /**
+   * Hasil hitungan SK yang dilaporkan: keadaan pada SK KGB terakhir atau hitungan mundurnya bagi pegawai baru (ADR-065),
+   * dan cocok tidaknya masa kerja menurut SK kenaikan pangkat dengan hitungan sistem (ADR-078).
+   */
   catatanSkBaru?: string | null;
   tanggalSkTerakhir: string | null;
   catatanUpt: string | null;

@@ -4,27 +4,172 @@
 // daftar "Perubahan yang diusulkan" yang dilihat peninjau sebelum memutuskan (app/api/usulan). Tanpa ini,
 // peninjau melihat angka mentah usulan, misalnya gaji pokok tanpa potongan masa kerja golongan dan jadwal KGB
 // yang bergeser, padahal yang diterapkan adalah hitungan SK-nya (ADR-052).
+//
+// Hitungan intinya (hitungSkDilaporkan) juga dipakai formulir UPT untuk pratinjau "Dihitung sistem" dan pratinjau SK
+// KGB, sehingga yang dilihat UPT sebelum mengajukan sama dengan yang diterapkan Kanwil (ADR-078).
 
-import { hitungKenaikanPangkat } from "./kenaikanPangkat";
-import { hitungPmk } from "./pmk";
-import { bulanKeKgbBerikutnya, getGajiPokok, getPangkat, isGolonganDikenal, selisihBulan, tambahBulan } from "./tabelGaji";
+import { hitungKenaikanPangkat, type HasilKenaikanPangkat } from "./kenaikanPangkat";
+import { hitungPmk, type HasilPmk } from "./pmk";
+import {
+  bulanKeKgbBerikutnya,
+  getGajiPokok,
+  getPangkat,
+  hitungMKGKenaikanPangkat,
+  isGolonganDikenal,
+  selisihBulan,
+  tambahBulan,
+} from "./tabelGaji";
 import { isJenisDasarBaru } from "./dasarBaruUsulan";
-import { tanggalKalender } from "./waktu";
+import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 
 /** Kolom pegawai yang nilainya ditentukan SK, bukan angka yang diketik UPT. */
 export const KOLOM_DITENTUKAN_SK = ["golonganRuang", "pangkat", "mkgTahun", "mkgBulan", "gajiPokok", "tmtGolongan", "tmtKgbBerikutnya"] as const;
 
+/** Masa kerja golongan dalam tahun dan bulan. */
+export interface MasaKerja {
+  tahun: number;
+  bulan: number;
+}
+
+const pecahBulan = (bulan: number): MasaKerja => ({ tahun: Math.floor(bulan / 12), bulan: bulan % 12 });
+
+/**
+ * Keadaan pegawai sebelum SK yang dilaporkan: golongan dan masa kerja golongan pada TMT KGB terakhir, sebagaimana data
+ * pegawai menyimpannya, beserta jadwal KGB berikutnya sebelum SK itu.
+ */
+export interface KeadaanSebelumSk {
+  golonganRuang: string;
+  mkgTahun: number | null;
+  mkgBulan: number | null;
+  tmtKgbTerakhir: NilaiTanggal;
+  tmtKgbBerikutnya: NilaiTanggal;
+}
+
+/** SK kenaikan pangkat atau PMK yang dilaporkan, sebagaimana tertulis pada SK-nya. */
+export interface SkDilaporkan {
+  jenis: "kp" | "pmk";
+  /** Golongan baru menurut SK kenaikan pangkat; PMK tidak mengubah golongan. */
+  golonganBaru: string;
+  /** Masa kerja golongan pada TMT SK menurut SK-nya. PMK menghitung darinya; kenaikan pangkat hanya mencocokkannya. */
+  mkgTahunSk: number;
+  mkgBulanSk: number;
+  tmt: Date;
+}
+
+export type HasilSkDilaporkan =
+  | { ok: false; pesan: string }
+  | {
+      ok: true;
+      jenis: "kp" | "pmk";
+      /** Keadaan sesudah SK: yang ditulis ke data pegawai, dengan masa kerja pada TMT KGB terakhir. */
+      golonganRuang: string;
+      pangkat: string;
+      mkgTahun: number;
+      mkgBulan: number;
+      gajiPokok: number;
+      tmtKgbBerikutnya: Date | null;
+      /**
+       * Masa kerja golongan pada TMT SK menurut hitungan sistem: masa kerja pada TMT KGB terakhir ditambah selang sampai
+       * TMT SK, dipotong bila pindah jenjang golongan. Itulah angka yang semestinya tertulis pada SK kenaikan pangkat.
+       * null bila TMT KGB terakhir tidak diketahui.
+       */
+      mkgPadaTmtSk: MasaKerja | null;
+      kp: HasilKenaikanPangkat | null;
+      pmk: HasilPmk | null;
+    };
+
+/**
+ * Akibat satu SK kenaikan pangkat atau PMK pada keadaan sebelumnya. Kenaikan pangkat memotong masa kerja golongan
+ * menurut lompatan golongan dan tidak menggeser jadwal KGB; PMK mempertahankan golongan dan dapat memajukan jadwal.
+ */
+export function hitungSkDilaporkan(lama: KeadaanSebelumSk, sk: SkDilaporkan): HasilSkDilaporkan {
+  const mkgTahunLama = lama.mkgTahun ?? 0;
+  const mkgBulanLama = lama.mkgBulan ?? 0;
+  const tmtTerakhir = tanggalKalender(lama.tmtKgbTerakhir);
+
+  if (sk.jenis === "kp") {
+    const h = hitungKenaikanPangkat({ golonganLama: lama.golonganRuang, mkgTahunLama, mkgBulanLama, golonganBaru: sk.golonganBaru });
+    if (!h.ok) return { ok: false, pesan: h.pesan };
+    let mkgPadaTmtSk: MasaKerja | null = null;
+    if (tmtTerakhir && sk.tmt >= tmtTerakhir) {
+      const padaTmt = pecahBulan(mkgTahunLama * 12 + mkgBulanLama + selisihBulan(tmtTerakhir, sk.tmt));
+      const potong = hitungMKGKenaikanPangkat(lama.golonganRuang, sk.golonganBaru, padaTmt.tahun, padaTmt.bulan);
+      mkgPadaTmtSk = potong ? { tahun: potong.mkgTahun, bulan: potong.mkgBulan } : padaTmt;
+    }
+    return {
+      ok: true,
+      jenis: "kp",
+      golonganRuang: h.hasil.golonganBaru,
+      pangkat: h.hasil.pangkatBaru,
+      mkgTahun: h.hasil.mkgTahunBaru,
+      mkgBulan: h.hasil.mkgBulanBaru,
+      gajiPokok: h.hasil.gajiPokokBaru,
+      // Kenaikan pangkat tidak menggeser jadwal KGB (Buku Saku KP 2026).
+      tmtKgbBerikutnya: tanggalKalender(lama.tmtKgbBerikutnya),
+      mkgPadaTmtSk,
+      kp: h.hasil,
+      pmk: null,
+    };
+  }
+
+  const h = hitungPmk({
+    golonganRuang: lama.golonganRuang,
+    mkgTahun: mkgTahunLama,
+    mkgBulan: mkgBulanLama,
+    tmtKgbTerakhir: lama.tmtKgbTerakhir,
+    tmtPmk: sk.tmt,
+    mkgTahunSk: sk.mkgTahunSk,
+    mkgBulanSk: sk.mkgBulanSk,
+  });
+  if (!h.ok) return { ok: false, pesan: h.pesan };
+  return {
+    ok: true,
+    jenis: "pmk",
+    golonganRuang: lama.golonganRuang,
+    pangkat: getPangkat(lama.golonganRuang),
+    mkgTahun: h.hasil.mkgTahunDasar,
+    mkgBulan: h.hasil.mkgBulanDasar,
+    gajiPokok: h.hasil.gajiPokokBaru,
+    tmtKgbBerikutnya: h.hasil.tmtKgbBerikutnyaUsulan,
+    mkgPadaTmtSk: h.hasil.mkgSesudahPadaTmt,
+    kp: null,
+    pmk: h.hasil,
+  };
+}
+
+/**
+ * Cocokkan masa kerja golongan yang tertulis pada SK kenaikan pangkat dengan hitungan sistem. null bila tidak dapat
+ * dicocokkan: hitungannya tidak ada, atau masa kerja menurut SK tidak diisi.
+ */
+export function cocokMkgSk(
+  hitungan: MasaKerja | null,
+  menurutSk: { tahun: number | null | undefined; bulan: number | null | undefined },
+): { cocok: boolean; hitungan: MasaKerja; menurutSk: MasaKerja } | null {
+  if (!hitungan || menurutSk.tahun === null || menurutSk.tahun === undefined || Number.isNaN(Number(menurutSk.tahun))) return null;
+  const sk = { tahun: Number(menurutSk.tahun), bulan: Number(menurutSk.bulan ?? 0) || 0 };
+  return { cocok: sk.tahun * 12 + sk.bulan === hitungan.tahun * 12 + hitungan.bulan, hitungan, menurutSk: sk };
+}
+
+export const teksMasaKerja = (m: MasaKerja) => `${m.tahun} tahun ${m.bulan} bulan`;
+
 export type DasarSkUsulan =
   /** Usulan tanpa SK kenaikan pangkat atau PMK yang lengkap: kolomnya ditulis apa adanya. */
   | { berlaku: false }
   | { berlaku: true; jenis: "kp" | "pmk"; ok: false; pesan: string }
-  | { berlaku: true; jenis: "kp" | "pmk"; ok: true; nilai: Partial<PegawaiRow> };
+  | {
+      berlaku: true;
+      jenis: "kp" | "pmk";
+      ok: true;
+      nilai: Partial<PegawaiRow>;
+      /** Masa kerja golongan pada TMT SK menurut hitungan sistem (lihat hitungSkDilaporkan). */
+      mkgPadaTmtSk: MasaKerja | null;
+    };
 
 /**
  * Hitung nilai dasar gaji menurut SK pada usulan, tanpa menulis apa pun. nilaiBaru: kolom yang diisi UPT
- * (perubahanPegawai). Kenaikan pangkat memotong masa kerja golongan menurut lompatan golongan dan tidak
- * menggeser jadwal KGB; PMK mempertahankan golongan dan dapat memajukan jadwal.
+ * (perubahanPegawai). Golongan pada usulan kenaikan pangkat adalah golongan barunya, dan masa kerja pada usulan PMK
+ * adalah yang tertulis pada SK PMK; keadaan sebelumnya selalu data pegawai yang tercatat.
  */
 export function hitungDasarSkUsulan(
   pegawaiLama: PegawaiRow,
@@ -36,48 +181,38 @@ export function hitungDasarSkUsulan(
   const tmtSk = tanggalKalender(usulan.dasarBaruTmt);
   if (!isJenisDasarBaru(jenisSk) || jenisSk === "koreksi" || !tanggalSk || !tmtSk) return { berlaku: false };
 
-  if (jenisSk === "kp") {
-    const h = hitungKenaikanPangkat({
-      golonganLama: pegawaiLama.golonganRuang,
-      mkgTahunLama: pegawaiLama.mkgTahun ?? 0,
-      mkgBulanLama: pegawaiLama.mkgBulan ?? 0,
-      golonganBaru: String(nilaiBaru.golonganRuang ?? pegawaiLama.golonganRuang),
-    });
-    if (!h.ok) return { berlaku: true, jenis: "kp", ok: false, pesan: h.pesan };
+  const h = hitungSkDilaporkan(pegawaiLama, {
+    jenis: jenisSk,
+    golonganBaru: String(nilaiBaru.golonganRuang ?? pegawaiLama.golonganRuang),
+    mkgTahunSk: Number(nilaiBaru.mkgTahun ?? pegawaiLama.mkgTahun ?? 0),
+    mkgBulanSk: Number(nilaiBaru.mkgBulan ?? pegawaiLama.mkgBulan ?? 0),
+    tmt: tmtSk,
+  });
+  if (!h.ok) return { berlaku: true, jenis: jenisSk, ok: false, pesan: h.pesan };
+  if (jenisSk === "kp")
     return {
       berlaku: true, jenis: "kp", ok: true,
       nilai: {
-        golonganRuang: h.hasil.golonganBaru,
-        pangkat: h.hasil.pangkatBaru,
-        mkgTahun: h.hasil.mkgTahunBaru,
-        mkgBulan: h.hasil.mkgBulanBaru,
-        gajiPokok: h.hasil.gajiPokokBaru,
+        golonganRuang: h.golonganRuang,
+        pangkat: h.pangkat,
+        mkgTahun: h.mkgTahun,
+        mkgBulan: h.mkgBulan,
+        gajiPokok: h.gajiPokok,
         tmtGolongan: tmtSk,
-        // Kenaikan pangkat tidak menggeser jadwal KGB (Buku Saku KP 2026).
         tmtKgbBerikutnya: pegawaiLama.tmtKgbBerikutnya,
       },
+      mkgPadaTmtSk: h.mkgPadaTmtSk,
     };
-  }
-
-  const h = hitungPmk({
-    golonganRuang: pegawaiLama.golonganRuang,
-    mkgTahun: pegawaiLama.mkgTahun ?? 0,
-    mkgBulan: pegawaiLama.mkgBulan ?? 0,
-    tmtKgbTerakhir: pegawaiLama.tmtKgbTerakhir,
-    tmtPmk: tmtSk,
-    mkgTahunSk: Number(nilaiBaru.mkgTahun ?? pegawaiLama.mkgTahun ?? 0),
-    mkgBulanSk: Number(nilaiBaru.mkgBulan ?? pegawaiLama.mkgBulan ?? 0),
-  });
-  if (!h.ok) return { berlaku: true, jenis: "pmk", ok: false, pesan: h.pesan };
   return {
     berlaku: true, jenis: "pmk", ok: true,
     nilai: {
       golonganRuang: pegawaiLama.golonganRuang,
-      mkgTahun: h.hasil.mkgTahunDasar,
-      mkgBulan: h.hasil.mkgBulanDasar,
-      gajiPokok: h.hasil.gajiPokokBaru,
-      tmtKgbBerikutnya: h.hasil.tmtKgbBerikutnyaUsulan,
+      mkgTahun: h.mkgTahun,
+      mkgBulan: h.mkgBulan,
+      gajiPokok: h.gajiPokok,
+      tmtKgbBerikutnya: h.tmtKgbBerikutnya,
     },
+    mkgPadaTmtSk: h.mkgPadaTmtSk,
   };
 }
 
@@ -97,7 +232,25 @@ export function usulanMenurutSk(
   return hasil as unknown as UsulanPegawaiRow;
 }
 
-/** SK kenaikan pangkat atau PMK pada usulan pegawai baru, dihitung ke keadaan pada TMT KGB terakhir (ADR-065). */
+/**
+ * Golongan dan masa kerja golongan pada SK acuan (SK KGB terakhir atau SK CPNS) yang ditulis UPT bersama SK yang
+ * dilaporkan (ADR-078); null pada usulan lama yang hanya menyalin golongan dan masa kerja dari SK yang dilaporkan.
+ */
+export function acuanUsulan(
+  usulan: Partial<UsulanPegawaiRow>,
+): { golongan: string; mkgTahun: number | null; mkgBulan: number } | null {
+  const golongan = usulan.golonganAcuan?.trim() ?? "";
+  if (!golongan) return null;
+  const tahun = usulan.mkgTahunAcuan;
+  return {
+    golongan,
+    // Kosong berarti belum diisi pada draf, bukan nol tahun.
+    mkgTahun: tahun === null || tahun === undefined || Number.isNaN(Number(tahun)) ? null : Number(tahun),
+    mkgBulan: Number(usulan.mkgBulanAcuan ?? 0) || 0,
+  };
+}
+
+/** SK kenaikan pangkat atau PMK pada usulan pegawai baru, dihitung ke keadaan pada TMT KGB terakhir (ADR-065, ADR-078). */
 export type SkPegawaiBaru =
   /** Tidak ada SK yang dilaporkan, atau isiannya belum cukup untuk dihitung (kekurangannya ditagih terpisah). */
   | { berlaku: false }
@@ -107,22 +260,41 @@ export type SkPegawaiBaru =
       jenis: "kp" | "pmk";
       ok: true;
       /** Masa kerja golongan seperti tertulis pada SK itu, yaitu pada TMT-nya. */
-      mkgPadaSk: { tahun: number; bulan: number };
+      mkgPadaSk: MasaKerja;
       tmtSk: Date;
       /** Nilai yang ditulis ke data pegawai saat usulan disetujui. */
       nilai: { pangkat: string; mkgTahun: number; mkgBulan: number; gajiPokok: number; tmtKgbBerikutnya: Date };
+      /**
+       * Keadaan pada SK acuan beserta rincian hitungannya, bila UPT menuliskannya (ADR-078). Tanpa itu masa kerja pada SK
+       * dihitung mundur ke TMT KGB terakhir (ADR-065).
+       */
+      acuan: {
+        golongan: string;
+        mkgTahun: number;
+        mkgBulan: number;
+        gajiPokok: number;
+        tmtKgbBerikutnya: Date | null;
+        /** Masa kerja pada TMT SK menurut hitungan sistem; pembanding masa kerja yang tertulis pada SK kenaikan pangkat. */
+        mkgHitunganPadaSk: MasaKerja | null;
+        kp: HasilKenaikanPangkat | null;
+        pmk: HasilPmk | null;
+      } | null;
     };
 
 /**
- * Pegawai baru yang sudah naik pangkat, penyesuaian ijazah, atau PMK sesudah SK KGB terakhir (ADR-065).
+ * Pegawai baru yang sudah naik pangkat, penyesuaian ijazah, atau PMK sesudah SK KGB terakhir (ADR-065, ADR-078).
  *
- * UPT menyalin golongan dan masa kerja golongan dari SK terbaru itu apa adanya, sedangkan TMT KGB terakhir dan
- * nomor SK tetap dari SK KGB terakhir. Data pegawai menyimpan masa kerja pada TMT KGB terakhir, jadi masa kerja
- * pada SK dihitung mundur sebanyak selang TMT KGB terakhir sampai TMT SK. Potongan masa kerja karena naik jenjang
- * golongan sudah termuat pada SK kenaikan pangkat, sehingga tidak dipotong lagi.
+ * Golongan dan masa kerja golongan pada kolom utama usulan adalah yang tertulis pada SK terbaru itu; TMT KGB terakhir
+ * dan nomor SK tetap dari SK KGB terakhir.
  *
- * Gaji pokok dan jadwalnya mengikuti hitungan pegawai lama: kenaikan pangkat tidak menggeser jadwal KGB
- * (hitungDasarSkUsulan), sedangkan PMK menghitung KGB berikutnya dari TMT PMK (lib/pmk.ts).
+ * Bila UPT juga menuliskan golongan dan masa kerja pada SK KGB terakhir (`golonganAcuan`), hitungannya sama dengan
+ * pegawai yang sudah tercatat: kenaikan pangkat memotong masa kerja menurut lompatan golongan dan tidak menggeser jadwal
+ * KGB, PMK menambah masa kerja dan dapat memajukan jadwal. Masa kerja yang tertulis pada SK kenaikan pangkat hanya
+ * dicocokkan.
+ *
+ * Tanpa itu (usulan lama), data pegawai menyimpan masa kerja pada TMT KGB terakhir, jadi masa kerja pada SK dihitung
+ * mundur sebanyak selang TMT KGB terakhir sampai TMT SK. Potongan masa kerja karena naik jenjang golongan sudah termuat
+ * pada SK kenaikan pangkat, sehingga tidak dipotong lagi.
  */
 export function hitungSkPegawaiBaru(usulan: Partial<UsulanPegawaiRow>): SkPegawaiBaru {
   const jenis = usulan.dasarBaruJenis?.trim() ?? "";
@@ -134,6 +306,55 @@ export function hitungSkPegawaiBaru(usulan: Partial<UsulanPegawaiRow>): SkPegawa
     return { berlaku: true, jenis, ok: false, pesan: "TMT SK yang dilaporkan, yang harus sesudah TMT KGB terakhir" };
 
   const padaSk = Number(usulan.mkgTahun ?? 0) * 12 + Number(usulan.mkgBulan ?? 0);
+  const sk = pecahBulan(padaSk);
+
+  const isiAcuan = acuanUsulan(usulan);
+  if (isiAcuan) {
+    if (!isGolonganDikenal(isiAcuan.golongan)) return { berlaku: true, jenis, ok: false, pesan: "golongan pada SK KGB terakhir" };
+    if (isiAcuan.mkgTahun === null) return { berlaku: true, jenis, ok: false, pesan: "masa kerja golongan pada SK KGB terakhir" };
+    const acuan = { ...isiAcuan, mkgTahun: isiAcuan.mkgTahun };
+    const gajiAcuan = getGajiPokok(acuan.golongan, acuan.mkgTahun, acuan.mkgBulan);
+    const tmtBerikutAcuan = tambahBulan(tmtTerakhir, bulanKeKgbBerikutnya(acuan.golongan, acuan.mkgTahun, acuan.mkgBulan));
+    const h = hitungSkDilaporkan(
+      { golonganRuang: acuan.golongan, mkgTahun: acuan.mkgTahun, mkgBulan: acuan.mkgBulan, tmtKgbTerakhir: tmtTerakhir, tmtKgbBerikutnya: tmtBerikutAcuan },
+      { jenis, golonganBaru: golongan, mkgTahunSk: sk.tahun, mkgBulanSk: sk.bulan, tmt: tmtSk },
+    );
+    if (!h.ok)
+      return {
+        berlaku: true,
+        jenis,
+        ok: false,
+        pesan:
+          jenis === "kp"
+            ? `golongan baru menurut SK kenaikan pangkat (${h.pesan.replace(/\.$/, "").toLowerCase()})`
+            : `masa kerja golongan menurut SK PMK (${h.pesan.replace(/\.$/, "")})`,
+      };
+    return {
+      berlaku: true,
+      jenis,
+      ok: true,
+      mkgPadaSk: sk,
+      tmtSk,
+      nilai: {
+        pangkat: h.pangkat,
+        mkgTahun: h.mkgTahun,
+        mkgBulan: h.mkgBulan,
+        gajiPokok: h.gajiPokok,
+        tmtKgbBerikutnya: h.tmtKgbBerikutnya ?? tmtBerikutAcuan,
+      },
+      acuan: {
+        golongan: acuan.golongan,
+        mkgTahun: acuan.mkgTahun,
+        mkgBulan: acuan.mkgBulan,
+        gajiPokok: gajiAcuan,
+        tmtKgbBerikutnya: tmtBerikutAcuan,
+        mkgHitunganPadaSk: h.jenis === "kp" ? h.mkgPadaTmtSk : null,
+        kp: h.kp,
+        pmk: h.pmk,
+      },
+    };
+  }
+
   const selang = selisihBulan(tmtTerakhir, tmtSk);
   const dasar = padaSk - selang;
   if (dasar < 0)
@@ -144,8 +365,7 @@ export function hitungSkPegawaiBaru(usulan: Partial<UsulanPegawaiRow>): SkPegawa
       pesan: `masa kerja golongan menurut SK yang dilaporkan (paling sedikit ${Math.floor(selang / 12)} tahun ${selang % 12} bulan, selang sejak TMT KGB terakhir)`,
     };
 
-  const sk = { tahun: Math.floor(padaSk / 12), bulan: padaSk % 12 };
-  const d = { tahun: Math.floor(dasar / 12), bulan: dasar % 12 };
+  const d = pecahBulan(dasar);
   return {
     berlaku: true,
     jenis,
@@ -168,6 +388,7 @@ export function hitungSkPegawaiBaru(usulan: Partial<UsulanPegawaiRow>): SkPegawa
             gajiPokok: getGajiPokok(golongan, sk.tahun, sk.bulan),
             tmtKgbBerikutnya: tambahBulan(tmtSk, bulanKeKgbBerikutnya(golongan, sk.tahun, sk.bulan)),
           },
+    acuan: null,
   };
 }
 
@@ -179,4 +400,73 @@ export function usulanBaruMenurutSk<T extends Partial<UsulanPegawaiRow>>(usulan:
   const sk = hitungSkPegawaiBaru(usulan);
   if (!sk.berlaku || !sk.ok) return usulan;
   return { ...usulan, ...sk.nilai };
+}
+
+/**
+ * Catatan untuk peninjau Kanwil tentang SK yang dilaporkan: keadaan pada SK acuan, masa kerja yang tertulis pada SK,
+ * dan apakah cocok dengan hitungan sistem (ADR-078). null bila tidak ada yang perlu dicatat.
+ */
+export function catatanSkDilaporkan(usulan: UsulanPegawaiRow, pegawai: PegawaiRow | null | undefined): string | null {
+  const jenis = usulan.dasarBaruJenis?.trim();
+  if (jenis !== "kp" && jenis !== "pmk") return null;
+  const acuan = acuanUsulan(usulan);
+  const label = jenis === "kp" ? "SK kenaikan pangkat" : "SK PMK";
+
+  if (usulan.jenis === "baru") {
+    const sk = hitungSkPegawaiBaru(usulan);
+    if (!sk.berlaku) return null;
+    if (!sk.ok) return `SK ini belum dapat dihitung: periksa ${sk.pesan}.`;
+    const tmt = formatTanggalId(sk.tmtSk);
+    if (!sk.acuan)
+      return (
+        `Masa kerja golongan pada SK ini ${teksMasaKerja(sk.mkgPadaSk)} (TMT ${tmt}), disalin UPT apa adanya. ` +
+        `Data di atas sudah dihitung mundur ke TMT KGB terakhir: ${sk.nilai.mkgTahun} tahun ${sk.nilai.mkgBulan} bulan.`
+      );
+    const awal = `Pada SK KGB terakhir: ${sk.acuan.golongan}, ${sk.acuan.mkgTahun} tahun ${sk.acuan.mkgBulan} bulan. `;
+    if (jenis === "pmk") return `${awal}Menurut ${label} TMT ${tmt}: ${teksMasaKerja(sk.mkgPadaSk)}.`;
+    const cek = cocokMkgSk(sk.acuan.mkgHitunganPadaSk, sk.mkgPadaSk);
+    return awal + teksCocok(label, tmt, cek);
+  }
+
+  // Pegawai tercatat: masa kerja menurut SK kenaikan pangkat baru ikut tersimpan sejak ADR-078, ditandai golongan acuan.
+  if (!pegawai || jenis !== "kp" || !acuan) return null;
+  const sk = hitungDasarSkUsulan(pegawai, usulan, perubahanDariUsulan(usulan));
+  if (!sk.berlaku || !sk.ok) return null;
+  const cek = cocokMkgSk(sk.mkgPadaTmtSk, { tahun: usulan.mkgTahun, bulan: usulan.mkgBulan });
+  return teksCocok(label, formatTanggalId(usulan.dasarBaruTmt), cek);
+}
+
+function teksCocok(label: string, tmt: string, cek: ReturnType<typeof cocokMkgSk>): string {
+  if (!cek) return `Masa kerja golongan menurut ${label} TMT ${tmt} tidak diisi UPT, jadi belum dicocokkan dengan hitungan sistem.`;
+  return cek.cocok
+    ? `Masa kerja golongan menurut ${label} TMT ${tmt} ${teksMasaKerja(cek.menurutSk)}, sesuai hitungan sistem.`
+    : `Perhatian: masa kerja golongan menurut ${label} TMT ${tmt} ${teksMasaKerja(cek.menurutSk)}, sedangkan hitungan sistem ` +
+        `${teksMasaKerja(cek.hitungan)}. Cocokkan dengan pindaian SK sebelum menyetujui.`;
+}
+
+/** Golongan dan masa kerja yang diisi UPT pada usulan; sisanya tidak dipakai hitungan SK. */
+function perubahanDariUsulan(usulan: Partial<UsulanPegawaiRow>): Partial<PegawaiRow> {
+  const hasil: Partial<PegawaiRow> = {};
+  if (usulan.golonganRuang) hasil.golonganRuang = usulan.golonganRuang;
+  if (usulan.mkgTahun !== null && usulan.mkgTahun !== undefined) hasil.mkgTahun = usulan.mkgTahun;
+  if (usulan.mkgBulan !== null && usulan.mkgBulan !== undefined) hasil.mkgBulan = usulan.mkgBulan;
+  return hasil;
+}
+
+/**
+ * Masa kerja golongan pada TMT SK kenaikan pangkat atau PMK yang tercatat sesudah KGB terakhir: angka yang tertulis pada
+ * SK itu. Data pegawai menyimpan masa kerja pada TMT KGB terakhir (dasar hitungan, sudah dipotong bila pangkatnya pindah
+ * jenjang), jadi keduanya berbeda sebanyak selang kedua TMT (ADR-078). null bila dasarnya bukan SK seperti itu.
+ */
+export function mkgPadaSkTercatat(
+  data: { mkgTahun?: string | number | null; mkgBulan?: string | number | null; tmtKgbTerakhir?: NilaiTanggal },
+  dasar: { jenis: string; tmt: NilaiTanggal } | null | undefined,
+): { mkg: MasaKerja; tmt: Date; jenis: "kp" | "pmk" } | null {
+  if (!dasar || (dasar.jenis !== "kp" && dasar.jenis !== "pmk")) return null;
+  const tmtSk = tanggalKalender(dasar.tmt);
+  const tmtTerakhir = tanggalKalender(data.tmtKgbTerakhir);
+  if (!tmtSk || !tmtTerakhir || tmtSk <= tmtTerakhir) return null;
+  const angka = (n: string | number | null | undefined) => Math.max(0, Math.floor(Number(n ?? 0) || 0));
+  const pada = angka(data.mkgTahun) * 12 + angka(data.mkgBulan) + selisihBulan(tmtTerakhir, tmtSk);
+  return { mkg: pecahBulan(pada), tmt: tmtSk, jenis: dasar.jenis };
 }

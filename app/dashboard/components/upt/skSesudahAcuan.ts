@@ -1,11 +1,18 @@
-// SK sesudah SK KGB terakhir pada formulir UPT (ADR-065), dipakai bersama formulir perorangan dan Usul KGB Kolektif.
+// SK sesudah SK KGB terakhir pada formulir UPT (ADR-065, ADR-078), dipakai bersama formulir perorangan dan Usul KGB
+// Kolektif.
 //
 // SK KGB terakhir (atau SK CPNS) tetap acuan jadwal KGB. SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang
 // terbit sesudahnya dilaporkan lewat satu pertanyaan wajib, dan SK paling baru di antara keduanya menjadi Atas
 // dasar SK KGB berikutnya (ADR-020).
+//
+// Formulir memisahkan dua keadaan sesuai urutan SK-nya (ADR-078): bagian atas memuat golongan dan masa kerja golongan
+// pada SK acuan, bagian SK memuat golongan dan masa kerja yang tertulis pada SK yang dilaporkan. Hitungannya memakai
+// fungsi yang sama dengan persetujuan Kanwil (lib/dasarSkUsulan.ts).
 
 import { TANPA_SK_BARU } from "@/lib/dasarBaruUsulan";
-import { hitungSkPegawaiBaru } from "@/lib/dasarSkUsulan";
+import { cocokMkgSk, hitungSkDilaporkan, type MasaKerja } from "@/lib/dasarSkUsulan";
+export { mkgPadaSkTercatat } from "@/lib/dasarSkUsulan";
+import { isGolonganDikenal } from "@/lib/tabelGaji";
 import { hitungUsulan, type HitunganUsulan } from "@/lib/usulanPegawai";
 import type { PratinjauAtasDasar } from "@/lib/linimasaDasarSk";
 import { formatTanggalId, tanggalKalender } from "@/lib/waktu";
@@ -17,55 +24,222 @@ export interface IsianSkBaru {
   tanggalSk: string;
   tmt: string;
   penetap: string;
+  /** Golongan/ruang baru menurut SK kenaikan pangkat (ADR-078). */
+  golongan?: string;
+  /** Masa kerja golongan pada TMT SK, seperti tertulis pada SK-nya (ADR-078). */
+  mkgTahun?: string;
+  mkgBulan?: string;
+  /** Jenis SK terakhir yang dipilih sebelum UPT menjawab Tidak ada, agar dapat dipulihkan bila menjawab Ada lagi. */
+  jenisAda?: string;
 }
 
 /**
- * Isian SK setelah UPT menjawab pertanyaannya. Ada: buka isian SK, bawaannya kenaikan pangkat. Tidak ada: isian SK
- * dikosongkan, kecuali sebab koreksi salah ketik yang memang tidak membawa SK.
+ * Isian SK setelah UPT menjawab pertanyaannya. Ada: buka isian SK, dengan jenis yang terakhir dipilih atau kenaikan
+ * pangkat. Tidak ada: isian SK tetap disimpan di formulir, supaya menjawab Ada lagi tidak menghapus yang sudah diketik;
+ * server tidak menyimpannya selama jawabannya Tidak ada (lib/usulanFormulir.ts).
  */
 export function jawabSkBaru<T extends IsianSkBaru>(dasar: T, ada: boolean): T {
-  if (ada) return dasar.jenis === "kp" || dasar.jenis === "pmk" ? dasar : { ...dasar, jenis: "kp" };
+  if (ada) {
+    if (dasar.jenis === "kp" || dasar.jenis === "pmk") return dasar;
+    return { ...dasar, jenis: dasar.jenisAda === "pmk" ? "pmk" : "kp" };
+  }
   if (dasar.jenis === "koreksi") return dasar;
-  return { ...dasar, jenis: TANPA_SK_BARU, nomorSk: "", tanggalSk: "", tmt: "", penetap: "" };
+  return {
+    ...dasar,
+    jenis: TANPA_SK_BARU,
+    jenisAda: dasar.jenis === "kp" || dasar.jenis === "pmk" ? dasar.jenis : dasar.jenisAda,
+  };
+}
+
+/** Keadaan pada SK acuan sebagaimana diisi di bagian atas formulir; semuanya teks. */
+export interface IsianAcuan {
+  golonganRuang: string;
+  mkgTahun: string;
+  mkgBulan: string;
+  tmtKgbTerakhir: string;
+}
+
+const angkaIsian = (teks: string | null | undefined) => {
+  const n = Number(String(teks ?? "").replace(/\D/g, ""));
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** Keadaan sesudah SK yang dilaporkan, sebagaimana akan dicatat Kanwil. */
+export type HitunganSesudahSk =
+  | { ok: false; pesan: string }
+  | {
+      ok: true;
+      jenis: "kp" | "pmk";
+      golongan: string;
+      pangkat: string;
+      /** Masa kerja golongan pada TMT KGB terakhir, yang disimpan di data pegawai. */
+      mkg: MasaKerja;
+      /** Masa kerja golongan pada TMT SK menurut hitungan sistem. */
+      mkgPadaTmtSk: MasaKerja | null;
+      /** Kenaikan pangkat: cocok tidaknya masa kerja yang tertulis pada SK dengan hitungan sistem. */
+      cocok: ReturnType<typeof cocokMkgSk>;
+      gajiPokok: number;
+      tmtKgbBerikutnya: Date | null;
+      penjelasan: string;
+    };
+
+export interface HitunganFormulir {
+  /** Menurut SK acuan pada bagian atas. */
+  acuan: HitunganUsulan;
+  /** Sesudah SK yang dilaporkan; null bila tidak ada SK, atau isiannya belum cukup untuk dihitung. */
+  sesudahSk: HitunganSesudahSk | null;
 }
 
 /**
- * Gaji pokok dan jadwal yang tampil di formulir. Pada pegawai baru yang melaporkan SK, golongan dan masa kerjanya
- * disalin dari SK itu, jadi hitungannya lewat masa kerja pada TMT KGB terakhir, sama dengan yang diterapkan saat
- * Kanwil menyetujui (lib/dasarSkUsulan.ts). Pegawai yang sudah tercatat dihitung ulang Kanwil dari data tercatat.
+ * Hitungan yang tampil di formulir: keadaan menurut SK acuan, dan keadaan sesudah SK kenaikan pangkat atau PMK yang
+ * dilaporkan. Yang kedua memakai hitungan persetujuan Kanwil (hitungSkDilaporkan): kenaikan pangkat memotong masa kerja
+ * menurut lompatan golongan dan tidak menggeser jadwal KGB, PMK menambah masa kerja dan dapat memajukan jadwal.
+ *
+ * `tmtKgbBerikutnyaTercatat`: jadwal pegawai yang sudah tercatat, yang dipertahankan Kanwil pada kenaikan pangkat.
  */
 export function hitungFormulirUsulan(
-  isian: { golonganRuang: string; mkgTahun: string; mkgBulan: string; tmtKgbTerakhir: string },
-  baru: boolean,
-  dasar: Pick<IsianSkBaru, "jenis" | "tmt">,
-): HitunganUsulan {
-  const biasa = hitungUsulan({
-    golonganRuang: isian.golonganRuang,
-    mkgTahun: isian.mkgTahun,
-    mkgBulan: isian.mkgBulan,
-    tmtKgbTerakhir: isian.tmtKgbTerakhir || null,
+  atas: IsianAcuan,
+  dasar: Pick<IsianSkBaru, "jenis" | "tmt" | "golongan" | "mkgTahun" | "mkgBulan">,
+  tmtKgbBerikutnyaTercatat?: string | null,
+): HitunganFormulir {
+  const acuan = hitungUsulan({
+    golonganRuang: atas.golonganRuang,
+    mkgTahun: atas.mkgTahun,
+    mkgBulan: atas.mkgBulan,
+    tmtKgbTerakhir: atas.tmtKgbTerakhir || null,
   });
-  if (!baru) return biasa;
-  const sk = hitungSkPegawaiBaru({
-    golonganRuang: isian.golonganRuang,
-    mkgTahun: Number(isian.mkgTahun || 0),
-    mkgBulan: Number(isian.mkgBulan || 0),
-    tmtKgbTerakhir: tanggalKalender(isian.tmtKgbTerakhir),
-    dasarBaruJenis: dasar.jenis,
-    dasarBaruTmt: tanggalKalender(dasar.tmt),
-  });
-  if (!sk.berlaku) return biasa;
-  if (!sk.ok) return { ...biasa, gajiPokok: 0, tmtKgbBerikutnya: null, penjelasan: "", peringatan: [`Periksa ${sk.pesan}.`] };
-  const n = sk.nilai;
+  const jenis = dasar.jenis;
+  if (jenis !== "kp" && jenis !== "pmk") return { acuan, sesudahSk: null };
+
+  const golonganSk = (dasar.golongan ?? "").trim();
+  const mkgSkDiisi = (dasar.mkgTahun ?? "") !== "" || (dasar.mkgBulan ?? "") !== "";
+  const tmtSk = tanggalKalender(dasar.tmt);
+  if ((jenis === "kp" && !golonganSk) || (jenis === "pmk" && !mkgSkDiisi) || !tmtSk) return { acuan, sesudahSk: null };
+  if (!isGolonganDikenal(atas.golonganRuang))
+    return { acuan, sesudahSk: { ok: false, pesan: "Isi golongan/ruang pada SK KGB terakhir di bagian atas lebih dulu." } };
+  const tmtTerakhir = tanggalKalender(atas.tmtKgbTerakhir);
+  if (tmtTerakhir && tmtSk < tmtTerakhir)
+    return {
+      acuan,
+      sesudahSk: {
+        ok: false,
+        pesan: `TMT SK ini lebih awal dari TMT KGB terakhir (${formatTanggalId(tmtTerakhir)}), jadi bukan SK sesudah SK KGB terakhir. Periksa kembali kedua tanggalnya.`,
+      },
+    };
+
+  const mkgTahun = angkaIsian(atas.mkgTahun);
+  const mkgBulan = angkaIsian(atas.mkgBulan);
+  const h = hitungSkDilaporkan(
+    {
+      golonganRuang: atas.golonganRuang,
+      mkgTahun,
+      mkgBulan,
+      tmtKgbTerakhir: tmtTerakhir,
+      tmtKgbBerikutnya: tanggalKalender(tmtKgbBerikutnyaTercatat) ?? acuan.tmtKgbBerikutnya,
+    },
+    {
+      jenis,
+      golonganBaru: jenis === "kp" ? golonganSk : atas.golonganRuang,
+      mkgTahunSk: angkaIsian(dasar.mkgTahun),
+      mkgBulanSk: angkaIsian(dasar.mkgBulan),
+      tmt: tmtSk,
+    },
+  );
+  if (!h.ok) return { acuan, sesudahSk: { ok: false, pesan: `${h.pesan.replace(/\.$/, "")}.` } };
+
+  const mkgSk = mkgSkDiisi ? { tahun: angkaIsian(dasar.mkgTahun), bulan: angkaIsian(dasar.mkgBulan) } : { tahun: null, bulan: null };
+  const cocok = jenis === "kp" ? cocokMkgSk(h.mkgPadaTmtSk, mkgSk) : null;
+  const mkg = (m: MasaKerja) => `${m.tahun} tahun ${m.bulan} bulan`;
+  const penjelasan =
+    jenis === "kp"
+      ? `${atas.golonganRuang} ${mkgTahun} tahun ${mkgBulan} bulan pada TMT KGB terakhir menjadi ${h.golonganRuang} ` +
+        (h.kp && h.kp.potonganMkgTahun > 0
+          ? `dengan masa kerja dipotong ${h.kp.potonganMkgTahun} tahun karena pindah jenjang golongan: ${mkg({ tahun: h.mkgTahun, bulan: h.mkgBulan })}`
+          : `dengan masa kerja tetap ${mkg({ tahun: h.mkgTahun, bulan: h.mkgBulan })}`) +
+        (h.mkgPadaTmtSk ? `, atau ${mkg(h.mkgPadaTmtSk)} pada TMT SK ${formatTanggalId(tmtSk)}. ` : ". ") +
+        "Kenaikan pangkat tidak menggeser jadwal KGB."
+      : `Tambahan masa kerja ${h.pmk ? `${Math.floor(h.pmk.tambahBulan / 12)} tahun ${h.pmk.tambahBulan % 12} bulan` : "-"}; ` +
+        `masa kerja ${mkg({ tahun: h.mkgTahun, bulan: h.mkgBulan })} pada TMT KGB terakhir. KGB berikutnya dihitung dari TMT PMK.`;
   return {
-    ...biasa,
-    gajiPokok: n.gajiPokok,
-    tmtKgbBerikutnya: n.tmtKgbBerikutnya,
-    peringatan: n.gajiPokok > 0 ? [] : biasa.peringatan,
-    penjelasan:
-      `Masa kerja pada SK yang dilaporkan ${sk.mkgPadaSk.tahun} tahun ${sk.mkgPadaSk.bulan} bulan (TMT ${formatTanggalId(sk.tmtSk)}), ` +
-      `dihitung mundur ke TMT KGB terakhir menjadi ${n.mkgTahun} tahun ${n.mkgBulan} bulan. ` +
-      `KGB berikutnya ${formatTanggalId(n.tmtKgbBerikutnya)}.`,
+    acuan,
+    sesudahSk: {
+      ok: true,
+      jenis,
+      golongan: h.golonganRuang,
+      pangkat: h.pangkat,
+      mkg: { tahun: h.mkgTahun, bulan: h.mkgBulan },
+      mkgPadaTmtSk: h.mkgPadaTmtSk,
+      cocok,
+      gajiPokok: h.gajiPokok,
+      tmtKgbBerikutnya: h.tmtKgbBerikutnya,
+      penjelasan,
+    },
+  };
+}
+
+/** Golongan dan masa kerja golongan menurut SK yang dilaporkan, sebagai isian teks. */
+export interface IsianMenurutSk {
+  golongan: string;
+  mkgTahun: string;
+  mkgBulan: string;
+}
+
+/**
+ * Isian awal formulir dari draf atau data tercatat (ADR-078): keadaan pada SK acuan untuk bagian atas, golongan dan masa
+ * kerja menurut SK yang dilaporkan untuk bagian SK.
+ *
+ * Draf yang menyimpan keadaan acuan dipisahkan apa adanya. Draf lama menyalin golongan dan masa kerja SK yang dilaporkan
+ * ke isian utama: pada pegawai tercatat, bagian atas diisi data tercatat; pada pegawai baru, keadaan pada SK KGB
+ * terakhirnya tidak diketahui sehingga dikosongkan untuk diisi.
+ */
+export function pisahkanIsianSk(input: {
+  nilai: Record<string, string>;
+  jenisSk: string | null | undefined;
+  acuan: IsianMenurutSk | null | undefined;
+  /** Data pegawai yang tercatat; null pada pegawai baru. */
+  tercatat: Record<string, string> | null | undefined;
+}): { atas: Record<string, string>; sk: IsianMenurutSk } {
+  const { nilai, jenisSk, acuan, tercatat } = input;
+  const kosong: IsianMenurutSk = { golongan: "", mkgTahun: "", mkgBulan: "" };
+  if (jenisSk !== "kp" && jenisSk !== "pmk") return { atas: { ...nilai }, sk: kosong };
+
+  const menurutSk: IsianMenurutSk = {
+    golongan: jenisSk === "kp" ? nilai.golonganRuang ?? "" : "",
+    mkgTahun: nilai.mkgTahun ?? "",
+    mkgBulan: nilai.mkgBulan ?? "",
+  };
+  if (tercatat) {
+    const atas = { ...nilai, golonganRuang: tercatat.golonganRuang ?? "", mkgTahun: tercatat.mkgTahun ?? "", mkgBulan: tercatat.mkgBulan ?? "", tmtGolongan: tercatat.tmtGolongan ?? nilai.tmtGolongan ?? "" };
+    // Draf lama kenaikan pangkat tidak memuat masa kerja menurut SK: isiannya sama dengan data tercatat.
+    const mkgSama = (nilai.mkgTahun ?? "") === (tercatat.mkgTahun ?? "") && (nilai.mkgBulan ?? "") === (tercatat.mkgBulan ?? "");
+    return { atas, sk: !acuan && jenisSk === "kp" && mkgSama ? { ...menurutSk, mkgTahun: "", mkgBulan: "" } : menurutSk };
+  }
+  if (acuan) return { atas: { ...nilai, golonganRuang: acuan.golongan, mkgTahun: acuan.mkgTahun, mkgBulan: acuan.mkgBulan }, sk: menurutSk };
+  return {
+    atas: { ...nilai, golonganRuang: jenisSk === "pmk" ? nilai.golonganRuang ?? "" : "", mkgTahun: "", mkgBulan: "" },
+    sk: menurutSk,
+  };
+}
+
+/**
+ * Isian utama dan keadaan acuan yang dikirim ke server (ADR-078). Tanpa SK yang dilaporkan, isian utama adalah keadaan
+ * pada SK acuan dan acuannya kosong. Dengan SK, isian utama adalah golongan dan masa kerja menurut SK itu (PMK tidak
+ * mengubah golongan), dan keadaan pada SK acuan dikirim terpisah.
+ */
+export function isianUntukDisimpan(
+  atas: Record<string, string>,
+  dasar: Pick<IsianSkBaru, "jenis" | "golongan" | "mkgTahun" | "mkgBulan">,
+): { nilai: Record<string, string>; acuan: { golonganAcuan: string; mkgTahunAcuan: string; mkgBulanAcuan: string } } {
+  if (dasar.jenis !== "kp" && dasar.jenis !== "pmk")
+    return { nilai: { ...atas }, acuan: { golonganAcuan: "", mkgTahunAcuan: "", mkgBulanAcuan: "" } };
+  return {
+    nilai: {
+      ...atas,
+      golonganRuang: dasar.jenis === "kp" ? dasar.golongan ?? "" : atas.golonganRuang ?? "",
+      mkgTahun: dasar.mkgTahun ?? "",
+      mkgBulan: dasar.mkgBulan ?? "",
+    },
+    acuan: { golonganAcuan: atas.golonganRuang ?? "", mkgTahunAcuan: atas.mkgTahun ?? "", mkgBulanAcuan: atas.mkgBulan ?? "" },
   };
 }
 

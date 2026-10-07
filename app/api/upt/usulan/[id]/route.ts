@@ -5,7 +5,8 @@ import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { BELUM_SELESAI, BERKAS_USULAN, DIPEGANG_UPT, pernahKgb } from "@/lib/usulanPegawai";
 import { bawaanPegawai, berkasPerluDisalin } from "@/lib/bawaanUsulan";
-import { bacaDasarBaru, bacaIsianUsulan, isiHitungan } from "@/lib/usulanFormulir";
+import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, isiHitungan } from "@/lib/usulanFormulir";
+import { tulisDenganAcuan } from "@/lib/acuanUsulanServer";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, hapusBerkasUsulan, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { TIPE_NOTIFIKASI } from "@/lib/generateNotifikasi";
@@ -74,7 +75,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { nama, pegawai } = await namaUsulan(usulan);
   // Formulir yang tidak memuat isian SK (mis. perbaikan berkas saja) memakai SK yang sudah tersimpan pada draf.
   const dasarBaru = form.has("dasarBaruJenis") ? bacaDasarBaru(teks) : null;
-  const isian = isiHitungan(dibaca.isian, pegawai, dasarBaru ?? usulan);
+  // Keadaan pada SK KGB terakhir ikut isian SK-nya (ADR-078): dikosongkan bila SK sesudahnya tidak lagi dilaporkan, atau
+  // bila formulirnya tidak memuatnya (laporan SK lama).
+  const acuan = dasarBaru ? bacaAcuan(teks, dasarBaru) : null;
+  const isian = isiHitungan(dibaca.isian, pegawai, {
+    ...(dasarBaru ?? usulan),
+    ...(acuan ?? { golonganAcuan: usulan.golonganAcuan, mkgTahunAcuan: usulan.mkgTahunAcuan, mkgBulanAcuan: usulan.mkgBulanAcuan }),
+  });
 
   // NIP boleh dibetulkan selama usulan masih dipegang UPT. Pada pegawai baru NIP adalah penandanya, jadi
   // tidak boleh kosong; pada usulan perbaikan, kosong berarti NIP tidak diusulkan berubah.
@@ -117,6 +124,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     // Sebab perubahan golongan atau masa kerja golongan beserta SK-nya (ADR-030); formulir yang tidak
     // memuatnya, mis. perbaikan berkas saja, tidak menyentuh kolom ini.
     ...(dasarBaru ?? {}),
+    ...(acuan ?? {}),
     nomorSkTerakhir: teks("nomorSkTerakhir") || null,
     tanggalSkTerakhir,
     // Laporan hukdis kini lewat modulnya sendiri (ADR-016). Formulir usulan tidak lagi mengirimnya, dan
@@ -148,7 +156,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       (await db.usulanPegawai.findMany({ where: { pegawaiId: pegawai.id, status: "disetujui" } })) as UsulanPegawaiRow[],
     );
     const salinan = await salinBerkasBawaan(
-      berkasPerluDisalin(hasil, bawaan, pernahKgb(hasil.mkgTahun ?? pegawai.mkgTahun, hasil.mkgBulan ?? pegawai.mkgBulan), dihapus),
+      berkasPerluDisalin(
+        hasil,
+        bawaan,
+        hasil.golonganAcuan?.trim()
+          ? pernahKgb(hasil.mkgTahunAcuan, hasil.mkgBulanAcuan)
+          : pernahKgb(hasil.mkgTahun ?? pegawai.mkgTahun, hasil.mkgBulan ?? pegawai.mkgBulan),
+        dihapus,
+      ),
       akun.kode,
     );
     Object.assign(perubahan, salinan);
@@ -158,7 +173,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (form.has("nomorSurat")) perubahan.nomorSurat = teks("nomorSurat") || null;
   if (form.has("tanggalSurat")) perubahan.tanggalSurat = tanggalSurat;
 
-  await db.usulanPegawai.update({ id }, perubahan);
+  await tulisDenganAcuan(perubahan, (isi) => db.usulanPegawai.update({ id }, isi));
 
   logAudit({
     userId: akun.pengguna.id,

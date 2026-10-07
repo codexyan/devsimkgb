@@ -24,6 +24,7 @@ import type { DokumenSk } from "@/lib/dokumenLinimasa";
 import { cariDokumenSk } from "@/lib/dokumenLinimasa";
 import type { DokumenPegawai } from "@/lib/dokumenPegawai";
 import TabDataPegawai, { type TindakanPegawai } from "./TabDataPegawai";
+import { mkgPadaSkTercatat } from "@/lib/dasarSkUsulan";
 import ModalUbahPegawai, { LABEL_BAGIAN, LABEL_BAGIAN_KECIL, type BagianUbah, type PegawaiUbah } from "@/app/dashboard/components/pegawai/ModalUbahPegawai";
 import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
 import ModalPmk from "@/app/dashboard/components/ModalPmk";
@@ -779,6 +780,11 @@ export default function RiwayatKGBPage() {
         (lengkap ? (
           <TabDataPegawai
             pegawai={lengkap}
+            mkgMenurutSk={
+              linimasaHalaman && linimasaHalaman !== "gagal" && linimasaHalaman.linimasa.dasar
+                ? mkgPadaSkTercatat(lengkap, { jenis: linimasaHalaman.linimasa.dasar.jenis, tmt: linimasaHalaman.linimasa.dasar.tmt })
+                : null
+            }
             bolehUbah={bolehUbah}
             bolehDokumen={bolehDokumen}
             versi={versiData}
