@@ -14,14 +14,14 @@
  * terlipat di bawah Perlu dikerjakan. Dipisah di sini supaya kalah dari dokumen lain milik pegawai yang sama, misalnya
  * SK terbit yang harus direkam di Gaji Web, alih-alih menyeretnya ikut terlipat.
  */
-export type KolomUpt = "kerja" | "kanwil" | "sk" | "selesai" | "kunci";
+export type KolomUpt = "kerja" | "kanwil" | "periksa" | "sk" | "selesai" | "kunci";
 
 /**
  * Urutan pemilihan kartu utama, bukan urutan kolom di layar. Yang menunggu tindakan UPT didahulukan: "kerja"
- * (melengkapi atau memperbaiki usulan) lalu "sk" (merekam di Gaji Web). "kanwil" sedang ditunggu orang lain, dan
- * "selesai" tidak menuntut apa pun.
+ * (melengkapi atau memperbaiki usulan), "periksa" (SK KGB buatan Kanwil yang menunggu review UPT, ADR-079), lalu "sk"
+ * (merekam di Gaji Web). "kanwil" sedang ditunggu orang lain, dan "selesai" tidak menuntut apa pun.
  */
-const URUTAN_KOLOM: Record<KolomUpt, number> = { kerja: 0, sk: 1, kanwil: 2, selesai: 3, kunci: 4 };
+const URUTAN_KOLOM: Record<KolomUpt, number> = { kerja: 0, periksa: 1, sk: 2, kanwil: 3, selesai: 4, kunci: 5 };
 
 export interface SumberKartu {
   /** Kunci unik sumbernya, mis. "usulan:<id>", "sk:<id>", "proses:<id>". */
@@ -111,7 +111,7 @@ export function kartuPerKolom<T extends SumberKartu>(
 ): Record<KolomUpt, KartuGabung<T>[]> {
   const gabung = gabungKartuUpt(sumber);
   const urutanKunci = new Map(sumber.map((s, i) => [s.kunci, i]));
-  const hasil: Record<KolomUpt, KartuGabung<T>[]> = { kerja: [], kanwil: [], sk: [], selesai: [], kunci: [] };
+  const hasil: Record<KolomUpt, KartuGabung<T>[]> = { kerja: [], kanwil: [], periksa: [], sk: [], selesai: [], kunci: [] };
   for (const g of gabung) hasil[g.kolom].push(g);
   for (const kolom of Object.keys(hasil) as KolomUpt[]) {
     hasil[kolom].sort((a, b) => (urutanKunci.get(a.kunci) ?? 0) - (urutanKunci.get(b.kunci) ?? 0));

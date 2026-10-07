@@ -991,7 +991,7 @@ html[data-dash-theme="dark"] .pub.pg-dasbor .pub-steps > li::before {
 .pub.pg-dasbor .lyr-daftar-nama strong { flex: 1; font-size: 12.5px; }
 
 /* Papan Alur KGB. */
-.pub.pg-dasbor .lyr-papan { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.pub.pg-dasbor .lyr-papan { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .pub.pg-dasbor .lyr-papan-kolom {
   display: grid; gap: 5px; align-content: start;
   padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunken);
@@ -1004,6 +1004,7 @@ html[data-dash-theme="dark"] .pub.pg-dasbor .pub-steps > li::before {
 .pub.pg-dasbor .lyr-titik-kuning { background: var(--warn-line); }
 .pub.pg-dasbor .lyr-titik-hijau { background: var(--ok-text); }
 .pub.pg-dasbor .lyr-titik-biru { background: var(--biru); }
+.pub.pg-dasbor .lyr-titik-ungu { background: var(--st-violet); }
 .pub.pg-dasbor .lyr-kartu-mini {
   padding: 6px 8px; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--kartu);
 }

@@ -25,6 +25,12 @@ const PESAN_BUKAN_UPT = "Usulan hanya dapat diajukan akun Admin UPT yang tertaut
  * misalnya, memuat lima. Karena itu nomor surat, tanggalnya, dan salinan suratnya diisi sekali di sini
  * lalu disalin ke setiap baris, bukan diketik ulang per pegawai. Kelengkapan tiap draf diperiksa lebih
  * dulu dan yang kurang disebutkan satu per satu, supaya operator tahu persis apa yang harus dilengkapi.
+ *
+ * Puluhan pegawai dalam satu permintaan melampaui batas CPU Worker dan terputus di tengah, sebagian terkirim dan
+ * sebagian tidak (ADR-079). Karena itu peramban memeriksa seluruh daftar lebih dulu (`periksaSaja`), lalu mengirimnya
+ * beberapa pegawai per permintaan: salinan surat diunggah pada kiriman pertama dan kiriman berikutnya memakai
+ * jalurnya (`pathBerkas`). Kiriman yang diulang aman: usulan yang sudah menunggu dengan surat yang sama dihitung
+ * terkirim, bukan ditolak.
  */
 export async function POST(req: Request) {
   await muatBatasInputSdm();
@@ -52,29 +58,51 @@ export async function POST(req: Request) {
   if (teks("tanggalSurat") && !tanggalSurat)
     return NextResponse.json({ error: "Tanggal surat usulan tidak valid" }, { status: 400 });
 
-  const idTerpilih = form.getAll("id").map((v) => String(v)).filter(Boolean);
+  const idTerpilih = [...new Set(form.getAll("id").map((v) => String(v)).filter(Boolean))];
   if (idTerpilih.length === 0) return NextResponse.json({ error: "Pilih dulu data pegawai yang akan diajukan" }, { status: 400 });
+  const periksaSaja = teks("periksaSaja") === "1";
+
+  // Salinan surat yang sudah diunggah pada kiriman pertama pengajuan yang sama (ADR-079). Hanya jalur surat usulan
+  // satker ini yang diterima.
+  const pathBerkasLama = teks("pathBerkas") || null;
+  if (pathBerkasLama && (!pathBerkasLama.startsWith(`usulan/${kode}_berkas_`) || pathBerkasLama.includes("..")))
+    return NextResponse.json({ error: "Salinan surat usulan tidak dikenali. Unggah ulang suratnya." }, { status: 400 });
 
   // Yang boleh diajukan adalah yang masih dipegang UPT: draf baru maupun usulan yang dikembalikan
   // Kanwil untuk diperbaiki. Keduanya berangkat lewat jalur yang sama, dengan satu surat.
   const semua = (await db.usulanPegawai.findMany({
-    where: { satker: kode, status: { in: DIPEGANG_UPT } },
+    where: { satker: kode, id: { in: idTerpilih } },
   })) as UsulanPegawaiRow[];
   const perId = new Map(semua.map((u) => [u.id, u]));
-  const draf = idTerpilih.map((id) => perId.get(id)).filter((u): u is UsulanPegawaiRow => !!u);
-  if (draf.length !== idTerpilih.length)
+  const draf = idTerpilih
+    .map((id) => perId.get(id))
+    .filter((u): u is UsulanPegawaiRow => !!u && DIPEGANG_UPT.includes(u.status));
+  // Kiriman yang diulang sesudah terputus: yang sudah berangkat dengan surat ini tidak dikirim lagi.
+  const sudahTerkirim = idTerpilih.filter((id) => {
+    const u = perId.get(id);
+    return !!u && u.status === "menunggu" && (u.nomorSurat ?? null) === nomorSurat;
+  });
+  if (draf.length + sudahTerkirim.length !== idTerpilih.length)
     return NextResponse.json(
       { error: "Ada data yang sudah tidak dipegang UPT, mungkin sudah terkirim. Muat ulang halaman, lalu coba lagi." },
       { status: 409 },
     );
+  if (draf.length === 0 && !periksaSaja)
+    return NextResponse.json({ ok: true, jumlah: 0, sudah: sudahTerkirim.length, pathBerkas: pathBerkasLama });
 
   // Kelengkapan diperiksa sebelum apa pun disimpan, agar satu draf yang kurang tidak membuat sebagian
-  // terkirim dan sebagian tidak.
+  // terkirim dan sebagian tidak. Hanya pegawai yang diajukan yang dibaca.
+  const idPegawai = [...new Set(draf.map((u) => u.pegawaiId).filter((id): id is string => !!id))];
   const pegawaiPerId = new Map(
-    ((await db.pegawai.findMany()) as PegawaiRow[]).map((p) => [p.id, p]),
+    (idPegawai.length > 0 ? ((await db.pegawai.findMany({ where: { id: { in: idPegawai } } })) as PegawaiRow[]) : []).map(
+      (p) => [p.id, p],
+    ),
   );
   // Berkas yang sudah disetujui untuk pegawainya ikut dihitung, lalu disalin saat dikirim (ADR-017).
-  const disetujui = (await db.usulanPegawai.findMany({ where: { status: "disetujui" } })) as UsulanPegawaiRow[];
+  const disetujui =
+    idPegawai.length > 0
+      ? ((await db.usulanPegawai.findMany({ where: { status: "disetujui", pegawaiId: { in: idPegawai } } })) as UsulanPegawaiRow[])
+      : [];
   const bawaanPerUsulan = new Map<string, BawaanUsulan>();
   for (const u of draf) {
     const pegawai = u.pegawaiId ? pegawaiPerId.get(u.pegawaiId) : null;
@@ -114,10 +142,12 @@ export async function POST(req: Request) {
       },
       { status: 400 },
     );
+  if (periksaSaja) return NextResponse.json({ ok: true, jumlah: draf.length, sudah: sudahTerkirim.length });
 
   // Satu salinan surat untuk seluruh pegawai pada pengajuan ini; jalurnya sama di tiap baris.
   const berkas = await simpanBerkasUsulan(form, kode);
   if ("galat" in berkas) return berkas.galat;
+  const pathBerkas = berkas.jalur.pathBerkas ?? pathBerkasLama;
 
   const diajukanOleh = `${pengguna.nama} (${pengguna.nip})`;
   const sekarang = new Date();
@@ -129,7 +159,15 @@ export async function POST(req: Request) {
     const bawaan = bawaanPerUsulan.get(u.id);
     const salinan = bawaan
       ? await salinBerkasBawaan(
-          berkasPerluDisalin(u, bawaan, pernahKgb(u.mkgTahun ?? pegawai?.mkgTahun, u.mkgBulan ?? pegawai?.mkgBulan)),
+          // Pernah KGB atau belum menurut keadaan pada SK KGB terakhir, bukan masa kerja menurut SK sesudahnya (ADR-078).
+          berkasPerluDisalin(
+            u,
+            bawaan,
+            pernahKgb(
+              u.golonganAcuan ? u.mkgTahunAcuan : (u.mkgTahun ?? pegawai?.mkgTahun),
+              u.golonganAcuan ? u.mkgBulanAcuan : (u.mkgBulan ?? pegawai?.mkgBulan),
+            ),
+          ),
           kode,
         )
       : {};
@@ -140,7 +178,7 @@ export async function POST(req: Request) {
         status: "menunggu",
         nomorSurat,
         tanggalSurat,
-        pathBerkas: berkas.jalur.pathBerkas ?? u.pathBerkas,
+        pathBerkas: pathBerkas ?? u.pathBerkas,
         diajukanOleh,
         diajukanAt: sekarang,
       },
@@ -163,14 +201,15 @@ export async function POST(req: Request) {
     }
   }
 
-  logAudit({
-    userId: pengguna.id,
-    aksi: "usul_data_pegawai",
-    detail:
-      `Usulan ${terkirim.length} pegawai dari ${satker.nama} ` +
-      `${nomorSurat ? `dengan surat ${nomorSurat}` : "sebagai laporan SK, tanpa surat usulan"}: ${terkirim.join(", ")}`,
-    targetNama: satker.nama,
-  });
+  if (terkirim.length > 0)
+    logAudit({
+      userId: pengguna.id,
+      aksi: "usul_data_pegawai",
+      detail:
+        `Usulan ${terkirim.length} pegawai dari ${satker.nama} ` +
+        `${nomorSurat ? `dengan surat ${nomorSurat}` : "sebagai laporan SK, tanpa surat usulan"}: ${terkirim.join(", ")}`,
+      targetNama: satker.nama,
+    });
 
-  return NextResponse.json({ ok: true, jumlah: terkirim.length });
+  return NextResponse.json({ ok: true, jumlah: terkirim.length, sudah: sudahTerkirim.length, pathBerkas: pathBerkas ?? null });
 }

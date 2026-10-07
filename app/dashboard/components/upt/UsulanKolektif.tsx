@@ -18,6 +18,7 @@ import { kunciBulanTmt } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan } from "@/app/dashboard/satker/labelSatker";
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
 import { kunciNomorSk } from "@/lib/nomorSurat";
+import { UKURAN_KIRIMAN, ajukanBertahap } from "./ajukanBertahap";
 import { pratinjauAtasDasarUsulan } from "@/lib/linimasaDasarSk";
 import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
 import {
@@ -313,6 +314,7 @@ export default function UsulanKolektif() {
   const [berkasSurat, setBerkasSurat] = useState<File | null>(null);
   const [pilihAjukan, setPilihAjukan] = useState<Set<string>>(() => new Set());
   const [mengajukan, setMengajukan] = useState(false);
+  const [kemajuanAjukan, setKemajuanAjukan] = useState("");
   const [selesai, setSelesai] = useState<string | null>(null);
 
   // Bulan usulan: dari pengingat dashboard (?bulan=yyyy-mm) bila ada, selain itu TMT dua bulan ke depan.
@@ -602,18 +604,21 @@ export default function UsulanKolektif() {
     setMengajukan(true);
     setGalat(null);
     try {
-      const form = new FormData();
-      for (const id of pilihAjukan) form.append("id", id);
-      form.set("nomorSurat", surat.nomorSurat.trim());
-      form.set("tanggalSurat", surat.tanggalSurat);
-      if (berkasSurat) form.set("berkas", berkasSurat);
-      const res = await fetch("/api/upt/usulan/ajukan", { method: "POST", body: form });
-      const d = (await res.json().catch(() => ({}))) as { error?: string; jumlah?: number };
-      if (!res.ok) {
-        setGalat(d.error ?? "Usulan gagal dikirim");
+      // Beberapa pegawai per kiriman: puluhan sekaligus terputus di tengah oleh batas CPU Worker (ADR-079).
+      const d = await ajukanBertahap({
+        ids: [...pilihAjukan],
+        nomorSurat: surat.nomorSurat.trim(),
+        tanggalSurat: surat.tanggalSurat,
+        berkas: berkasSurat,
+        kemajuan: (n, total) => setKemajuanAjukan(total > UKURAN_KIRIMAN ? `Mengirim ${n} dari ${total}…` : ""),
+      });
+      if (!d.ok) {
+        setGalat(d.galat);
+        // Yang sudah berangkat dilepas dari centang; menekan Ajukan lagi mengirim sisanya.
+        if (d.terkirim.length > 0) setPilihAjukan((lama) => new Set([...lama].filter((id) => !d.terkirim.includes(id))));
         return;
       }
-      setSelesai(`${d.jumlah ?? pilihAjukan.size} pegawai diusulkan ke Kanwil dengan surat ${surat.nomorSurat.trim()}.`);
+      setSelesai(`${d.jumlah} pegawai diusulkan ke Kanwil dengan surat ${surat.nomorSurat.trim()}.`);
       setBaris(null);
       setAktif(null);
       setTerpilih(new Set());
@@ -626,6 +631,7 @@ export default function UsulanKolektif() {
       setGalat("Usulan gagal dikirim");
     } finally {
       setMengajukan(false);
+      setKemajuanAjukan("");
     }
   }
 
@@ -1086,7 +1092,7 @@ export default function UsulanKolektif() {
               ← Lengkapi
             </button>
             <button type="button" className="dsb-tombol" onClick={() => void ajukan()} disabled={mengajukan || pilihAjukan.size === 0}>
-              {mengajukan ? "Mengirim…" : `Ajukan ${pilihAjukan.size} pegawai ke Kanwil`}
+              {mengajukan ? kemajuanAjukan || "Mengirim…" : `Ajukan ${pilihAjukan.size} pegawai ke Kanwil`}
             </button>
           </div>
         </section>

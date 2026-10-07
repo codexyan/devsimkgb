@@ -987,8 +987,10 @@ export default async function IsiPanduan({
                     tetap tersimpan di formulir bila Anda berganti jawaban. Jawaban ini wajib sebelum diajukan. Kotak{" "}
                     <em>Dihitung sistem sesudah SK ini</em> menghitung dengan cara persetujuan Kanwil: naik dari golongan
                     II ke III memotong masa kerja 5 tahun, jadwal KGB tidak bergeser, lalu masa kerja yang Anda salin dari
-                    SK dicocokkan dengan hitungan sistem. Pada pegawai yang sudah tercatat, golongan dan masa kerja di
-                    bagian pangkat dikunci ke data tercatat selama SK dilaporkan. Baris <em>Atas dasar SK KGB berikutnya</em>{" "}
+                    SK dicocokkan dengan hitungan sistem. Bagian pangkat tetap berisi keadaan pada SK KGB terakhir dan
+                    boleh Anda betulkan bila data tercatat keliru: formulir menyebut koreksinya, dan Kanwil menghitung SK
+                    yang dilaporkan dari isian Anda. Bila SK yang dilaporkan ternyata sudah tercatat, formulir
+                    memperingatkan; SK itu tidak dicatat dua kali. Baris <em>Atas dasar SK KGB berikutnya</em>{" "}
                     menunjukkan SK yang akan tercetak sebagai dasar: yang TMT-nya paling baru. Golongan atau masa kerja
                     yang berubah tanpa SK hanya boleh karena salah ketik: centang <em>Koreksi data</em>.
                   </li>
@@ -1047,6 +1049,12 @@ export default async function IsiPanduan({
                   nomor surat yang sama. Nomor, tanggal, dan PDF suratnya diisi sekali dan berlaku untuk semua pegawai
                   pada surat itu, karena satu surat usulan lazim memuat beberapa pegawai.
                 </p>
+                <p>
+                  Lebih dari lima pegawai diperiksa kelengkapannya sekaligus, lalu dikirim lima-lima; tombolnya menunjukkan
+                  kemajuannya. Bila pengiriman terputus, yang sudah terkirim dilepas dari centang dan pesan menyebut
+                  jumlahnya: tekan Ajukan lagi untuk sisanya, dengan nomor surat yang sama. Jangan menghapus usulan untuk
+                  mengulang: usulan yang dihapus hilang beserta berkasnya.
+                </p>
                 <LayarKolektif3 />
                 <p>
                   Sesudah diajukan, usulannya pindah ke kolom <strong>Di Kanwil</strong> dan tidak lagi dapat disunting,
@@ -1083,8 +1091,8 @@ export default async function IsiPanduan({
 
                 <h3 className="pub-h3">Sebelum SK ditandatangani: periksa SK dari Kanwil</h3>
                 <p>
-                  Setelah Kanwil membuat SK KGB pegawai satker Anda, kartu <strong>Review SK KGB</strong> muncul di Perlu
-                  dikerjakan, disertai lonceng. Tekan <strong>Periksa SK</strong>: pratinjaunya bertanda air DRAF, dan isinya
+                  Setelah Kanwil membuat SK KGB pegawai satker Anda, kartu <strong>Review SK KGB</strong> muncul di kolom{" "}
+                  <strong>Periksa SK</strong> pada papan Alur KGB, disertai lonceng. Tekan <strong>Periksa SK</strong>: pratinjaunya bertanda air DRAF, dan isinya
                   sama dengan yang kelak dicetak. Periksa nama, NIP, pangkat dan golongan, gaji pokok, masa kerja, serta TMT.
                   Bila semuanya benar, centang pernyataan lalu tekan <strong>SK sudah benar</strong>; Kanwil baru mencetaknya
                   untuk ditandatangani basah, mengirimnya lewat Srikandi, dan mengunggah TTE-nya. Bila ada yang keliru, tekan{" "}
@@ -1518,7 +1526,9 @@ export default async function IsiPanduan({
                       Di Dashboard, usulan yang menunggu diringkas satu baris per UPT: jumlah usulan, jumlah surat, dan
                       umur usulan tertua. Tombol <strong>Tinjau</strong> pada baris itu membuka menu Usulan UPT yang sudah
                       tersaring ke UPT tersebut, tempat tiap pegawai ditinjau dan seluruh usulan pada satu surat dapat
-                      disetujui sekaligus.
+                      disetujui sekaligus. Persetujuan sekaligus dikirim tiga usulan per tahap; bila terputus, tekan Setujui
+                      lagi. Usulan yang SK-nya sudah tercatat oleh persetujuan yang terputus dilanjutkan, tidak ditolak
+                      sebagai SK ganda.
                     </p>
                     <p>
                       Daftar berisi satu nama per pegawai, dikelompokkan per UPT dan dapat disaring per UPT; usulan lain
@@ -1687,7 +1697,7 @@ export default async function IsiPanduan({
                     <p>
                       <strong>SK pegawai UPT direview Admin UPT lebih dulu.</strong> Untuk pegawai UPT, tombolnya menjadi{" "}
                       <strong>Buat SK dan minta review UPT</strong>: SK tercatat, tetapi tidak diunduh, dan Admin UPT satker
-                      itu menerima permintaan review di lonceng dan di Perlu dikerjakan. Selama belum disetujui, kartu
+                      itu menerima permintaan review di lonceng dan di kolom Periksa SK. Selama belum disetujui, kartu
                       pegawai bertanda <em>Menunggu review UPT</em>, setiap unduhan SK bertanda air DRAF, dan Unggah SK TTE
                       ditolak. Bila UPT meminta perbaikan, kartu bertanda merah beserta catatannya; pilih Perbaiki SK, dan
                       review diminta ulang otomatis. Setelah UPT menyatakan SK sudah benar, tekan <strong>Cetak SK</strong>{" "}

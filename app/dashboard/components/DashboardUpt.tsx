@@ -13,6 +13,7 @@ import { BELUM_SELESAI, LABEL_JENIS_USULAN } from "@/lib/usulanPegawai";
 import { kunciNomorSk } from "@/lib/nomorSurat";
 import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
 import { kartuPerKolom, type KolomUpt, type SumberKartu } from "@/lib/papanUpt";
+import { UKURAN_KIRIMAN, ajukanBertahap } from "./upt/ajukanBertahap";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
 import ModalDasarBaru from "@/app/dashboard/components/upt/ModalDasarBaru";
 import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
@@ -224,6 +225,9 @@ interface SumberPapan extends SumberKartu {
 const KOLOM_UPT: { k: KolomUpt; judul: string; ket: string; nada: Nada }[] = [
   { k: "kerja", judul: "Perlu dikerjakan", ket: "Menunggu tindakan UPT", nada: "kuning" },
   { k: "kanwil", judul: "Di Kanwil", ket: "Ditinjau atau diproses Kanwil", nada: "biru" },
+  // SK KGB buatan Kanwil yang menunggu review satker sebelum dicetak (ADR-077), dipisah dari Perlu dikerjakan supaya
+  // tidak tenggelam di antara draf data pegawai (ADR-079).
+  { k: "periksa", judul: "Periksa SK", ket: "SK KGB dari Kanwil, periksa sebelum dicetak", nada: "ungu" },
   { k: "sk", judul: "SK terbit", ket: "Unduh, lalu rekam di Gaji Web", nada: "hijau" },
   // "Selesai" hanya berarti KGB-nya sudah direkam di Gaji Web satker, langkah terakhir yang memang
   // dipegang Admin UPT. Usulan data yang ditinjau Kanwil tidak masuk sini (lihat sumberPapan).
@@ -234,6 +238,7 @@ const KOSONG_UPT: Record<KolomUpt, string> = {
   kerja: "Tidak ada yang perlu dikerjakan. Pegawai baru ditambahkan dari Pegawai Satker.",
   kunci: "",
   kanwil: "Tidak ada yang sedang di Kanwil.",
+  periksa: "Tidak ada SK KGB yang menunggu diperiksa.",
   sk: "Belum ada SK baru yang perlu direkam.",
   selesai: "Belum ada KGB yang direkam di Gaji Web.",
 };
@@ -361,6 +366,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const [suratAjukan, setSuratAjukan] = useState({ nomorSurat: "", tanggalSurat: "" });
   const [berkasAjukan, setBerkasAjukan] = useState<File | null>(null);
   const [mengajukan, setMengajukan] = useState(false);
+  const [kemajuanAjukan, setKemajuanAjukan] = useState("");
   const [galatAjukan, setGalatAjukan] = useState<string | null>(null);
   /** Berkas usulan yang sedang dibuka; UPT dapat memastikan yang terkirim memang benar. */
   const [pratinjau, setPratinjau] = useState<{ judul: string; subjudul: string; url: string } | null>(null);
@@ -477,24 +483,28 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     setDialogAjukan(true);
   }
 
-  /** Kirim draf terpilih ke Kanwil dengan satu surat usulan untuk semuanya. */
+  /** Kirim draf terpilih ke Kanwil dengan satu surat usulan untuk semuanya, beberapa pegawai per kiriman (ADR-079). */
   async function ajukanTerpilih() {
     setMengajukan(true);
     setGalatAjukan(null);
     try {
-      const form = new FormData();
-      for (const id of pilihAjukan) form.append("id", id);
-      form.set("nomorSurat", suratAjukan.nomorSurat);
-      form.set("tanggalSurat", suratAjukan.tanggalSurat);
-      if (berkasAjukan) form.set("berkas", berkasAjukan);
-
-      const res = await fetch("/api/upt/usulan/ajukan", { method: "POST", body: form });
-      const d = (await res.json().catch(() => ({}))) as { error?: string; jumlah?: number };
-      if (!res.ok) {
-        setGalatAjukan(d.error ?? "Usulan gagal dikirim");
+      const d = await ajukanBertahap({
+        ids: [...pilihAjukan],
+        nomorSurat: suratAjukan.nomorSurat,
+        tanggalSurat: suratAjukan.tanggalSurat,
+        berkas: berkasAjukan,
+        kemajuan: (n, total) => setKemajuanAjukan(total > UKURAN_KIRIMAN ? `Mengirim ${n} dari ${total}…` : ""),
+      });
+      if (!d.ok) {
+        setGalatAjukan(d.galat);
+        // Yang sudah terkirim tidak lagi berupa draf; daftar dimuat ulang supaya centangnya tinggal sisanya.
+        if (d.terkirim.length > 0) {
+          setPilihAjukan((lama) => new Set([...lama].filter((id) => !d.terkirim.includes(id))));
+          void muatUsulan();
+        }
         return;
       }
-      setKabar(`${d.jumlah ?? 0} pegawai diusulkan ke Kanwil dengan surat ${suratAjukan.nomorSurat}.`);
+      setKabar(`${d.jumlah} pegawai diusulkan ke Kanwil dengan surat ${suratAjukan.nomorSurat}.`);
       setTimeout(() => setKabar(null), 7000);
       setDialogAjukan(false);
       setPilihAjukan(new Set());
@@ -505,6 +515,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
       setGalatAjukan("Usulan gagal dikirim");
     } finally {
       setMengajukan(false);
+      setKemajuanAjukan("");
     }
   }
 
@@ -1222,7 +1233,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 ? { teks: LABEL_REVIEW_SK.dilewati.upt, nada: "biru" }
                 : { teks: "SK sedang dibuat Kanwil", nada: "biru" };
       return {
-        kolom: minta ? ("kerja" as const) : ("kanwil" as const),
+        kolom: minta ? ("periksa" as const) : ("kanwil" as const),
         kunci: `proses:${p.id}`,
         pegawaiId: p.id,
         nip: p.nip,
@@ -1750,7 +1761,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 Batal
               </button>
               <button type="submit" className="kgbm-tombol kgbm-utama" disabled={mengajukan || pilihAjukan.size === 0}>
-                {mengajukan ? "Mengirim…" : `Kirim ${pilihAjukan.size} pegawai`}
+                {mengajukan ? kemajuanAjukan || "Mengirim…" : `Kirim ${pilihAjukan.size} pegawai`}
               </button>
             </>
           }
