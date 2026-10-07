@@ -1640,6 +1640,13 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
   background: var(--sub); }
 .upt-papan-cari .dsb-cari { width: 100%; }
 .upt-papan-cari .pgw-tautan { justify-self: start; font-size: 12px; }
+/* Kotak cari papan Alur KGB di kepala panel, berlaku untuk semua kolom (ADR-079). */
+.upt-papan-alat .dsb-cari { width: 260px; max-width: 100%; }
+.upt-papan-hasil { font-size: 12px; color: var(--dt3); white-space: nowrap; }
+@media (max-width: 640px) {
+  .upt-papan-alat { width: 100%; }
+  .upt-papan-alat .dsb-cari { flex: 1 1 100%; width: 100%; }
+}
 /* Draf yang masa usul KGB-nya belum dibuka, terlipat di bawah Perlu dikerjakan (ADR-059). */
 .upt-terkunci { margin-top: 2px; padding-top: 8px; border-top: 1px dashed var(--ln1); }
 .upt-terkunci > summary { display: flex; align-items: center; gap: 6px; padding: 4px; list-style: none; cursor: pointer;
