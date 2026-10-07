@@ -75,7 +75,7 @@ test("pegawai baru, penyesuaian ijazah: masa kerja pada SK dihitung mundur ke TM
   assert.equal(usulanBaruMenurutSk(baruPi).mkgTahun, 6);
 });
 
-test("pegawai baru, PMK: gaji pokok menurut masa kerja pada SK, jadwal KGB dihitung dari TMT PMK", () => {
+test("pegawai baru, PMK: gaji pokok menurut masa kerja pada SK, jadwal KGB tetap pada siklusnya (ADR-080)", () => {
   // KGB terakhir 1 Jun 2025 di III/a 2 tahun; PMK 1 Mar 2026 menjadi 5 tahun 9 bulan.
   const sk = hitungSkPegawaiBaru({
     golonganRuang: "III/a", mkgTahun: 5, mkgBulan: 9, tmtKgbTerakhir: tgl(2025, 6), dasarBaruJenis: "pmk", dasarBaruTmt: tgl(2026, 3),
@@ -84,8 +84,8 @@ test("pegawai baru, PMK: gaji pokok menurut masa kerja pada SK, jadwal KGB dihit
   assert.equal(sk.nilai.mkgTahun, 5);
   assert.equal(sk.nilai.mkgBulan, 0);
   assert.equal(sk.nilai.gajiPokok, getGajiPokok("III/a", 5, 9));
-  // Langkah tabel berikutnya pada 6 tahun: 3 bulan sesudah TMT PMK.
-  assert.deepEqual(sk.nilai.tmtKgbBerikutnya, tgl(2026, 6));
+  // PMK tidak menggeser periode: 24 bulan sesudah KGB terakhir.
+  assert.deepEqual(sk.nilai.tmtKgbBerikutnya, tgl(2027, 6));
 });
 
 test("pegawai baru: tanpa SK, atau SK yang mendahului KGB terakhir, atau masa kerja yang terlalu kecil", () => {
@@ -159,7 +159,7 @@ test("pegawai baru ber-acuan: dihitung dari SK KGB terakhir seperti pegawai terc
   assert.match(turun.pesan, /golongan baru menurut SK kenaikan pangkat/);
 });
 
-test("pegawai baru ber-acuan, PMK: masa kerja menurut SK menjadi dasar, jadwal dihitung dari TMT PMK", () => {
+test("pegawai baru ber-acuan, PMK: masa kerja menurut SK menjadi dasar, jadwal tetap pada siklusnya (ADR-080)", () => {
   // KGB terakhir 1 Jun 2025 di III/a 2 tahun; PMK 1 Mar 2026 menjadi 5 tahun 9 bulan (contoh yang sama dengan uji lama).
   const sk = hitungSkPegawaiBaru({
     golonganRuang: "III/a", mkgTahun: 5, mkgBulan: 9, tmtKgbTerakhir: tgl(2025, 6),
@@ -167,7 +167,7 @@ test("pegawai baru ber-acuan, PMK: masa kerja menurut SK menjadi dasar, jadwal d
   });
   assert.ok(sk.berlaku && sk.ok);
   assert.equal(sk.nilai.gajiPokok, getGajiPokok("III/a", 5, 9));
-  assert.deepEqual(sk.nilai.tmtKgbBerikutnya, tgl(2026, 6));
+  assert.deepEqual(sk.nilai.tmtKgbBerikutnya, tgl(2027, 6));
   assert.equal(sk.acuan?.pmk?.tambahBulan, 69 - 33, "tambahan = 5 thn 9 bln dikurangi (2 thn + 9 bln selang)");
 });
 

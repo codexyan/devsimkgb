@@ -316,7 +316,7 @@ export const PANDUAN_DASAR_BARU: readonly ContohDasarBaru[] = [
     },
     barisLain:
       "Masa kerja golongan disalin dari SK PMK (5 tahun 9 bulan); golongan dan TMT KGB terakhir dari SK KGB terakhir. Sistem menghitung mundur " +
-      "masa kerjanya ke TMT KGB terakhir dan menghitung jadwal KGB berikutnya dari TMT PMK. Bila diketahui, isi juga golonganAcuan III/a dan " +
+      "masa kerjanya ke TMT KGB terakhir; jadwal KGB berikutnya tidak bergeser. Bila diketahui, isi juga golonganAcuan III/a dan " +
       "mkgTahunAcuan 2 (keadaan pada SK KGB terakhir). Pindaian SK PMK ditagih saat diajukan.",
   },
   {

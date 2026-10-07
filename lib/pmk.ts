@@ -1,10 +1,10 @@
 // Peninjauan masa kerja (PMK): SK yang menambah masa kerja golongan pegawai, misalnya dengan memperhitungkan
 // masa kerja sebelum CPNS, dan karena itu menetapkan gaji pokok baru (ADR-021).
 //
-// Data pegawai menyimpan MKG pada TMT KGB terakhir; KGB berikutnya jatuh saat MKG mencapai langkah berikutnya di
-// tabel gaji PP 5/2024 (lib/tabelGaji.ts). PMK menambah MKG itu sebesar tambahannya. Berbeda dengan kenaikan
-// pangkat, PMK dapat menggeser jadwal KGB: dari TMT PMK, KGB berikutnya jatuh saat MKG yang baru mencapai langkah
-// tabel berikutnya. Modul ini murni; route yang memanggilnya menulis ke penyimpanan.
+// Data pegawai menyimpan MKG pada TMT KGB terakhir. PMK menambah MKG itu sebesar tambahannya, dan gaji pokok mengikuti
+// masa kerja menurut SK PMK sejak TMT-nya. Seperti kenaikan pangkat, PMK tidak menggeser periode KGB sedikit pun: KGB
+// berikutnya tetap pada jadwalnya, dan jarak antar-KGB tetap 24 bulan (ADR-080). Dulu KGB berikutnya dihitung ulang dari
+// TMT PMK sampai langkah tabel berikutnya. Modul ini murni; route yang memanggilnya menulis ke penyimpanan.
 
 import { bulanKeKgbBerikutnya, getGajiPokok, isGolonganDikenal, selisihBulan, tambahBulan } from "./tabelGaji";
 import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
@@ -19,7 +19,7 @@ export interface HasilPmk {
   mkgTahunDasar: number;
   mkgBulanDasar: number;
   gajiPokokBaru: number;
-  /** Usulan TMT KGB berikutnya: saat MKG yang baru mencapai langkah tabel gaji berikutnya. */
+  /** Usulan TMT KGB berikutnya: jadwal sebelum PMK, sebab PMK tidak menggeser periode KGB (ADR-080). */
   tmtKgbBerikutnyaUsulan: Date;
 }
 
@@ -37,6 +37,8 @@ export function hitungPmk(input: {
   mkgTahun: number;
   mkgBulan: number;
   tmtKgbTerakhir: NilaiTanggal;
+  /** Jadwal KGB berikutnya sebelum PMK; tanpa nilai ini dihitung dari TMT KGB terakhir. */
+  tmtKgbBerikutnya?: NilaiTanggal;
   tmtPmk: NilaiTanggal;
   mkgTahunSk: number;
   mkgBulanSk: number;
@@ -79,7 +81,9 @@ export function hitungPmk(input: {
       mkgTahunDasar: Math.floor((dasar + tambah) / 12),
       mkgBulanDasar: (dasar + tambah) % 12,
       gajiPokokBaru: getGajiPokok(input.golonganRuang, baru.tahun, baru.bulan),
-      tmtKgbBerikutnyaUsulan: tambahBulan(tmtPmk, bulanKeKgbBerikutnya(input.golonganRuang, baru.tahun, baru.bulan)),
+      tmtKgbBerikutnyaUsulan:
+        tanggalKalender(input.tmtKgbBerikutnya) ??
+        tambahBulan(tmtTerakhir, bulanKeKgbBerikutnya(input.golonganRuang, input.mkgTahun || 0, input.mkgBulan || 0)),
     },
   };
 }

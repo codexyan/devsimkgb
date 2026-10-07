@@ -3,9 +3,9 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
-import { BELUM_SELESAI, BERKAS_USULAN, DIPEGANG_UPT, pernahKgb } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, BERKAS_USULAN, DIPEGANG_UPT, pernahKgbUsulan } from "@/lib/usulanPegawai";
 import { bawaanPegawai, berkasPerluDisalin } from "@/lib/bawaanUsulan";
-import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, isiHitungan } from "@/lib/usulanFormulir";
+import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, bacaKeadaanKgb, isiHitungan } from "@/lib/usulanFormulir";
 import { tulisDenganAcuan } from "@/lib/acuanUsulanServer";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, hapusBerkasUsulan, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
@@ -125,6 +125,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     // memuatnya, mis. perbaikan berkas saja, tidak menyentuh kolom ini.
     ...(dasarBaru ?? {}),
     ...(acuan ?? {}),
+    // Pilihan sudah atau belum pernah KGB (ADR-080); formulir yang tidak memuatnya membiarkan yang tersimpan.
+    ...(form.has("keadaanKgb") ? { keadaanKgb: bacaKeadaanKgb(teks) } : {}),
     nomorSkTerakhir: teks("nomorSkTerakhir") || null,
     tanggalSkTerakhir,
     // Laporan hukdis kini lewat modulnya sendiri (ADR-016). Formulir usulan tidak lagi mengirimnya, dan
@@ -159,9 +161,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       berkasPerluDisalin(
         hasil,
         bawaan,
-        hasil.golonganAcuan?.trim()
-          ? pernahKgb(hasil.mkgTahunAcuan, hasil.mkgBulanAcuan)
-          : pernahKgb(hasil.mkgTahun ?? pegawai.mkgTahun, hasil.mkgBulan ?? pegawai.mkgBulan),
+        pernahKgbUsulan(hasil, pegawai),
         dihapus,
       ),
       akun.kode,

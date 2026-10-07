@@ -73,6 +73,7 @@ export default function ModalPmk({
       mkgTahun: pegawai.mkgTahun,
       mkgBulan: pegawai.mkgBulan,
       tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
+      tmtKgbBerikutnya: pegawai.tmtKgbBerikutnya,
       tmtPmk,
       mkgTahunSk: Number(mkgTahunSk),
       mkgBulanSk: Number(mkgBulanSk || "0"),
@@ -282,8 +283,8 @@ export default function ModalPmk({
           </div>
 
           <Catatan>
-            Berbeda dengan kenaikan pangkat, PMK dapat menggeser jadwal KGB: masa kerja yang bertambah bisa mencapai langkah
-            tabel gaji berikutnya lebih cepat. Golongan pegawai tidak berubah.
+            PMK menambah masa kerja golongan dan menaikkan gaji pokok sejak TMT PMK, tetapi tidak menggeser jadwal KGB: KGB
+            berikutnya tetap pada jadwalnya dan jarak antar-KGB tetap 24 bulan (ADR-080). Golongan pegawai tidak berubah.
           </Catatan>
 
           <PesanGalat pesan={galat || null} />

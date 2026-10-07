@@ -263,6 +263,7 @@ export async function catatPmk(input: {
     mkgTahun: pegawai.mkgTahun ?? 0,
     mkgBulan: pegawai.mkgBulan ?? 0,
     tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
+    tmtKgbBerikutnya: pegawai.tmtKgbBerikutnya,
     tmtPmk,
     mkgTahunSk,
     mkgBulanSk,

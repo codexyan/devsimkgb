@@ -447,7 +447,8 @@ export default async function HalamanBeranda() {
                   pengangkatan PNS: bila sudah memakai gaji pokok hasil KGB, sejak TMT PNS tidak ada lagi kekurangan.
                 </li>
                 <li>
-                  KGB berikutnya 2 tahun setelah KGB pertama, kecuali ada SK peninjauan masa kerja yang memajukannya.
+                  KGB berikutnya 2 tahun setelah KGB pertama. SK peninjauan masa kerja menambah masa kerja dan gaji pokok tanpa
+                  menggeser jadwal ini.
                 </li>
               </ul>
             </article>

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import KolomBerkas from "./KolomBerkas";
-import { BERKAS_USULAN, berkasDasarBaru, berkasUntukKeadaan, pernahKgb as sudahPernahKgb } from "@/lib/usulanPegawai";
+import { BERKAS_USULAN, berkasDasarBaru, berkasUntukKeadaan } from "@/lib/usulanPegawai";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiSaatIni } from "@/lib/pilihanPegawai";
@@ -17,7 +17,9 @@ import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
 import {
   asalAtasDasar,
   hitungFormulirUsulan,
+  isianMkgAwal,
   isianUntukDisimpan,
+  pernahKgbAwal,
   jawabSkBaru,
   koreksiAtas,
   mkgPadaSkTercatat,
@@ -55,6 +57,8 @@ export interface DrafUsulanUpt {
   dasarBaru?: { jenis: string; jenisKp: string; nomorSk: string; tanggalSk: string; tmt: string; penetap: string } | null;
   /** Golongan dan masa kerja pada SK KGB terakhir, bila disimpan bersama SK sesudahnya (ADR-078); null pada draf lama. */
   acuan?: { golongan: string; mkgTahun: string; mkgBulan: string } | null;
+  /** Pilihan "pernah" atau "belum" pernah KGB yang tersimpan (ADR-080); null pada draf lama. */
+  keadaanKgb?: string | null;
   berkas: { medan: string; label: string; nama?: string | null }[];
 }
 
@@ -215,7 +219,8 @@ export default function FormulirUsulan({
   const [hapusTersimpan, setHapusTersimpan] = useState<Set<string>>(() => new Set());
   // Pegawai yang belum pernah KGB mengisi TMT CPNS dan masa kerja 0; yang sudah pernah menyalin SK KGB
   // terakhirnya. Pemisahan ini yang menghilangkan tebak-tebakan pada dua isian tersulit.
-  const [pernahKgb, setPernahKgb] = useState(() => sudahPernahKgb(awal.mkgTahun, awal.mkgBulan));
+  // Pilihan yang tersimpan, atau tebakan dari riwayat dan masa kerja golongan (ADR-080); disimpan bersama draf.
+  const [pernahKgb, setPernahKgb] = useState(() => pernahKgbAwal(draf?.keadaanKgb, pegawai?.dasarKgb, awal));
   // Golongan dan masa kerja golongan hanya berubah karena kenaikan pangkat, PMK, atau salah ketik (ADR-030).
   const perluSebab =
     jenis !== "baru" &&
@@ -232,7 +237,13 @@ export default function FormulirUsulan({
   const [pratinjauSk, setPratinjauSk] = useState<Record<string, string> | null>(null);
 
 
-  const ubah = (kunci: string, nilai: string) => setIsian((f) => ({ ...f, [kunci]: nilai }));
+  const ubah = (kunci: string, nilai: string) =>
+    setIsian((f) => ({
+      ...f,
+      [kunci]: nilai,
+      // Belum pernah KGB: masa kerja golongan mengikuti langkah awal tabel golongannya (II/c: 3 tahun, ADR-080).
+      ...(kunci === "golonganRuang" && !pernahKgb ? isianMkgAwal(nilai) : {}),
+    }));
   /** Usulan yang dilempar kembali Kanwil; isinya utuh, yang berubah hanya kalimat pemandunya. */
   const dikembalikan = draf?.status === "revisi";
 
@@ -298,6 +309,7 @@ export default function FormulirUsulan({
     if (pegawai) hasil.pegawaiId = pegawai.id;
     for (const bidang of BIDANG_DIISI) hasil[bidang.kunci] = nilai[bidang.kunci] ?? "";
     Object.assign(hasil, acuan);
+    hasil.keadaanKgb = pernahKgb ? "pernah" : "belum";
     hasil.nomorSkTerakhir = sk.nomorSkTerakhir;
     hasil.tanggalSkTerakhir = sk.tanggalSkTerakhir;
     hasil.catatanUpt = sk.catatanUpt;
@@ -570,7 +582,7 @@ export default function FormulirUsulan({
               type="button"
               role="radio"
               aria-checked={!pernahKgb}
-              onClick={() => { setPernahKgb(false); ubah("mkgTahun", "0"); ubah("mkgBulan", "0"); }}
+              onClick={() => { setPernahKgb(false); setIsian((f) => ({ ...f, ...isianMkgAwal(f.golonganRuang ?? "") })); }}
             >
               Belum pernah KGB
             </button>

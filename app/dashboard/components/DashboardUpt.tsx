@@ -1038,7 +1038,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                                       },
                                       {
                                         label: "Laporkan peninjauan masa kerja",
-                                        keterangan: "SK PMK; masa kerja golongan bertambah dan jadwal KGB dapat maju",
+                                        keterangan: "SK PMK; masa kerja golongan dan gaji bertambah, jadwal KGB tetap",
                                         onPilih: () => bukaDasarBaru(p, "pmk"),
                                       },
                                       {

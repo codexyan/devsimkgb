@@ -37,6 +37,8 @@ export interface KeadaanTercatat {
   mkgTahun: number;
   mkgBulan: number;
   tmtKgbTerakhir: string;
+  /** Pilihan sudah atau belum pernah KGB pada draf (ADR-080); tanpa nilai ini ditebak dari masa kerja golongan. */
+  pernah?: boolean;
 }
 
 /** Pratayang akibat SK: baris siap tampil, atau sebab mengapa belum dapat dihitung. */

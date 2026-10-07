@@ -12,8 +12,8 @@
 import { TANPA_SK_BARU } from "@/lib/dasarBaruUsulan";
 import { cocokMkgSk, hitungSkDilaporkan, type MasaKerja } from "@/lib/dasarSkUsulan";
 export { mkgPadaSkTercatat } from "@/lib/dasarSkUsulan";
-import { isGolonganDikenal } from "@/lib/tabelGaji";
-import { hitungUsulan, type HitunganUsulan } from "@/lib/usulanPegawai";
+import { isGolonganDikenal, mkgAwalGolongan } from "@/lib/tabelGaji";
+import { hitungUsulan, pernahKgb, type HitunganUsulan } from "@/lib/usulanPegawai";
 import type { PratinjauAtasDasar } from "@/lib/linimasaDasarSk";
 import { formatTanggalId, tanggalKalender } from "@/lib/waktu";
 
@@ -93,7 +93,7 @@ export interface HitunganFormulir {
 /**
  * Hitungan yang tampil di formulir: keadaan menurut SK acuan, dan keadaan sesudah SK kenaikan pangkat atau PMK yang
  * dilaporkan. Yang kedua memakai hitungan persetujuan Kanwil (hitungSkDilaporkan): kenaikan pangkat memotong masa kerja
- * menurut lompatan golongan dan tidak menggeser jadwal KGB, PMK menambah masa kerja dan dapat memajukan jadwal.
+ * menurut lompatan golongan, PMK menambah masa kerja; keduanya tidak menggeser jadwal KGB (ADR-080).
  *
  * `tmtKgbBerikutnyaTercatat`: jadwal pegawai yang sudah tercatat, yang dipertahankan Kanwil pada kenaikan pangkat.
  */
@@ -159,7 +159,7 @@ export function hitungFormulirUsulan(
         (h.mkgPadaTmtSk ? `, atau ${mkg(h.mkgPadaTmtSk)} pada TMT SK ${formatTanggalId(tmtSk)}. ` : ". ") +
         "Kenaikan pangkat tidak menggeser jadwal KGB."
       : `Tambahan masa kerja ${h.pmk ? `${Math.floor(h.pmk.tambahBulan / 12)} tahun ${h.pmk.tambahBulan % 12} bulan` : "-"}; ` +
-        `masa kerja ${mkg({ tahun: h.mkgTahun, bulan: h.mkgBulan })} pada TMT KGB terakhir. KGB berikutnya dihitung dari TMT PMK.`;
+        `masa kerja ${mkg({ tahun: h.mkgTahun, bulan: h.mkgBulan })} pada TMT KGB terakhir. PMK tidak menggeser jadwal KGB.`;
   return {
     acuan,
     sesudahSk: {
@@ -277,4 +277,27 @@ export function koreksiAtas(
   if ((atas.tmtGolongan ?? "") !== (tercatat.tmtGolongan ?? ""))
     hasil.push({ label: "TMT golongan", lama: tgl(tercatat.tmtGolongan), baru: tgl(atas.tmtGolongan) });
   return hasil;
+}
+
+/**
+ * Masa kerja golongan CPNS yang belum pernah KGB: langkah awal tabel golongannya, mis. 3 tahun bagi II/c (ADR-080).
+ * Tombol "Belum pernah KGB" dan penggantian golongan selama belum pernah KGB mengisinya.
+ */
+export function isianMkgAwal(golongan: string): { mkgTahun: string; mkgBulan: string } {
+  const awal = mkgAwalGolongan(golongan);
+  return { mkgTahun: String(awal.tahun), mkgBulan: String(awal.bulan) };
+}
+
+/**
+ * Keadaan awal "sudah pernah KGB" di formulir (ADR-080): pilihan yang tersimpan pada draf; selain itu SK KGB yang tercatat
+ * sebagai dasar berarti sudah pernah; selain itu tebakan dari masa kerja golongan dan langkah awal tabelnya.
+ */
+export function pernahKgbAwal(
+  keadaanKgb: string | null | undefined,
+  dasarKgb: { jenis: string } | null | undefined,
+  isian: { golonganRuang?: string; mkgTahun?: string; mkgBulan?: string },
+): boolean {
+  if (keadaanKgb === "pernah") return true;
+  if (keadaanKgb === "belum") return false;
+  return dasarKgb?.jenis === "kgb" || pernahKgb(isian.mkgTahun, isian.mkgBulan, isian.golonganRuang);
 }

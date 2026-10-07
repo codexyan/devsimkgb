@@ -11,7 +11,7 @@ import { isoTanggalLokal } from "./waktu";
 // III/a, KGB terakhir TMT 1 Des 2024 dengan MKG 2 tahun; KGB berikutnya semula 1 Des 2026 (MKG 4).
 const pegawai = { golonganRuang: "III/a", mkgTahun: 2, mkgBulan: 0, tmtKgbTerakhir: "2024-12-01" };
 
-test("PMK satu tahun memajukan KGB berikutnya dan menaikkan gaji sesuai MKG baru", () => {
+test("PMK satu tahun menaikkan masa kerja dan gaji sejak TMT PMK tanpa menggeser jadwal KGB (ADR-080)", () => {
   // TMT PMK 1 Jul 2025: MKG sebelumnya 2 th 7 bl, SK PMK menetapkan 3 th 7 bl.
   const h = hitungPmk({ ...pegawai, tmtPmk: "2025-07-01", mkgTahunSk: 3, mkgBulanSk: 7 });
   assert.equal(h.ok, true);
@@ -20,18 +20,19 @@ test("PMK satu tahun memajukan KGB berikutnya dan menaikkan gaji sesuai MKG baru
   assert.deepEqual(h.hasil.mkgSebelumPadaTmt, { tahun: 2, bulan: 7 });
   assert.deepEqual([h.hasil.mkgTahunDasar, h.hasil.mkgBulanDasar], [3, 0]);
   assert.equal(h.hasil.gajiPokokBaru, getGajiPokok("III/a", 3, 7));
-  // MKG 4 tahun tercapai 5 bulan sesudah TMT PMK, bukan 1 Des 2026.
-  assert.equal(isoTanggalLokal(h.hasil.tmtKgbBerikutnyaUsulan), "2025-12-01");
-  // Kalkulasi KGB dari data pegawai yang baru sampai tepat di MKG 4 tahun pada tanggal itu.
+  // Periode KGB tetap: 1 Des 2026, bukan 1 Des 2025 saat MKG 4 tahun tercapai menurut tabel.
+  assert.equal(isoTanggalLokal(h.hasil.tmtKgbBerikutnyaUsulan), "2026-12-01");
+  // KGB pada jadwalnya membawa masa kerja tambahan PMK, lalu KGB berikutnya 24 bulan kemudian.
   const kgb = kalkulasiKGB({
     golonganRuang: "III/a",
     mkgTahun: h.hasil.mkgTahunDasar,
     mkgBulan: h.hasil.mkgBulanDasar,
     tmtKgbBerikutnya: h.hasil.tmtKgbBerikutnyaUsulan,
     tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
-    hariIni: new Date(2025, 8, 1),
+    hariIni: new Date(2026, 8, 1),
   });
-  assert.deepEqual([kgb.mkgTahunBaru, kgb.mkgBulanBaru], [4, 0]);
+  assert.deepEqual([kgb.mkgTahunBaru, kgb.mkgBulanBaru], [5, 0]);
+  assert.equal(isoTanggalLokal(kgb.tmtKgbBerikutnya), "2028-12-01");
 });
 
 test("PMK dua tahun penuh tidak menggeser jadwal, hanya menaikkan gaji", () => {
