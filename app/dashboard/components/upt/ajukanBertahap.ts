@@ -52,8 +52,9 @@ export async function ajukanBertahap(p: {
     return form;
   };
 
-  // Seluruh daftar diperiksa dulu, supaya satu draf yang kurang tidak membuat separuhnya terkirim.
-  if (ids.length > UKURAN_KIRIMAN) {
+  // Seluruh daftar diperiksa dulu, supaya satu draf yang kurang tidak membuat separuhnya terkirim. Tanpa nomor surat
+  // pun diperiksa dulu: surat hanya boleh kosong bila seluruh isinya laporan SK (ADR-046), dan itu dinilai per kiriman.
+  if (ids.length > UKURAN_KIRIMAN || !p.nomorSurat.trim()) {
     const periksa = await kirimDenganUlang(() => {
       const form = dasar();
       for (const id of ids) form.append("id", id);

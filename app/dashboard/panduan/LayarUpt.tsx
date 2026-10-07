@@ -262,12 +262,11 @@ export function LayarDataPegawai() {
       jalur="Pegawai Satker"
       judul="Pegawai dan KGB"
       keterangan={[
-        "Usul KGB Kolektif: menyiapkan banyak pegawai untuk satu surat. Ini jalur yang Anda pakai setiap periode.",
-        "Lapor KP/PI/PMK: melaporkan SK kenaikan pangkat, penyesuaian ijazah, atau PMK untuk satu atau banyak pegawai sekaligus, tanpa surat usulan. Dipakai untuk meremajakan data sesudah SK-nya terbit.",
+        "Usul KGB Kolektif: menyiapkan banyak pegawai untuk satu surat, termasuk melaporkan SK kenaikan pangkat, penyesuaian ijazah, atau PMK banyak pegawai sekaligus. Ini jalur yang Anda pakai setiap periode.",
         "Unggah daftar: satu berkas Excel (.xlsx) atau CSV berisi banyak pegawai sekaligus. Dipakai saat mengisi data pertama kali atau meremajakan banyak data.",
         "Tambah pegawai: untuk satu orang yang belum tercatat, misalnya CPNS yang baru dilantik.",
-        "Usulkan perbaikan: membetulkan data satu pegawai yang sudah tercatat, termasuk NIP yang salah ketik.",
-        "Titik tiga: tindakan lain untuk pegawai itu, yaitu Laporkan kenaikan pangkat dan Laporkan peninjauan masa kerja (untuk satu pegawai), Laporkan mutasi, dan Seharusnya tidak tercatat? untuk baris yang keliru sejak awal.",
+        "Perbarui data: identitas, jabatan, keadaan KGB, dan SK sesudah SK KGB terakhir (kenaikan pangkat, PI, atau PMK) satu pegawai, dalam satu formulir.",
+        "Titik tiga: Laporkan mutasi, dan Seharusnya tidak tercatat? untuk baris yang keliru sejak awal.",
       ]}
       anak={
         <>
@@ -284,16 +283,12 @@ export function LayarDataPegawai() {
                 <No n={1} />
               </span>
               <span className="lyr-sorot-bungkus">
-                <Tombol jenis="garis" anak="Lapor KP/PI/PMK" />
+                <Tombol jenis="garis" anak="Unggah daftar" />
                 <No n={2} />
               </span>
               <span className="lyr-sorot-bungkus">
-                <Tombol jenis="garis" anak="Unggah daftar" />
-                <No n={3} />
-              </span>
-              <span className="lyr-sorot-bungkus">
                 <Tombol anak="Tambah pegawai" />
-                <No n={4} />
+                <No n={3} />
               </span>
             </span>
           </div>
@@ -303,12 +298,12 @@ export function LayarDataPegawai() {
               <small>199001012025061001 · Penjaga Tahanan · II/a</small>
             </span>
             <span className="lyr-sorot-bungkus">
-              <Tombol jenis="garis" anak="Usulkan perbaikan" />
-              <No n={5} />
+              <Tombol jenis="garis" anak="Perbarui data" />
+              <No n={4} />
             </span>
             <span className="lyr-sorot-bungkus">
               <Tombol jenis="garis" anak="⋮" />
-              <No n={6} />
+              <No n={5} />
             </span>
           </div>
         </>
@@ -632,7 +627,7 @@ export function LayarKolektif2() {
                 <span className="lyr-berkas-kotak">
                   <span className="lyr-berkas-ikon">+</span>
                   <span className="min-w-0">
-                    <strong>SK kenaikan pangkat terakhir</strong>
+                    <strong>SK kenaikan pangkat</strong>
                     <small>Tarik PDF ke sini atau klik untuk memilih</small>
                   </span>
                   <span className="lyr-tautan">Pilih</span>

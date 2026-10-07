@@ -16,7 +16,8 @@ import {
 } from "@/lib/pengumumanUpt";
 
 /* Pop-up pengumuman perubahan untuk Admin UPT (ADR-073, ADR-074, ADR-075): nama menu baru dan pegawai baru yang kini tampil di
-   tabel Pegawai Satker, lalu tombol Lapor KP/PI/PMK beserta peringatan dan kabar disetujuinya, lalu formulir usulan yang
+   tabel Pegawai Satker, lalu laporan SK kenaikan pangkat, PI, dan PMK di satu tempat (dulu tombol Lapor KP/PI/PMK, ADR-081)
+   beserta peringatan dan kabar disetujuinya, lalu formulir usulan yang
    memisahkan SK KGB terakhir dari SK sesudahnya beserta pratinjau SK KGB (ADR-078). Adegan bergerak yang
    berganti sendiri, dapat dijeda, dilewati, atau dibuka lagi lewat tombol "Apa yang baru". Tiap adegan milik satu
    pengumuman; yang tampil otomatis hanya adegan dari pengumuman yang belum dilihat akun itu. Penanda "sudah dilihat"
@@ -53,14 +54,14 @@ const ADEGAN: readonly { pengumuman: IdPengumumanUpt; gambar: Gambar; judul: str
   {
     pengumuman: "lapor-sk-2026-10",
     gambar: "lapor",
-    judul: "Lapor KP/PI/PMK untuk banyak pegawai sekaligus",
-    teks: "Setelah SK kenaikan pangkat, penyesuaian ijazah, atau PMK terbit, tekan Lapor KP/PI/PMK di Pegawai Satker. Pilih beberapa pegawai, isi SK masing-masing, periksa hitungannya, lalu kirim sekaligus tanpa surat usulan.",
+    judul: "SK kenaikan pangkat, PI, dan PMK dilaporkan di satu tempat",
+    teks: "Laporkan SK yang terbit sesudah SK KGB terakhir di langkah SK sesudah SK KGB terakhir: lewat Perbarui data untuk satu pegawai, atau Usul KGB Kolektif untuk banyak pegawai. Bila isinya hanya laporan SK, kosongkan nomor surat saat mengajukan. SK kenaikan pangkat hanya diminta bila Anda melaporkannya.",
   },
   {
     pengumuman: "lapor-sk-2026-10",
     gambar: "kabar",
     judul: "Ada peringatan sebelum kirim, dan kabar saat disetujui",
-    teks: "Bila KGB pegawai sedang diproses Kanwil, Anda diberi tahu dampaknya sebelum mengirim. Setelah Kanwil menyetujui laporan, kabarnya muncul di Notifikasi. Isian Anda tidak pernah ditimpa isian bersama.",
+    teks: "Bila KGB pegawai sedang diproses Kanwil, Anda diberi tahu dampaknya sebelum mengirim. Setelah Kanwil menyetujui laporan SK, kabarnya muncul di Notifikasi.",
   },
   {
     pengumuman: "sk-usulan-2026-10",
@@ -437,7 +438,7 @@ function AdeganAman() {
   );
 }
 
-/* ── Adegan 4: lapor KP/PI/PMK massal ──────────────────────────────────── */
+/* ── Adegan 4: laporan SK lewat Usul KGB Kolektif (ADR-081; dulu Lapor KP/PI/PMK) ── */
 
 const BARIS_LAPOR: { nama: string; jenis: string; hitung: string; d: string; e: string }[] = [
   { nama: "Rina Lestari", jenis: "Kenaikan pangkat", hitung: "II/b → III/a", d: "1.0s", e: "3.5s" },
@@ -449,13 +450,13 @@ function AdeganLapor() {
   return (
     <div className="pmn-tabel pmn-lapor">
       <div className="pmn-bar">
-        <span className="pmn-tombol-g">Usul KGB Kolektif</span>
         <span className="pmn-tombol-g">Unggah daftar</span>
-        <span className="pmn-tekan pmn-tekan-lapor">Lapor KP/PI/PMK</span>
+        <span className="pmn-tombol-g">Tambah pegawai</span>
+        <span className="pmn-tekan pmn-tekan-lapor">Usul KGB Kolektif</span>
       </div>
       <div className="pmn-kepala-lapor">
         <span>Pegawai</span>
-        <span>SK dan hitungan</span>
+        <span>SK sesudah SK KGB terakhir</span>
         <span>Status</span>
       </div>
       {BARIS_LAPOR.map((b) => (

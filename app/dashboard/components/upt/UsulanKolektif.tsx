@@ -28,6 +28,7 @@ import {
   isianUntukDisimpan,
   jawabSkBaru,
   pernahKgbAwal,
+  peringatanDampakKgb,
   koreksiAtas,
   mkgPadaSkTercatat,
   pisahkanIsianSk,
@@ -118,6 +119,8 @@ interface Baris {
   dasar: IsianSkBaru & { golongan: string; mkgTahun: string; mkgBulan: string };
   /** Data pegawai yang tercatat; null bagi pegawai baru. Keadaan sebelum SK yang dilaporkan (ADR-078). */
   dataTercatat: Record<string, string> | null;
+  /** KGB pegawai yang sedang berjalan, untuk peringatan dampak SK yang dilaporkan (ADR-081). */
+  kgb: { status: string | null; tmt: string | null } | null;
   /** Dasar SK KGB berikutnya menurut catatan SIM-KGB; null bagi pegawai baru. */
   tercatat: DasarKgbBerikutnya | null;
   keadaan: Keadaan;
@@ -163,6 +166,7 @@ function barisDari(p: PegawaiUpt | null, d: DrafUpt | null): Baris {
       ? { ...DASAR_KOSONG, ...d.dasarBaru, jenisKp: d.dasarBaru.jenisKp || "reguler", ...terpisah.sk }
       : { ...DASAR_KOSONG },
     dataTercatat,
+    kgb: p ? { status: p.statusKGB, tmt: p.tmtKgb } : null,
     tercatat: p?.dasarKgb ?? null,
     keadaan: "siap",
     pesan: null,
@@ -611,8 +615,10 @@ export default function UsulanKolektif() {
 
   async function ajukan() {
     if (pilihAjukan.size === 0) return;
-    if (!surat.nomorSurat.trim() || !surat.tanggalSurat) {
-      setGalat("Isi nomor dan tanggal surat usulan Srikandi.");
+    // Surat boleh kosong bila seluruh yang diajukan hanya melaporkan SK kenaikan pangkat, PI, atau PMK (ADR-046, ADR-081);
+    // server yang menilainya dan menyebut alasannya bila tidak.
+    if (surat.nomorSurat.trim() && !surat.tanggalSurat) {
+      setGalat("Isi tanggal surat usulan Srikandi.");
       return;
     }
     setMengajukan(true);
@@ -632,7 +638,9 @@ export default function UsulanKolektif() {
         if (d.terkirim.length > 0) setPilihAjukan((lama) => new Set([...lama].filter((id) => !d.terkirim.includes(id))));
         return;
       }
-      setSelesai(`${d.jumlah} pegawai diusulkan ke Kanwil dengan surat ${surat.nomorSurat.trim()}.`);
+      setSelesai(
+        `${d.jumlah} pegawai diusulkan ke Kanwil${surat.nomorSurat.trim() ? ` dengan surat ${surat.nomorSurat.trim()}` : " sebagai laporan SK, tanpa surat usulan"}.`,
+      );
       setBaris(null);
       setAktif(null);
       setTerpilih(new Set());
@@ -1077,6 +1085,10 @@ export default function UsulanKolektif() {
 
             <div className="kol-ajukan-surat">
               <p className="kol-subjudul">Surat usulan Srikandi</p>
+              <p className="kol-catatan-kecil">
+                Wajib, kecuali semua pegawai yang diajukan hanya melaporkan SK kenaikan pangkat, penyesuaian ijazah, atau PMK:
+                laporan SK dikirim tanpa surat usulan.
+              </p>
               <label className="kol-label">
                 <span className="kol-wajib">Nomor surat</span>
                 <input className="kol-isi" value={surat.nomorSurat} onChange={(e) => setSurat((s) => ({ ...s, nomorSurat: e.target.value }))} placeholder="W.19.PAS.7-KP.04.03-1" />
@@ -1445,6 +1457,14 @@ function DetailBaris({
                 ? `Golongan dan masa kerja di tabel adalah keadaan pada ${skAcuan}. Golongan baru dan masa kerja golongan pada TMT pangkat disalin dari SK kenaikan pangkat apa adanya; sistem mencocokkan masa kerjanya dengan hitungannya sendiri.`
                 : `Golongan dan masa kerja di tabel adalah keadaan pada ${skAcuan}. Masa kerja golongan pada TMT PMK disalin dari SK PMK apa adanya; gaji naik, jadwal KGB berikutnya tidak bergeser. Pindaian SK PMK ditagih di bagian berkas.`}
             </p>
+            {(() => {
+              const dampak = peringatanDampakKgb(b.kgb?.status, b.kgb?.tmt);
+              return dampak ? (
+                <p className="kol-kurang" data-nada={dampak.nada}>
+                  <span aria-hidden="true">!</span> {dampak.teks}
+                </p>
+              ) : null;
+            })()}
             {skSudahTercatat && (
               <p className="kol-kurang">
                 <span aria-hidden="true">!</span> SK ini sudah tercatat di SIM-KGB. Bila datanya sudah benar, jawab Tidak ada. Bila keadaan

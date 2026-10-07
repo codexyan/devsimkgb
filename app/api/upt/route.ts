@@ -208,7 +208,7 @@ export async function GET() {
             berkas: BERKAS_USULAN.flatMap((jenis) => {
               // Surat usulan dan pindaian SK PMK tidak terbawa: keduanya milik peristiwanya, bukan pegawainya.
               const asal =
-                jenis.kunci === "pathBerkas" || jenis.kunci === "pathSkPmk" ? undefined : b.berkas[jenis.kunci];
+                jenis.kunci === "pathBerkas" || jenis.kunci === "pathSkPmk" || jenis.kunci === "pathSkPangkat" ? undefined : b.berkas[jenis.kunci];
               return asal ? [{ medan: jenis.medan, label: jenis.label, nama: namaAsliBerkas(asal.jalur), usulanId: asal.usulanId }] : [];
             }),
           };
