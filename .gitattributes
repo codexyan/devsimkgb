@@ -1,0 +1,3 @@
+# Migrasi SQL selalu berakhir baris LF. D1 menolak trigger yang memuat CR, sedangkan git di Windows
+# (core.autocrlf) mengubahnya menjadi CRLF saat checkout (ADR-085).
+*.sql text eol=lf

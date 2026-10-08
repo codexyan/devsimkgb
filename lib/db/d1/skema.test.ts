@@ -78,3 +78,26 @@ test("trigger jejak perubahan terpasang di setiap tabel yang dijejak", () => {
   }
   assert.equal(trigger.size, TABEL_DIJEJAK.length * 2 + TABEL_JEJAK_HAPUS_SAJA.length);
 });
+
+test("trigger jejak mencatat setiap kolom tabelnya, termasuk kolom yang ditambahkan migrasi sesudahnya", () => {
+  const { db } = buatD1Uji();
+  const sqlTrigger = new Map(
+    (db.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'trigger'").all() as { name: string; sql: string }[]).map((t) => [t.name, t.sql]),
+  );
+  for (const t of [...TABEL_DIJEJAK, ...TABEL_JEJAK_HAPUS_SAJA]) {
+    const nama = [`jejak_data_hapus_${t}`, ...(TABEL_DIJEJAK.includes(t) ? [`jejak_data_ubah_${t}`] : [])];
+    for (const n of nama) {
+      const sql = sqlTrigger.get(n) ?? "";
+      for (const kolom of Object.keys(SKEMA_D1[t])) {
+        assert.ok(sql.includes(`'${kolom}', OLD.${kolom}`), `${n} belum mencatat ${kolom}: buat ulang triggernya di migrasi D1`);
+      }
+    }
+  }
+});
+
+test("berkas migrasi D1 berakhir baris LF: D1 menolak trigger yang memuat CR", () => {
+  const folder = path.join(process.cwd(), "d1", "migrations");
+  for (const f of readdirSync(folder).filter((x) => x.endsWith(".sql"))) {
+    assert.ok(!readFileSync(path.join(folder, f), "utf8").includes("\r"), `${f} memuat CR; simpan dengan akhir baris LF`);
+  }
+});

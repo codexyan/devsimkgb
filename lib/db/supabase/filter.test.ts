@@ -11,7 +11,7 @@ import type { Where } from "../repo";
 import { keKondisi, keParameter, type Kondisi, type NilaiFilter } from "./filter";
 import { keSnake } from "./nama";
 import { dariJson, keJson } from "./nilai";
-import { KOLOM_CONTOH, RECORD_CONTOH as RECORD, T1, T2, WHERE_CONTOH as WHERE } from "../contohFilter";
+import { KOLOM_CONTOH, RECORD_CONTOH as RECORD, T1, WHERE_CONTOH as WHERE } from "../contohFilter";
 
 type Rec = Record<string, unknown>;
 

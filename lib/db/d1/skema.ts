@@ -432,7 +432,8 @@ export const SKEMA_D1: Readonly<Record<string, Readonly<Record<string, JenisKolo
     golongan_acuan: "teks",
     mkg_tahun_acuan: "bilangan",
     mkg_bulan_acuan: "bilangan",
-    keadaan_kgb: "teks"
+    keadaan_kgb: "teks",
+    penetap_sk_terakhir: "teks"
   },
   jejak_data: {
     id: "bilangan",
