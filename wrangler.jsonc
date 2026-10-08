@@ -18,6 +18,17 @@
   "r2_buckets": [
     { "binding": "SK_BUCKET", "bucket_name": "sim-kgb-sk" }
   ],
+  // D1: basis data SIM-KGB (ADR-085), aktif bila DATA_BACKEND=d1. Skema di d1/migrations; terapkan dengan
+  //   npx wrangler d1 migrations apply sim-kgb --remote
+  // sebelum kode yang membutuhkan migrasi baru di-deploy.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sim-kgb",
+      "database_id": "bea1c8d4-b5ef-40e4-8807-b1e48d5faa46",
+      "migrations_dir": "d1/migrations"
+    }
+  ],
   // Cron 00:00 UTC (08:00 WITA): cadangan otomatis lalu notifikasi harian. Cron 12:00 UTC (20:00 WITA):
   // cadangan otomatis saja (ADR-084). Ditangani handler scheduled di wrapper worker (lihat worker-entry.js)
   // yang memanggil /api/cron/cadangan dan /api/cron/notifikasi.

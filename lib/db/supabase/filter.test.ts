@@ -11,78 +11,13 @@ import type { Where } from "../repo";
 import { keKondisi, keParameter, type Kondisi, type NilaiFilter } from "./filter";
 import { keSnake } from "./nama";
 import { dariJson, keJson } from "./nilai";
+import { KOLOM_CONTOH, RECORD_CONTOH as RECORD, T1, WHERE_CONTOH as WHERE } from "../contohFilter";
 
 type Rec = Record<string, unknown>;
 
-const KOLOM = ["nama", "status", "aktif", "jumlah", "tmtKgbBaru"];
+const KOLOM: readonly string[] = KOLOM_CONTOH;
 const camelDari = new Map(KOLOM.map((k) => [keSnake(k), k]));
 const keKolom = (nama: string) => (KOLOM.includes(nama) ? keSnake(nama) : null);
-
-const T1 = new Date("2026-01-01T00:00:00.000Z");
-const T2 = new Date("2026-06-01T00:00:00.000Z");
-
-const RECORD: Rec[] = [
-  { nama: "Budi Santoso", status: "a", aktif: true, jumlah: 5, tmtKgbBaru: T1 },
-  { nama: "ANI", status: "b", aktif: false, jumlah: 3, tmtKgbBaru: T2 },
-  { nama: "50% diskon", status: null, aktif: null, jumlah: null, tmtKgbBaru: null },
-  { nama: "a_b", status: "a", aktif: true, jumlah: 1, tmtKgbBaru: T2 },
-  { nama: "axb", status: "c", aktif: false, jumlah: 10, tmtKgbBaru: T1 },
-  { nama: null, status: "b", aktif: true, jumlah: 5, tmtKgbBaru: null },
-];
-
-const WHERE: Where[] = [
-  {},
-  { status: "a" },
-  { status: null },
-  { status: undefined },
-  { status: ["a"] },
-  { aktif: true },
-  { aktif: false },
-  { jumlah: 5 },
-  { tmtKgbBaru: T1 },
-  { tmtKgbBaru: "2026-06-01T00:00:00.000Z" },
-  { tmtKgbBaru: new Date("tidak valid") },
-  { status: { equals: "b" } },
-  { status: { not: "a" } },
-  { status: { not: null } },
-  { status: { not: undefined } },
-  { tmtKgbBaru: { not: T1 } },
-  { status: { in: ["a", "b"] } },
-  { status: { in: [] } },
-  { status: { in: [null] } },
-  { status: { in: ["a", null] } },
-  { status: { in: "a" } },
-  { status: { notIn: ["a"] } },
-  { status: { notIn: [] } },
-  { status: { notIn: [null] } },
-  { status: { notIn: ["a", null] } },
-  { nama: { contains: "an" } },
-  { nama: { contains: "AN" } },
-  { nama: { contains: "" } },
-  { nama: { contains: "50%" } },
-  { nama: { contains: "a_b" } },
-  { nama: { startsWith: "bu" } },
-  { nama: { contains: "an", mode: "insensitive" } },
-  { jumlah: { lt: 5 } },
-  { jumlah: { lte: 5 } },
-  { jumlah: { gt: 3 } },
-  { jumlah: { gte: 5 } },
-  { jumlah: { lt: null } },
-  { tmtKgbBaru: { lte: T1 } },
-  { tmtKgbBaru: { gt: "2026-03-01T00:00:00.000Z" } },
-  { status: "a", aktif: true },
-  { status: { in: ["a", "b"], not: "b" } },
-  { OR: [{ status: "a" }, { jumlah: { gt: 3 } }] },
-  { OR: [] },
-  { AND: [] },
-  { OR: "x" },
-  { AND: [{ status: { not: "a" } }, { nama: { contains: "i" } }] },
-  { OR: [{ status: null }, { AND: [{ aktif: true }, { jumlah: { in: [1, 5] } }] }] },
-  { status: { operatorAneh: 1 } },
-  { tidakAda: "x" },
-  { tidakAda: { not: "x" } },
-  { tidakAda: undefined },
-];
 
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

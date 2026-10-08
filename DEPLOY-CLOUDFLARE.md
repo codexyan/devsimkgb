@@ -16,6 +16,7 @@ Konfigurasi ada di `wrangler.jsonc`:
 | `assets` | `.open-next/assets`, binding `ASSETS` | Berkas statis hasil build. |
 | `services` | `WORKER_SELF_REFERENCE` ke `sim-kgb` | Dipakai handler `scheduled` untuk memanggil endpoint cron di Worker yang sama. |
 | `r2_buckets` | `SK_BUCKET` ke bucket `sim-kgb-sk` | Berkas SK KGB. |
+| `d1_databases` | `DB` ke D1 `sim-kgb` (APAC), migrasi di `d1/migrations` | Basis data bila `DATA_BACKEND=d1` (ADR-085). |
 | `triggers.crons` | `0 0 * * *`, `0 12 * * *` | Pukul 00.00 UTC (08.00 WITA): cadangan otomatis lalu notifikasi harian. Pukul 12.00 UTC (20.00 WITA): cadangan otomatis saja (ADR-084). |
 | `compatibility_flags` | `nodejs_compat`, `global_fetch_strictly_public` | Runtime Node yang dibutuhkan Next.js. |
 
@@ -47,14 +48,44 @@ Saat `next dev`, binding tersedia lewat `initOpenNextCloudflareForDev()` di `nex
 Semua route memakai `import { db } from "@/lib/db"`. Penyimpanan dipilih di `lib/db/index.ts` setiap kali
 data diakses:
 
+- `DATA_BACKEND=d1` memakai Cloudflare D1 lewat binding `DB` (ADR-085). Produksi beralih ke sini sesudah data
+  disalin (lihat "Peralihan ke D1" di bawah).
 - `DATA_BACKEND=sheets` memakai Google Sheets.
-- `DATA_BACKEND=supabase` memakai Supabase (Postgres lewat REST). **Ini yang dipakai produksi.**
+- `DATA_BACKEND=supabase` memakai Supabase (Postgres lewat REST). Dipakai produksi sampai peralihan ke D1.
 - Tanpa `DATA_BACKEND`, Supabase dipakai bila `SUPABASE_URL` terisi; selain itu Google Sheets.
 - Nilai `DATA_BACKEND` lain membuat request gagal dengan pesan galat yang jelas.
 
 Google Sheets membutuhkan akun layanan yang diberi akses Editor ke spreadsheet, dengan Google Sheets API
 aktif di project Google Cloud. Supabase membutuhkan secret key proyek; key itu melewati RLS, jadi hanya
 boleh dipakai di server.
+
+### Migrasi D1
+
+Skema D1 ada di `d1/migrations`. Terapkan ke D1 produksi **sebelum** kode yang membutuhkannya di-deploy:
+
+```bash
+npx wrangler d1 migrations list sim-kgb --remote    # yang belum diterapkan
+npx wrangler d1 migrations apply sim-kgb --remote
+```
+
+Berkas SQL harus berakhir baris LF (`.gitattributes`). D1 menolak trigger yang memuat CR ("incomplete input"). Kolom
+baru pada tabel yang dijejak menuntut trigger jejaknya dibuat ulang di migrasi yang sama (contoh:
+`0003_usulan_penetap_sk_terakhir.sql`). `lib/db/d1/skema.test.ts` menagih keduanya, dan juga menagih agar selama
+Supabase masih aktif setiap kolom baru dibuat di kedua basis data.
+
+### Peralihan ke D1
+
+1. Deploy kode yang memuat binding D1. `DATA_BACKEND` belum diatur, jadi basis data tetap Supabase.
+2. Super Admin, di menu Cadangkan data:
+   1. Tekan **Cadangkan sekarang**.
+   2. Tekan **Salin semua ke D1**: satu transaksi, berhasil seluruhnya atau tidak sama sekali.
+   3. Tekan **Bandingkan**.
+3. `npx wrangler secret put DATA_BACKEND` dengan nilai `d1`. Versi baru langsung aktif tanpa build ulang.
+4. **Bandingkan** lagi. Bila perlu, tekan **Salin yang tertinggal**.
+5. Untuk kembali ke Supabase: `npx wrangler secret delete DATA_BACKEND`.
+
+Pemulihan di D1: Time Travel (`npx wrangler d1 time-travel restore sim-kgb --timestamp=…`) untuk seluruh database,
+atau `scripts/pulihkan-cadangan.ts` untuk baris tertentu (ADR-084, ADR-085).
 
 ### Migrasi Supabase diterapkan manual
 
@@ -103,7 +134,7 @@ npx wrangler secret put SUPABASE_SECRET_KEY
 |----------|-------|----------|
 | `AUTH_SECRET` | Ya | Kunci sesi NextAuth v5 (buat dengan `openssl rand -base64 32`). NextAuth juga membaca `NEXTAUTH_SECRET` sebagai nama lama. |
 | `CRON_SECRET` | Ya | Bearer token endpoint cron. Tanpa nilai ini endpoint cron menjawab 503. |
-| `DATA_BACKEND` | Tidak | `sheets` atau `supabase` (lihat bagian 3). |
+| `DATA_BACKEND` | Tidak | `d1`, `sheets`, atau `supabase` (lihat bagian 3). Atur sebagai secret, bukan variabel teks di wrangler.jsonc, supaya peralihan tidak memerlukan build ulang. |
 | `GOOGLE_SHEET_ID` | Untuk Sheets | ID spreadsheet dari URL `docs.google.com/spreadsheets/d/<ID>/edit`. |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Untuk Sheets | Email akun layanan. |
 | `GOOGLE_PRIVATE_KEY` | Untuk Sheets | `private_key` dari JSON key; boleh ditulis satu baris dengan `\n`. |

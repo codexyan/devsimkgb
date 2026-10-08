@@ -1,13 +1,17 @@
 // Membaca berkas cadangan otomatis (lib/cadanganOtomatis.ts) dan menyusun SQL untuk mengembalikan sebagian barisnya
-// ke Supabase (ADR-084). Dipakai scripts/pulihkan-cadangan.ts; SQL-nya dijalankan sendiri oleh pemilik di Supabase
-// SQL Editor, jadi tidak ada yang berubah tanpa dibaca lebih dulu.
+// (ADR-084): ke Supabase (Postgres) atau ke Cloudflare D1 (SQLite, ADR-085). Dipakai scripts/pulihkan-cadangan.ts;
+// SQL-nya dijalankan sendiri oleh pemilik di Supabase SQL Editor atau konsol D1, jadi tidak ada yang berubah tanpa
+// dibaca lebih dulu.
+
+import { barisKeD1 } from "./db/d1/barisMentah";
+import { SKEMA_D1 } from "./db/d1/skema";
 
 type Baris = Record<string, unknown>;
 
 export interface KepalaCadangan {
   aplikasi: string;
   versi: number;
-  bentuk: "postgres" | "aplikasi";
+  bentuk: "postgres" | "d1" | "aplikasi";
   dibuat: string;
   tabel: string[];
 }
@@ -84,5 +88,102 @@ export function sqlPulihkan(tabel: string, daftar: readonly Baris[], opsi: { tim
     `select * from jsonb_populate_recordset(null::public.${tabel}, $${tanda}$${json}$${tanda}$::jsonb)\n` +
     `${konflik};\n` +
     urutan
+  );
+}
+
+// ── Cloudflare D1 (SQLite) ─────────────────────────────────────────────────────────────────────────────────────
+
+/** Panjang JSON per pernyataan; konsol dan API D1 membatasi satu pernyataan 100 KB. */
+const UKURAN_JSON_D1 = 80_000;
+const namaSah = (x: string) => /^[a-z_][a-z0-9_]*$/.test(x);
+
+function kolomD1(tabel: string): string[] {
+  if (!namaSah(tabel) || !SKEMA_D1[tabel]) throw new Error(`Tabel ${tabel} tidak ada di skema D1`);
+  return Object.keys(SKEMA_D1[tabel]);
+}
+
+/**
+ * Ekspresi nilai tiap kolom dari sebuah objek JSON. Urutan baris dimasukkan (urutan_sisip, kunci utama D1) dipakai
+ * bila belum terpakai baris lain; bila sudah, baris yang dikembalikan diberi nomor baru di ujung.
+ */
+function ekspresiKolom(tabel: string, kolom: string[], sumber: string): string[] {
+  return kolom.map((k) =>
+    k === "urutan_sisip"
+      ? `CASE WHEN EXISTS (SELECT 1 FROM ${tabel} WHERE urutan_sisip = json_extract(${sumber}, '$.urutan_sisip')) ` +
+        `THEN NULL ELSE json_extract(${sumber}, '$.urutan_sisip') END`
+      : `json_extract(${sumber}, '$.${k}')`,
+  );
+}
+
+function konflikD1(kolom: string[], timpa: boolean): string {
+  if (!timpa) return "";
+  const diubah = kolom.filter((k) => k !== "id" && k !== "urutan_sisip");
+  return ` WHERE true ON CONFLICT(id) DO UPDATE SET ${diubah.map((k) => `${k} = excluded.${k}`).join(", ")}`;
+}
+
+/**
+ * SQL D1 untuk mengembalikan baris cadangan (bentuk Postgres maupun D1) ke satu tabel. Barisnya diubah ke bentuk kolom
+ * D1, lalu dikirim sebagai JSON yang dibongkar json_each, dipotong per 80 KB. Bawaannya baris yang id-nya sudah ada
+ * dilewati; dengan `timpa`, isinya diganti isi cadangan.
+ */
+export function sqlPulihkanD1(tabel: string, daftar: readonly Baris[], opsi: { timpa?: boolean } = {}): string {
+  const semuaKolom = kolomD1(tabel);
+  if (daftar.length === 0) return `-- ${tabel}: tidak ada baris yang cocok.\n`;
+  const baris = daftar.map((b) => barisKeD1(tabel, b));
+  const kolom = semuaKolom.filter((k) => baris.some((b) => k in b));
+  const potongan: Baris[][] = [];
+  let kini: Baris[] = [];
+  let ukuran = 0;
+  for (const b of baris) {
+    const u = JSON.stringify(b).length;
+    if (kini.length > 0 && ukuran + u > UKURAN_JSON_D1) {
+      potongan.push(kini);
+      kini = [];
+      ukuran = 0;
+    }
+    kini.push(b);
+    ukuran += u;
+  }
+  potongan.push(kini);
+  const isi = potongan.map(
+    (p) =>
+      `INSERT ${opsi.timpa ? "" : "OR IGNORE "}INTO ${tabel} (${kolom.join(", ")})\n` +
+      `SELECT ${ekspresiKolom(tabel, kolom, "value").join(", ")}\n` +
+      `FROM json_each('${JSON.stringify(p).replace(/'/g, "''")}')${konflikD1(kolom, !!opsi.timpa)};\n`,
+  );
+  return `-- ${baris.length} baris ${tabel}${opsi.timpa ? " (menimpa baris yang sudah ada)" : " (baris yang sudah ada dilewati)"}\n${isi.join("")}`;
+}
+
+/** Waktu untuk filter jejak: ISO apa adanya, atau "YYYY-MM-DD HH:MM" waktu WITA. */
+export function waktuJejak(teks: string): string {
+  const wita = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})$/.exec(teks.trim());
+  const t = wita ? new Date(`${wita[1]}T${wita[2]}:${wita[3]}:00+08:00`) : new Date(teks);
+  if (Number.isNaN(t.getTime())) throw new Error(`Waktu tidak dikenal: ${teks}`);
+  return t.toISOString();
+}
+
+/** SQL D1: kembalikan baris yang terhapus dari jejak perubahan dalam rentang waktu. Yang id-nya masih ada dilewati. */
+export function sqlPulihkanJejakD1(tabel: string, rentang: { dari: string; sampai: string }): string {
+  const kolom = kolomD1(tabel);
+  const dari = waktuJejak(rentang.dari);
+  const sampai = waktuJejak(rentang.sampai);
+  return (
+    `-- Baris ${tabel} yang terhapus antara ${dari} dan ${sampai} (UTC), dari jejak perubahan.\n` +
+    `INSERT OR IGNORE INTO ${tabel} (${kolom.join(", ")})\n` +
+    `SELECT ${ekspresiKolom(tabel, kolom, "j.lama").join(", ")}\n` +
+    `FROM jejak_data j WHERE j.tabel = '${tabel}' AND j.aksi = 'hapus' ` +
+    `AND j.waktu >= '${dari}' AND j.waktu <= '${sampai}' ORDER BY j.id;\n`
+  );
+}
+
+/** SQL D1: kembalikan isi satu baris ke keadaan yang tersimpan pada satu jejak (sebelum perubahan itu). */
+export function sqlKembalikanBarisD1(tabel: string, idJejak: number): string {
+  if (!Number.isInteger(idJejak) || idJejak <= 0) throw new Error("id jejak harus bilangan bulat positif");
+  const kolom = kolomD1(tabel).filter((k) => k !== "id" && k !== "urutan_sisip");
+  return (
+    `-- Kembalikan baris ${tabel} ke isi pada jejak ${idJejak}. Perubahan sesudah jejak itu ikut terganti.\n` +
+    `UPDATE ${tabel} SET (${kolom.join(", ")}) =\n` +
+    `  (SELECT ${kolom.map((k) => `json_extract(lama, '$.${k}')`).join(", ")} FROM jejak_data WHERE id = ${idJejak} AND tabel = '${tabel}')\n` +
+    `WHERE id = (SELECT id_baris FROM jejak_data WHERE id = ${idJejak} AND tabel = '${tabel}');\n`
   );
 }

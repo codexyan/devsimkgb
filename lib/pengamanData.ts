@@ -5,6 +5,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { backendData } from "./db";
 import { rest, totalDariContentRange } from "./db/supabase/rest";
 import { tabelBelumAda } from "./db/tabelBelumAda";
+import { klienD1 } from "./db/d1/klien";
 import {
   AWALAN_CADANGAN,
   buatCadangan,
@@ -29,8 +30,18 @@ export async function bucketCadangan(): Promise<(BucketCadangan & R2Bucket) | nu
 
 /** Keadaan jejak perubahan: aktif bila migrasinya sudah dijalankan, dengan jumlah catatan 24 jam terakhir. */
 export async function keadaanJejakData(sekarang = new Date()): Promise<{ aktif: boolean; jumlah24Jam: number | null }> {
-  if (backendData() !== "supabase") return { aktif: false, jumlah24Jam: null };
+  const backend = backendData();
   const sejak = new Date(sekarang.getTime() - 86_400_000).toISOString();
+  if (backend === "d1") {
+    try {
+      const baris = await (await klienD1()).prepare("SELECT count(*) AS n FROM jejak_data WHERE waktu >= ?").bind(sejak).first<{ n: number }>();
+      return { aktif: true, jumlah24Jam: Number(baris?.n ?? 0) };
+    } catch (e) {
+      if (tabelBelumAda(e)) return { aktif: false, jumlah24Jam: null };
+      throw e;
+    }
+  }
+  if (backend !== "supabase") return { aktif: false, jumlah24Jam: null };
   try {
     const res = await rest(`jejak_data?select=id&waktu=gte.${encodeURIComponent(sejak)}&limit=1`, { prefer: ["count=exact"] });
     await res.text();
@@ -43,8 +54,17 @@ export async function keadaanJejakData(sekarang = new Date()): Promise<{ aktif: 
 
 /** Buang jejak perubahan yang lebih tua dari masa simpannya; null bila tabelnya belum ada atau bukan Supabase. */
 export async function pangkasJejakData(sekarang = new Date()): Promise<number | null> {
-  if (backendData() !== "supabase") return null;
+  const backend = backendData();
   const batas = new Date(sekarang.getTime() - LAMA_SIMPAN_JEJAK_HARI * 86_400_000).toISOString();
+  if (backend === "d1") {
+    try {
+      return (await (await klienD1()).prepare("DELETE FROM jejak_data WHERE waktu < ?").bind(batas).run()).meta.changes ?? 0;
+    } catch (e) {
+      if (tabelBelumAda(e)) return null;
+      throw e;
+    }
+  }
+  if (backend !== "supabase") return null;
   try {
     const res = await rest(`jejak_data?waktu=lt.${encodeURIComponent(batas)}`, {
       method: "DELETE",
