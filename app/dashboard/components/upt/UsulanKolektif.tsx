@@ -34,12 +34,15 @@ import {
   pisahkanIsianSk,
   teksAtasDasar,
   type IsianSkBaru,
+  penetapSesudahNomor,
+  petunjukPenetapAcuan,
 } from "./skSesudahAcuan";
 import ModalPratinjauSkUsulan from "./ModalPratinjauSkUsulan";
 import { GarisLangkah, RingkasanLangkah } from "./GarisLangkah";
 import { LANGKAH_ISIAN, cekIsianPegawai, langkahAwal, type CekIsian, type NomorLangkah } from "./langkahIsian";
 import { BIDANG_IDENTITAS, PILIHAN_BIDANG } from "./FormulirUsulan";
 import { denganNilaiSaatIni } from "@/lib/pilihanPegawai";
+import { SARAN_PENETAP_SK } from "@/lib/penetapSk";
 
 /* Usul KGB Kolektif Admin UPT (ADR-015, ADR-029): usul KGB beberapa pegawai dalam satu surat Srikandi. Halaman dibuka
    pada pegawai jatuh tempo periode ini; perbaikan data dan draf pegawai baru hasil Unggah daftar hanya ikut bila
@@ -65,7 +68,7 @@ interface PegawaiUpt {
   statusKGB: string | null;
   usulanBerjalan?: string | null;
   dataSekarang: Record<string, string>;
-  bawaan?: { nomorSkTerakhir: string; tanggalSkTerakhir: string; berkas: BerkasTersimpan[] };
+  bawaan?: { nomorSkTerakhir: string; tanggalSkTerakhir: string; penetapSkTerakhir?: string; berkas: BerkasTersimpan[] };
   /** Dasar SK KGB berikutnya menurut catatan SIM-KGB (lib/dasarKgbBerikutnya.ts); pembanding pratinjau Atas dasar. */
   dasarKgb?: DasarKgbBerikutnya | null;
 }
@@ -86,7 +89,7 @@ interface DrafUpt {
   nip: string;
   status: string;
   nilai: Record<string, string> | null;
-  surat: { nomorSkTerakhir: string; tanggalSkTerakhir: string; catatanUpt: string } | null;
+  surat: { nomorSkTerakhir: string; tanggalSkTerakhir: string; penetapSkTerakhir?: string; catatanUpt: string } | null;
   hukdis: { ada: boolean; jenis: string; nomorSk: string; tmtMulai: string; tmtBerakhir: string; keterangan: string } | null;
   dasarBaru: { jenis: string; jenisKp: string; nomorSk: string; tanggalSk: string; tmt: string; penetap: string } | null;
   /** Golongan dan masa kerja pada SK KGB terakhir, bila disimpan bersama SK sesudahnya (ADR-078). */
@@ -136,7 +139,9 @@ const DASAR_KOSONG = {
 };
 
 /** Isian yang disunting di tabel; sisanya ikut dari data tercatat apa adanya. */
-const KOLOM_TABEL = ["golonganRuang", "mkgTahun", "mkgBulan", "tmtKgbTerakhir", "nomorSkTerakhir", "tanggalSkTerakhir"] as const;
+const KOLOM_TABEL = [
+  "golonganRuang", "mkgTahun", "mkgBulan", "tmtKgbTerakhir", "nomorSkTerakhir", "tanggalSkTerakhir", "penetapSkTerakhir",
+] as const;
 
 function barisDari(p: PegawaiUpt | null, d: DrafUpt | null): Baris {
   const dataTercatat = d?.jenis === "baru" ? null : (p?.dataSekarang ?? null);
@@ -145,11 +150,15 @@ function barisDari(p: PegawaiUpt | null, d: DrafUpt | null): Baris {
   const data = terpisah.atas;
   // SK dasar draf lebih dulu; bila kosong, yang sudah disetujui Kanwil sehingga tidak perlu diketik ulang.
   const skDraf = d?.surat?.nomorSkTerakhir?.trim() ? d.surat : null;
+  const nomorSk = skDraf?.nomorSkTerakhir ?? p?.bawaan?.nomorSkTerakhir ?? "";
   const awal: Record<string, string> = {
     ...data,
     tmtKgbTerakhir: data.tmtKgbTerakhir || data.tmtGolongan || "",
-    nomorSkTerakhir: skDraf?.nomorSkTerakhir ?? p?.bawaan?.nomorSkTerakhir ?? "",
+    nomorSkTerakhir: nomorSk,
     tanggalSkTerakhir: skDraf ? skDraf.tanggalSkTerakhir : (d?.surat?.tanggalSkTerakhir || p?.bawaan?.tanggalSkTerakhir || ""),
+    // Pejabat penetap SK itu (ADR-086); draf lama yang belum memuatnya mendapat saran dari awalan nomornya.
+    penetapSkTerakhir:
+      (skDraf ? skDraf.penetapSkTerakhir : p?.bawaan?.penetapSkTerakhir) || penetapSesudahNomor("", "", nomorSk),
   };
   return {
     kunci: d ? `draf:${d.id}` : `pegawai:${p!.id}`,
@@ -209,6 +218,7 @@ function kelengkapan(b: Baris): { selesai: number; total: number; kurang: string
     tmtAcuan: b.isian.tmtKgbTerakhir ?? "",
     nomorSkAcuan: b.isian.nomorSkTerakhir ?? "",
     tanggalSkAcuan: b.isian.tanggalSkTerakhir ?? "",
+    penetapSkAcuan: b.isian.penetapSkTerakhir ?? "",
     jawaban,
     perluSebab,
     kurangDasar: kekuranganDasarBaru(
@@ -261,6 +271,7 @@ function isianBaris(b: Baris): Record<string, string> {
   hasil.keadaanKgb = b.pernah ? "pernah" : "belum";
   hasil.nomorSkTerakhir = b.isian.nomorSkTerakhir ?? "";
   hasil.tanggalSkTerakhir = b.isian.tanggalSkTerakhir ?? "";
+  hasil.penetapSkTerakhir = b.isian.penetapSkTerakhir ?? "";
   hasil.catatanUpt = b.catatanUpt;
   // Sebab perubahan golongan atau masa kerja golongan beserta SK-nya (ADR-030).
   hasil.dasarBaruJenis = b.dasar.jenis;
@@ -536,6 +547,10 @@ export default function UsulanKolektif() {
         [kolom]: nilai,
         // Belum pernah KGB: masa kerja golongan mengikuti langkah awal tabel golongannya (II/c: 3 tahun, ADR-080).
         ...(kolom === "golonganRuang" && !b.pernah ? isianMkgAwal(nilai) : {}),
+        // Pejabat penetap yang masih berupa saran mengikuti nomor SK yang baru (ADR-086).
+        ...(kolom === "nomorSkTerakhir"
+          ? { penetapSkTerakhir: penetapSesudahNomor(b.isian.penetapSkTerakhir ?? "", b.isian.nomorSkTerakhir ?? "", nilai) }
+          : {}),
       },
     }));
   }
@@ -1370,6 +1385,24 @@ function DetailBaris({
             <label className="kol-label">
               <span className="kol-wajib">{b.pernah ? "Tanggal SK KGB terakhir" : "Tanggal SK CPNS"}</span>
               <input className="kol-isi" type="date" data-beda={beda("tanggalSkTerakhir")} value={b.isian.tanggalSkTerakhir ?? ""} onChange={(e) => onIsi("tanggalSkTerakhir", e.target.value)} />
+            </label>
+            <label className="kol-label kol-label-lebar">
+              <span className="kol-wajib">{b.pernah ? "Oleh (pejabat penetap SK KGB terakhir)" : "Oleh (pejabat penetap SK CPNS)"}</span>
+              <input
+                className="kol-isi"
+                data-beda={beda("penetapSkTerakhir")}
+                value={b.isian.penetapSkTerakhir ?? ""}
+                onChange={(e) => onIsi("penetapSkTerakhir", e.target.value)}
+                list="kol-saran-penetap"
+                autoComplete="off"
+                placeholder="Pilih atau ketik jabatan penetap"
+              />
+              <datalist id="kol-saran-penetap">
+                {SARAN_PENETAP_SK.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+              <span className="kol-catatan-kecil">{petunjukPenetapAcuan(b.isian.penetapSkTerakhir ?? "", b.isian.nomorSkTerakhir ?? "")}</span>
             </label>
           </div>
           {mkgSkTercatat && (

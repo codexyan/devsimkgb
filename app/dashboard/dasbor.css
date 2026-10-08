@@ -2912,6 +2912,7 @@ html[data-gerak="kurangi"] .dsb-putar {
 .kol-subjudul span { font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--dt5); }
 .kol-isian-kisi { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 560px) { .kol-isian-kisi { grid-template-columns: minmax(0, 1fr); } }
+.kol-label-lebar { grid-column: 1 / -1; }
 .kol-md-detail .kol-isi { width: 100%; padding: 8px 10px; font-size: 13px; }
 .kol-md-detail .kol-mkg .kol-isi { width: 64px; }
 .kol-md-detail .kol-mkg { gap: 6px; font-size: 12px; }

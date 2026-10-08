@@ -48,7 +48,7 @@ function dataUsulan(sebagian: Record<string, unknown> = {}) {
     pathSyaratCpns: null, pathSkPangkat: "usulan/kp.pdf", pathSkCpns: null, pathSkPmk: null, nama: null, tempatLahir: null,
     tanggalLahir: null, jenisKelamin: null, pendidikanTerakhir: null, jabatan: "JABATAN LAMA SALAH", pangkat: null, golonganRuang: "II/a",
     eselon: null, jenisJabatan: null, tmtGolongan: null, mkgTahun: 0, mkgBulan: 0, gajiPokok: null, tmtKgbTerakhir: tgl(2025, 6),
-    tmtKgbBerikutnya: tgl(2027, 6), nomorSkTerakhir: "SK-LAMA", tanggalSkTerakhir: tgl(2025, 5, 20), hukdisAda: true,
+    tmtKgbBerikutnya: tgl(2027, 6), nomorSkTerakhir: "SK-LAMA", tanggalSkTerakhir: tgl(2025, 5, 20), penetapSkTerakhir: "Menteri Imigrasi dan Pemasyarakatan", hukdisAda: true,
     hukdisJenis: "ringan", hukdisNomorSk: "H-1", hukdisTmtMulai: tgl(2026, 1), hukdisTmtBerakhir: tgl(2026, 6), hukdisKeterangan: "x",
     catatanUpt: "catatan UPT", diajukanOleh: "Admin UPT (199505052019051005)", diajukanAt: tgl(2026, 9, 6), ditinjauOleh: "Peninjau",
     ditinjauAt: tgl(2026, 9, 8), alasanTolak: null,
@@ -89,6 +89,7 @@ test("usulan yang sudah disetujui dikembalikan sebagai usulan perbaikan baru, te
     assert.equal(baru.nip, "199001012015031001");
     // SK dasar terbawa dari usulan yang disetujui; berkas tidak disalin (terbawa lewat bawaan saat disimpan).
     assert.equal(baru.nomorSkTerakhir, "SK-LAMA");
+    assert.equal(baru.penetapSkTerakhir, "Menteri Imigrasi dan Pemasyarakatan", "pejabat penetapnya ikut terbawa (ADR-086)");
     assert.equal(baru.pathBerkas, null);
     assert.equal(baru.pathSkPangkat, null);
     // SK yang sudah tercatat tidak dicatat ulang, dan laporan hukdis lama tidak dilaporkan dua kali.
@@ -100,6 +101,10 @@ test("usulan yang sudah disetujui dikembalikan sebagai usulan perbaikan baru, te
     const pegawai = await db.pegawai.findUnique({ id: "p1" });
     assert.deepEqual(bandingkanUsulan(pegawai as never, baru as never), []);
     assert.deepEqual(kekuranganUsulan(baru as never, "perubahan", pegawai as never), []);
+    // Tanpa pejabat penetap (dan nomornya tanpa saran), usulan itu belum lengkap (ADR-086).
+    assert.deepEqual(kekuranganUsulan({ ...baru, penetapSkTerakhir: null } as never, "perubahan", pegawai as never), [
+      "pejabat penetap SK CPNS",
+    ]);
     // Data pegawai tidak berubah.
     assert.equal(pegawai?.jabatan, "Pembimbing Kemasyarakatan");
 

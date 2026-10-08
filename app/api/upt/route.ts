@@ -210,6 +210,7 @@ export async function GET() {
           return {
             nomorSkTerakhir: b.nomorSkTerakhir ?? "",
             tanggalSkTerakhir: kunciTanggal(b.tanggalSkTerakhir) ?? "",
+            penetapSkTerakhir: b.penetapSkTerakhir ?? "",
             berkas: BERKAS_USULAN.flatMap((jenis) => {
               // Surat usulan dan pindaian SK PMK tidak terbawa: keduanya milik peristiwanya, bukan pegawainya.
               const asal =

@@ -85,6 +85,7 @@ export async function GET(req: Request) {
               tanggalSurat: tanggalIsian(u.tanggalSurat),
               nomorSkTerakhir: u.nomorSkTerakhir ?? "",
               tanggalSkTerakhir: tanggalIsian(u.tanggalSkTerakhir),
+              penetapSkTerakhir: u.penetapSkTerakhir ?? "",
               catatanUpt: u.catatanUpt ?? "",
             }
           : null,
@@ -237,7 +238,7 @@ export async function POST(req: Request) {
   if (!draf) {
     const kurang = kekuranganUsulan(
       {
-        ...denganBerkasBawaan(isian, bawaan ?? { nomorSkTerakhir: null, tanggalSkTerakhir: null, berkas: {} }),
+        ...denganBerkasBawaan(isian, bawaan ?? { nomorSkTerakhir: null, tanggalSkTerakhir: null, penetapSkTerakhir: null, berkas: {} }),
         ...dasarBaru,
         ...acuan,
         // Berkas yang diunggah bersama permintaan ini dihitung ada; objeknya baru disimpan setelah semua lolos.
@@ -297,6 +298,7 @@ export async function POST(req: Request) {
     tmtKgbTerakhir: null, tmtKgbBerikutnya: null,
     nomorSkTerakhir: teks("nomorSkTerakhir") || null,
     tanggalSkTerakhir: teks("tanggalSkTerakhir") ? bacaTanggalInput(teks("tanggalSkTerakhir")) : null,
+    penetapSkTerakhir: teks("penetapSkTerakhir") || null,
     hukdisAda,
     hukdisJenis: teks("hukdisJenis") || null,
     hukdisNomorSk: teks("hukdisNomorSk") || null,
