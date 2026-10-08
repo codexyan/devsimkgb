@@ -12,6 +12,7 @@ import type { RiwayatKGBRow, RiwayatPangkatRow, RiwayatPmkRow, UsulanPegawaiRow 
 import { kgbBerjalanTerbaru } from "@/lib/dataPegawai";
 import { suratSudahDibuat, type SuratKgbTersimpan } from "@/lib/prosesKgb";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
+import { penetapSkAcuanUsulan } from "@/lib/penetapSk";
 
 export const runtime = "nodejs";
 
@@ -118,6 +119,8 @@ export async function GET(req: Request) {
         hukdisKeterangan: u.hukdisKeterangan,
         nomorSkTerakhir: u.nomorSkTerakhir,
         tanggalSkTerakhir: u.tanggalSkTerakhir ? new Date(u.tanggalSkTerakhir).toISOString() : null,
+        // Isian UPT, atau saran dari awalan nomornya bila usulan dibuat sebelum isian itu ada (ADR-086).
+        penetapSkTerakhir: u.nomorSkTerakhir?.trim() ? penetapSkAcuanUsulan(u) : null,
         catatanUpt: u.catatanUpt,
         kgb: u.status === "menunggu" ? kgbTerdampak(u.pegawaiId) : null,
         diajukanOleh: u.diajukanOleh,

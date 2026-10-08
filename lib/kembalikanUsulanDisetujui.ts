@@ -16,6 +16,7 @@ import { newId } from "./sheets/id";
 import { notifikasiUsulanRevisi } from "./generateNotifikasi";
 import { BELUM_SELESAI, BIDANG_USULAN } from "./usulanPegawai";
 import { bawaanPegawai } from "./bawaanUsulan";
+import { tulisDenganAcuan } from "./acuanUsulanServer";
 import { pegawaiSatker } from "./aksesUpt";
 import { TANPA_SK_BARU } from "./dasarBaruUsulan";
 import { SATKER } from "./satker";
@@ -103,6 +104,7 @@ export async function kembalikanUsulanDisetujui(input: {
     tmtKgbTerakhir: null, tmtKgbBerikutnya: null,
     nomorSkTerakhir: bawaan.nomorSkTerakhir,
     tanggalSkTerakhir: bawaan.tanggalSkTerakhir,
+    penetapSkTerakhir: bawaan.penetapSkTerakhir,
     // SK kenaikan pangkat atau PMK pada usulan lama sudah tercatat sebagai riwayat dan dibetulkan lewat Ubah data SK,
     // bukan dicatat ulang: jawabannya di sini "tidak ada SK baru yang belum tercatat". UPT dapat menggantinya bila
     // memang ada SK lain sesudahnya.
@@ -128,7 +130,7 @@ export async function kembalikanUsulanDisetujui(input: {
     alasanTolak: catatan,
     ...isian,
   };
-  await db.usulanPegawai.create(baris);
+  await tulisDenganAcuan(baris, (isi) => db.usulanPegawai.create(isi));
 
   try {
     await db.notifikasi.create({

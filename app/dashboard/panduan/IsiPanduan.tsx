@@ -963,7 +963,7 @@ export default async function IsiPanduan({
                   Sesudah memilih, Anda melengkapi data dan berkas tiap pegawai satu per satu, dalam lima langkah yang
                   sama dengan formulir <strong>Tambah pegawai</strong> dan <strong>Perbarui data</strong>:{" "}
                   <strong>1 Identitas</strong>, <strong>2 Jabatan</strong>, <strong>3 Jenis KGB</strong> (sudah pernah KGB
-                  dengan SK KGB terakhir, atau CPNS baru dengan SK CPNS, beserta pindaiannya),{" "}
+                  dengan SK KGB terakhir, atau CPNS baru dengan SK CPNS, beserta pejabat penetap dan pindaiannya),{" "}
                   <strong>4 SK sesudahnya</strong> (kenaikan pangkat, penyesuaian ijazah, atau PMK beserta pindaiannya),
                   dan <strong>5 Periksa &amp; simpan</strong>. Garis langkah di atas isian menandai langkah yang lengkap
                   (✓) dan yang masih kurang (!); tekan langkahnya untuk langsung ke sana. Draf yang dibuka lagi langsung
@@ -1040,9 +1040,17 @@ export default async function IsiPanduan({
                 <p>
                   Berkas wajib ditagih saat diajukan: bagi pegawai baru selalu, bagi usulan perbaikan hanya bila
                   golongan, TMT golongan, masa kerja golongan, atau TMT KGB terakhirnya ikut diubah. Pada usulan
-                  perbaikan berikutnya, nomor dan tanggal SK dasar serta berkas terakhir yang sudah disetujui Kanwil{" "}
-                  <strong>terisi sendiri</strong> dan bertanda <em>disetujui</em>; pilih PDF baru hanya bila SK-nya
-                  memang berganti.
+                  perbaikan berikutnya, nomor, tanggal, dan pejabat penetap SK dasar serta berkas terakhir yang sudah
+                  disetujui Kanwil <strong>terisi sendiri</strong> dan bertanda <em>disetujui</em>; pilih PDF baru hanya
+                  bila SK-nya memang berganti.
+                </p>
+                <p>
+                  Isian <strong>Oleh</strong> pada langkah 3 adalah pejabat yang menetapkan SK KGB terakhir (atau SK
+                  CPNS), dan wajib diisi: pejabat itulah yang tertulis pada baris &ldquo;Oleh Pejabat&rdquo; SK KGB
+                  berikutnya. Pilih dari daftar atau ketik sesuai tulisan pada SK. Nomor SK berawalan{" "}
+                  <strong>WP.19</strong> disarankan Kepala Kantor Wilayah Direktorat Jenderal Pemasyarakatan, berawalan{" "}
+                  <strong>W.19</strong> Kepala Kantor Wilayah Kementerian Hukum dan HAM; ganti bila SK-nya ditetapkan
+                  pejabat lain.
                 </p>
                 <p>
                   Dua hal yang <strong>tidak</strong> diisi di sini. <strong>Hukuman disiplin</strong> dilaporkan lewat

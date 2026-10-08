@@ -34,6 +34,8 @@ export interface UsulanKanwil {
    */
   catatanSkBaru?: string | null;
   tanggalSkTerakhir: string | null;
+  /** Pejabat penetap SK itu, isian UPT atau saran dari awalan nomornya (ADR-086). */
+  penetapSkTerakhir?: string | null;
   catatanUpt: string | null;
   diajukanOleh: string | null;
   diajukanAt: string | null;
@@ -148,6 +150,7 @@ export default function DetailUsulan({ usulan: u, pratinjauDiTempat = false }: {
           <span>SK dasar dari UPT</span>
           {u.nomorSkTerakhir ?? "-"}
           {u.tanggalSkTerakhir ? `, ${tgl(u.tanggalSkTerakhir)}` : ""}
+          {u.penetapSkTerakhir ? `, oleh ${u.penetapSkTerakhir}` : ""}
         </p>
       )}
       {u.catatanUpt && <blockquote className="usl-kutipan">{u.catatanUpt}</blockquote>}

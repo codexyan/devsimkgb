@@ -575,6 +575,10 @@ export function LayarKolektif2() {
                   <small>Nomor SK KGB terakhir</small>
                   <span className="lyr-kotak">Sesuai SK</span>
                 </span>
+                <span className="lyr-medan">
+                  <small>Oleh (pejabat penetap)</small>
+                  <span className="lyr-kotak">Sesuai SK</span>
+                </span>
               </div>
               <div className="lyr-hitung">
                 <span>

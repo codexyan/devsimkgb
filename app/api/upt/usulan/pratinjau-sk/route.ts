@@ -54,6 +54,7 @@ export async function POST(req: Request) {
     ...bacaAcuan(teks, dasarBaru),
     nomorSkTerakhir: teks("nomorSkTerakhir") || null,
     tanggalSkTerakhir: teks("tanggalSkTerakhir") ? bacaTanggalInput(teks("tanggalSkTerakhir")) : null,
+    penetapSkTerakhir: teks("penetapSkTerakhir") || null,
   };
 
   let pegawaiLama: PegawaiRow | null = null;

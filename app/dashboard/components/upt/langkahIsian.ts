@@ -35,6 +35,8 @@ export function cekIsianPegawai(i: {
   tmtAcuan: string;
   nomorSkAcuan: string;
   tanggalSkAcuan: string;
+  /** Pejabat penetap SK acuan: baris "Oleh" SK KGB berikutnya (ADR-086). */
+  penetapSkAcuan: string;
   /** Jawaban "ada SK sesudah SK acuan?"; null bila belum dijawab. */
   jawaban: "ada" | "tidak" | null;
   perluSebab: boolean;
@@ -61,6 +63,7 @@ export function cekIsianPegawai(i: {
   c.push({ langkah: 3, ok: !!i.tmtAcuan, label: i.pernah ? "TMT KGB terakhir" : "TMT CPNS" });
   c.push({ langkah: 3, ok: !!i.nomorSkAcuan.trim(), label: `nomor ${acuan}` });
   c.push({ langkah: 3, ok: !!i.tanggalSkAcuan, label: `tanggal ${acuan}` });
+  c.push({ langkah: 3, ok: !!i.penetapSkAcuan.trim(), label: `pejabat penetap ${acuan}` });
   c.push({ langkah: 4, ok: !!i.jawaban, label: `jawaban SK sesudah ${acuan}` });
   if (i.jawaban === "ada" || (i.jawaban === "tidak" && i.perluSebab))
     c.push({

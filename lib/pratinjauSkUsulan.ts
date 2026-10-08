@@ -11,7 +11,7 @@
 import { KOLOM_DITENTUKAN_SK, hitungSkPegawaiBaru, rencanaSkUsulan, type SkTercatat } from "./dasarSkUsulan";
 import { rencanaSiklusBerikutnya, type RencanaSiklusKgb } from "./jadwalKgb";
 import { susunLinimasaDasar, type KgbUntukLinimasa, type SkGaji, type SkPenetapGaji } from "./linimasaDasarSk";
-import { kunciNomorSk } from "./nomorSurat";
+import { penetapSesudahUsulan } from "./penetapSk";
 import { getPangkat } from "./tabelGaji";
 import { isiHitungan } from "./usulanFormulir";
 import { perubahanPegawai } from "./usulanPegawai";
@@ -162,8 +162,11 @@ export function dasarSkPratinjau(input: {
     pegawai: {
       nomorSkDasar: acuanBaru || pegawaiLama?.nomorSkDasar || null,
       tanggalSkDasar: acuanBaru ? usulan.tanggalSkTerakhir ?? null : pegawaiLama?.tanggalSkDasar ?? null,
-      // Nomor SK dasar yang berganti membuat pejabat penetap lama tidak berlaku lagi (lib/setujuiUsulan.ts).
-      penetapSkDasar: acuanBaru && kunciNomorSk(acuanBaru) !== kunciNomorSk(pegawaiLama?.nomorSkDasar) ? null : pegawaiLama?.penetapSkDasar ?? null,
+      // Sama dengan persetujuan (lib/setujuiUsulan.ts): isian UPT, saran dari nomor SK yang berganti, atau yang tercatat.
+      penetapSkDasar: (() => {
+        const penetap = penetapSesudahUsulan(pegawaiLama ?? null, usulan);
+        return penetap === undefined ? pegawaiLama?.penetapSkDasar ?? null : penetap;
+      })(),
       tmtKgbTerakhir: usulan.tmtKgbTerakhir ?? pegawaiLama?.tmtKgbTerakhir ?? null,
       ...mkgAcuan,
     },
