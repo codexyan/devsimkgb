@@ -3248,7 +3248,7 @@ html[data-gerak="kurangi"] .dsb-putar {
 .ksk-bulan { margin: 0; padding: 0 7px 7px; list-style: none; display: grid; gap: 3px; }
 .ksk-bulan button {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: 4px 7px;
   width: 100%;
   padding: 6px 8px;
@@ -3284,6 +3284,15 @@ html[data-gerak="kurangi"] .dsb-putar {
   color: var(--dt5);
 }
 .ksk-kaki .dsb-tag { font-size: 10px; }
+
+/* Gembok fokus papan (ADR-088): redup bila terbuka, navy bila terkunci. */
+.ksk-gembok { flex-shrink: 0; align-self: center; color: var(--dt5); opacity: 0.55; }
+.ksk-kepala[aria-pressed="true"] .ksk-gembok,
+.ksk-bulan button[aria-pressed="true"] .ksk-gembok { color: var(--navy-solid); opacity: 1; }
+.ksk-kepala:hover .ksk-gembok,
+.ksk-bulan button:hover .ksk-gembok { opacity: 1; }
+.ksk-kepala[aria-pressed="true"] { background: var(--tint-navy); }
+.ksk-petunjuk { margin: 0; font-size: 11px; line-height: 1.45; color: var(--dt5); }
 
 .ksk-lain {
   margin: 0;

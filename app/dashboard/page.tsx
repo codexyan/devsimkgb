@@ -51,6 +51,18 @@ import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
 import { kodeSatkerPegawai } from "@/lib/rekapSatker";
 import { susunKartuSatker } from "@/lib/kartuSatkerDasbor";
+import {
+  FOKUS_KOSONG,
+  alihPeriode,
+  alihSatker,
+  bacaFokus,
+  cocokFokus,
+  fokusBerlaku,
+  fokusKosong,
+  kunciSimpanFokus,
+  satkerDalamFokus,
+  type FokusPapan,
+} from "@/lib/fokusPapan";
 import { dipegangKeuanganKanwil } from "@/lib/aksesUpt";
 import { namaRingkasSatker } from "@/app/dashboard/satker/labelSatker";
 /* -----------------------------------------
@@ -241,6 +253,22 @@ function DashboardMain() {
   const [filterMonth, setFilterMonth] = useState<string | null>(null);
   // Saringan satker (ADR-012): "semua", "upt", atau kode satker ("kanwil" untuk pegawai Kanwil).
   const [saringSatker, setSaringSatker] = useState("semua");
+  // Fokus papan per satker dan periode TMT (ADR-088), tersimpan per akun di peramban ini.
+  const [fokusSimpan, setFokusSimpan] = useState<FokusPapan>(() => {
+    try {
+      return typeof window === "undefined" ? FOKUS_KOSONG : bacaFokus(window.localStorage.getItem(kunciSimpanFokus(dashUser.nip)));
+    } catch {
+      return FOKUS_KOSONG;
+    }
+  });
+  const simpanFokus = (f: FokusPapan) => {
+    setFokusSimpan(f);
+    try {
+      window.localStorage.setItem(kunciSimpanFokus(dashUser.nip), JSON.stringify(f));
+    } catch {
+      // Penyimpanan peramban tidak tersedia: fokus tetap berlaku sampai halaman dimuat ulang.
+    }
+  };
   const [modal, setModal] = useState<ModalAksi | null>(null);
   // Seluruh usulan UPT yang menunggu tinjauan, termasuk pegawai baru yang belum punya pegawaiId.
   const [usulanMenunggu, setUsulanMenunggu] = useState<UsulanMenunggu[]>([]);
@@ -352,8 +380,37 @@ function DashboardMain() {
 
   const { stats, pegawaiJatuhTempo, followupNotifs } = data;
 
-  /* -- Antrian kerja: satu daftar untuk semua tahap, disaring satker lalu bulan TMT -- */
-  const dalamSatker = pegawaiJatuhTempo.filter((p) => cocokSatker(p, saringSatker));
+  // Pantau satker: angka per tahap dari antrian yang sama, ditambah usulan UPT yang menunggu.
+  const usulanPerSatker = new Map<string, number>();
+  for (const u of usulanMenunggu) {
+    const kode = cariSatker(u.unitKerja)?.kode;
+    if (kode) usulanPerSatker.set(kode, (usulanPerSatker.get(kode) ?? 0) + 1);
+  }
+  /**
+   * Kartu satker (ADR-036): pekerjaan tiap satker dipecah per bulan TMT. Sumbernya sama dengan papan
+   * antrian, yaitu pegawaiJatuhTempo beserta posisinya, jadi angka di kartu dan isi papan tidak bisa berbeda.
+   * Tidak disaring satker maupun bulan, sebab kartunya justru yang memilih keduanya.
+   */
+  const kartuSatker = susunKartuSatker(
+    pegawaiJatuhTempo.map((p) => ({
+      kode: kodeSatkerPegawai(p.unitKerja) ?? SATKER_KANWIL.kode,
+      bulanTmt: kunciBulan(p.tmtKgbBerikutnya),
+      posisi: posisiAntrian(p),
+    })),
+    usulanPerSatker,
+  );
+  const kodeKartu = (p: PegawaiJatuhTempo) => kodeSatkerPegawai(p.unitKerja) ?? SATKER_KANWIL.kode;
+  // Kunci yang satker atau periodenya sudah tidak punya pekerjaan tidak berlaku, supaya papan tidak kosong diam-diam.
+  const fokus = fokusBerlaku(
+    fokusSimpan,
+    kartuSatker.map((k) => ({ kode: k.kode, bulan: k.bulan.map((b) => b.bulanTmt) })),
+  );
+  const adaFokus = !fokusKosong(fokus);
+
+  /* -- Antrian kerja: satu daftar untuk semua tahap, disaring fokus, satker, lalu bulan TMT -- */
+  const dalamSatker = pegawaiJatuhTempo.filter(
+    (p) => cocokSatker(p, saringSatker) && cocokFokus(fokus, kodeKartu(p), kunciBulan(p.tmtKgbBerikutnya)),
+  );
 
   /*
    * Kolom papan mengikuti satker yang disaring (ADR-049). Sesudah SK diunggah, pegawai Kanwil menunggu
@@ -363,7 +420,14 @@ function DashboardMain() {
    */
   const kolomPapanTampil: KolomPapan[] = (() => {
     const semuaKolom: KolomPapan[] = ["terkunci", "input", "proses", "keuangan", "rekam_upt", "selesai"];
-    if (saringSatker === "semua") return semuaKolom;
+    if (saringSatker === "semua") {
+      if (!adaFokus) return semuaKolom;
+      // Fokus hanya Kanwil, atau hanya UPT: kolom yang tidak mungkin terisi disembunyikan, sama dengan saringan satker.
+      const kode = [...satkerDalamFokus(fokus)];
+      const adaKanwil = kode.includes(SATKER_KANWIL.kode);
+      const adaUpt = kode.some((k) => k !== SATKER_KANWIL.kode);
+      return semuaKolom.filter((k) => (k === "rekam_upt" ? adaUpt : k === "keuangan" ? adaKanwil : true));
+    }
     const kanwil = saringSatker === SATKER_KANWIL.kode;
     return semuaKolom.filter((k) => (k === "rekam_upt" ? !kanwil : k === "keuangan" ? kanwil : true));
   })();
@@ -427,7 +491,7 @@ function DashboardMain() {
     .map((st) => ({ st, jumlah: pegawaiJatuhTempo.filter((p) => cocokSatker(p, st.kode)).length }))
     .filter((x) => x.jumlah > 0);
   const labelSaringan =
-    saringSatker === "semua" ? "semua satker"
+    saringSatker === "semua" ? (adaFokus ? "fokus" : "semua satker")
     : saringSatker === "upt" ? "seluruh UPT"
     : namaRingkasSatker(SATKER.find((st) => st.kode === saringSatker) ?? SATKER_KANWIL);
 
@@ -438,29 +502,20 @@ function DashboardMain() {
    */
   const usulanPerUpt = ringkasUsulanPerUpt(usulanMenunggu, new Date(), (unitKerja) => cariSatker(unitKerja)?.kode ?? unitKerja.trim());
 
-  // Pantau satker: angka per tahap dari antrian yang sama, ditambah usulan UPT yang menunggu.
-  const usulanPerSatker = new Map<string, number>();
-  for (const u of usulanMenunggu) {
-    const kode = cariSatker(u.unitKerja)?.kode;
-    if (kode) usulanPerSatker.set(kode, (usulanPerSatker.get(kode) ?? 0) + 1);
-  }
-  /**
-   * Kartu satker (ADR-036): pekerjaan tiap satker dipecah per bulan TMT. Sumbernya sama dengan papan
-   * antrian, yaitu pegawaiJatuhTempo beserta posisinya, jadi angka di kartu dan isi papan tidak bisa berbeda.
-   * Tidak disaring satker maupun bulan, sebab kartunya justru yang memilih keduanya.
-   */
-  const kartuSatker = susunKartuSatker(
-    pegawaiJatuhTempo.map((p) => ({
-      kode: kodeSatkerPegawai(p.unitKerja) ?? SATKER_KANWIL.kode,
-      bulanTmt: kunciBulan(p.tmtKgbBerikutnya),
-      posisi: posisiAntrian(p),
-    })),
-    usulanPerSatker,
-  );
   const namaSatkerKartu = (kode: string) => {
     const st = SATKER.find((s) => s.kode === kode);
     return { ringkas: st ? namaRingkasSatker(st) : kode, lengkap: st?.nama ?? kode };
   };
+  // Rincian fokus untuk penanda di kepala papan: satker utuh, lalu satker dengan TMT yang dikunci.
+  const rincianFokus = [
+    ...fokus.satker.map((k) => namaSatkerKartu(k).ringkas),
+    ...fokus.periode.map((p) => {
+      const [kode, bulan] = p.split("|");
+      const [y, m] = bulan.split("-").map(Number);
+      const namaBulan = y && m ? new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "short", year: "numeric" }) : bulan;
+      return `${namaSatkerKartu(kode).ringkas} TMT ${namaBulan}`;
+    }),
+  ];
   const satkerTanpaPekerjaan = Math.max(0, SATKER.length - kartuSatker.length);
 
 
@@ -947,6 +1002,20 @@ function DashboardMain() {
               Antrian kerja KGB <small>{labelSaringan}</small>
             </h2>
             <div className="dsb-antrian-alat">
+              {adaFokus && (
+                <button
+                  type="button"
+                  className="dsb-tombol dsb-tombol-kecil"
+                  data-jenis="lembut"
+                  onClick={() => simpanFokus(FOKUS_KOSONG)}
+                  title={`Fokus: ${rincianFokus.join(", ")}. Tekan untuk membuka semua kunci.`}
+                  aria-label={`Buka fokus papan: ${rincianFokus.join(", ")}`}
+                >
+                  <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+                  Fokus: {rincianFokus.length > 2 ? `${rincianFokus.slice(0, 2).join(", ")} +${rincianFokus.length - 2}` : rincianFokus.join(", ")}
+                  <svg aria-hidden="true" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </button>
+              )}
               {filterMonth && (
                 <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="lembut" onClick={() => setFilterMonth(null)} aria-label={`Hapus saringan TMT ${namaBulanFilter}`}>
                   TMT {namaBulanFilter}
@@ -1053,13 +1122,19 @@ function DashboardMain() {
             kartu={kartuSatker}
             namaSatker={namaSatkerKartu}
             tanpaPekerjaan={satkerTanpaPekerjaan}
-            satkerTerpilih={saringSatker === "semua" || saringSatker === "upt" ? null : saringSatker}
-            bulanTerpilih={filterMonth}
-            onPilih={(kode, bulan) => {
-              setSaringSatker(kode ?? "semua");
-              setFilterMonth(bulan);
-              setTahap("semua");
+            fokus={fokus}
+            onAlihSatker={(kode) => {
+              // Fokus menjadi saringan utama papan; saringan satker dan TMT di kepala papan dikembalikan ke semua.
+              simpanFokus(alihSatker(fokus, kode));
+              setSaringSatker("semua");
+              setFilterMonth(null);
             }}
+            onAlihPeriode={(kode, bulan) => {
+              simpanFokus(alihPeriode(fokus, kode, bulan));
+              setSaringSatker("semua");
+              setFilterMonth(null);
+            }}
+            onBukaSemua={() => simpanFokus(FOKUS_KOSONG)}
           />
 
           {/* Pemantauan SK pegawai UPT yang belum direkam di Gaji Web satkernya. Dipindah dari dasbor

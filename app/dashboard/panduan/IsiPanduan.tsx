@@ -1626,8 +1626,12 @@ export default async function IsiPanduan({
                     <p>
                       Di Dashboard, buka Antrian kerja KGB pada ubin Perlu diproses, lalu pilih Input KGB pada kartu
                       pegawai. Antrian itu kini hanya bertampilan papan; tampilan Daftar sudah dilepas karena kolom
-                      papan sudah menjawab pertanyaan yang sama. Di menu Proses KGB, pilih Input KGB pada baris
-                      berstatus Belum Diproses. Jendela Input KGB menampilkan
+                      papan sudah menjawab pertanyaan yang sama. Untuk mengerjakan satu satker atau satu periode lebih
+                      dulu, tekan gembok satker atau baris TMT pada panel <strong>Pekerjaan per satker</strong>: papan
+                      hanya menampilkan yang dikunci (boleh beberapa sekaligus), dan pilihan itu tetap tersimpan untuk
+                      akun Anda di perangkat itu sampai Anda menekan <strong>Buka semua</strong> atau tanda silang pada
+                      penanda Fokus di kepala papan. Kunci ini hanya menyaring tampilan; pekerjaan lain tidak tertahan.
+                      Di menu Proses KGB, pilih Input KGB pada baris berstatus Belum Diproses. Jendela Input KGB menampilkan
                       data kepegawaian saat ini dan hasil perhitungan: masa kerja golongan baru, gaji pokok baru, TMT KGB
                       baru, TMT KGB berikutnya, dan batas input SDM.
                     </p>
