@@ -29,8 +29,11 @@ export const TUGAS_UPT: Record<JenisTugasUpt, { judul: string; nada: NadaTugas }
   periksa: { judul: "Perlu diperiksa", nada: "biru" },
 };
 
-/** Urutan pengerjaan; makin kecil makin dulu. */
-const URUTAN: Record<JenisTugasUpt, number> = { perbaiki: 0, lengkapi: 1, ajukan: 2, periksa: 3 };
+/**
+ * Urutan pengerjaan; makin kecil makin dulu. Yang dikembalikan Kanwil lebih dulu, lalu yang tinggal diajukan (paling
+ * cepat selesai), baru yang masih perlu dilengkapi atau diperiksa (ADR-090).
+ */
+const URUTAN: Record<JenisTugasUpt, number> = { perbaiki: 0, ajukan: 1, lengkapi: 2, periksa: 3 };
 
 export interface UsulanTugas {
   id: string;

@@ -266,6 +266,8 @@ function KartuUpt({
   nama,
   sub,
   nada,
+  label,
+  redup,
   tanda,
   catatan,
   petunjuk,
@@ -278,6 +280,10 @@ function KartuUpt({
   nama: string;
   sub: string;
   nada?: Nada;
+  /** Label keadaan di atas nama, mis. SIAP DIAJUKAN (ADR-090). */
+  label?: { teks: string; nada?: Nada };
+  /** Kartu yang sedang menunggu Kanwil: diredupkan supaya yang dapat dikerjakan UPT lebih menonjol (ADR-090). */
+  redup?: boolean;
   /** Draf yang masa usul KGB-nya belum dibuka; tampil redup di kelompok terlipat (ADR-059). */
   terkunci?: boolean;
   tanda?: { teks: string; nada?: Nada };
@@ -295,10 +301,16 @@ function KartuUpt({
     <article
       className="dsb-kartu-kgb upt-kartu"
       data-nada={nada}
+      data-redup={redup ? "" : undefined}
       data-terkunci={terkunci ? "" : undefined}
       title={petunjuk}
       aria-label={nama}
     >
+      {label && (
+        <p className="dsb-kartu-label-baris">
+          <span className="dsb-kartu-label" data-nada={label.nada}>{label.teks}</span>
+        </p>
+      )}
       <p className="dsb-kartu-kepala">
         {pilih}
         <span className="dsb-nama truncate">{nama}</span>
@@ -1067,9 +1079,17 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const adaDraf = tugas.some((t) => t.usulanId && !t.terkunci);
   const tmtSingkat = (t: string | null) => (t ? `TMT ${formatTanggalId(t, { month: "short", year: "numeric" })}` : "TMT belum tercatat");
 
-  /** Sumber kartu papan; satu entri per dokumen, digabungkan per pegawai di bawah (ADR-026). */
-  const sumberPapan: SumberPapan[] = [
-    ...tugas.map((t) => {
+  /**
+   * Label dan garis kartu tugas menurut tindakan UPT (ADR-090): merah untuk yang dikembalikan, hijau untuk yang tinggal
+   * diajukan, kuning untuk yang perlu dilengkapi atau diperiksa.
+   */
+  const RUPA_TUGAS: Record<string, { label: { teks: string; nada: Nada }; nada?: Nada }> = {
+    perbaiki: { label: { teks: "Dikembalikan", nada: "merah" }, nada: "merah" },
+    ajukan: { label: { teks: "Siap diajukan", nada: "hijau" }, nada: "hijau" },
+    lengkapi: { label: { teks: "Belum lengkap", nada: "kuning" } },
+    periksa: { label: { teks: "Perlu diperiksa", nada: "kuning" } },
+  };
+  const kartuTugas = (t: (typeof tugas)[number]): SumberPapan => {
       const u = usulanById(t.usulanId);
       const p = pegawaiById(t.pegawaiId);
       const cfg = TUGAS_UPT[t.jenis];
@@ -1096,8 +1116,9 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             // Dulu baris ini hanya "TMT Jan 2028", sehingga draf yang siap diajukan terbaca sebagai KGB yang
             // seharusnya masih terkunci (ADR-057).
             sub={u ? `${t.nip} · ${LABEL_JENIS_USULAN[u.jenis] ?? "Usulan data"}` : `${t.nip} · ${tmtSingkat(t.tmt)}`}
-            nada={t.jenis === "perbaiki" ? "ungu" : undefined}
-            tanda={kunci ? { teks: `Terkunci sampai ${namaBulan(kunci.bulanKirim)}` } : { teks: cfg.judul, nada: cfg.nada }}
+            nada={kunci ? undefined : RUPA_TUGAS[t.jenis]?.nada}
+            label={kunci ? undefined : (RUPA_TUGAS[t.jenis]?.label ?? { teks: cfg.judul })}
+            tanda={kunci ? { teks: `Terkunci sampai ${namaBulan(kunci.bulanKirim)}` } : undefined}
             // Penugasan BKO disebut di sini supaya tidak terkira orangnya sudah pindah dan usulannya
             // bukan urusan satker ini lagi; unit kerjanya memang tetap di satker ini.
             catatan={
@@ -1141,7 +1162,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                   </button>
                 </>
               ) : p ? (
-                <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => bukaUsulan(p)}>
+                <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => bukaUsulan(p)}>
                   Perbarui data
                 </button>
               ) : null
@@ -1149,7 +1170,12 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           />
         ),
       };
-    }),
+  };
+  /** Sumber kartu papan; satu entri per dokumen, digabungkan per pegawai di bawah (ADR-026). */
+  const sumberPapan: SumberPapan[] = [
+    // Perlu dikerjakan menurut tindakan UPT (ADR-090): yang dikembalikan lebih dulu, termasuk laporan, lalu sisanya
+    // menurut urutan daftar tugas (siap diajukan, belum lengkap, perlu diperiksa).
+    ...tugas.filter((t) => t.jenis === "perbaiki").map(kartuTugas),
     ...laporan
       .filter((l) => l.status === "dikembalikan")
       .map((l) => ({
@@ -1165,8 +1191,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             lain={lain}
             nama={l.nama}
             sub={`${l.nip} · ${l.label}`}
-            nada="ungu"
-            tanda={{ teks: "Laporan dikembalikan", nada: "ungu" }}
+            nada="merah"
+            label={{ teks: "Laporan dikembalikan", nada: "merah" }}
             catatan={l.catatanKanwil ? `Catatan Kanwil: ${l.catatanKanwil}` : null}
             aksi={
               <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => void batalkanLaporan(l)}>
@@ -1176,6 +1202,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           />
         ),
       })),
+    ...tugas.filter((t) => t.jenis !== "perbaiki").map(kartuTugas),
     ...terkirim
       .filter((u) => u.status === "menunggu")
       .map((u) => ({
@@ -1189,6 +1216,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         render: (lain: string[]) => (
           <KartuUpt
             lain={lain}
+            redup
             tahap={1}
             nama={u.nama}
             sub={`${u.nip} · dikirim ${fmtTgl(u.diajukanAt)}`}
@@ -1230,7 +1258,12 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             tahap={indeksTahap(tahapProsesKgb(review?.status))}
             nama={p.nama}
             sub={`${p.nip} · ${tmtSingkat(p.tmtKgb)}`}
-            tanda={tanda}
+            // Periksa SK menunggu Anda; selebihnya sedang dikerjakan Kanwil (ADR-090).
+            nada={minta ? "kuning" : undefined}
+            label={minta ? { teks: review && review.versi > 1 ? "Periksa lagi" : "Periksa SK", nada: "kuning" } : undefined}
+            redup={!minta}
+            // Label Periksa SK sudah menyebut keadaannya; penanda hanya untuk keadaan lain.
+            tanda={minta ? undefined : tanda}
             catatan={
               minta
                 ? `SK ${review?.nomorSurat ?? ""} dari Kanwil${review?.dimintaAt ? `, ${fmtTgl(review.dimintaAt)}` : ""}. Periksa sebelum dicetak dan ditandatangani`
@@ -1271,6 +1304,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         render: (lain: string[]) => (
           <KartuUpt
             lain={lain}
+            redup
             tahap={2}
             nama={p.nama}
             sub={`${p.nip} · ${tmtSingkat(p.tmtKgb)}`}
@@ -1296,6 +1330,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         render: (lain: string[]) => (
           <KartuUpt
             lain={lain}
+            redup
             nama={l.nama}
             sub={`${l.nip} · ${l.label}${l.tmt ? ` · TMT ${fmtTgl(l.tmt)}` : ""}`}
             tanda={{ teks: "Laporan menunggu tinjauan", nada: "kuning" }}
@@ -1322,14 +1357,14 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         <KartuUpt
           lain={lain}
           tahap={5}
+          nada={sk.berkasAda ? "hijau" : undefined}
+          label={sk.berkasAda ? { teks: "Siap direkam", nada: "hijau" } : undefined}
+          redup={!sk.berkasAda}
           nama={sk.nama}
           sub={`TMT ${fmtTgl(sk.tmtKgbBaru)} · ${sk.golonganBaru} · ${fmtRp(sk.gajiPokokBaru)}`}
           // Berkas SK yang belum diunggah Tim SDM berarti belum dapat direkam; rapelan tetap disebut di catatan.
-          tanda={
-            sk.berkasAda
-              ? { teks: "Siap direkam di Gaji Web", nada: "hijau" }
-              : { teks: "Menunggu berkas SK dari Tim SDM", nada: "kuning" }
-          }
+          // Yang siap direkam sudah disebut labelnya; penanda hanya untuk berkas yang belum diunggah Tim SDM.
+          tanda={sk.berkasAda ? undefined : { teks: "Menunggu berkas SK dari Tim SDM", nada: "kuning" }}
           catatan={
             [
               sk.nomorSurat ? `SK ${sk.nomorSurat}` : "",
@@ -1342,14 +1377,16 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           aksi={
             <>
               {sk.berkasAda && (
-                <a href={`/api/upt/sk/${sk.id}`} target="_blank" rel="noopener noreferrer" className="dsb-tombol dsb-tombol-kecil">
+                <a href={`/api/upt/sk/${sk.id}`} target="_blank" rel="noopener noreferrer" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" style={{ order: 1 }}>
                   Unduh SK
                 </a>
               )}
+              {/* Langkah yang ditagih papan ini: menandai SK sudah direkam di Gaji Web (ADR-090). */}
               <button
                 type="button"
                 className="dsb-tombol dsb-tombol-kecil"
-                data-jenis="garis"
+                data-nada={sk.berkasAda ? "hijau-penuh" : undefined}
+                data-jenis={sk.berkasAda ? undefined : "garis"}
                 disabled={menandaiGajiWeb === sk.id}
                 onClick={() => {
                   setGalatGajiWeb(null);

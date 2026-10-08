@@ -1142,6 +1142,30 @@ export default async function IsiPanduan({
                   Kanwil dengan keterangan <em>Data disetujui, menunggu Kanwil memproses KGB</em>; pegawai itu tidak perlu
                   diusulkan lagi untuk KGB yang sama.
                 </p>
+                <p>
+                  <strong>Warna dan label kartu.</strong> Label di atas nama menyebut apa yang harus Anda kerjakan, dan
+                  tombol pertama adalah langkah itu.
+                </p>
+                <ul>
+                  <li>
+                    Garis <strong>merah</strong> (<em>Dikembalikan</em>, <em>Laporan dikembalikan</em>): perbaiki lebih dulu.
+                  </li>
+                  <li>
+                    Garis <strong>hijau</strong> (<em>Siap diajukan</em>, <em>Siap direkam</em>): tinggal selangkah, yaitu
+                    centang lalu Ajukan, atau tandai <strong>Sudah direkam di Gaji Web</strong>.
+                  </li>
+                  <li>
+                    Garis <strong>kuning</strong> (<em>Periksa SK</em>): SK dari Kanwil menunggu pemeriksaan Anda.
+                  </li>
+                  <li>
+                    Kartu dalam bingkai putus-putus yang redup sedang menunggu Kanwil, jadi tidak ada yang perlu Anda
+                    lakukan.
+                  </li>
+                </ul>
+                <p>
+                  Di Perlu dikerjakan, urutannya: yang dikembalikan, yang siap diajukan, yang belum lengkap, lalu yang
+                  perlu diperiksa.
+                </p>
 
                 <h3 className="pub-h3">Langkah 6: Setelah SK terbit, unduh dan rekam di Gaji Web</h3>
                 <p>

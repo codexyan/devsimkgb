@@ -48,7 +48,7 @@ test("usulan yang dikembalikan didahulukan dan membawa catatan Kanwil", () => {
     [],
     "2026-06",
   );
-  assert.deepEqual(daftar.map((t) => t.jenis), ["perbaiki", "lengkapi", "ajukan"]);
+  assert.deepEqual(daftar.map((t) => t.jenis), ["perbaiki", "ajukan", "lengkapi"], "yang tinggal diajukan sebelum yang belum lengkap (ADR-090)");
   assert.equal(daftar[0].catatan, "Lampirkan SK pengangkatan PNS");
 });
 
