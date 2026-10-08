@@ -210,6 +210,8 @@ export interface UsulanPegawaiRow {
   golonganAcuan?: string | null; mkgTahunAcuan?: number | null; mkgBulanAcuan?: number | null;
   /** "pernah" atau "belum" pernah KGB menurut pilihan UPT (ADR-080); kosong pada usulan lama dan unggahan. */
   keadaanKgb?: string | null;
+  /** Pejabat penetap SK KGB terakhir atau SK CPNS (nomorSkTerakhir): baris "Oleh" SK KGB berikutnya (ADR-086). */
+  penetapSkTerakhir?: string | null;
   hukdisAda: boolean; hukdisJenis: string | null; hukdisNomorSk: string | null;
   hukdisTmtMulai: Date | null; hukdisTmtBerakhir: Date | null; hukdisKeterangan: string | null;
   catatanUpt: string | null;
@@ -279,6 +281,7 @@ export const defs = {
       s("pathSkPmk"),
       s("golonganAcuan"), i("mkgTahunAcuan"), i("mkgBulanAcuan"),
       s("keadaanKgb"),
+      s("penetapSkTerakhir"),
     ],
   },
   RiwayatKGB: {

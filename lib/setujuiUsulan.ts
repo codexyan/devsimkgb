@@ -31,7 +31,7 @@ import {
 } from "./dasarSkUsulan";
 import { kodeSatkerPegawai } from "./rekapSatker";
 import { tanggalKalender } from "./waktu";
-import { kunciNomorSk } from "./nomorSurat";
+import { penetapSesudahUsulan } from "./penetapSk";
 
 
 export interface HasilSetujui {
@@ -180,7 +180,8 @@ export async function setujuiUsulan(
       // Input KGB pertama, jadi Tim SDM tidak mengetiknya ulang (ADR-010).
       nomorSkDasar: usulan.nomorSkTerakhir?.trim() || null,
       tanggalSkDasar: usulan.tanggalSkTerakhir ?? null,
-      penetapSkDasar: null,
+      // Pejabat penetap SK itu: isian UPT, atau saran dari awalan nomornya (ADR-086). Kosong diisi Kanwil saat Input KGB.
+      penetapSkDasar: penetapSesudahUsulan(null, usulan) ?? null,
     };
     if (lanjutan) {
       // Isian usulan (yang mungkin sudah dibetulkan UPT sejak percobaan sebelumnya) ditulis ulang; yang dicatat Kanwil
@@ -335,15 +336,15 @@ export async function setujuiUsulan(
       { id: pegawaiLama.id },
       {
         ...nilaiDitulis,
-        // SK dasar ikut diperbarui hanya bila UPT mengisinya pada usulan ini (ADR-010). Bila nomornya berganti,
-        // pejabat penetap SK lama tidak lagi berlaku; usulan UPT tidak memuat penetap, jadi dikosongkan dan diisi
-        // Tim SDM saat Input KGB (ADR-056).
+        // SK dasar ikut diperbarui hanya bila UPT mengisinya pada usulan ini (ADR-010). Pejabat penetapnya diambil dari
+        // isian UPT; usulan lama tanpa isian itu yang mengganti nomor SK memakai saran dari nomornya, atau dikosongkan
+        // dan diisi Tim SDM saat Input KGB (ADR-056, ADR-086).
         ...(usulan.nomorSkTerakhir?.trim() ? { nomorSkDasar: usulan.nomorSkTerakhir.trim() } : {}),
         ...(usulan.tanggalSkTerakhir ? { tanggalSkDasar: usulan.tanggalSkTerakhir } : {}),
-        ...(usulan.nomorSkTerakhir?.trim() &&
-        kunciNomorSk(usulan.nomorSkTerakhir) !== kunciNomorSk(pegawaiLama.nomorSkDasar)
-          ? { penetapSkDasar: null }
-          : {}),
+        ...(() => {
+          const penetap = penetapSesudahUsulan(pegawaiLama, usulan);
+          return penetap === undefined ? {} : { penetapSkDasar: penetap };
+        })(),
         konfirmasiUptTmt: tmtSiklus,
         konfirmasiUptAt: sekarang,
         konfirmasiUptOleh: usulan.diajukanOleh,

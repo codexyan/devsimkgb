@@ -129,6 +129,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     ...(form.has("keadaanKgb") ? { keadaanKgb: bacaKeadaanKgb(teks) } : {}),
     nomorSkTerakhir: teks("nomorSkTerakhir") || null,
     tanggalSkTerakhir,
+    // Formulir lama yang belum memuat isian penetap membiarkan yang tersimpan (ADR-086).
+    ...(form.has("penetapSkTerakhir") ? { penetapSkTerakhir: teks("penetapSkTerakhir") || null } : {}),
     // Laporan hukdis kini lewat modulnya sendiri (ADR-016). Formulir usulan tidak lagi mengirimnya, dan
     // laporan lama pada draf dibiarkan utuh kecuali permintaannya memang memuat isian hukdis.
     ...(form.has("hukdisAda")

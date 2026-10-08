@@ -16,6 +16,7 @@ import { isGolonganDikenal, mkgAwalGolongan } from "@/lib/tabelGaji";
 import { hitungUsulan, pernahKgb, type HitunganUsulan } from "@/lib/usulanPegawai";
 import type { PratinjauAtasDasar } from "@/lib/linimasaDasarSk";
 import { formatTanggalId, tanggalKalender } from "@/lib/waktu";
+import { saranPenetapDariNomor } from "@/lib/penetapSk";
 
 export interface IsianSkBaru {
   jenis: string;
@@ -328,4 +329,22 @@ export function peringatanDampakKgb(
         "SK ini baru dapat diterapkan setelah Tim SDM Kanwil membatalkan KGB itu; hubungi mereka lebih dulu agar tidak tertahan.",
     };
   return null;
+}
+
+/**
+ * Isian "Oleh" SK acuan sesudah nomornya diubah (ADR-086): isian yang kosong atau masih berupa saran dari nomor lama
+ * diganti saran dari nomor baru; yang dipilih atau diketik sendiri dibiarkan.
+ */
+export function penetapSesudahNomor(penetap: string, nomorLama: string, nomorBaru: string): string {
+  const saranLama = saranPenetapDariNomor(nomorLama) ?? "";
+  if (penetap.trim() && penetap !== saranLama) return penetap;
+  return saranPenetapDariNomor(nomorBaru) ?? "";
+}
+
+/** Keterangan di bawah isian "Oleh" SK acuan. */
+export function petunjukPenetapAcuan(penetap: string, nomor: string): string {
+  const saran = saranPenetapDariNomor(nomor);
+  return saran && penetap === saran
+    ? "Disarankan dari awalan nomor SK. Samakan dengan pejabat yang tertulis pada SK; ganti bila berbeda."
+    : 'Pejabat yang menetapkan SK itu, sesuai tulisan pada SK. Menjadi baris "Oleh" pada SK KGB berikutnya.';
 }

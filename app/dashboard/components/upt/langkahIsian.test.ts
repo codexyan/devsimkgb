@@ -17,6 +17,7 @@ const dasar = {
   tmtAcuan: "2025-03-01",
   nomorSkAcuan: "SK-CPNS-1",
   tanggalSkAcuan: "2025-02-20",
+  penetapSkAcuan: "Menteri Imigrasi dan Pemasyarakatan",
   jawaban: "tidak" as const,
   perluSebab: false,
   kurangDasar: [],
@@ -79,4 +80,12 @@ test("perbaikan data: identitas dan jabatan tidak wajib; SK yang dilaporkan mena
     ["golongan baru menurut SK kenaikan pangkat", "SK kenaikan pangkat"],
   );
   assert.equal(langkahAwal(cek), 4);
+});
+
+test("pejabat penetap SK acuan wajib di langkah 3 (ADR-086)", () => {
+  const cek = cekIsianPegawai({ ...dasar, penetapSkAcuan: " " });
+  assert.equal(keadaanLangkah(cek, 3), "kurang");
+  assert.deepEqual(cek.filter((c) => !c.ok).map((c) => [c.langkah, c.label]), [[3, "pejabat penetap SK CPNS"]]);
+  const pernah = cekIsianPegawai({ ...dasar, pernah: true, mkgTahun: "7", penetapSkAcuan: "" });
+  assert.ok(pernah.some((c) => !c.ok && c.label === "pejabat penetap SK KGB terakhir"));
 });

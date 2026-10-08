@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
+import { BidangPenetap, KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import KolomBerkas from "./KolomBerkas";
 import { BERKAS_USULAN, berkasDasarBaru, berkasUntukKeadaan } from "@/lib/usulanPegawai";
 import { BIDANG_DIISI } from "@/lib/usulanFormulir";
@@ -24,6 +24,8 @@ import {
   jawabSkBaru,
   koreksiAtas,
   mkgPadaSkTercatat,
+  penetapSesudahNomor,
+  petunjukPenetapAcuan,
   pisahkanIsianSk,
   teksAtasDasar,
 } from "./skSesudahAcuan";
@@ -55,7 +57,15 @@ export interface DrafUsulanUpt {
   /** Catatan peninjau Kanwil pada usulan yang dikembalikan; kolomnya dipakai bersama alasan penolakan lama. */
   alasanTolak?: string | null;
   nilai: Record<string, string> | null;
-  surat: { nomorSurat: string; tanggalSurat: string; nomorSkTerakhir: string; tanggalSkTerakhir: string; catatanUpt: string } | null;
+  surat: {
+    nomorSurat: string;
+    tanggalSurat: string;
+    nomorSkTerakhir: string;
+    tanggalSkTerakhir: string;
+    /** Pejabat penetap SK itu (ADR-086); kosong pada draf lama. */
+    penetapSkTerakhir?: string;
+    catatanUpt: string;
+  } | null;
   hukdis: { ada: boolean; jenis: string; nomorSk: string; tmtMulai: string; tmtBerakhir: string; keterangan: string } | null;
   dasarBaru?: { jenis: string; jenisKp: string; nomorSk: string; tanggalSk: string; tmt: string; penetap: string } | null;
   /** Golongan dan masa kerja pada SK KGB terakhir, bila disimpan bersama SK sesudahnya (ADR-078); null pada draf lama. */
@@ -69,6 +79,7 @@ export interface DrafUsulanUpt {
 export interface BawaanUsulanUpt {
   nomorSkTerakhir: string;
   tanggalSkTerakhir: string;
+  penetapSkTerakhir?: string;
   berkas: { medan: string; label: string; nama?: string | null; usulanId: string }[];
 }
 
@@ -90,7 +101,7 @@ export interface PegawaiUntukUsulan {
  */
 const BERKAS_PEGAWAI = BERKAS_USULAN.filter((b) => b.keadaan !== "pengajuan");
 
-const SK_KOSONG = { nomorSkTerakhir: "", tanggalSkTerakhir: "", catatanUpt: "" };
+const SK_KOSONG = { nomorSkTerakhir: "", tanggalSkTerakhir: "", penetapSkTerakhir: "", catatanUpt: "" };
 
 /** Isian identitas; sisanya dikelompokkan sendiri karena punya pemandu. */
 export const BIDANG_IDENTITAS = new Set(["nama", "tempatLahir", "tanggalLahir", "jenisKelamin", "pendidikanTerakhir"]);
@@ -198,9 +209,13 @@ export default function FormulirUsulan({
   // SK dasar yang sudah disetujui Kanwil menjadi isian awal, agar tidak diketik ulang pada tiap perbaikan.
   const bawaan = jenis === "perubahan" ? pegawai?.bawaan : undefined;
   const skDraf = draf?.surat?.nomorSkTerakhir?.trim() ? draf.surat : null;
+  const nomorSkAwal = skDraf?.nomorSkTerakhir ?? bawaan?.nomorSkTerakhir ?? "";
   const [sk, setSk] = useState({
-    nomorSkTerakhir: skDraf?.nomorSkTerakhir ?? bawaan?.nomorSkTerakhir ?? "",
+    nomorSkTerakhir: nomorSkAwal,
     tanggalSkTerakhir: skDraf ? skDraf.tanggalSkTerakhir : (draf?.surat?.tanggalSkTerakhir || bawaan?.tanggalSkTerakhir || ""),
+    // Pejabat penetap SK itu (ADR-086). Draf lama yang belum memuatnya mendapat saran dari awalan nomornya.
+    penetapSkTerakhir:
+      (skDraf ? skDraf.penetapSkTerakhir : bawaan?.penetapSkTerakhir) || penetapSesudahNomor("", "", nomorSkAwal),
     catatanUpt: draf?.surat?.catatanUpt ?? "",
   });
   // SK sesudah SK KGB terakhir beserta isinya, atau jawaban tidak ada (ADR-030, ADR-065). Jenis kosong berarti
@@ -316,6 +331,7 @@ export default function FormulirUsulan({
     tmtAcuan: isian.tmtKgbTerakhir ?? "",
     nomorSkAcuan: sk.nomorSkTerakhir,
     tanggalSkAcuan: sk.tanggalSkTerakhir,
+    penetapSkAcuan: sk.penetapSkTerakhir,
     jawaban,
     perluSebab,
     kurangDasar: kekuranganDasarBaru(
@@ -364,6 +380,7 @@ export default function FormulirUsulan({
     hasil.keadaanKgb = pernahKgb ? "pernah" : "belum";
     hasil.nomorSkTerakhir = sk.nomorSkTerakhir;
     hasil.tanggalSkTerakhir = sk.tanggalSkTerakhir;
+    hasil.penetapSkTerakhir = sk.penetapSkTerakhir;
     hasil.catatanUpt = sk.catatanUpt;
     hasil.dasarBaruJenis = dasar.jenis;
     hasil.dasarBaruJenisKp = dasar.jenisKp;
@@ -798,7 +815,14 @@ export default function FormulirUsulan({
               <input
                 className="kgbm-input"
                 value={sk.nomorSkTerakhir}
-                onChange={(e) => setSk((f) => ({ ...f, nomorSkTerakhir: e.target.value }))}
+                onChange={(e) => {
+                  const nomor = e.target.value;
+                  setSk((f) => ({
+                    ...f,
+                    nomorSkTerakhir: nomor,
+                    penetapSkTerakhir: penetapSesudahNomor(f.penetapSkTerakhir, f.nomorSkTerakhir, nomor),
+                  }));
+                }}
               />
               <span className="kgbm-bantuan">
                 {pernahKgb
@@ -812,6 +836,13 @@ export default function FormulirUsulan({
               onUbah={(v) => setSk((f) => ({ ...f, tanggalSkTerakhir: v }))}
             />
           </div>
+          <BidangPenetap
+            label={`Oleh (pejabat penetap ${skAcuan})`}
+            wajib
+            nilai={sk.penetapSkTerakhir}
+            onUbah={(v) => setSk((f) => ({ ...f, penetapSkTerakhir: v }))}
+            petunjuk={petunjukPenetapAcuan(sk.penetapSkTerakhir, sk.nomorSkTerakhir)}
+          />
         </div>
       </div>
 

@@ -8,7 +8,9 @@
 
 //
 // Kolom keadaan_kgb (ADR-080, migrasi 20261008090000_usulan_keadaan_kgb.sql) diperlakukan sama: bila belum ada,
-// simpanannya diulang tanpa pilihan itu, dan keadaannya kembali ditebak dari masa kerja golongan.
+// simpanannya diulang tanpa pilihan itu, dan keadaannya kembali ditebak dari masa kerja golongan. Begitu pula
+// penetap_sk_terakhir (ADR-086, migrasi 20261008150000_usulan_penetap_sk_terakhir.sql): tanpa kolom itu, penetapnya
+// disarankan dari awalan nomor SK saat disetujui.
 
 import { GalatSupabase } from "./db/supabase/rest";
 import { KOSONG_ACUAN, type AcuanUsulan } from "./usulanFormulir";
@@ -23,8 +25,15 @@ export function kolomKeadaanKgbBelumAda(e: unknown): boolean {
   return e instanceof GalatSupabase && e.kode === "PGRST204" && /'keadaan_kgb'/.test(e.message);
 }
 
-/** Tulis isian usulan; kolom yang belum dimigrasikan (acuan, keadaan KGB) dilepas lalu ditulis ulang. */
-export async function tulisDenganAcuan<T extends Partial<AcuanUsulan> & { keadaanKgb?: string | null }>(
+/** true bila galatnya karena kolom penetap_sk_terakhir belum ada di tabel usulan_pegawai. */
+export function kolomPenetapBelumAda(e: unknown): boolean {
+  return e instanceof GalatSupabase && e.kode === "PGRST204" && /'penetap_sk_terakhir'/.test(e.message);
+}
+
+/** Tulis isian usulan; kolom yang belum dimigrasikan (acuan, keadaan KGB, penetap SK) dilepas lalu ditulis ulang. */
+export async function tulisDenganAcuan<
+  T extends Partial<AcuanUsulan> & { keadaanKgb?: string | null; penetapSkTerakhir?: string | null },
+>(
   isi: T,
   tulis: (isi: T) => Promise<unknown>,
 ): Promise<{ acuanTersimpan: boolean }> {
@@ -35,13 +44,16 @@ export async function tulisDenganAcuan<T extends Partial<AcuanUsulan> & { keadaa
       await tulis(sekarang);
       return { acuanTersimpan };
     } catch (e) {
-      if (coba < 2 && kolomAcuanBelumAda(e)) {
+      if (coba < 3 && kolomAcuanBelumAda(e)) {
         console.warn("[usulan] kolom SK acuan belum ada; usulan disimpan tanpa acuan. Jalankan migrasi 20261007120000_usulan_sk_acuan.sql.");
         sekarang = { ...sekarang, ...KOSONG_ACUAN };
         acuanTersimpan = false;
-      } else if (coba < 2 && kolomKeadaanKgbBelumAda(e)) {
+      } else if (coba < 3 && kolomKeadaanKgbBelumAda(e)) {
         console.warn("[usulan] kolom keadaan_kgb belum ada; pilihan pernah KGB tidak disimpan. Jalankan migrasi 20261008090000_usulan_keadaan_kgb.sql.");
         sekarang = { ...sekarang, keadaanKgb: null };
+      } else if (coba < 3 && kolomPenetapBelumAda(e)) {
+        console.warn("[usulan] kolom penetap_sk_terakhir belum ada; pejabat penetap SK tidak disimpan. Jalankan migrasi 20261008150000_usulan_penetap_sk_terakhir.sql.");
+        sekarang = { ...sekarang, penetapSkTerakhir: null };
       } else throw e;
     }
   }

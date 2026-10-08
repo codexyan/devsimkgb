@@ -30,6 +30,8 @@ export interface BerkasBawaan {
 export interface BawaanUsulan {
   nomorSkTerakhir: string | null;
   tanggalSkTerakhir: Date | null;
+  /** Pejabat penetap SK itu (ADR-086). */
+  penetapSkTerakhir: string | null;
   berkas: Partial<Record<KunciBerkasPegawai, BerkasBawaan>>;
 }
 
@@ -41,7 +43,7 @@ const waktu = (u: Pick<UsulanPegawaiRow, "ditinjauAt" | "diajukanAt">) =>
  * surat itu milik satu pengajuan, bukan milik pegawainya.
  */
 export function bawaanPegawai(
-  pegawai: Pick<PegawaiRow, "id"> & Partial<Pick<PegawaiRow, "nomorSkDasar" | "tanggalSkDasar">>,
+  pegawai: Pick<PegawaiRow, "id"> & Partial<Pick<PegawaiRow, "nomorSkDasar" | "tanggalSkDasar" | "penetapSkDasar">>,
   usulan: readonly UsulanPegawaiRow[],
 ): BawaanUsulan {
   const disetujui = usulan
@@ -58,11 +60,17 @@ export function bawaanPegawai(
 
   const nomorPegawai = pegawai.nomorSkDasar?.trim();
   if (nomorPegawai)
-    return { nomorSkTerakhir: nomorPegawai, tanggalSkTerakhir: pegawai.tanggalSkDasar ?? null, berkas };
+    return {
+      nomorSkTerakhir: nomorPegawai,
+      tanggalSkTerakhir: pegawai.tanggalSkDasar ?? null,
+      penetapSkTerakhir: pegawai.penetapSkDasar?.trim() || null,
+      berkas,
+    };
   const asalSk = disetujui.find((u) => u.nomorSkTerakhir?.trim());
   return {
     nomorSkTerakhir: asalSk?.nomorSkTerakhir?.trim() ?? null,
     tanggalSkTerakhir: asalSk?.tanggalSkTerakhir ?? null,
+    penetapSkTerakhir: asalSk?.penetapSkTerakhir?.trim() || null,
     berkas,
   };
 }

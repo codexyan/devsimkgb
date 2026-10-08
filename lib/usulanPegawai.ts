@@ -10,6 +10,8 @@ import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
 import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
 import { KURANG_JAWABAN_SK_BARU, jawabanSkBaru, kekuranganDasarBaru, perluDasarBaru } from "./dasarBaruUsulan";
 import { hitungSkPegawaiBaru, rencanaSkUsulan } from "./dasarSkUsulan";
+import { penetapSkAcuanUsulan } from "./penetapSk";
+import { kunciNomorSk } from "./nomorSurat";
 import { bulanKeKgbBerikutnya, getGajiPokok, getPangkat, isGolonganDikenal, mkgAwalGolongan, tambahBulan } from "./tabelGaji";
 
 export type StatusUsulan = "draf" | "menunggu" | "revisi" | "disetujui" | "ditolak";
@@ -441,6 +443,15 @@ export function kekuranganUsulan(
   // tercatat; tanpa jawaban itu Atas dasar SK KGB berikutnya bisa keliru diam-diam (ADR-065). Golongan dan masa kerja
   // golongan hanya berubah karena SK itu atau salah ketik, jadi usulan perbaikan yang mengubahnya menyebut sebabnya
   // (ADR-030). Pegawai baru belum punya pembanding.
+  // Pejabat penetap SK KGB terakhir atau SK CPNS menjadi baris "Oleh" SK KGB berikutnya (ADR-086): isian UPT, saran dari
+  // awalan nomornya, atau yang sudah tercatat untuk nomor SK yang sama.
+  const nomorAcuan = usulan.nomorSkTerakhir?.trim();
+  if (nomorAcuan) {
+    const penetapTercatat =
+      pegawai && kunciNomorSk(pegawai.nomorSkDasar) === kunciNomorSk(nomorAcuan) ? pegawai.penetapSkDasar?.trim() : null;
+    if (!penetapSkAcuanUsulan(usulan) && !penetapTercatat)
+      kurang.push(`pejabat penetap ${pernahKgbUsulan(usulan, pegawai) ? "SK KGB terakhir" : "SK CPNS"}`);
+  }
   if (!jawabanSkBaru(usulan.dasarBaruJenis)) kurang.push(KURANG_JAWABAN_SK_BARU);
   else kurang.push(...kekuranganDasarBaru(usulan, jenis !== "baru" && perluDasarBaru(perubahan)));
   // SK kenaikan pangkat yang dilaporkan menuntut golongan barunya, dan SK PMK menuntut masa kerja golongan menurut SK itu.

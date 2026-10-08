@@ -174,7 +174,7 @@ test("usulan yang mengubah golongan tanpa menyebut SK-nya ditolak saat diajukan"
   );
 });
 
-test("usulan yang mengganti nomor SK dasar mengosongkan pejabat penetap SK lama; nomor yang sama (beda spasi) tidak", async () => {
+test("pejabat penetap SK dasar: isian UPT dipakai; nomor baru tanpa isian memakai saran dari awalan nomornya; nomor sama tidak berubah", async () => {
   await denganDataLokal(async () => {
     const { db } = await import("./db");
     const { setujuiUsulan } = await import("./setujuiUsulan");
@@ -210,14 +210,26 @@ test("usulan yang mengganti nomor SK dasar mengosongkan pejabat penetap SK lama;
     assert.equal(hasilSama.ok, true);
     assert.equal((await db.pegawai.findUnique({ id: "p2" }))?.penetapSkDasar, "Kepala Kantor Wilayah lama");
 
-    // Nomor lain: penetap SK lama tidak berlaku lagi untuk SK baru.
+    // Nomor lain tanpa isian penetap (usulan lama): penetap SK lama tidak berlaku lagi; W.19 disarankan Kanwil Kemenkumham.
     const lain = usulan("u3", "W.19-KP.04.04-7001");
     await db.usulanPegawai.create(lain);
     const hasilLain = await setujuiUsulan(lain as never, await db.pegawai.findUnique({ id: "p2" }), "Peninjau", new Date(), "u1");
     assert.equal(hasilLain.ok, true);
     const sesudah = await db.pegawai.findUnique({ id: "p2" });
     assert.equal(sesudah?.nomorSkDasar, "W.19-KP.04.04-7001");
-    assert.equal(sesudah?.penetapSkDasar ?? null, null);
+    assert.equal(sesudah?.penetapSkDasar, "Kepala Kantor Wilayah Kementerian Hukum dan HAM Kalimantan Selatan");
+
+    // Nomor lain tanpa saran dan tanpa isian: dikosongkan, diisi Kanwil saat Input KGB.
+    const tanpaSaran = usulan("u4", "SK-LAIN-12");
+    await db.usulanPegawai.create(tanpaSaran);
+    await setujuiUsulan(tanpaSaran as never, await db.pegawai.findUnique({ id: "p2" }), "Peninjau", new Date(), "u1");
+    assert.equal((await db.pegawai.findUnique({ id: "p2" }))?.penetapSkDasar ?? null, null);
+
+    // Isian UPT selalu dipakai, termasuk untuk nomor yang sama.
+    const isian = { ...usulan("u5", "SK-LAIN-12"), penetapSkTerakhir: "Kepala Lembaga Pemasyarakatan Kelas IIA Banjarmasin" };
+    await db.usulanPegawai.create(isian);
+    await setujuiUsulan(isian as never, await db.pegawai.findUnique({ id: "p2" }), "Peninjau", new Date(), "u1");
+    assert.equal((await db.pegawai.findUnique({ id: "p2" }))?.penetapSkDasar, "Kepala Lembaga Pemasyarakatan Kelas IIA Banjarmasin");
   });
 });
 
