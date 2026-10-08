@@ -269,7 +269,6 @@ export async function GET() {
     kgbDitunda: pegawai.filter((p) => p.kgbDitunda).length,
     tahunIni: rekap?.tahunIni ?? null,
     terlambat: rekap?.terlambat ?? 0,
-    mendatang: rekap?.mendatang ?? [],
     pegawai,
     sk,
   });

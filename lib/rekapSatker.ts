@@ -43,7 +43,10 @@ export interface RingkasanSatker {
   terlambat: number;
   /** Seluruh siklus yang belum selesai dan berpotensi rapelan. */
   berpotensiRapelan: number;
-  /** Jumlah pegawai per bulan TMT untuk beberapa bulan ke depan: dasar jadwal surat usulan UPT. */
+  /**
+   * Jumlah KGB per bulan TMT untuk beberapa bulan ke depan, satu per pegawai per TMT: dasar jadwal surat usulan UPT.
+   * Yang sudah diinput atau selesai tetap terhitung di bulan TMT-nya (ADR-093).
+   */
   mendatang: { bulanTmt: string; jumlah: number }[];
 }
 
@@ -81,9 +84,11 @@ export function rekapPerSatker(input: {
       tahunIni: hitungRekapStatus(siklusSatker.filter((k) => tahunTmt(k) === tahun), hariIni),
       terlambat: semua.terlambat,
       berpotensiRapelan: semua.berpotensiRapelan,
+      // Menurut TMT siklus KGB, sama dengan tahunIni (ADR-093). Dulu menurut TMT KGB berikutnya di data pegawai, yang
+      // bergeser ke siklus sesudahnya begitu KGB diinput, sehingga angka bulan itu menyusut setiap Kanwil menginput.
       mendatang: bulanDepan.map((bulanTmt) => ({
         bulanTmt,
-        jumlah: pegawaiSatker.filter((p) => kunciBulanTmt(p.tmtKgbBerikutnya) === bulanTmt).length,
+        jumlah: siklusSatker.filter((k) => kunciBulanTmt(k.tmtKgbBaru) === bulanTmt).length,
       })),
     };
   });

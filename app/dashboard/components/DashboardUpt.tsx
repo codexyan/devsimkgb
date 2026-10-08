@@ -185,7 +185,6 @@ interface DataUpt {
   kgbDitunda: number;
   tahunIni: RekapStatusKgb | null;
   terlambat: number;
-  mendatang: { bulanTmt: string; jumlah: number }[];
   pegawai: PegawaiUpt[];
   sk: SkUpt[];
 }
@@ -1078,14 +1077,14 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   );
 
   // ── Papan alur KGB: satu kartu per urusan, di kolom tahap yang sedang dijalani ──────────────
-  const jadwal = (() => {
-    const peta = new Map((data?.mendatang ?? []).map((m) => [m.bulanTmt, m.jumlah]));
-    // Mulai dari bulan usulan berjalan: jendela kirim bulan sebelumnya sudah lewat.
-    return Array.from({ length: 4 }, (_, i) => {
-      const bulanTmt = geserBulan(bulanUsulan, i);
-      return { bulanTmt, jumlah: peta.get(bulanTmt) ?? (i === 0 ? perluDiusulkan.length : 0) };
-    });
-  })();
+  // Mulai dari bulan usulan berjalan: jendela kirim bulan sebelumnya sudah lewat. Angkanya dihitung dari daftar yang
+  // sama dengan jendela yang terbuka saat kartu ditekan, yaitu bulan TMT siklus KGB tiap pegawai (ADR-093). Dulu angka ini
+  // memakai TMT KGB berikutnya di data pegawai, yang bergeser ke siklus sesudahnya begitu Kanwil menginput KGB, sehingga
+  // "TMT Des 2026" menyusut ke 2 padahal 57 pegawai masih jatuh tempo bulan itu.
+  const jadwal = Array.from({ length: 4 }, (_, i) => {
+    const bulanTmt = geserBulan(bulanUsulan, i);
+    return { bulanTmt, jumlah: pegawai.filter((p) => p.bulanTmt === bulanTmt).length };
+  });
   // Tombol Ajukan hanya bila ada draf yang memang dapat dicentang; draf terkunci tidak bercentang.
   const adaDraf = tugas.some((t) => t.usulanId && !t.terkunci);
   const tmtSingkat = (t: string | null) => (t ? `TMT ${formatTanggalId(t, { month: "short", year: "numeric" })}` : "TMT belum tercatat");
