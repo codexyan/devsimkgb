@@ -484,12 +484,80 @@ test("pegawai baru yang sudah terbentuk oleh persetujuan yang terputus: usulanny
     assert.equal(p?.mkgTahun, 2);
     assert.equal((await db.riwayatPangkat.findMany({ where: { pegawaiId: "p6" } })).length, 1);
 
-    // Pegawai yang dicatat Kanwil sendiri (bukan dari persetujuan usulan) tetap ditolak.
+    // Pegawai yang dicatat Kanwil sendiri (bukan dari persetujuan usulan) tidak dibuat ulang: usulannya diterapkan sebagai
+    // perbaikan data pegawai itu (ADR-091).
     const lain = { ...pegawai, id: "p7", nip: "199101012020121778", createdAt: dibuat, konfirmasiUptAt: null };
     await db.pegawai.create(lain);
     const u2 = { ...usulan, id: "u22", nip: "199101012020121778" };
     await db.usulanPegawai.create(u2);
-    const tolak = await setujuiUsulan(u2 as never, null, "Peninjau", new Date(), "u1");
-    assert.equal(tolak.ok, false);
+    const perbaikan = await setujuiUsulan(u2 as never, null, "Peninjau", new Date(), "u1");
+    assert.equal(perbaikan.ok, true, JSON.stringify(perbaikan));
+    assert.equal((await db.pegawai.findMany({ where: { nip: "199101012020121778" } })).length, 1);
+    assert.equal((await db.usulanPegawai.findUnique({ id: "u22" }))?.jenis, "perubahan");
+  });
+});
+
+/** Pegawai p1 yang sudah tercatat beserta usulan pegawai baru ber-NIP sama yang tertinggal (ADR-091). */
+async function siapkanBaruTercatat(over: Record<string, unknown> = {}) {
+  const { db, usulan } = await siapkan("sedang_diproses", true);
+  // Pegawainya pernah diperbaiki lewat usulan yang disetujui, jadi bukan persetujuan yang terputus (ADR-079).
+  await db.usulanPegawai.update({ id: usulan.id }, { status: "disetujui" });
+  const baru = {
+    ...usulan, id: "u30", pegawaiId: null, jenis: "baru", nip: "199001012015031001", unitKerja: "Rutan Kelas IIB Rantau",
+    nama: "PEGAWAI UJI", jabatan: "Penjaga Tahanan", pangkat: "Pengatur Muda", golonganRuang: "II/a", tmtGolongan: tgl(2025, 6),
+    mkgTahun: 0, mkgBulan: 0, gajiPokok: 2184000, tmtKgbTerakhir: tgl(2025, 6), tmtKgbBerikutnya: tgl(2026, 6),
+    nomorSurat: "WP.19.PAS17-SA.04.04-2",
+    ...over,
+  };
+  await db.usulanPegawai.create(baru);
+  return { db, baru };
+}
+
+test("usulan pegawai baru yang NIP-nya sudah tercatat di satker yang sama diterapkan sebagai perbaikan data (ADR-091)", async () => {
+  await denganDataLokal(async () => {
+    const { db, baru } = await siapkanBaruTercatat();
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+    const hasil = await setujuiUsulan(baru as never, null, "Peninjau", new Date(), "u1");
+    assert.equal(hasil.ok, true, JSON.stringify(hasil));
+    if (!hasil.ok) return;
+    assert.equal(hasil.pegawaiId, "p1");
+    assert.equal(hasil.jumlahPerubahan, 0);
+    assert.match(hasil.ringkasPerubahan, /NIP sudah tercatat, diterapkan sebagai perbaikan data: tanpa perubahan kolom/);
+    assert.equal((await db.pegawai.findMany({ where: { nip: "199001012015031001" } })).length, 1, "tidak ada pegawai ganda");
+    const u = await db.usulanPegawai.findUnique({ id: "u30" });
+    assert.equal(u?.status, "disetujui");
+    assert.equal(u?.jenis, "perubahan");
+    assert.equal(u?.pegawaiId, "p1");
+    assert.equal(u?.unitKerja, null);
+    // Isiannya sama dengan data tercatat, jadi KGB yang berjalan dan SK-nya tidak tersentuh.
+    assert.equal(hasil.penyesuaianKgb, null);
+    assert.notEqual(await db.suratKGB.findUnique({ kgbId: "k1" }), null);
+  });
+});
+
+test("isian usulan pegawai baru yang berbeda dari data tercatat diterapkan seperti usulan perbaikan (ADR-091)", async () => {
+  await denganDataLokal(async () => {
+    const { db, baru } = await siapkanBaruTercatat({ jabatan: "Pengelola Keamanan" });
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+    const hasil = await setujuiUsulan(baru as never, null, "Peninjau", new Date(), "u1");
+    assert.equal(hasil.ok, true, JSON.stringify(hasil));
+    if (!hasil.ok) return;
+    assert.equal(hasil.jumlahPerubahan, 1);
+    assert.match(hasil.ringkasPerubahan, /Jabatan Penjaga Tahanan → Pengelola Keamanan/);
+    assert.equal((await db.pegawai.findUnique({ id: "p1" }))?.jabatan, "Pengelola Keamanan");
+  });
+});
+
+test("usulan pegawai baru yang NIP-nya tercatat di satker lain tetap ditolak tanpa mengubah apa pun (ADR-091)", async () => {
+  await denganDataLokal(async () => {
+    const { db, baru } = await siapkanBaruTercatat({ satker: "lapas-perempuan-martapura", unitKerja: null });
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+    const hasil = await setujuiUsulan(baru as never, null, "Peninjau", new Date(), "u1");
+    assert.equal(hasil.ok, false);
+    assert.match(hasil.ok ? "" : hasil.pesan, /sudah tercatat atas nama PEGAWAI UJI di Rutan Kelas IIB Rantau/);
+    assert.match(hasil.ok ? "" : hasil.pesan, /Pemindahan antarsatker dicatat Kanwil/);
+    const u = await db.usulanPegawai.findUnique({ id: "u30" });
+    assert.equal(u?.jenis, "baru");
+    assert.equal(u?.status, "menunggu");
   });
 });

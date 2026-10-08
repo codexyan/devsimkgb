@@ -9,6 +9,7 @@ import { cariSkTercatat, catatanSkDilaporkan, usulanBaruMenurutSk, usulanMenurut
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
 import type { RiwayatKGBRow, RiwayatPangkatRow, RiwayatPmkRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
+import { jadikanPerbaikan, nipBaruTercatat } from "@/lib/usulanBaruTercatat";
 import { kgbBerjalanTerbaru } from "@/lib/dataPegawai";
 import { suratSudahDibuat, type SuratKgbTersimpan } from "@/lib/prosesKgb";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
@@ -39,15 +40,26 @@ export async function GET(req: Request) {
     return NextResponse.json({ jumlah: await db.usulanPegawai.count(saring) });
   }
 
-  const semuaUsulan = (await db.usulanPegawai.findMany({ where: saring })) as UsulanPegawaiRow[];
+  const [usulanTersimpan, namaPegawai] = await Promise.all([
+    db.usulanPegawai.findMany({ where: saring }) as Promise<UsulanPegawaiRow[]>,
+    db.pegawai.findKolom(["id", "nama", "nip"]),
+  ]);
+  // Usulan pegawai baru yang menunggu sementara NIP-nya sudah tercatat (ADR-091): pegawainya ikut dimuat, supaya usulan
+  // di satker yang sama ditinjau sebagai perbaikan data pegawai itu, sama dengan yang terjadi saat disetujui.
+  const idPerNip = new Map(namaPegawai.map((p) => [p.nip, p.id]));
+  const idTercatat = (u: UsulanPegawaiRow) =>
+    u.jenis === "baru" && u.status === "menunggu" && u.nip ? (idPerNip.get(u.nip) ?? null) : null;
   // Data induk lengkap dan riwayatnya hanya dibutuhkan usulan yang menunggu; usulan lain cukup nama dan NIP. Seluruh
   // tabel tidak lagi dibaca untuk setiap pembukaan daftar (ADR-079).
   const idMenunggu = [
-    ...new Set(semuaUsulan.filter((u) => u.status === "menunggu" && u.pegawaiId).map((u) => u.pegawaiId as string)),
+    ...new Set(
+      usulanTersimpan.flatMap((u) => (u.status !== "menunggu" ? [] : u.pegawaiId ? [u.pegawaiId] : [idTercatat(u)])).filter(
+        (id): id is string => !!id,
+      ),
+    ),
   ];
   const dariPegawai = <T>(ambil: (where: Where) => Promise<T[]>) => cariDalam(ambil, "pegawaiId", idMenunggu);
-  const [namaPegawai, semuaPegawai, semuaKgb, semuaPangkat, semuaPmk] = await Promise.all([
-    db.pegawai.findKolom(["id", "nama", "nip"]),
+  const [semuaPegawai, semuaKgb, semuaPangkat, semuaPmk] = await Promise.all([
     pegawaiMenurutId(idMenunggu),
     dariPegawai((where) => db.riwayatKGB.findMany({ where }) as Promise<RiwayatKGBRow[]>),
     // SK yang dilaporkan dan sudah tercatat: hasil persetujuan yang terputus, atau laporan ulang (ADR-079).
@@ -65,6 +77,16 @@ export async function GET(req: Request) {
   const pmkPerPegawai = new Map<string, RiwayatPmkRow[]>();
   for (const r of semuaPmk) pmkPerPegawai.set(r.pegawaiId, [...(pmkPerPegawai.get(r.pegawaiId) ?? []), r]);
   const pegawaiById = new Map(semuaPegawai.map((p) => [p.id, p]));
+  /** Keadaan NIP usulan pegawai baru yang sudah tercatat, per id usulan (ADR-091). */
+  const nipTercatat = new Map<string, { nama: string; unitKerja: string; satkerSama: boolean }>();
+  const semuaUsulan = usulanTersimpan.map((u) => {
+    const id = idTercatat(u);
+    const tercatat = id ? pegawaiById.get(id) : undefined;
+    const keadaan = nipBaruTercatat(u, tercatat);
+    if (!keadaan || !tercatat) return u;
+    nipTercatat.set(u.id, { nama: tercatat.nama, unitKerja: tercatat.unitKerja, satkerSama: keadaan === "satker_sama" });
+    return keadaan === "satker_sama" ? jadikanPerbaikan(u, tercatat) : u;
+  });
   const kgbPerPegawai = new Map<string, RiwayatKGBRow[]>();
   for (const k of semuaKgb) kgbPerPegawai.set(k.pegawaiId, [...(kgbPerPegawai.get(k.pegawaiId) ?? []), k]);
   const suratByKgb = new Map(semuaSurat.map((sr) => [sr.kgbId, sr]));
@@ -95,6 +117,8 @@ export async function GET(req: Request) {
         id: u.id,
         pegawaiId: u.pegawaiId,
         jenis: u.jenis,
+        /** Diajukan sebagai pegawai baru padahal NIP-nya sudah tercatat (ADR-091); null bila tidak. */
+        nipTercatat: nipTercatat.get(u.id) ?? null,
         nama: n?.nama ?? u.nama ?? "-",
         nip: n?.nip ?? u.nip ?? "-",
         unitKerja: namaSatker.get(u.satker) ?? u.satker,

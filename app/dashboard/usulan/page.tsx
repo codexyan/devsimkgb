@@ -521,7 +521,15 @@ export default function UsulanPage() {
                                 {u.nomorSurat ? ` · ${u.nomorSurat}` : ""}
                               </span>
                               <span className="usl-butir-tanda">
-                                {u.jenis === "baru" && <span className="dsb-tag" data-garis="" data-nada="hijau">{LABEL_JENIS_USULAN.baru}</span>}
+                                {u.jenis === "baru" && !u.nipTercatat && (
+                                  <span className="dsb-tag" data-garis="" data-nada="hijau">{LABEL_JENIS_USULAN.baru}</span>
+                                )}
+                                {/* Diajukan sebagai pegawai baru padahal NIP-nya sudah tercatat (ADR-091). */}
+                                {u.nipTercatat && (
+                                  <span className="dsb-tag" data-garis="" data-nada={u.nipTercatat.satkerSama ? "kuning" : "merah"}>
+                                    {u.nipTercatat.satkerSama ? "NIP sudah tercatat" : "NIP di satker lain"}
+                                  </span>
+                                )}
                                 {u.perubahan.length > 0 && <span className="dsb-tag" data-garis="">{u.perubahan.length} perubahan</span>}
                                 {u.hukdis && <span className="dsb-tag" data-garis="" data-nada="merah">Hukdis</span>}
                                 {u.status === "menunggu" && u.kgb && u.kgb.status !== "menunggu_keuangan" && (

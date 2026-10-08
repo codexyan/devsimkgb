@@ -13,7 +13,7 @@ import { BELUM_SELESAI, LABEL_JENIS_USULAN } from "@/lib/usulanPegawai";
 import { kunciNomorSk } from "@/lib/nomorSurat";
 import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
 import { TAHAP_KGB_UPT, indeksTahap, kartuPerKolom, tahapProsesKgb, type KolomUpt, type SumberKartu } from "@/lib/papanUpt";
-import { UKURAN_KIRIMAN, ajukanBertahap } from "./upt/ajukanBertahap";
+import { UKURAN_KIRIMAN, ajukanBertahap, kabarJadiPerbaikan } from "./upt/ajukanBertahap";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
 import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
 import MenuTindakan from "@/app/dashboard/components/MenuTindakan";
@@ -121,11 +121,20 @@ interface UsulanTerkirim extends DrafUsulanUpt {
   jumlahPerubahan: number | null;
   /** Yang masih kurang sebelum draf ini boleh diajukan; selalu kosong untuk usulan yang sudah dikirim. */
   kekurangan: string[];
+  /**
+   * Usulan pegawai baru yang NIP-nya sudah tercatat (ADR-091). Di satker ini ia diajukan dan ditinjau sebagai perbaikan
+   * data pegawai itu; di satker lain tidak dapat diajukan.
+   */
+  nipTercatat?: { nama?: string; satkerSama: boolean } | null;
   diajukanAt: string | null;
   ditinjauAt: string | null;
   ditinjauOleh: string | null;
   alasanTolak: string | null;
 }
+
+/** Jenis usulan seperti yang akan ditinjau Kanwil: pegawai baru yang NIP-nya sudah tercatat menjadi perbaikan (ADR-091). */
+const labelJenis = (u: Pick<UsulanTerkirim, "jenis" | "nipTercatat">) =>
+  LABEL_JENIS_USULAN[u.nipTercatat?.satkerSama ? "perubahan" : u.jenis] ?? u.jenis;
 
 /** Satu laporan mutasi atau pemberhentian yang dikirim satker ini (lib/laporanMutasi.ts). */
 interface LaporanUpt {
@@ -520,7 +529,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         return;
       }
       setKabar(
-        `${d.jumlah} pegawai diusulkan ke Kanwil${suratAjukan.nomorSurat.trim() ? ` dengan surat ${suratAjukan.nomorSurat}` : " sebagai laporan SK, tanpa surat usulan"}.`,
+        `${d.jumlah} pegawai diusulkan ke Kanwil${suratAjukan.nomorSurat.trim() ? ` dengan surat ${suratAjukan.nomorSurat}` : " sebagai laporan SK, tanpa surat usulan"}.` +
+          kabarJadiPerbaikan(d.jadiPerbaikan),
       );
       setTimeout(() => setKabar(null), 7000);
       setDialogAjukan(false);
@@ -677,7 +687,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const barisBaru = useMemo(() => {
     const urut: Record<string, number> = { revisi: 0, draf: 1, menunggu: 2 };
     return usulan
-      .filter((u) => u.jenis === "baru" && u.status in urut)
+      // Yang NIP-nya sudah tercatat di satker ini sudah punya baris pegawainya sendiri (ADR-091).
+      .filter((u) => u.jenis === "baru" && u.status in urut && !u.nipTercatat?.satkerSama)
       .sort((a, b) => urut[a.status] - urut[b.status] || a.nama.localeCompare(b.nama, "id"));
   }, [usulan]);
   // Saringan Belum tercatat hilang bersama barisnya; tanpa ini tabel kosong tanpa tombol untuk kembali.
@@ -1115,7 +1126,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             // Kartu draf adalah usulan DATA (perbaikan atau pegawai baru), bukan usulan KGB; jenisnya disebut di sini.
             // Dulu baris ini hanya "TMT Jan 2028", sehingga draf yang siap diajukan terbaca sebagai KGB yang
             // seharusnya masih terkunci (ADR-057).
-            sub={u ? `${t.nip} · ${LABEL_JENIS_USULAN[u.jenis] ?? "Usulan data"}` : `${t.nip} · ${tmtSingkat(t.tmt)}`}
+            sub={u ? `${t.nip} · ${labelJenis(u)}` : `${t.nip} · ${tmtSingkat(t.tmt)}`}
             nada={kunci ? undefined : RUPA_TUGAS[t.jenis]?.nada}
             label={kunci ? undefined : (RUPA_TUGAS[t.jenis]?.label ?? { teks: cfg.judul })}
             tanda={kunci ? { teks: `Terkunci sampai ${namaBulan(kunci.bulanKirim)}` } : undefined}
@@ -1124,6 +1135,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             catatan={
               [
                 t.catatan ? `${t.jenis === "perbaiki" ? "Catatan Kanwil" : "Belum ada"}: ${t.catatan}` : "",
+                // Draf pegawai baru yang orangnya sudah tercatat diajukan sebagai perbaikan datanya (ADR-091).
+                u?.nipTercatat?.satkerSama ? `NIP sudah tercatat atas nama ${u.nipTercatat.nama ?? t.nama}; diajukan sebagai perbaikan data` : "",
                 // Masa usul KGB-nya belum dibuka: kapan terbuka, dan jalan lain bila perbaikannya mendesak.
                 kunci
                   ? `Masa usul KGB ${namaBulan(kunci.bulanTmt)} dibuka ${namaBulan(kunci.bulanKirim)}, 2 bulan sebelum TMT. Bila mendesak, ajukan lewat Usul KGB Kolektif`
@@ -1212,7 +1225,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         nip: u.nip,
         nama: u.nama,
         waktu: u.diajukanAt ?? null,
-        ringkas: `${LABEL_JENIS_USULAN[u.jenis] ?? u.jenis} menunggu tinjauan Kanwil`,
+        ringkas: `${labelJenis(u)} menunggu tinjauan Kanwil`,
         render: (lain: string[]) => (
           <KartuUpt
             lain={lain}
@@ -1220,8 +1233,15 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             tahap={1}
             nama={u.nama}
             sub={`${u.nip} · dikirim ${fmtTgl(u.diajukanAt)}`}
-            tanda={{ teks: `${LABEL_JENIS_USULAN[u.jenis] ?? u.jenis}: menunggu tinjauan`, nada: "kuning" }}
-            catatan={u.nomorSurat ? `Surat ${u.nomorSurat}` : null}
+            tanda={{ teks: `${labelJenis(u)}: menunggu tinjauan`, nada: "kuning" }}
+            catatan={
+              [
+                u.nomorSurat ? `Surat ${u.nomorSurat}` : "",
+                u.nipTercatat?.satkerSama ? "Dikirim sebagai pegawai baru; NIP-nya sudah tercatat, jadi Kanwil meninjaunya sebagai perbaikan data" : "",
+              ]
+                .filter(Boolean)
+                .join(" · ") || null
+            }
             aksi={
               <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => setDialogBatal(u)}>
                 Batalkan usulan
@@ -1835,7 +1855,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 <span className="dsb-titik" data-nada={u.kekurangan.length > 0 ? "merah" : "hijau"} aria-hidden="true" />
                 <span className="min-w-0">
                   <span className="dsb-nama">{u.nama}</span>
-                  <span className="dsb-kecil"> · {LABEL_JENIS_USULAN[u.jenis] ?? u.jenis}</span>
+                  <span className="dsb-kecil"> · {labelJenis(u)}</span>
                   {u.kekurangan.length > 0 && (
                     <p className="dsb-kecil" style={{ margin: 0, color: "var(--st-red)" }}>
                       Belum lengkap: {u.kekurangan.join(", ")}

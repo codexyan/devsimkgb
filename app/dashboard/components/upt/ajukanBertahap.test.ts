@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ajukanBertahap } from "./ajukanBertahap";
+import { ajukanBertahap, kabarJadiPerbaikan } from "./ajukanBertahap";
 
 type Kiriman = { id: string[]; periksaSaja: boolean; berkas: boolean; pathBerkas: string | null };
 
@@ -32,12 +32,21 @@ const surat = new File([new Uint8Array([37, 80, 68, 70])], "surat.pdf", { type: 
 test("12 pegawai: diperiksa sekali, dikirim per 5, surat diunggah sekali lalu jalurnya dipakai ulang", async () => {
   const { log, pulihkan } = tiruFetch((k) => ({
     status: 200,
-    body: k.periksaSaja ? { ok: true, jumlah: 12 } : { ok: true, jumlah: k.id.length, sudah: 0, pathBerkas: "usulan/x_berkas_1.pdf" },
+    body: k.periksaSaja
+      ? { ok: true, jumlah: 12 }
+      : {
+          ok: true,
+          jumlah: k.id.length,
+          sudah: 0,
+          pathBerkas: "usulan/x_berkas_1.pdf",
+          // Pegawai baru yang NIP-nya sudah tercatat, diajukan sebagai perbaikan data (ADR-091).
+          jadiPerbaikan: k.id.includes("u2") ? ["A"] : k.id.includes("u11") ? ["B"] : [],
+        },
   }));
   try {
     const kemajuan: number[] = [];
     const h = await ajukanBertahap({ ids, nomorSurat: "W.1", tanggalSurat: "2026-10-07", berkas: surat, kemajuan: (n) => kemajuan.push(n) });
-    assert.deepEqual(h, { ok: true, jumlah: 12 });
+    assert.deepEqual(h, { ok: true, jumlah: 12, jadiPerbaikan: ["A", "B"] }, "nama yang dijadikan perbaikan dikumpulkan dari tiap kiriman");
     assert.equal(log.length, 4);
     assert.equal(log[0].periksaSaja, true);
     assert.deepEqual(log.slice(1).map((k) => k.id.length), [5, 5, 2]);
@@ -77,4 +86,10 @@ test("draf yang kurang ditolak saat diperiksa, sebelum apa pun dikirim", async (
   } finally {
     pulihkan();
   }
+});
+
+test("kabar pegawai baru yang diajukan sebagai perbaikan data (ADR-091)", () => {
+  assert.equal(kabarJadiPerbaikan([]), "");
+  assert.match(kabarJadiPerbaikan(["A"]), /^ A ternyata sudah tercatat di SIM-KGB, jadi usulannya diajukan sebagai perbaikan data/);
+  assert.match(kabarJadiPerbaikan(["A", "B"]), /^ 2 pegawai \(A, B\) ternyata sudah tercatat/);
 });

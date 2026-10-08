@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { pegawaiMenurutId } from "@/lib/dataSatker";
+import { cariDalam, pegawaiMenurutId } from "@/lib/dataSatker";
 import { auth } from "@/auth";
 import { newId } from "@/lib/sheets/id";
 import { akunUpt } from "@/lib/auth/akunUpt";
@@ -16,7 +16,8 @@ import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkas
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
 import { bentrokNipUsulan } from "@/lib/nipUsulan";
-import type { UsulanPegawaiRow } from "@/lib/sheets/tables";
+import type { PegawaiRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
+import { jadikanPerbaikan, nipBaruTercatat, pesanSatkerLainUpt } from "@/lib/usulanBaruTercatat";
 
 export const runtime = "nodejs";
 
@@ -52,16 +53,36 @@ export async function GET(req: Request) {
     ...new Set(semuaUsulan.map((u) => u.pegawaiId).filter((id): id is string => !!id)),
   ]);
   const pegawaiById = new Map(semuaPegawai.map((p) => [p.id, p]));
+  // Usulan pegawai baru yang belum selesai sementara NIP-nya sudah tercatat (ADR-091): yang di satker ini diajukan dan
+  // disetujui sebagai perbaikan data pegawai itu, jadi kelengkapan dan jumlah perubahannya dihitung sebagai perbaikan.
+  const tercatatPerNip = new Map(
+    (
+      await cariDalam(
+        (where) => db.pegawai.findMany({ where }) as Promise<PegawaiRow[]>,
+        "nip",
+        semuaUsulan.filter((u) => u.jenis === "baru" && BELUM_SELESAI.includes(u.status)).map((u) => u.nip),
+      )
+    ).map((p) => [p.nip, p]),
+  );
 
   const daftar = semuaUsulan
-    .map((u) => {
-      const p = u.pegawaiId ? pegawaiById.get(u.pegawaiId) : null;
+    .map((usulan) => {
+      const tercatat = usulan.nip && BELUM_SELESAI.includes(usulan.status) ? tercatatPerNip.get(usulan.nip) : undefined;
+      const keadaanNip = nipBaruTercatat(usulan, tercatat);
+      const u = keadaanNip === "satker_sama" && tercatat ? jadikanPerbaikan(usulan, tercatat) : usulan;
+      const p = u.pegawaiId ? (pegawaiById.get(u.pegawaiId) ?? (tercatat?.id === u.pegawaiId ? tercatat : null)) : null;
       // Berkas yang sudah disetujui ikut terbawa saat disimpan atau diajukan, jadi kelengkapannya ikut dihitung.
       const lengkapiBawaan = p && u.jenis === "perubahan" ? denganBerkasBawaan(u, bawaanPegawai(p, semuaUsulan)) : u;
       return {
         id: u.id,
-        pegawaiId: u.pegawaiId,
-        jenis: u.jenis,
+        // Jenis yang tersimpan: formulir draf tetap formulir pegawai baru sampai diajukan (ADR-091).
+        pegawaiId: usulan.pegawaiId,
+        jenis: usulan.jenis,
+        /**
+         * Pegawai ber-NIP sama yang sudah tercatat; null bila tidak ada (ADR-091). Nama pegawai satker lain tidak dikirim,
+         * sama dengan rute lain yang tidak membuka data satker lain kepada UPT.
+         */
+        nipTercatat: !keadaanNip || !tercatat ? null : keadaanNip === "satker_sama" ? { nama: tercatat.nama, satkerSama: true } : { satkerSama: false },
         nama: p?.nama ?? u.nama ?? "-",
         nip: p?.nip ?? u.nip ?? "-",
         status: u.status,
@@ -75,7 +96,12 @@ export async function GET(req: Request) {
           ? null
           : u.jenis === "baru" ? BIDANG_USULAN.length : p ? bandingkanUsulan(p, u).length : 0,
         // Apa yang masih kurang sebelum draf ini boleh diajukan; kosong berarti siap.
-        kekurangan: DIPEGANG_UPT.includes(u.status) ? kekuranganUsulan(lengkapiBawaan, u.jenis, p) : [],
+        // NIP yang tercatat di satker lain: drafnya harus dihapus, jadi kekurangan lain tidak perlu disebut (ADR-091).
+        kekurangan: !DIPEGANG_UPT.includes(u.status)
+          ? []
+          : keadaanNip === "satker_lain"
+            ? [pesanSatkerLainUpt(u.nip ?? "")]
+            : kekuranganUsulan(lengkapiBawaan, u.jenis, p),
         // Isi dikirim utuh agar formulirnya dapat dilanjutkan, baik draf maupun usulan yang
         // dikembalikan Kanwil; usulan yang sedang ditinjau atau sudah selesai tidak perlu.
         nilai: DIPEGANG_UPT.includes(u.status) ? nilaiFormulir(u) : null,
