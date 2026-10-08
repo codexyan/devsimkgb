@@ -41,6 +41,14 @@ export async function POST(req: Request) {
   if ("galat" in izin) return izin.galat;
   const { mode } = (await req.json().catch(() => ({}))) as { mode?: string };
   if (mode !== "salin" && mode !== "susulan") return NextResponse.json({ error: "Mode tidak dikenal" }, { status: 400 });
+  // Salin semua mengosongkan D1. Sesudah peralihan, D1 adalah basis data aktif: menyalin ulang dari Supabase akan menimpa
+  // semua yang tertulis sejak peralihan. Panel menyembunyikan tombolnya, tetapi tab yang dibuka sebelum peralihan masih
+  // menampilkannya sampai dimuat ulang.
+  if (mode === "salin" && backendData() === "d1")
+    return NextResponse.json(
+      { error: "Basis data aktif sudah D1. Salin semua dinonaktifkan supaya data D1 tidak tertimpa; pakai Salin yang tertinggal." },
+      { status: 409 },
+    );
   try {
     const hasil = mode === "salin" ? await salinSemua() : await salinSusulan();
     logAudit({
