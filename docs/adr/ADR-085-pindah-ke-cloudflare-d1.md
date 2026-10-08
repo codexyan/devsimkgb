@@ -96,3 +96,15 @@ disalin balik dari cadangan D1. Supabase disimpan tanpa diubah selama dua minggu
   - tersalin dalam satu batch, 0 pelanggaran foreign key;
   - bacaan aplikasi dari D1 sama persis dengan bacaan dari Supabase.
 - Di D1 produksi (masih kosong), nilai bawaan dan trigger diuji dengan satu baris sementara, lalu dibersihkan.
+
+## Catatan peralihan, 8 Oktober 2026 malam
+
+- Secret `DATA_BACKEND=d1` sempat dipasang sebelum Salin semua, sehingga aplikasi membaca D1 kosong selama ±1 menit
+  (20.17–20.18 WITA). Lalu dikembalikan ke `supabase`. Tidak ada data yang tertulis ke D1 selama itu. Sejak itu Salin semua
+  ditolak server bila basis data aktif sudah D1 (PR #52).
+- Peralihan yang sah: Salin semua pukul 20.21 WITA, `DATA_BACKEND=d1` pukul 20.25 WITA.
+- Susulan hanya menambah baris baru. Tiga draf usulan UPT yang disimpan ulang di Supabase di antara kedua waktu itu tidak
+  ikut. Karena itu ditambahkan **Selaraskan perubahan** (`selaraskanPerubahan`):
+  - membaca jejak_data Supabase (ADR-084) sejak Salin semua terakhir di log audit D1, dikurangi jeda 5 menit;
+  - menimpa baris D1 dengan isi Supabase terbaru, atau menghapusnya bila sudah dihapus di Supabase;
+  - baris yang sudah diubah lagi di D1 sesudah salinan tidak ditimpa dan dilaporkan sebagai bentrok.

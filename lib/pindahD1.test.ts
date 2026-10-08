@@ -12,7 +12,7 @@ import { d1 } from "./db/d1/tables";
 import { buatD1Uji, type D1Uji } from "./db/d1/ujiD1";
 import { supabase } from "./db/supabase/tables";
 import { namaTabel } from "./db/supabase/nama";
-import { URUTAN_SALIN, bandingkan, salinSemua, salinSusulan, type SumberMentah } from "./pindahD1";
+import { URUTAN_SALIN, bandingkan, salinSemua, salinSusulan, selaraskanPerubahan, type SumberMentah } from "./pindahD1";
 
 type Baris = Record<string, unknown>;
 
@@ -140,4 +140,47 @@ test("susulan hanya menambah baris yang belum ada; banding menunjukkan selisihny
   assert.equal((await d1.usulanPegawai.findUnique({ id: "usulan_pegawai-1" }))?.catatanUpt, "diubah di D1", "baris yang ada tidak ditimpa");
   assert.equal(await d1.pegawai.count(), 4, "pegawai baru di D1 tetap ada");
   assert.equal((await salinSusulan(sumberDari(data))).total, 0, "susulan kedua tidak menulis apa-apa");
+});
+
+test("selaras: perubahan dan penghapusan di Supabase sesudah salinan diterapkan ke D1, kecuali yang sudah diubah di D1", async () => {
+  const data = dataPostgres();
+  await salinSemua(sumberDari(data));
+  const sejak = new Date();
+  await new Promise((r) => setTimeout(r, 5));
+  process.env.DATA_BACKEND = "d1";
+  // Sesudah peralihan, draf usulan-1 juga disimpan ulang di D1.
+  await d1.usulanPegawai.update({ id: "usulan_pegawai-1" }, { catatanUpt: "diubah di D1" } as never);
+
+  // Di Supabase, di antara Salin semua dan peralihan: dua draf disimpan ulang dan satu dihapus, tercatat di jejak.
+  const usulan = data.get("usulan_pegawai")!;
+  usulan[0].catatan_upt = "disimpan ulang di Supabase";
+  usulan[1].catatan_upt = "Supabase juga";
+  data.set("usulan_pegawai", usulan.filter((u) => u.id !== "usulan_pegawai-2"));
+  const waktu = new Date().toISOString();
+  data.get("jejak_data")!.push(
+    { id: 100, waktu, tabel: "usulan_pegawai", aksi: "ubah", id_baris: "usulan_pegawai-0", lama: {} },
+    { id: 101, waktu, tabel: "usulan_pegawai", aksi: "ubah", id_baris: "usulan_pegawai-1", lama: {} },
+    { id: 102, waktu, tabel: "usulan_pegawai", aksi: "hapus", id_baris: "usulan_pegawai-2", lama: {} },
+    // Jejak lama, jauh sebelum salinan, tidak disentuh.
+    { id: 103, waktu: "2026-01-01T00:00:00.000Z", tabel: "pegawai", aksi: "ubah", id_baris: "pegawai-0", lama: {} },
+  );
+
+  const hasil = await selaraskanPerubahan(sejak, sumberDari(data));
+  const id = (d: { id: string }[]) => d.map((x) => x.id);
+  assert.deepEqual(id(hasil.ditimpa), ["usulan_pegawai-0"]);
+  assert.deepEqual(id(hasil.bentrok), ["usulan_pegawai-1"]);
+  assert.deepEqual(id(hasil.dihapus), ["usulan_pegawai-2"]);
+  assert.deepEqual(hasil.ditambah, []);
+
+  assert.equal((await d1.usulanPegawai.findUnique({ id: "usulan_pegawai-0" }))?.catatanUpt, "disimpan ulang di Supabase");
+  assert.equal((await d1.usulanPegawai.findUnique({ id: "usulan_pegawai-1" }))?.catatanUpt, "diubah di D1", "bentrok tidak ditimpa");
+  assert.equal(await d1.usulanPegawai.findUnique({ id: "usulan_pegawai-2" }), null);
+  // Kolom lain dan nomor urutan baris yang ditimpa tetap utuh.
+  const u0 = await d1.usulanPegawai.findUnique({ id: "usulan_pegawai-0" });
+  assert.equal(u0?.nama, "nama-0");
+  const tanpaUbah = await bandingkan(sumberDari(data));
+  assert.deepEqual(
+    tanpaUbah.filter((b) => b.tabel === "usulan_pegawai").map((b) => [b.supabase, b.d1, b.belumDiD1, b.hanyaDiD1]),
+    [[2, 2, 0, 0]],
+  );
 });

@@ -5,6 +5,7 @@
 //   salin   : D1 dikosongkan lalu diisi ulang dari Supabase. Hanya selama Supabase masih basis data aktif.
 //   susulan : hanya baris yang ada di Supabase tetapi belum ada di D1 (mis. tertulis tepat saat peralihan).
 //   banding : jumlah baris dan selisih id per tabel di kedua sisi.
+//   selaras : perubahan dan penghapusan di Supabase sesudah salinan terakhir, menurut jejak_data-nya, diterapkan ke D1.
 
 import { backendData } from "./db";
 import { KOLOM_URUTAN } from "./db/supabase/nama";
@@ -149,4 +150,105 @@ export async function salinSusulan(sumber: SumberMentah = sumberSupabaseMentah):
   }
   if (pernyataan.length > 1) await db.batch(pernyataan);
   return { mode: "susulan", ditulis, total: Object.values(ditulis).reduce((a, b) => a + b, 0) };
+}
+
+/**
+ * Jeda pengaman sebelum waktu salinan: perubahan yang tertulis ke Supabase saat salinan sedang dibaca ikut diselaraskan.
+ * Menimpa baris yang memang sudah sama tidak mengubah apa pun.
+ */
+const JEDA_SELARAS_MS = 5 * 60_000;
+
+export interface BarisSelaras {
+  tabel: string;
+  id: string;
+}
+
+export interface HasilSelaras {
+  sejak: string;
+  /** Baris D1 yang ditimpa dengan isi Supabase terbaru. */
+  ditimpa: BarisSelaras[];
+  /** Baris yang dihapus di Supabase sesudah salinan, ikut dihapus di D1. */
+  dihapus: BarisSelaras[];
+  /** Baris yang belum ada di D1 (biasanya diurus Salin yang tertinggal). */
+  ditambah: BarisSelaras[];
+  /** Diubah di Supabase dan sudah diubah lagi di D1 sesudah peralihan: dibiarkan, diperiksa manual. */
+  bentrok: BarisSelaras[];
+}
+
+/** Waktu Salin semua yang terakhir menurut log audit di D1; null bila belum pernah. */
+export async function waktuSalinTerakhir(): Promise<Date | null> {
+  const db = await klienD1();
+  const r = await db.prepare("SELECT max(waktu) AS waktu FROM audit_log WHERE aksi = 'pindah_d1_salin'").first<{ waktu: string | null }>();
+  const t = r?.waktu ? new Date(r.waktu) : null;
+  return t && !Number.isNaN(t.getTime()) ? t : null;
+}
+
+/** Timpa satu baris D1 dengan isi baris itu di Supabase; nomor urutannya di D1 dipertahankan. */
+function pernyataanTimpa(db: KlienD1, tabel: string, baris: Baris): PernyataanD1 {
+  const kolom = Object.keys(SKEMA_D1[tabel]).filter((k) => k in baris && k !== "id" && k !== KOLOM_URUTAN);
+  // Satu parameter JSON dibongkar json_each, sama dengan pernyataanSisip: D1 membatasi 100 parameter per pernyataan.
+  return db
+    .prepare(
+      `UPDATE ${tabel} SET (${kolom.join(", ")}) = ` +
+        `(SELECT ${kolom.map((k) => `json_extract(value, '$.${k}')`).join(", ")} FROM json_each(?)) WHERE id = ?`,
+    )
+    .bind(JSON.stringify([baris]), String(baris.id));
+}
+
+/**
+ * Terapkan ke D1 perubahan dan penghapusan yang terjadi di Supabase sesudah salinan terakhir. Salin yang tertinggal hanya
+ * menambah baris baru, jadi perubahan pada baris yang sudah tersalin, misalnya draf usulan yang disimpan ulang di antara
+ * Salin semua dan pergantian DATA_BACKEND, tertinggal tanpa langkah ini. Baris yang diubah dikenali dari jejak_data
+ * Supabase (ADR-084). Baris yang sudah diubah lagi di D1 sejak salinan tidak ditimpa dan dilaporkan sebagai bentrok.
+ */
+export async function selaraskanPerubahan(sejak: Date, sumber: SumberMentah = sumberSupabaseMentah): Promise<HasilSelaras> {
+  const db = await klienD1();
+  const tabelData = new Set<string>(URUTAN_SALIN.filter((t) => t !== "jejak_data"));
+  const batasAsal = sejak.getTime() - JEDA_SELARAS_MS;
+  const sasaran = new Map<string, BarisSelaras>();
+  for (const j of await sumber("jejak_data")) {
+    const tabel = String(j.tabel ?? "");
+    const waktu = new Date(String(j.waktu ?? "")).getTime();
+    if (!tabelData.has(tabel) || j.id_baris == null || !(waktu >= batasAsal)) continue;
+    sasaran.set(`${tabel}|${j.id_baris}`, { tabel, id: String(j.id_baris) });
+  }
+
+  // Jejak D1 sesudah salinan hanya berasal dari D1 sendiri: sampai peralihan, aplikasi tidak menulis ke D1.
+  const { results } = await db
+    .prepare("SELECT tabel, id_baris FROM jejak_data WHERE waktu > ?")
+    .bind(sejak.toISOString())
+    .all<{ tabel: string; id_baris: string | null }>();
+  const diubahDiD1 = new Set(results.map((r) => `${r.tabel}|${r.id_baris}`));
+
+  const isiAsal = new Map<string, Map<string, Baris>>();
+  const idTujuan = new Map<string, Set<string>>();
+  const hasil: HasilSelaras = { sejak: sejak.toISOString(), ditimpa: [], dihapus: [], ditambah: [], bentrok: [] };
+  const pernyataan: PernyataanD1[] = [db.prepare("PRAGMA defer_foreign_keys = ON")];
+  for (const [kunci, s] of sasaran) {
+    if (diubahDiD1.has(kunci)) {
+      hasil.bentrok.push(s);
+      continue;
+    }
+    if (!isiAsal.has(s.tabel)) isiAsal.set(s.tabel, new Map((await sumber(s.tabel)).map((b) => [String(b.id), b])));
+    if (!idTujuan.has(s.tabel)) idTujuan.set(s.tabel, await idD1(db, s.tabel));
+    const asal = isiAsal.get(s.tabel)!.get(s.id);
+    const adaDiD1 = idTujuan.get(s.tabel)!.has(s.id);
+    if (!asal) {
+      if (adaDiD1) {
+        pernyataan.push(db.prepare(`DELETE FROM ${s.tabel} WHERE id = ?`).bind(s.id));
+        hasil.dihapus.push(s);
+      }
+      continue;
+    }
+    const baris = barisKeD1(s.tabel, asal);
+    if (adaDiD1) {
+      pernyataan.push(pernyataanTimpa(db, s.tabel, baris));
+      hasil.ditimpa.push(s);
+    } else {
+      pernyataan.push(...pernyataanSisip(db, s.tabel, [{ ...baris, [KOLOM_URUTAN]: null }], true));
+      hasil.ditambah.push(s);
+    }
+  }
+  if (pernyataan.length > 1) await db.batch(pernyataan);
+  return hasil;
 }

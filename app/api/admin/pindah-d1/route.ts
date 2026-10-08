@@ -4,7 +4,7 @@ import { penggunaLogin, PESAN_SESI_BERAKHIR } from "@/lib/auth/penggunaLogin";
 import { ROLES } from "@/lib/auth/roles";
 import { logAudit } from "@/lib/auditLog";
 import { backendData } from "@/lib/db";
-import { bandingkan, salinSemua, salinSusulan } from "@/lib/pindahD1";
+import { bandingkan, salinSemua, salinSusulan, selaraskanPerubahan, waktuSalinTerakhir } from "@/lib/pindahD1";
 
 export const runtime = "nodejs";
 
@@ -35,11 +35,12 @@ export async function GET() {
   }
 }
 
-/** POST { mode: "salin" | "susulan" }. */
+/** POST { mode: "salin" | "susulan" | "selaras" }. */
 export async function POST(req: Request) {
   const izin = await superAdmin();
   if ("galat" in izin) return izin.galat;
   const { mode } = (await req.json().catch(() => ({}))) as { mode?: string };
+  if (mode === "selaras") return selaras(izin.pengguna.id);
   if (mode !== "salin" && mode !== "susulan") return NextResponse.json({ error: "Mode tidak dikenal" }, { status: 400 });
   // Salin semua mengosongkan D1. Sesudah peralihan, D1 adalah basis data aktif: menyalin ulang dari Supabase akan menimpa
   // semua yang tertulis sejak peralihan. Panel menyembunyikan tombolnya, tetapi tab yang dibuka sebelum peralihan masih
@@ -59,6 +60,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, hasil, backend: backendData(), banding: await bandingkan() });
   } catch (e) {
     console.error(`[pindah-d1] ${mode} gagal:`, e);
+    return NextResponse.json({ error: pesanGalat(e) }, { status: 500 });
+  }
+}
+
+/**
+ * Perubahan dan penghapusan di Supabase sesudah Salin semua yang terakhir, diterapkan ke D1. Hanya sesudah peralihan:
+ * sebelumnya Salin semua sudah membawa semuanya.
+ */
+async function selaras(userId: string) {
+  if (backendData() !== "d1")
+    return NextResponse.json({ error: "Selaraskan perubahan dipakai sesudah DATA_BACKEND beralih ke D1." }, { status: 409 });
+  try {
+    const sejak = await waktuSalinTerakhir();
+    if (!sejak) return NextResponse.json({ error: "Belum ada Salin semua yang tercatat di log audit D1." }, { status: 409 });
+    const hasil = await selaraskanPerubahan(sejak);
+    const daftar = (d: { tabel: string; id: string }[]) => d.map((x) => `${x.tabel} ${x.id}`).join(", ") || "-";
+    logAudit({
+      userId,
+      aksi: "pindah_d1_selaras",
+      detail:
+        `Selaraskan perubahan Supabase sesudah salinan ${hasil.sejak} ke Cloudflare D1: ` +
+        `ditimpa ${daftar(hasil.ditimpa)}; dihapus ${daftar(hasil.dihapus)}; ditambah ${daftar(hasil.ditambah)}; ` +
+        `bentrok, dibiarkan ${daftar(hasil.bentrok)}`,
+    });
+    return NextResponse.json({ ok: true, selaras: hasil, backend: backendData(), banding: await bandingkan() });
+  } catch (e) {
+    console.error("[pindah-d1] selaras gagal:", e);
     return NextResponse.json({ error: pesanGalat(e) }, { status: 500 });
   }
 }
