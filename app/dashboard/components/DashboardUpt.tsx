@@ -93,20 +93,20 @@ function salinanHapusUsulan(status: string) {
       judul: "Hapus data yang disiapkan",
       tombol: "Hapus data",
       peringatan:
-        "Data yang sudah diketik beserta berkas yang diunggah hilang dan tidak dapat dikembalikan. Kanwil belum pernah melihat data ini.",
+        "Data yang sudah diketik beserta berkas yang diunggah hilang dari daftar dan tidak dapat Anda kembalikan sendiri. Kanwil belum pernah melihat data ini. Bila terhapus karena keliru, segera hubungi Kanwil.",
     };
   if (status === "revisi")
     return {
       judul: "Hapus usulan yang dikembalikan",
       tombol: "Hapus usulan",
       peringatan:
-        "Usulan ini beserta berkasnya hilang dan tidak dapat dikembalikan. Hapus hanya bila Kanwil memang meminta demikian; bila datanya cuma perlu diralat, tekan Perbaiki agar isinya tidak perlu diketik ulang.",
+        "Usulan ini beserta berkasnya hilang dari daftar dan tidak dapat Anda kembalikan sendiri. Hapus hanya bila Kanwil memang meminta demikian; bila datanya cuma perlu diralat, tekan Perbaiki agar isinya tidak perlu diketik ulang.",
     };
   return {
     judul: "Batalkan usulan",
     tombol: "Batalkan usulan",
     peringatan:
-      "Usulan ini beserta berkas yang sudah diunggah dihapus dan tidak lagi masuk antrian tinjauan Kanwil. Isinya tidak dapat dikembalikan; bila datanya keliru, kirim usulan baru setelah diperbaiki.",
+      "Usulan ini beserta berkas yang sudah diunggah dihapus dan tidak lagi masuk antrian tinjauan Kanwil. Isinya tidak dapat Anda kembalikan sendiri; bila datanya keliru, kirim usulan baru setelah diperbaiki.",
   };
 }
 

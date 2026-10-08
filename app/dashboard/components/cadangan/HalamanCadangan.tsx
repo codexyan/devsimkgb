@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { zipSync, strToU8 } from "fflate";
 import { BATAS_HARI_CADANGAN, keCsv, namaBerkasCadangan, statusCadangan, terbaru, type KeadaanCadangan } from "@/lib/cadangan";
-import { ROLE_LABEL } from "@/lib/auth/roles";
+import { ROLES, ROLE_LABEL } from "@/lib/auth/roles";
 import { formatTanggalId } from "@/lib/waktu";
 import { catatCadanganLokal, bacaCadanganLokal, KABAR_CADANGAN } from "./cadanganLokal";
+import PanelCadanganServer from "./PanelCadanganServer";
 
 /* Cadangan data bulanan wajib (ADR-018). Data diminta per jenis lalu disusun menjadi CSV dan ZIP di
    peramban, bukan di server: Worker Cloudflare punya batas CPU per permintaan, dan cadangan sebesar ini
@@ -232,6 +233,8 @@ export default function HalamanCadangan() {
           </button>
         </div>
       </section>
+
+      {data?.role === ROLES.SUPER_ADMIN && <PanelCadanganServer />}
     </div>
   );
 }

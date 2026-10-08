@@ -464,7 +464,7 @@ export default function LogAktivitasPage() {
       {dialogHapus && (
         <KerangkaModal
           judul={`Hapus ${terpilih.size} entri log?`}
-          subjudul="Jejak audit tidak dapat dikembalikan setelah dihapus"
+          subjudul="Entri yang dihapus hilang dari Log Aktivitas"
           nada="merah"
           ukuran="sm"
           sibuk={menghapus}
@@ -482,7 +482,7 @@ export default function LogAktivitasPage() {
           }
         >
           <p className="dsb-sub" style={{ margin: 0 }}>
-            Entri yang dihapus tidak dapat dikembalikan. Penghapusan ini sendiri tercatat sebagai aktivitas baru
+            Entri yang dihapus hilang dari daftar ini. Penghapusan ini sendiri tercatat sebagai aktivitas baru
             beserta jumlah entri yang dihapus.
           </p>
         </KerangkaModal>

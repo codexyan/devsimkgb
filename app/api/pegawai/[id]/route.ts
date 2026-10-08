@@ -16,6 +16,7 @@ import { infoStatusKgb } from "@/lib/statusKgb";
 import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { selaraskanSkDasarPegawai } from "@/lib/selarasSkDasar";
+import { pindahkanKeTerhapus, type BucketPindah } from "@/lib/r2Terhapus";
 
 export const runtime = "nodejs";
 
@@ -206,9 +207,8 @@ export async function PATCH(
   return NextResponse.json({ ...untukPeran(pegawai, role), selaras });
 }
 
-type BucketSk = {
+type BucketSk = BucketPindah & {
   list(opsi: { prefix: string; cursor?: string }): Promise<{ objects: { key: string }[]; truncated: boolean; cursor?: string }>;
-  delete(kunci: string[]): Promise<void>;
 };
 
 /** Kunci objek R2 dari pathFile tersimpan; format lama berupa URL penuh memakai nama berkasnya. */
@@ -226,7 +226,8 @@ function kunciBerkasSk(pathFile: unknown): string | null {
 
 /**
  * Hapus berkas SK pegawai di R2: yang tercatat di SuratKGB dan unggahan lain berawalan
- * sk/<nip>_ (termasuk unggahan yang sudah diganti). Best effort; galat dikembalikan, tidak dilempar.
+ * sk/<nip>_ (termasuk unggahan yang sudah diganti). Berkasnya dipindahkan ke terhapus/ dan baru dibuang
+ * sesudah 90 hari (ADR-084). Best effort; galat dikembalikan, tidak dilempar.
  */
 async function hapusBerkasSk(kunciTercatat: string[], nip: string): Promise<{ terhapus: number; galat: string | null }> {
   try {
@@ -243,9 +244,11 @@ async function hapusBerkasSk(kunciTercatat: string[], nip: string): Promise<{ te
         cursor = hasil.truncated ? hasil.cursor : undefined;
       } while (cursor);
     }
-    const daftar = [...semua];
-    for (let i = 0; i < daftar.length; i += 1000) await bucket.delete(daftar.slice(i, i + 1000));
-    return { terhapus: daftar.length, galat: null };
+    const hasil = await pindahkanKeTerhapus(bucket, [...semua]);
+    return {
+      terhapus: hasil.dipindah,
+      galat: hasil.gagal.length > 0 ? `${hasil.gagal.length} berkas gagal dipindahkan ke terhapus/` : null,
+    };
   } catch (e) {
     return { terhapus: 0, galat: e instanceof Error ? e.message : "galat tidak diketahui" };
   }

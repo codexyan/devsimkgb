@@ -6,13 +6,13 @@ import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { BATAS_BERKAS_USULAN_BYTE, BERKAS_USULAN, PESAN_BERKAS_TERLALU_BESAR, kunciBerkasUsulan, namaAsliBerkas } from "./usulanPegawai";
 import { adaPenandaPdf } from "./prosesKgb";
+import { pindahkanKeTerhapus, type BucketPindah } from "./r2Terhapus";
 
 // Batasnya didefinisikan di lib/usulanPegawai.ts agar formulir di peramban memeriksa hal yang sama sebelum mengunggah.
 export const BATAS_BERKAS_BYTE = BATAS_BERKAS_USULAN_BYTE;
 export const PESAN_TERLALU_BESAR = PESAN_BERKAS_TERLALU_BESAR;
 
 export type KunciBerkasUsulan = (typeof BERKAS_USULAN)[number]["kunci"];
-type Bucket = { delete(keys: string | string[]): Promise<void> };
 
 /**
  * Simpan berkas PDF yang disertakan formulir. Hanya berkas yang benar-benar dikirim yang disimpan,
@@ -46,16 +46,17 @@ export async function simpanBerkasUsulan(
 }
 
 /**
- * Hapus objek berkas usulan. Best effort: kegagalannya tidak membatalkan perubahan basis data, karena
- * berkas yatim di R2 tidak terlihat pengguna dan tidak menghalangi apa pun.
+ * Hapus objek berkas usulan: dipindahkan ke terhapus/ dan baru dibuang sesudah 90 hari, agar berkas usulan yang
+ * terhapus masih dapat dikembalikan (ADR-084). Best effort: kegagalannya tidak membatalkan perubahan basis data,
+ * karena berkas yatim di R2 tidak terlihat pengguna dan tidak menghalangi apa pun.
  */
 export async function hapusBerkasUsulan(jalur: readonly string[]): Promise<void> {
   const daftar = jalur.filter(Boolean);
   if (daftar.length === 0) return;
   try {
     const { env } = await getCloudflareContext({ async: true });
-    const bucket = (env as unknown as { SK_BUCKET?: Bucket }).SK_BUCKET;
-    if (bucket) await bucket.delete([...daftar]);
+    const bucket = (env as unknown as { SK_BUCKET?: BucketPindah }).SK_BUCKET;
+    if (bucket) await pindahkanKeTerhapus(bucket, daftar);
   } catch {
     // Diabaikan dengan sengaja; lihat keterangan di atas.
   }

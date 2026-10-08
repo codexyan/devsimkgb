@@ -16,7 +16,7 @@ Konfigurasi ada di `wrangler.jsonc`:
 | `assets` | `.open-next/assets`, binding `ASSETS` | Berkas statis hasil build. |
 | `services` | `WORKER_SELF_REFERENCE` ke `sim-kgb` | Dipakai handler `scheduled` untuk memanggil endpoint cron di Worker yang sama. |
 | `r2_buckets` | `SK_BUCKET` ke bucket `sim-kgb-sk` | Berkas SK KGB. |
-| `triggers.crons` | `0 0 * * *` | Cron harian pukul 00.00 UTC (08.00 WITA). |
+| `triggers.crons` | `0 0 * * *`, `0 12 * * *` | Pukul 00.00 UTC (08.00 WITA): cadangan otomatis lalu notifikasi harian. Pukul 12.00 UTC (20.00 WITA): cadangan otomatis saja (ADR-084). |
 | `compatibility_flags` | `nodejs_compat`, `global_fetch_strictly_public` | Runtime Node yang dibutuhkan Next.js. |
 
 `open-next.config.ts` memakai konfigurasi bawaan (tanpa incremental cache), karena hampir semua
@@ -168,10 +168,16 @@ mengubah binding di `wrangler.jsonc`.
 
 ## 6. Cron harian
 
-1. Cron Trigger `0 0 * * *` memanggil handler `scheduled` di `worker-entry.js`.
-2. Handler itu memanggil `https://sim-kgb.internal/api/cron/notifikasi` lewat binding
-   `WORKER_SELF_REFERENCE`, dengan header `Authorization: Bearer <CRON_SECRET>`.
-3. `app/api/cron/notifikasi/route.ts` menjawab 503 bila `CRON_SECRET` belum diisi dan 401 bila token
+1. Kedua Cron Trigger memanggil handler `scheduled` di `worker-entry.js`.
+2. Handler itu memanggil `https://sim-kgb.internal/api/cron/cadangan`, lalu pada cron `0 0 * * *` juga
+   `https://sim-kgb.internal/api/cron/notifikasi`, lewat binding `WORKER_SELF_REFERENCE` dengan header
+   `Authorization: Bearer <CRON_SECRET>`.
+3. `app/api/cron/cadangan/route.ts` (ADR-084) menyimpan cadangan seluruh basis data ke R2
+   `cadangan/otomatis/<waktu>.jsonl.gz`. Sesudahnya route membuang cadangan yang melewati masa simpan, berkas di
+   `terhapus/` yang lebih tua dari 90 hari, dan `jejak_data` yang lebih tua dari 90 hari. Daftar dan unduhannya ada di
+   menu Cadangkan data (Super Admin). Pemulihan memakai `scripts/pulihkan-cadangan.ts` dan
+   `docs/sql/pulihkan-jejak-data.sql`.
+4. `app/api/cron/notifikasi/route.ts` menjawab 503 bila `CRON_SECRET` belum diisi dan 401 bila token
    tidak cocok. Bila token cocok, route menjalankan:
    - `bersihkanHukdisKedaluwarsa()` (`lib/hukdisKedaluwarsa.ts`): menonaktifkan penanda hukdis pegawai
      yang sudah lewat tanggal berakhir. Kegagalan langkah ini dicatat dan tidak menghentikan langkah berikutnya.
@@ -181,6 +187,7 @@ Hasil dan galat terlihat di log Worker (observability aktif). Untuk menguji tanp
 
 ```bash
 curl -H "Authorization: Bearer <CRON_SECRET>" https://<domain-produksi>/api/cron/notifikasi
+curl -H "Authorization: Bearer <CRON_SECRET>" https://<domain-produksi>/api/cron/cadangan
 ```
 
 Di luar cron, `GET /api/notifikasi` juga membuat notifikasi paling sering sekali tiap 15 menit per isolate.

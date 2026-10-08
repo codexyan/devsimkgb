@@ -18,10 +18,11 @@
   "r2_buckets": [
     { "binding": "SK_BUCKET", "bucket_name": "sim-kgb-sk" }
   ],
-  // Cron harian (00:00 UTC) → generate notifikasi. Ditangani handler scheduled
-  // di wrapper worker (lihat worker-entry.js) yang memanggil /api/cron/notifikasi.
+  // Cron 00:00 UTC (08:00 WITA): cadangan otomatis lalu notifikasi harian. Cron 12:00 UTC (20:00 WITA):
+  // cadangan otomatis saja (ADR-084). Ditangani handler scheduled di wrapper worker (lihat worker-entry.js)
+  // yang memanggil /api/cron/cadangan dan /api/cron/notifikasi.
   "triggers": {
-    "crons": ["0 0 * * *"]
+    "crons": ["0 0 * * *", "0 12 * * *"]
   },
   // Pembatas cek status KGB publik (worker-entry.js, lib/pembatasCekKgb.ts). Durable Object PembatasCekKgb
   // memegang satu penghitung tunggal untuk semua pusat data (per alamat IP dan per NIP). Binding ratelimits

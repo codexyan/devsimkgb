@@ -1074,7 +1074,8 @@ export default async function IsiPanduan({
                   Lebih dari lima pegawai diperiksa kelengkapannya sekaligus, lalu dikirim lima-lima; tombolnya menunjukkan
                   kemajuannya. Bila pengiriman terputus, yang sudah terkirim dilepas dari centang dan pesan menyebut
                   jumlahnya: tekan Ajukan lagi untuk sisanya, dengan nomor surat yang sama. Jangan menghapus usulan untuk
-                  mengulang: usulan yang dihapus hilang beserta berkasnya.
+                  mengulang: usulan yang dihapus hilang dari daftar UPT beserta berkasnya, dan hanya Kanwil yang dapat
+                  mengembalikannya dari cadangan.
                 </p>
                 <LayarKolektif3 />
                 <p>
