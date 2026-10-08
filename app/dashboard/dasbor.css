@@ -1559,6 +1559,7 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 .dsb-kartu-kgb[data-nada="merah"] { box-shadow: inset 3px 0 0 var(--st-red); }
 /* Kolom Sedang diproses (ADR-089): siap ditindaklanjuti Kanwil bergaris hijau, menunggu UPT diredupkan. */
 .dsb-kartu-kgb[data-nada="hijau"] { box-shadow: inset 3px 0 0 var(--st-green); }
+.dsb-kartu-kgb[data-nada="kuning"] { box-shadow: inset 3px 0 0 var(--st-amber); }
 .dsb-kartu-kgb[data-redup] { border-style: dashed; background: var(--sub); }
 .dsb-kartu-kgb[data-redup] :is(.dsb-kartu-kepala, .dsb-kecil, .dsb-kartu-tanda) { opacity: 0.72; }
 .dsb-kartu-label-baris { margin: 0 0 5px; line-height: 1; }
@@ -1575,6 +1576,7 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 }
 .dsb-kartu-label[data-nada="hijau"] { background: var(--tint-green-bg); color: var(--st-green); }
 .dsb-kartu-label[data-nada="merah"] { background: var(--tint-red-bg); color: var(--st-red); }
+.dsb-kartu-label[data-nada="kuning"] { background: var(--tint-amber-bg); color: var(--st-amber); }
 .dsb-kartu-kgb[data-seret] { opacity: 0.4; }
 
 /* Kepala kartu: nama pegawai dan penanda asalnya. Warna penanda membedakan pegawai Kanwil dari pegawai
