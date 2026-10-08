@@ -1,7 +1,8 @@
 # ADR-082: Papan Alur KGB UPT tanpa bolak-balik
 
 Tanggal: 7 Oktober 2026
-Status: berlaku. Melengkapi ADR-077 (review SK oleh UPT) dan ADR-079 (kolom Periksa SK).
+Status: berlaku, kecuali butir 2 (review hanya bila berbeda) yang diganti ADR-087: setiap SK pegawai UPT menunggu UPT.
+Melengkapi ADR-077 (review SK oleh UPT) dan ADR-079 (kolom Periksa SK).
 
 ## Konteks
 

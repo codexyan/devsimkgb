@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bedaSkDenganUsulan, type HarapanSk } from "./sesuaiUsulan";
-import { skBolehDicetak, LABEL_REVIEW_SK } from "./reviewSkUpt";
+import { skBolehDicetak, LABEL_REVIEW_SK, normalReviewSk } from "./reviewSkUpt";
 import { TAHAP_KGB_UPT, indeksTahap, tahapProsesKgb } from "./papanUpt";
 
 const harapan: HarapanSk = {
@@ -37,10 +37,15 @@ test("Atas dasar yang tidak dapat disusun dari usulan dianggap berbeda, supaya S
   assert.deepEqual(beda.map((b) => b.label), ["Atas dasar SK"]);
 });
 
-test("SK sesuai usulan boleh dicetak dan diunggah TTE seperti yang disetujui UPT", () => {
-  assert.equal(skBolehDicetak({ status: "sesuai" }), true);
+test("SK yang sama dengan usulan tetap menunggu UPT; review lama berstatus sesuai dibaca sebagai menunggu (ADR-087)", () => {
+  assert.equal(skBolehDicetak({ status: "sesuai" }), false);
   assert.equal(skBolehDicetak({ status: "menunggu" }), false);
-  assert.equal(LABEL_REVIEW_SK.sesuai.nada, "hijau");
+  const lama = { status: "sesuai", ditanggapiAt: new Date(), ditanggapiOleh: "Sistem: sesuai usulan UPT" };
+  assert.deepEqual(normalReviewSk(lama), { status: "menunggu", ditanggapiAt: null, ditanggapiOleh: null });
+  const disetujui = { status: "disetujui", ditanggapiAt: new Date(), ditanggapiOleh: "UPT" };
+  assert.equal(normalReviewSk(disetujui), disetujui);
+  assert.equal(normalReviewSk(null), null);
+  assert.ok(LABEL_REVIEW_SK.sesuai);
 });
 
 test("tahap KGB pada kartu: kembali ke Di Kanwil sesudah Periksa SK terbaca maju ke TTE", () => {
@@ -51,7 +56,8 @@ test("tahap KGB pada kartu: kembali ke Di Kanwil sesudah Periksa SK terbaca maju
   assert.equal(indeksTahap(tahapProsesKgb(null)), 2, "SK sedang dibuat");
   assert.equal(indeksTahap(tahapProsesKgb("menunggu")), 3, "Periksa SK");
   assert.equal(indeksTahap(tahapProsesKgb("perbaikan")), 2, "SK diperbaiki Kanwil");
-  for (const status of ["disetujui", "sesuai", "dilewati"]) assert.equal(indeksTahap(tahapProsesKgb(status)), 4, status);
+  assert.equal(indeksTahap(tahapProsesKgb("sesuai")), 3, "sesuai usulan masih menunggu Periksa SK (ADR-087)");
+  for (const status of ["disetujui", "dilewati"]) assert.equal(indeksTahap(tahapProsesKgb(status)), 4, status);
   assert.equal(indeksTahap("sk_terbit"), 5);
   assert.equal(indeksTahap("selesai"), 6);
 });

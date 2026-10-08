@@ -203,7 +203,7 @@ function keadaan(p: PegawaiUpt): { teks: string; nada?: Nada } {
     // SK yang sudah dibuat Kanwil menunggu review satker ini lebih dulu (ADR-077).
     const r = p.reviewSk?.status;
     if (r === "menunggu") return { teks: LABEL_REVIEW_SK.menunggu.upt, nada: "kuning" };
-    if (r) return { teks: LABEL_REVIEW_SK[r].upt, nada: r === "disetujui" || r === "sesuai" ? "hijau" : "navy" };
+    if (r) return { teks: LABEL_REVIEW_SK[r].upt, nada: r === "disetujui" ? "hijau" : "navy" };
     return { teks: "Sedang diproses Kanwil", nada: "navy" };
   }
   if (p.terkunci) return { teks: "Belum masuk jadwal" };
@@ -1213,8 +1213,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             ? { teks: LABEL_REVIEW_SK.perbaikan.upt, nada: "ungu" }
             : review?.status === "disetujui"
               ? { teks: LABEL_REVIEW_SK.disetujui.upt, nada: "hijau" }
-              : review?.status === "sesuai"
-              ? { teks: LABEL_REVIEW_SK.sesuai.upt, nada: "hijau" }
               : review?.status === "dilewati"
                 ? { teks: LABEL_REVIEW_SK.dilewati.upt, nada: "biru" }
                 : { teks: "SK sedang dibuat Kanwil", nada: "biru" };

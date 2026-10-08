@@ -160,8 +160,9 @@ export function indeksTahap(k: KeadaanTahap): number {
 
 /** Keadaan tahap KGB yang sedang diproses Kanwil menurut status review SK-nya. */
 export function tahapProsesKgb(statusReview: string | null | undefined): KeadaanTahap {
-  if (statusReview === "menunggu") return "sk_diperiksa";
+  // "sesuai" (ADR-082) kini dibaca sebagai menunggu review UPT (ADR-087).
+  if (statusReview === "menunggu" || statusReview === "sesuai") return "sk_diperiksa";
   if (statusReview === "perbaikan") return "sk_diperbaiki";
-  if (statusReview === "disetujui" || statusReview === "sesuai" || statusReview === "dilewati") return "tte";
+  if (statusReview === "disetujui" || statusReview === "dilewati") return "tte";
   return "sk_dibuat";
 }
