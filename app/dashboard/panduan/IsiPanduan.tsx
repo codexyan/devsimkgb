@@ -1725,6 +1725,14 @@ export default async function IsiPanduan({
                       melalui review ini. SK pegawai UPT yang dibuat sebelum review aktif juga tertahan sampai direview:
                       pilih <strong>Minta review UPT</strong>.
                     </p>
+                    <p>
+                      Di papan antrian Dashboard, kolom <strong>Sedang diproses</strong> diurutkan menurut tindakan Kanwil.
+                      Yang paling atas adalah SK yang diminta diperbaiki UPT (garis merah, label <em>Perbaiki SK</em>).
+                      Sesudahnya SK yang <strong>siap cetak</strong> (garis hijau, tombol <strong>Cetak SK</strong> hijau
+                      di depan, lalu Unggah TTE), kemudian KGB yang perlu dibuat SK-nya. Paling bawah, dalam bingkai
+                      putus-putus yang diredupkan, SK yang masih menunggu review UPT beserta lama menunggunya. Dalam
+                      tiap kelompok, batas input terdekat di atas.
+                    </p>
                   </div>
                   </li>
                   <li>
