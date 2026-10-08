@@ -13,6 +13,28 @@ interface Banding {
   hanyaDiD1: number;
 }
 
+/** Hasil Selaraskan perubahan (lib/pindahD1.ts). */
+interface Selaras {
+  ditimpa: { tabel: string; id: string }[];
+  dihapus: { tabel: string; id: string }[];
+  ditambah: { tabel: string; id: string }[];
+  bentrok: { tabel: string; id: string }[];
+}
+
+function kabarSelaras(s: Selaras): { nada: "hijau" | "merah"; teks: string } {
+  const bagian = [
+    s.ditimpa.length ? `${s.ditimpa.length} baris diperbarui` : "",
+    s.dihapus.length ? `${s.dihapus.length} dihapus` : "",
+    s.ditambah.length ? `${s.ditambah.length} ditambah` : "",
+  ].filter(Boolean);
+  const isi = bagian.length ? `${bagian.join(", ")} dari Supabase.` : "Tidak ada perubahan Supabase yang tertinggal.";
+  if (s.bentrok.length === 0) return { nada: "hijau", teks: isi };
+  return {
+    nada: "merah",
+    teks: `${isi} ${s.bentrok.length} baris sudah diubah lagi di D1 sehingga dibiarkan; periksa manual: ${s.bentrok.map((b) => `${b.tabel} ${b.id}`).join(", ")}.`,
+  };
+}
+
 interface Keadaan {
   backend: string;
   banding?: Banding[];
@@ -39,13 +61,13 @@ export default function PanelPindahD1() {
     return () => clearTimeout(t);
   }, []);
 
-  async function jalankan(mode: "salin" | "susulan") {
+  async function jalankan(mode: "salin" | "susulan" | "selaras") {
     if (
       mode === "salin" &&
       !window.confirm("Isi D1 akan dikosongkan lalu diisi ulang dengan seluruh data Supabase. Lanjutkan?")
     )
       return;
-    setSibuk(mode === "salin" ? "Menyalin seluruh data…" : "Menyalin yang tertinggal…");
+    setSibuk(mode === "salin" ? "Menyalin seluruh data…" : mode === "selaras" ? "Menyelaraskan perubahan…" : "Menyalin yang tertinggal…");
     setKabar(null);
     try {
       const res = await fetch("/api/admin/pindah-d1", {
@@ -53,10 +75,10 @@ export default function PanelPindahD1() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode }),
       });
-      const d = (await res.json().catch(() => ({}))) as Keadaan & { hasil?: { total: number }; error?: string };
+      const d = (await res.json().catch(() => ({}))) as Keadaan & { hasil?: { total: number }; selaras?: Selaras; error?: string };
       if (!res.ok) throw new Error(d.error ?? "Gagal");
       setData(d);
-      setKabar({ nada: "hijau", teks: `${d.hasil?.total.toLocaleString("id-ID") ?? 0} baris ditulis ke D1.` });
+      setKabar(d.selaras ? kabarSelaras(d.selaras) : { nada: "hijau", teks: `${d.hasil?.total.toLocaleString("id-ID") ?? 0} baris ditulis ke D1.` });
     } catch (e) {
       setKabar({ nada: "merah", teks: e instanceof Error ? e.message : "Gagal" });
     } finally {
@@ -79,7 +101,7 @@ export default function PanelPindahD1() {
         <p className="dsb-kecil" style={{ margin: 0 }}>
           Basis data aktif: <b>{data ? (aktifD1 ? "Cloudflare D1" : "Supabase") : "…"}</b>.{" "}
           {aktifD1
-            ? "Supabase disimpan sebagai cadangan. Salin yang tertinggal hanya menambah baris yang belum ada di D1."
+            ? "Supabase disimpan sebagai cadangan. Salin yang tertinggal hanya menambah baris yang belum ada di D1; Selaraskan perubahan menerapkan perubahan dan penghapusan di Supabase sesudah Salin semua terakhir."
             : "Salin semua mengosongkan D1 lalu mengisinya dengan seluruh data Supabase dalam satu transaksi."}
         </p>
         {kabar && (
@@ -141,6 +163,12 @@ export default function PanelPindahD1() {
           <button type="button" className="dsb-tombol" data-jenis="garis" onClick={() => void jalankan("susulan")} disabled={!!sibuk}>
             Salin yang tertinggal
           </button>
+          {/* Perubahan pada baris yang sudah tersalin, di antara Salin semua dan peralihan (lib/pindahD1.ts). */}
+          {aktifD1 && (
+            <button type="button" className="dsb-tombol" onClick={() => void jalankan("selaras")} disabled={!!sibuk}>
+              Selaraskan perubahan
+            </button>
+          )}
           {!aktifD1 && (
             <button type="button" className="dsb-tombol" onClick={() => void jalankan("salin")} disabled={!!sibuk || !data}>
               Salin semua ke D1
