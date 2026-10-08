@@ -1,0 +1,48 @@
+// Repository Cloudflare D1 (ADR-085) dengan kunci dan tipe baris yang sama dengan `sheets` dan `supabase`.
+
+import {
+  defs,
+  type AuditLogRow,
+  type NotifikasiRow,
+  type PegawaiRow,
+  type PengumumanDilihatRow,
+  type ReviewSkUptRow,
+  type PenandatanganRow,
+  type RiwayatKGBRow,
+  type RiwayatPangkatRow,
+  type RiwayatPmkRow,
+  type RiwayatMutasiRow,
+  type LaporanMutasiRow,
+  type LaporanHukdisRow,
+  type TemplateSuratRow,
+  type UsulanPegawaiRow,
+  type UserRow,
+} from "../../sheets/tables";
+import { D1Table } from "./table";
+
+export const d1 = {
+  user: new D1Table<UserRow>(defs.User),
+  profileChangeRequest: new D1Table(defs.ProfileChangeRequest),
+  pegawai: new D1Table<PegawaiRow>(defs.Pegawai),
+  riwayatKGB: new D1Table<RiwayatKGBRow>(defs.RiwayatKGB),
+  suratKGB: new D1Table(defs.SuratKGB),
+  serahTerima: new D1Table(defs.SerahTerima),
+  konfigurasiKanwil: new D1Table(defs.KonfigurasiKanwil),
+  penandatangan: new D1Table<PenandatanganRow>(defs.Penandatangan),
+  notifikasi: new D1Table<NotifikasiRow>(defs.Notifikasi),
+  riwayatHukdis: new D1Table(defs.RiwayatHukdis),
+  riwayatPangkat: new D1Table<RiwayatPangkatRow>(defs.RiwayatPangkat),
+  riwayatPmk: new D1Table<RiwayatPmkRow>(defs.RiwayatPmk),
+  riwayatMutasi: new D1Table<RiwayatMutasiRow>(defs.RiwayatMutasi),
+  laporanMutasi: new D1Table<LaporanMutasiRow>(defs.LaporanMutasi),
+  laporanHukdis: new D1Table<LaporanHukdisRow>(defs.LaporanHukdis),
+  templateSurat: new D1Table<TemplateSuratRow>(defs.TemplateSurat),
+  usulanPegawai: new D1Table<UsulanPegawaiRow>(defs.UsulanPegawai),
+  hukdisJenis: new D1Table(defs.HukdisJenis),
+  hukdisKonfigurasi: new D1Table(defs.HukdisKonfigurasi),
+  regulasi: new D1Table(defs.Regulasi),
+  auditLog: new D1Table<AuditLogRow>(defs.AuditLog),
+  pengumumanDilihat: new D1Table<PengumumanDilihatRow>(defs.PengumumanDilihat),
+  reviewSkUpt: new D1Table<ReviewSkUptRow>(defs.ReviewSkUpt),
+  rekonBulanan: new D1Table(defs.RekonBulanan),
+};

@@ -8,6 +8,7 @@
 // terputus saat disusun dan tidak boleh dipercaya utuh.
 
 import { backendData, db, type Db } from "./db";
+import { klienD1 } from "./db/d1/klien";
 import { KOLOM_URUTAN, namaTabel } from "./db/supabase/nama";
 import { rest } from "./db/supabase/rest";
 import { ALL_DEFS } from "./sheets/tables";
@@ -31,8 +32,11 @@ const KOLOM_RAHASIA: Readonly<Record<string, readonly string[]>> = { users: ["pa
 type Baris = Record<string, unknown>;
 
 export interface SumberCadangan {
-  /** "postgres": baris mentah Supabase (snake_case); "aplikasi": record lapisan data (camelCase), untuk uji lokal. */
-  bentuk: "postgres" | "aplikasi";
+  /**
+   * "postgres": baris mentah Supabase (snake_case); "d1": baris mentah D1 (snake_case, boolean 0/1, ADR-085);
+   * "aplikasi": record lapisan data (camelCase), untuk uji lokal.
+   */
+  bentuk: "postgres" | "d1" | "aplikasi";
   tabel: readonly string[];
   /** Baris satu tabel, per halaman. */
   baca(tabel: string): AsyncIterable<Baris[]>;
@@ -95,8 +99,27 @@ export function sumberAplikasi(): SumberCadangan {
   };
 }
 
+/** Sumber baris mentah dari Cloudflare D1 (ADR-085), per halaman menurut urutan baris dimasukkan. */
+export function sumberD1(): SumberCadangan {
+  return {
+    bentuk: "d1",
+    tabel: tabelAplikasi(),
+    async *baca(tabel: string) {
+      const d1 = await klienD1();
+      for (let offset = 0; ; offset += UKURAN_HALAMAN) {
+        const { results } = await d1
+          .prepare(`SELECT * FROM ${tabel} ORDER BY ${KOLOM_URUTAN} LIMIT ${UKURAN_HALAMAN} OFFSET ${offset}`)
+          .all<Baris>();
+        if (results.length > 0) yield results.map((b) => ({ ...b }));
+        if (results.length < UKURAN_HALAMAN) return;
+      }
+    },
+  };
+}
+
 export function sumberBawaan(): SumberCadangan {
-  return backendData() === "supabase" ? sumberSupabase() : sumberAplikasi();
+  const backend = backendData();
+  return backend === "d1" ? sumberD1() : backend === "supabase" ? sumberSupabase() : sumberAplikasi();
 }
 
 function tanpaRahasia(tabel: string, baris: Baris): Baris {
