@@ -127,6 +127,12 @@ export default function ModalReviewSk({
             Kanwil sudah membuat SK KGB pegawai ini. Periksa nama, NIP, pangkat dan golongan, gaji pokok, masa kerja, serta TMT
             sebelum SK dicetak, ditandatangani basah, dan dikirim lewat Srikandi. Pratinjau di samping bertanda air DRAF.
           </Catatan>
+          {data?.sesuaiUsulan && (
+            <Catatan nada="hijau">
+              Isi SK ini sama dengan usulan Anda yang disetujui Kanwil: golongan, masa kerja, gaji pokok, TMT, dan Atas dasar.
+              Periksa tampilannya (nama, NIP, jabatan, satker, penandatangan), lalu tekan SK sudah benar.
+            </Catatan>
+          )}
           {data?.bedaUsulan && (
             <Catatan nada="amber">
               {data.bedaUsulan.alasan}

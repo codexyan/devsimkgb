@@ -53,10 +53,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ kgbId: 
   await muatKppnSatker();
   const isi = await dataSuratTersimpan({ kgb, pegawai, surat });
   if (!isi.ok) return NextResponse.json({ error: isi.pesan }, { status: isi.status });
-  // Mengapa SK ini perlu diperiksa: bedanya dengan usulan UPT yang disetujui (ADR-082).
+  // Perbandingan dengan usulan UPT yang disetujui (ADR-082): bedanya ditunjukkan, dan yang sama ditandai supaya UPT cepat
+  // memeriksa (ADR-087).
   const cek = await cekSesuaiUsulan(kgb, pegawai);
   return NextResponse.json({
     surat: isi.surat,
+    sesuaiUsulan: cek.sesuai,
     bedaUsulan: cek.sesuai ? null : { alasan: cek.alasan, beda: cek.beda },
     reviewSk: infoReviewSk(review, { aktif: true, unitKerja: pegawai.unitKerja }),
     pegawai: { nama: pegawai.nama, nip: pegawai.nip, jabatan: pegawai.jabatan },

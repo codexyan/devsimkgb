@@ -1,4 +1,5 @@
-// Apakah SK KGB yang dibuat Kanwil sama dengan usulan UPT yang disetujui (ADR-082). Server: membaca usulan dan riwayat.
+// Apakah SK KGB yang dibuat Kanwil sama dengan usulan UPT yang disetujui (ADR-082); keterangan untuk review UPT (ADR-087).
+// Server: membaca usulan dan riwayat.
 
 import { db } from "./db";
 import { keadaanSesudahUsulan, rencanaKgbPratinjau, dasarSkPratinjau } from "./pratinjauSkUsulan";

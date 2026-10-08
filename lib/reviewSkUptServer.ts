@@ -11,6 +11,7 @@ import { TIPE_NOTIFIKASI, notifikasiHasilReviewSk, notifikasiReviewSk } from "./
 import { kodeSatkerPegawai } from "./rekapSatker";
 import { SATKER } from "./satker";
 import type { PegawaiRow, ReviewSkUptRow, RiwayatKGBRow } from "./sheets/tables";
+import { normalReviewSk } from "./reviewSkUpt";
 
 type Gagal = { ok: false; status: number; pesan: string };
 const gagal = (status: number, pesan: string): Gagal => ({ ok: false, status, pesan });
@@ -21,7 +22,7 @@ const namaSatker = (kode: string) => SATKER.find((s) => s.kode === kode)?.nama ?
 export async function muatSemuaReviewSk(saring?: { satker: string }): Promise<{ aktif: boolean; perKgb: Map<string, ReviewSkUptRow> }> {
   try {
     const baris = (await db.reviewSkUpt.findMany(saring ? { where: { satker: saring.satker } } : undefined)) as ReviewSkUptRow[];
-    return { aktif: true, perKgb: new Map(baris.map((r) => [r.id, r])) };
+    return { aktif: true, perKgb: new Map(baris.map((r) => [r.id, normalReviewSk(r)])) };
   } catch (e) {
     if (tabelBelumAda(e)) return { aktif: false, perKgb: new Map() };
     throw e;
@@ -31,7 +32,7 @@ export async function muatSemuaReviewSk(saring?: { satker: string }): Promise<{ 
 /** Review satu KGB; `aktif` false bila tabelnya belum dibuat. */
 export async function muatReviewSk(kgbId: string): Promise<{ aktif: boolean; review: ReviewSkUptRow | null }> {
   try {
-    return { aktif: true, review: ((await db.reviewSkUpt.findUnique({ id: kgbId })) as ReviewSkUptRow | null) ?? null };
+    return { aktif: true, review: normalReviewSk(((await db.reviewSkUpt.findUnique({ id: kgbId })) as ReviewSkUptRow | null) ?? null) };
   } catch (e) {
     if (tabelBelumAda(e)) return { aktif: false, review: null };
     throw e;
@@ -64,24 +65,22 @@ export async function mintaReviewSk(input: {
   /** "Nama (NIP)" peminta. */
   oleh: string;
   sekarang: Date;
-  /** SK sama dengan usulan UPT yang disetujui (lib/sesuaiUsulanServer.ts): tercatat "sesuai", tanpa review ulang (ADR-082). */
-  sesuaiUsulan?: boolean;
 }): Promise<{ aktif: false } | { aktif: true; review: ReviewSkUptRow }> {
-  const { kgb, pegawai, nomorSurat, tanggalSurat, oleh, sekarang, sesuaiUsulan = false } = input;
+  const { kgb, pegawai, nomorSurat, tanggalSurat, oleh, sekarang } = input;
   const ada = await muatReviewSk(kgb.id);
   if (!ada.aktif) return { aktif: false };
 
   const isi = {
     pegawaiId: pegawai.id,
     satker: kodeSatkerPegawai(pegawai.unitKerja),
-    status: sesuaiUsulan ? "sesuai" : "menunggu",
+    status: "menunggu",
     versi: (ada.review?.versi ?? 0) + 1,
     nomorSurat,
     tanggalSurat,
     dimintaAt: sekarang,
     dimintaOleh: oleh,
-    ditanggapiAt: sesuaiUsulan ? sekarang : null,
-    ditanggapiOleh: sesuaiUsulan ? "Sistem: sesuai usulan UPT" : null,
+    ditanggapiAt: null,
+    ditanggapiOleh: null,
     catatan: null,
     alasanLewati: null,
   };
@@ -91,8 +90,6 @@ export async function mintaReviewSk(input: {
 
   // Lonceng lama (permintaan dan hasil versi sebelumnya) tidak berlaku lagi untuk SK yang baru.
   await tutupLonceng(kgb.id, [TIPE_NOTIFIKASI.REVIEW_SK, TIPE_NOTIFIKASI.REVIEW_SK_HASIL]);
-  // SK yang sesuai usulan tidak meminta apa pun dari UPT, jadi tanpa lonceng.
-  if (sesuaiUsulan) return { aktif: true, review };
   try {
     await db.notifikasi.create({
       ...notifikasiReviewSk(kgb, pegawai, { nomorSurat, versi: review.versi }),

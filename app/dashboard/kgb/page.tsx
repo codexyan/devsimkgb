@@ -684,8 +684,8 @@ export default function KGBPage() {
                   ? `UPT meminta perbaikan SK${k.reviewSk.catatan ? `: ${k.reviewSk.catatan}` : ""}. Pilih Buat SK untuk memperbaikinya; review diminta ulang otomatis.`
                   : k.reviewSk?.status === "disetujui"
                     ? "SK sudah disetujui Admin UPT. Pilih Cetak SK untuk tanda tangan basah dan versi Srikandi, lalu Unggah SK TTE setelah ditandatangani."
-                    : k.reviewSk?.status === "sesuai"
-                    ? "SK sama dengan usulan UPT yang disetujui, jadi tidak direview ulang. Pilih Cetak SK untuk tanda tangan basah dan versi Srikandi, lalu Unggah SK TTE setelah ditandatangani."
+                    : k.reviewSk && k.reviewSk.status === null
+                    ? "SK ini dibuat sebelum review UPT aktif dan belum pernah diperiksa Admin UPT. Pilih Minta review UPT; Cetak SK dan Unggah SK TTE tersedia setelah UPT menyetujui."
                     : k.reviewSk?.status === "dilewati"
                       ? `Review UPT dilewati Super Admin${k.reviewSk.alasanLewati ? ` (${k.reviewSk.alasanLewati})` : ""}. Cetak SK lalu Unggah SK TTE setelah ditandatangani.`
                       : "SK KGB sudah dibuat. Setelah SK ditandatangani secara elektronik, pilih Unggah SK TTE."}

@@ -1,4 +1,5 @@
-// SK KGB yang sama dengan usulan UPT tidak perlu direview ulang (ADR-082).
+// Apakah SK KGB sama dengan usulan UPT yang disetujui (ADR-082). Sejak ADR-087 hasilnya hanya keterangan bagi UPT saat
+// memeriksa SK; setiap SK pegawai UPT tetap menunggu review.
 //
 // Admin UPT sudah melihat hitungan SK KGB-nya saat mengajukan (Pratinjau SK, ADR-078), lalu dulu diminta memeriksa SK
 // yang sama sekali lagi setelah Kanwil membuatnya (ADR-077). Pemeriksaan kedua itu hanya berguna bila SK yang dibuat

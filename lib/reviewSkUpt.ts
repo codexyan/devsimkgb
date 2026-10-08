@@ -5,11 +5,17 @@
 // ditandatangani basah dan dikirim lewat Srikandi, lalu mengunggah TTE. Sebelum disetujui, PDF yang diunduh bertanda air
 // DRAF dan Unggah TTE ditolak. Bila UPT meminta perbaikan, Kanwil memperbaiki SK dan review diminta lagi. Super Admin
 // dapat melewati review untuk keadaan mendesak, dengan alasan yang tercatat. Pegawai Kanwil tidak melalui review ini.
+//
+// Setiap SK pegawai UPT menunggu UPT, termasuk yang sama persis dengan usulannya (ADR-087, mengganti ADR-082) dan SK
+// lama yang dibuat sebelum review aktif.
 
 import { dipegangKeuanganKanwil } from "./aksesUpt";
 import type { ReviewSkUptRow } from "./sheets/tables";
 
-/** "sesuai": SK sama dengan usulan UPT yang disetujui, jadi tidak perlu direview ulang (ADR-082). */
+/**
+ * "sesuai": dulu SK yang sama dengan usulan UPT ditandai sendiri tanpa review (ADR-082). Sejak ADR-087 status ini tidak
+ * dibuat lagi, dan baris lama yang masih "sesuai" dibaca sebagai "menunggu" (normalReviewSk).
+ */
 export type StatusReviewSk = "menunggu" | "disetujui" | "perbaikan" | "dilewati" | "sesuai";
 
 export const STATUS_REVIEW_SK: readonly StatusReviewSk[] = ["menunggu", "disetujui", "perbaikan", "dilewati", "sesuai"];
@@ -74,11 +80,23 @@ export function infoReviewSk(
 }
 
 /**
- * SK boleh dicetak bersih dan diunggah TTE-nya. Tidak wajib review (pegawai Kanwil, review belum aktif), review belum
- * pernah diminta (SK lama), sudah disetujui UPT, sesuai usulan UPT (ADR-082), atau dilewati Super Admin.
+ * Review lama berstatus "sesuai" (ADR-082) dibaca sebagai permintaan yang masih menunggu UPT (ADR-087): SK itu belum
+ * pernah dilihat UPT.
+ */
+export function normalReviewSk<T extends Pick<ReviewSkUptRow, "status" | "ditanggapiAt" | "ditanggapiOleh">>(review: T): T;
+export function normalReviewSk<T extends Pick<ReviewSkUptRow, "status" | "ditanggapiAt" | "ditanggapiOleh">>(review: T | null): T | null;
+export function normalReviewSk<T extends Pick<ReviewSkUptRow, "status" | "ditanggapiAt" | "ditanggapiOleh">>(review: T | null): T | null {
+  if (!review || review.status !== "sesuai") return review;
+  return { ...review, status: "menunggu", ditanggapiAt: null, ditanggapiOleh: null };
+}
+
+/**
+ * SK boleh dicetak bersih dan diunggah TTE-nya: tidak wajib review (pegawai Kanwil, atau review belum aktif), sudah
+ * disetujui UPT, atau dilewati Super Admin dengan alasan. SK pegawai UPT yang review-nya belum pernah diminta (SK lama)
+ * ikut menunggu (ADR-087).
  */
 export function skBolehDicetak(info: Pick<InfoReviewSk, "status"> | null | undefined): boolean {
-  return !info || info.status === null || info.status === "disetujui" || info.status === "sesuai" || info.status === "dilewati";
+  return !info || info.status === "disetujui" || info.status === "dilewati";
 }
 
 /** Alasan Unggah TTE ditolak karena review UPT; null bila boleh. */
@@ -86,5 +104,7 @@ export function alasanTolakTanpaReview(info: Pick<InfoReviewSk, "status" | "cata
   if (skBolehDicetak(info)) return null;
   if (info?.status === "perbaikan")
     return `UPT meminta perbaikan SK ${namaPegawai}${info.catatan ? `: ${info.catatan}` : ""}. Perbaiki SK lalu tunggu persetujuan UPT sebelum mencetak dan mengunggah TTE.`;
+  if (info && info.status === null)
+    return `SK ${namaPegawai} dibuat sebelum review UPT aktif dan belum pernah diperiksa Admin UPT. Tekan Minta review UPT, lalu tunggu persetujuannya; Super Admin dapat melewati review dengan alasan.`;
   return `SK ${namaPegawai} masih menunggu review Admin UPT. Cetak dan Unggah TTE baru dapat dilakukan setelah UPT menyatakan SK sudah benar, atau setelah Super Admin melewati review dengan alasan.`;
 }

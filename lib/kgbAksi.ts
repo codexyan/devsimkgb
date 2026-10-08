@@ -410,7 +410,9 @@ export interface ReviewSkUntukUpt {
   surat: DataSuratKGB;
   reviewSk: InfoReviewSk | null;
   pegawai: { nama: string; nip: string; jabatan: string };
-  /** Mengapa SK ini perlu diperiksa: bedanya dengan usulan UPT yang disetujui (ADR-082); null bila sesuai. */
+  /** SK sama persis dengan usulan UPT yang disetujui (ADR-087): tetap diperiksa, tetapi UPT diberi tahu. */
+  sesuaiUsulan?: boolean;
+  /** Bedanya dengan usulan UPT yang disetujui (ADR-082); null bila sesuai. */
   bedaUsulan?: { alasan: string; beda: { label: string; usulan: string; sk: string }[] } | null;
 }
 

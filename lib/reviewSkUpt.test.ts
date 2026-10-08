@@ -22,9 +22,10 @@ test("hanya pegawai UPT yang SK-nya direview, dan hanya selama review aktif", ()
   assert.equal(lama?.status, null, "SK yang dibuat sebelum review aktif belum pernah diminta review-nya");
 });
 
-test("SK boleh dicetak bersih dan diunggah TTE hanya bila tidak wajib, belum pernah diminta, disetujui, atau dilewati", () => {
+test("SK boleh dicetak bersih dan diunggah TTE hanya bila tidak wajib, disetujui UPT, atau dilewati (ADR-087)", () => {
   assert.equal(skBolehDicetak(null), true);
-  assert.equal(skBolehDicetak({ status: null }), true);
+  assert.equal(skBolehDicetak({ status: null }), false, "SK lama yang belum pernah direview ikut menunggu");
+  assert.equal(skBolehDicetak({ status: "sesuai" }), false, "sesuai usulan tetap menunggu UPT");
   assert.equal(skBolehDicetak({ status: "disetujui" }), true);
   assert.equal(skBolehDicetak({ status: "dilewati" }), true);
   assert.equal(skBolehDicetak({ status: "menunggu" }), false);
@@ -32,6 +33,7 @@ test("SK boleh dicetak bersih dan diunggah TTE hanya bila tidak wajib, belum per
   assert.match(alasanTolakTanpaReview({ status: "menunggu", catatan: null }, "A") ?? "", /menunggu review Admin UPT/);
   assert.match(alasanTolakTanpaReview({ status: "perbaikan", catatan: "golongan salah" }, "A") ?? "", /golongan salah/);
   assert.equal(alasanTolakTanpaReview({ status: "disetujui", catatan: null }, "A"), null);
+  assert.match(alasanTolakTanpaReview({ status: null, catatan: null }, "A") ?? "", /Minta review UPT/);
 });
 
 async function denganDataLokal(kerja: () => Promise<void>) {
@@ -140,5 +142,27 @@ test("tanggapan ditolak bila KGB sudah tidak Sedang Diproses", async () => {
     await db.riwayatKGB.update({ id: "k1" }, { status: "ditolak" });
     const hasil = await tanggapiReviewSk({ kgbId: "k1", satker: "rutan-rantau", keputusan: "setuju", catatan: "", oleh: "UPT", sekarang: SEKARANG });
     assert.equal(hasil.ok, false);
+  });
+});
+
+test("review lama berstatus sesuai (ADR-082) kini menunggu UPT: tertahan, lalu dapat ditanggapi (ADR-087)", async () => {
+  await denganDataLokal(async () => {
+    const db = await siapkanKgb();
+    const { muatReviewSk, muatSemuaReviewSk, tanggapiReviewSk } = await import("./reviewSkUptServer");
+    await db.reviewSkUpt.create({
+      id: "k1", pegawaiId: "p1", satker: "rutan-rantau", status: "sesuai", versi: 1, nomorSurat: "W.19-1", tanggalSurat: SEKARANG,
+      dimintaAt: SEKARANG, dimintaOleh: "SDM (1)", ditanggapiAt: SEKARANG, ditanggapiOleh: "Sistem: sesuai usulan UPT", catatan: null, alasanLewati: null,
+    });
+    const { review } = await muatReviewSk("k1");
+    assert.equal(review?.status, "menunggu");
+    assert.equal(review?.ditanggapiOleh, null);
+    assert.equal((await muatSemuaReviewSk()).perKgb.get("k1")?.status, "menunggu");
+    assert.equal(skBolehDicetak(infoReviewSk(review, { aktif: true, unitKerja: UPT })), false, "Cetak dan Unggah TTE tertahan");
+
+    const setuju = await tanggapiReviewSk({ kgbId: "k1", satker: "rutan-rantau", keputusan: "setuju", catatan: "", oleh: "UPT (2)", sekarang: SEKARANG });
+    assert.equal(setuju.ok, true);
+    const sesudah = (await muatReviewSk("k1")).review;
+    assert.equal(sesudah?.status, "disetujui");
+    assert.equal(skBolehDicetak(infoReviewSk(sesudah, { aktif: true, unitKerja: UPT })), true);
   });
 });
