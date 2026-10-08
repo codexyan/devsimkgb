@@ -18,7 +18,7 @@ import { kunciBulanTmt } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan } from "@/app/dashboard/satker/labelSatker";
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
 import { kunciNomorSk } from "@/lib/nomorSurat";
-import { UKURAN_KIRIMAN, ajukanBertahap } from "./ajukanBertahap";
+import { UKURAN_KIRIMAN, ajukanBertahap, kabarJadiPerbaikan } from "./ajukanBertahap";
 import { pratinjauAtasDasarUsulan } from "@/lib/linimasaDasarSk";
 import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
 import {
@@ -656,7 +656,8 @@ export default function UsulanKolektif() {
         return;
       }
       setSelesai(
-        `${d.jumlah} pegawai diusulkan ke Kanwil${surat.nomorSurat.trim() ? ` dengan surat ${surat.nomorSurat.trim()}` : " sebagai laporan SK, tanpa surat usulan"}.`,
+        `${d.jumlah} pegawai diusulkan ke Kanwil${surat.nomorSurat.trim() ? ` dengan surat ${surat.nomorSurat.trim()}` : " sebagai laporan SK, tanpa surat usulan"}.` +
+          kabarJadiPerbaikan(d.jadiPerbaikan),
       );
       setBaris(null);
       setAktif(null);

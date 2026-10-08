@@ -32,6 +32,7 @@ import {
 import { kodeSatkerPegawai } from "./rekapSatker";
 import { tanggalKalender } from "./waktu";
 import { penetapSesudahUsulan } from "./penetapSk";
+import { jadikanPerbaikan, kolomJadiPerbaikan, nipBaruTercatat, pesanSatkerLainKanwil } from "./usulanBaruTercatat";
 
 
 export interface HasilSetujui {
@@ -116,11 +117,16 @@ export async function setujuiUsulan(
     const bentrok = (await db.pegawai.findUnique({ nip })) as PegawaiRow | null;
     // Pegawai yang sudah terbentuk dari usulan ini oleh persetujuan yang terputus dilanjutkan, bukan ditolak (ADR-079).
     const lanjutan = bentrok && (await terbentukDariUsulan(bentrok, usulan)) ? bentrok : null;
-    if (bentrok && !lanjutan)
-      return {
-        ok: false,
-        pesan: `NIP ${nip} sudah tercatat atas nama ${bentrok.nama}. Kembalikan usulan ini dan minta UPT mengirim usulan perbaikan data.`,
-      };
+    if (bentrok && !lanjutan) {
+      // Pegawai ber-NIP sama di satker yang sama: usulannya diterapkan sebagai perbaikan data pegawai itu (ADR-091).
+      // Jenisnya ditulis lebih dulu, supaya usulan yang gagal diterapkan tetap terbaca sebagai perbaikan di kedua papan.
+      if (nipBaruTercatat(usulan, bentrok) !== "satker_sama") return { ok: false, pesan: pesanSatkerLainKanwil(nip, bentrok) };
+      await db.usulanPegawai.update({ id: usulan.id }, kolomJadiPerbaikan(bentrok));
+      const hasil = await setujuiUsulan(jadikanPerbaikan(usulan, bentrok), bentrok, oleh, sekarang, userId);
+      return hasil.ok
+        ? { ...hasil, ringkasPerubahan: `NIP sudah tercatat, diterapkan sebagai perbaikan data: ${hasil.ringkasPerubahan}` }
+        : hasil;
+    }
 
     const golongan = String(nilaiBaru.golonganRuang ?? "");
     // SK kenaikan pangkat, penyesuaian ijazah, atau PMK sesudah SK KGB terakhir (ADR-065): golongan dan masa kerja

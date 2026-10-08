@@ -8,12 +8,20 @@
 
 export const UKURAN_KIRIMAN = 5;
 
+/** Kalimat tambahan untuk draf pegawai baru yang diajukan sebagai perbaikan data (ADR-091); kosong bila tidak ada. */
+export function kabarJadiPerbaikan(nama: readonly string[]): string {
+  if (nama.length === 0) return "";
+  const siapa = nama.length === 1 ? nama[0] : `${nama.length} pegawai (${nama.join(", ")})`;
+  return ` ${siapa} ternyata sudah tercatat di SIM-KGB, jadi usulannya diajukan sebagai perbaikan data, bukan pegawai baru.`;
+}
+
 export type HasilAjukan =
-  | { ok: true; jumlah: number }
+  /** `jadiPerbaikan`: nama pegawai baru yang NIP-nya sudah tercatat, diajukan sebagai perbaikan data (ADR-091). */
+  | { ok: true; jumlah: number; jadiPerbaikan: string[] }
   /** `terkirim`: id yang sudah berangkat sebelum kiriman yang gagal; tidak lagi berupa draf. */
   | { ok: false; galat: string; terkirim: string[] };
 
-type Jawaban = { error?: string; jumlah?: number; sudah?: number; pathBerkas?: string | null };
+type Jawaban = { error?: string; jumlah?: number; sudah?: number; pathBerkas?: string | null; jadiPerbaikan?: string[] };
 
 async function kirim(form: FormData): Promise<{ ok: boolean; status: number; d: Jawaban }> {
   const res = await fetch("/api/upt/usulan/ajukan", { method: "POST", body: form });
@@ -66,6 +74,7 @@ export async function ajukanBertahap(p: {
 
   let pathBerkas: string | null = null;
   let terkirim = 0;
+  const jadiPerbaikan: string[] = [];
   for (let i = 0; i < ids.length; i += UKURAN_KIRIMAN) {
     p.kemajuan?.(terkirim, ids.length);
     const bagian = ids.slice(i, i + UKURAN_KIRIMAN);
@@ -86,6 +95,7 @@ export async function ajukanBertahap(p: {
     }
     pathBerkas = h.d.pathBerkas ?? pathBerkas;
     terkirim += (h.d.jumlah ?? 0) + (h.d.sudah ?? 0);
+    jadiPerbaikan.push(...(h.d.jadiPerbaikan ?? []));
   }
-  return { ok: true, jumlah: terkirim };
+  return { ok: true, jumlah: terkirim, jadiPerbaikan };
 }

@@ -5,7 +5,9 @@ import { newId } from "@/lib/sheets/id";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { TIPE_NOTIFIKASI, notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
-import { DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgbUsulan } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgbUsulan } from "@/lib/usulanPegawai";
+import { jadikanPerbaikan, kolomJadiPerbaikan, nipBaruTercatat, pesanSatkerLainUpt } from "@/lib/usulanBaruTercatat";
+import { cariDalam } from "@/lib/dataSatker";
 import { laporanSkDasar } from "@/lib/dasarBaruUsulan";
 import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan, type BawaanUsulan } from "@/lib/bawaanUsulan";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
@@ -74,9 +76,56 @@ export async function POST(req: Request) {
     where: { satker: kode, id: { in: idTerpilih } },
   })) as UsulanPegawaiRow[];
   const perId = new Map(semua.map((u) => [u.id, u]));
-  const draf = idTerpilih
+  const drafDipilih = idTerpilih
     .map((id) => perId.get(id))
     .filter((u): u is UsulanPegawaiRow => !!u && DIPEGANG_UPT.includes(u.status));
+
+  // NIP draf pegawai baru diperiksa ulang: pegawainya bisa tercatat sesudah draf dibuat. Yang tercatat di satker ini
+  // diajukan sebagai perbaikan data pegawai itu; yang tercatat di satker lain ditolak (ADR-091).
+  const tercatatPerNip = new Map(
+    (
+      await cariDalam(
+        (where) => db.pegawai.findMany({ where }) as Promise<PegawaiRow[]>,
+        "nip",
+        drafDipilih.filter((u) => u.jenis === "baru").map((u) => u.nip),
+      )
+    ).map((p) => [p.nip, p]),
+  );
+  const nipTertolak: { id: string; nama: string; kurang: string[] }[] = [];
+  const jadiPerbaikan = new Map<string, PegawaiRow>();
+  const draf = drafDipilih.map((u) => {
+    const pegawai = u.nip ? tercatatPerNip.get(u.nip) : undefined;
+    const keadaan = nipBaruTercatat(u, pegawai);
+    if (!keadaan || !pegawai) return u;
+    if (keadaan === "satker_lain") {
+      nipTertolak.push({ id: u.id, nama: u.nama ?? u.nip ?? "-", kurang: [pesanSatkerLainUpt(u.nip ?? "")] });
+      return u;
+    }
+    jadiPerbaikan.set(u.id, pegawai);
+    return jadikanPerbaikan(u, pegawai);
+  });
+  // Satu pegawai hanya boleh punya satu usulan yang belum selesai, sama dengan usulan perbaikan yang dibuat dari kartunya.
+  if (jadiPerbaikan.size > 0) {
+    const berjalan = (await cariDalam(
+      (where) => db.usulanPegawai.findMany({ where }) as Promise<UsulanPegawaiRow[]>,
+      "pegawaiId",
+      [...jadiPerbaikan.values()].map((p) => p.id),
+      { status: { in: [...BELUM_SELESAI] } },
+    )) as UsulanPegawaiRow[];
+    for (const [id, pegawai] of jadiPerbaikan) {
+      const lain = berjalan.find((b) => b.pegawaiId === pegawai.id && b.id !== id);
+      if (lain)
+        nipTertolak.push({
+          id,
+          nama: pegawai.nama,
+          kurang: [
+            `NIP sudah tercatat dan pegawai ini sudah punya usulan perbaikan yang ${
+              lain.status === "menunggu" ? "menunggu tinjauan Kanwil" : "belum diajukan"
+            }. Hapus draf pegawai baru ini`,
+          ],
+        });
+    }
+  }
   // Kiriman yang diulang sesudah terputus: yang sudah berangkat dengan surat ini tidak dikirim lagi.
   const sudahTerkirim = idTerpilih.filter((id) => {
     const u = perId.get(id);
@@ -127,8 +176,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Tanggal surat usulan wajib diisi dan harus valid" }, { status: 400 });
   }
 
-  const belumLengkap: { nama: string; kurang: string[] }[] = [];
+  const belumLengkap: { nama: string; kurang: string[] }[] = nipTertolak.map(({ nama, kurang }) => ({ nama, kurang }));
+  // Draf yang tertolak karena NIP-nya harus dihapus, jadi kekurangan lainnya tidak disebut lagi.
+  const idTertolak = new Set(nipTertolak.map((t) => t.id));
   for (const u of draf) {
+    if (idTertolak.has(u.id)) continue;
     const pegawai = u.pegawaiId ? pegawaiPerId.get(u.pegawaiId) : null;
     const bawaan = bawaanPerUsulan.get(u.id);
     const kurang = kekuranganUsulan(bawaan ? denganBerkasBawaan(u, bawaan) : u, u.jenis, pegawai);
@@ -168,9 +220,11 @@ export async function POST(req: Request) {
           kode,
         )
       : {};
+    const tercatat = jadiPerbaikan.get(u.id);
     await db.usulanPegawai.update(
       { id: u.id },
       {
+        ...(tercatat ? kolomJadiPerbaikan(tercatat) : {}),
         ...salinan,
         status: "menunggu",
         nomorSurat,
@@ -180,7 +234,7 @@ export async function POST(req: Request) {
         diajukanAt: sekarang,
       },
     );
-    terkirim.push(nama);
+    terkirim.push(tercatat ? `${nama} (NIP sudah tercatat, diajukan sebagai perbaikan data)` : nama);
 
     // Usulan yang dikembalikan sudah diperbaiki dan berangkat lagi; tagihan perbaikannya ditutup.
     if (u.status === "revisi")
@@ -208,5 +262,12 @@ export async function POST(req: Request) {
       targetNama: satker.nama,
     });
 
-  return NextResponse.json({ ok: true, jumlah: terkirim.length, sudah: sudahTerkirim.length, pathBerkas: pathBerkas ?? null });
+  return NextResponse.json({
+    ok: true,
+    jumlah: terkirim.length,
+    sudah: sudahTerkirim.length,
+    pathBerkas: pathBerkas ?? null,
+    // Draf pegawai baru yang diajukan sebagai perbaikan data karena NIP-nya sudah tercatat (ADR-091).
+    jadiPerbaikan: [...jadiPerbaikan.values()].map((p) => p.nama),
+  });
 }

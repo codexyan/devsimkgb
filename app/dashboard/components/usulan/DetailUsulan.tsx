@@ -44,6 +44,11 @@ export interface UsulanKanwil {
   alasanTolak: string | null;
   /** KGB yang tersentuh bila usulan disetujui; hanya untuk usulan yang menunggu. */
   kgb?: { status: string; tmtKgbBaru: string | null; skDibuat: boolean } | null;
+  /**
+   * Diajukan sebagai pegawai baru padahal NIP-nya sudah tercatat (ADR-091). Di satker yang sama usulan ini sudah tampil
+   * sebagai perbaikan data pegawai itu; di satker lain tidak dapat disetujui.
+   */
+  nipTercatat?: { nama: string; unitKerja: string; satkerSama: boolean } | null;
 }
 
 /** Kolom yang menggeser hitungan KGB; ditandai agar peninjau tahu dampaknya pada uang. */
@@ -82,7 +87,20 @@ export default function DetailUsulan({ usulan: u, pratinjauDiTempat = false }: {
 
   return (
     <div className="usl-detail">
-      {u.jenis === "baru" && (
+      {u.nipTercatat?.satkerSama ? (
+        <Catatan nada="amber">
+          UPT mengirim ini sebagai usulan pegawai baru, tetapi NIP {u.nip} sudah tercatat atas nama {u.nipTercatat.nama}.
+          Menyetujuinya menerapkan usulan ini sebagai perbaikan data pegawai tersebut, bukan menambah pegawai baru;
+          {u.perubahan.length > 0
+            ? " yang berubah hanya kolom di bawah."
+            : " isiannya sama dengan data tercatat, jadi tidak ada data yang berubah."}
+        </Catatan>
+      ) : u.nipTercatat ? (
+        <Catatan nada="merah">
+          NIP {u.nip} sudah tercatat atas nama {u.nipTercatat.nama} di {u.nipTercatat.unitKerja || "satker lain"}. Usulan
+          pegawai baru ini tidak dapat disetujui: kembalikan ke UPT agar dihapus. Pemindahan antarsatker dicatat Kanwil.
+        </Catatan>
+      ) : u.jenis === "baru" && (
         <Catatan nada="hijau">
           Pegawai ini belum tercatat di SIM-KGB. Menyetujui usulan menambahkannya ke data induk beserta jadwal KGB-nya;
           periksa NIP, golongan, masa kerja golongan, dan TMT terhadap berkasnya.
@@ -120,7 +138,8 @@ export default function DetailUsulan({ usulan: u, pratinjauDiTempat = false }: {
             ))}
           </dl>
         </section>
-      ) : (
+      ) : u.nipTercatat?.satkerSama ? null : (
+        // Pegawai baru yang sudah tercatat dengan isian yang sama sudah dijelaskan catatan di atas (ADR-091).
         <Catatan>Tidak ada kolom data yang diusulkan berubah; usulan ini berisi laporan atau lampiran saja.</Catatan>
       )}
 

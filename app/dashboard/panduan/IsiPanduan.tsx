@@ -1039,7 +1039,9 @@ export default async function IsiPanduan({
                 </p>
                 <p>
                   Berkas wajib ditagih saat diajukan: bagi pegawai baru selalu, bagi usulan perbaikan hanya bila
-                  golongan, TMT golongan, masa kerja golongan, atau TMT KGB terakhirnya ikut diubah. Pada usulan
+                  golongan, TMT golongan, masa kerja golongan, atau TMT KGB terakhirnya ikut diubah. Draf pegawai baru
+                  yang NIP-nya ternyata sudah tercatat di satker Anda ditandai di papan dan diajukan sebagai perbaikan
+                  data pegawai itu; yang tercatat di satker lain tidak dapat diajukan dan harus dihapus. Pada usulan
                   perbaikan berikutnya, nomor, tanggal, dan pejabat penetap SK dasar serta berkas terakhir yang sudah
                   disetujui Kanwil <strong>terisi sendiri</strong> dan bertanda <em>disetujui</em>; pilih PDF baru hanya
                   bila SK-nya memang berganti.
@@ -1599,6 +1601,13 @@ export default async function IsiPanduan({
                       diketik UPT (misalnya SK CPNS) menjadi SK dasar Input KGB pertama. Bila KGB pegawai sedang berjalan
                       dan SK-nya belum diunggah, perhitungannya disesuaikan otomatis saat usulan disetujui. Selama usulan
                       menunggu, baris pegawai bertanda Tertahan usulan UPT dan langkah prosesnya ditolak.
+                    </p>
+                    <p>
+                      Usulan pegawai baru yang NIP-nya ternyata sudah tercatat di satker yang sama bertanda{" "}
+                      <em>NIP sudah tercatat</em>. Usulan itu ditinjau dan disetujui sebagai perbaikan data pegawai
+                      tersebut, jadi tidak ada pegawai ganda: yang berbeda dari data tercatat tampil di daftar perubahan,
+                      dan bila isiannya sama, persetujuan tidak mengubah apa pun. NIP yang tercatat di satker lain
+                      bertanda <em>NIP di satker lain</em> dan tidak dapat disetujui; kembalikan ke UPT agar dihapus.
                     </p>
                   </div>
                   </li>
