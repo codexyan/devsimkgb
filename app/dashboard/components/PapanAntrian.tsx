@@ -27,8 +27,12 @@ export interface KartuPapan {
   tmt: string;
   catatan?: string;
   catatanNada?: Nada;
-  /** Garis tepi kiri untuk kartu yang mendesak. */
+  /** Garis tepi kiri: merah untuk yang mendesak atau diminta diperbaiki, hijau untuk yang siap ditindaklanjuti. */
   nada?: Nada;
+  /** Label keadaan di kepala kartu, mis. SIAP CETAK (ADR-089). */
+  label?: { teks: string; nada?: Nada };
+  /** Kartu yang sedang menunggu pihak lain (mis. review UPT): diredupkan supaya yang dapat dikerjakan lebih menonjol. */
+  redup?: boolean;
   tanda?: { teks: string; nada?: Nada }[];
   aksi?: ReactNode;
   /** Kolom tujuan yang boleh dan label aksinya, mis. { proses: "Input KGB" }. */
@@ -171,12 +175,18 @@ export default function PapanAntrian({
                     key={x.id}
                     className="dsb-kartu-kgb"
                     data-nada={x.nada}
+                    data-redup={x.redup ? "" : undefined}
                     data-seret={seret?.id === x.id ? "" : undefined}
                     draggable={!!x.pindah && Object.keys(x.pindah).length > 0}
                     onDragStart={(e) => mulaiSeret(e, x)}
                     onDragEnd={selesaiSeret}
                     aria-label={x.nama}
                   >
+                    {x.label && (
+                      <p className="dsb-kartu-label-baris">
+                        <span className="dsb-kartu-label" data-nada={x.label.nada}>{x.label.teks}</span>
+                      </p>
+                    )}
                     <p className="dsb-kartu-kepala">
                       <span className="dsb-nama truncate">{x.nama}</span>
                       {x.asal && (

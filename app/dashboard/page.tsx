@@ -51,6 +51,7 @@ import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
 import { kodeSatkerPegawai } from "@/lib/rekapSatker";
 import { susunKartuSatker } from "@/lib/kartuSatkerDasbor";
+import { bandingTindakan, tindakanProses, type TindakanProses } from "@/lib/tindakanProses";
 import {
   FOKUS_KOSONG,
   alihPeriode,
@@ -436,12 +437,19 @@ function DashboardMain() {
   const dalamBulan = dalamSatker
     .filter((p) => !filterMonth || kunciBulan(p.tmtKgbBerikutnya) === filterMonth)
     .filter((p) => !qAntrian || p.nama.toLowerCase().includes(qAntrian) || p.nip.includes(qAntrian) || (p.unitKerja ?? "").toLowerCase().includes(qAntrian))
-    .sort(
-      (a, b) =>
-        URUTAN_POSISI[posisiAntrian(a)] - URUTAN_POSISI[posisiAntrian(b)] ||
-        new Date(a.tmtKgbBerikutnya).getTime() - new Date(b.tmtKgbBerikutnya).getTime() ||
-        a.nama.localeCompare(b.nama, "id"),
-    );
+    .sort((a, b) => {
+      const pa = posisiAntrian(a);
+      const pb = posisiAntrian(b);
+      if (pa !== pb) return URUTAN_POSISI[pa] - URUTAN_POSISI[pb];
+      // Sedang diproses: menurut tindakan Kanwil, lalu batas input terdekat (ADR-089).
+      if (pa === "diproses") {
+        const t = bandingTindakan(a, b);
+        if (t !== 0) return t;
+      }
+      return (
+        new Date(a.tmtKgbBerikutnya).getTime() - new Date(b.tmtKgbBerikutnya).getTime() || a.nama.localeCompare(b.nama, "id")
+      );
+    });
   const jumlahTahap = (t: Tahap) => dalamBulan.filter((p) => cocokTahap(posisiAntrian(p), t)).length;
   const antrian = dalamBulan.filter((p) => cocokTahap(posisiAntrian(p), tahap));
   const jumlahPosisi = (...daftar: PosisiAntrian[]) => dalamBulan.filter((p) => daftar.includes(posisiAntrian(p))).length;
@@ -754,17 +762,39 @@ function DashboardMain() {
       pindah.input = "Batalkan proses";
     }
     const tanda: NonNullable<KartuPapan["tanda"]> = [];
+    // Kolom Sedang diproses (ADR-089): garis, label, dan redup menurut siapa yang harus bertindak.
+    let nadaKartu: Nada | undefined = pos === "lewat" ? "merah" : undefined;
+    let label: KartuPapan["label"];
+    let redup = false;
     if (kolom === "proses") {
-      const review = p.skSudahDibuat ? p.reviewSk?.status ?? null : null;
-      tanda.push(
-        !p.skSudahDibuat
-          ? { teks: "Perlu buat SK" }
-          : review === "perbaikan"
-            ? { teks: `${LABEL_REVIEW_SK.perbaikan.kanwil}${p.reviewSk?.catatan ? `: ${p.reviewSk.catatan}` : ""}`, nada: "merah" }
-            : review
-              ? { teks: LABEL_REVIEW_SK[review].kanwil, nada: LABEL_REVIEW_SK[review].nada }
-              : { teks: "SK dibuat, tunggu TTE", nada: "navy" },
-      );
+      const tindakan = tindakanProses(p);
+      const review = p.reviewSk ?? null;
+      const tgl = (iso: string | null) => (iso ? ` ${formatTanggalId(iso, { day: "numeric", month: "short" })}` : "");
+      if (tindakan === "buat_sk") tanda.push({ teks: "Perlu buat SK" });
+      else if (tindakan === "perbaikan") {
+        nadaKartu = "merah";
+        label = { teks: "Perbaiki SK", nada: "merah" };
+        tanda.push({ teks: `${LABEL_REVIEW_SK.perbaikan.kanwil}${review?.catatan ? `: ${review.catatan}` : ""}`, nada: "merah" });
+      } else if (tindakan === "siap") {
+        nadaKartu = "hijau";
+        label = { teks: "Siap cetak", nada: "hijau" };
+        tanda.push(
+          review?.status === "disetujui"
+            ? { teks: `Disetujui UPT${tgl(review.ditanggapiAt)}`, nada: "hijau" }
+            : review?.status === "dilewati"
+              ? { teks: `Review dilewati${review.alasanLewati ? `: ${review.alasanLewati}` : ""}`, nada: "kuning" }
+              : { teks: "SK dibuat, siap cetak dan TTE", nada: "hijau" },
+        );
+      } else if (tindakan === "minta_review") {
+        tanda.push({ teks: "SK lama belum direview UPT: minta review", nada: "kuning" });
+      } else {
+        redup = true;
+        const hari = review?.dimintaAt ? hariSejak(review.dimintaAt) : null;
+        tanda.push({
+          teks: `Menunggu review UPT${hari === null ? "" : hari === 0 ? " sejak hari ini" : ` · ${hari} hari`}`,
+          nada: "ungu",
+        });
+      }
     }
     if (dibatalkan) tanda.push({ teks: "Dibatalkan", nada: "merah" });
     // Kartu yang lewat batas sudah menyebutnya di baris TMT; penanda rapelan hanya untuk yang sudah berjalan.
@@ -788,7 +818,9 @@ function DashboardMain() {
       tmt: `TMT ${formatTanggalId(p.tmtKgbBerikutnya, { month: "short", year: "numeric" })}`,
       catatan,
       catatanNada,
-      nada: pos === "lewat" ? "merah" : undefined,
+      nada: nadaKartu,
+      label,
+      redup,
       tanda,
       aksi: tombol ? (
         <div className="dsb-aksi" style={{ flexWrap: "wrap", justifyContent: "flex-start" }}>{tombol}</div>
@@ -855,7 +887,8 @@ function DashboardMain() {
       const kgbId = p.kgbId;
       return (
         <>
-          <button type="button" className="dsb-ikon-tombol" data-nada="merah" onClick={() => setModal({ jenis: "batalkan", kgbId, pegawai: pegawaiModal(p) })} title="Batalkan proses KGB" aria-label={`Batalkan proses KGB ${p.nama}`}>
+          {/* Batalkan di ujung, supaya langkah berikutnya selalu tombol pertama (ADR-089). */}
+          <button type="button" className="dsb-ikon-tombol" data-nada="merah" style={{ order: 1 }} onClick={() => setModal({ jenis: "batalkan", kgbId, pegawai: pegawaiModal(p) })} title="Batalkan proses KGB" aria-label={`Batalkan proses KGB ${p.nama}`}>
             <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
           {p.skSudahDibuat ? (
@@ -899,17 +932,19 @@ function DashboardMain() {
               )}
               {skBolehDicetak(p.reviewSk) && (
                 <>
+                  {/* Langkah berikutnya tampil paling depan dan Cetak SK menjadi tombol utama (ADR-089). */}
                   <button
                     type="button"
                     className="dsb-tombol dsb-tombol-kecil"
-                    data-jenis="garis"
+                    data-nada="hijau-penuh"
+                    style={{ order: -2 }}
                     disabled={sibukSk === kgbId}
                     onClick={() => void cetakSkPegawai(p)}
                     title="Unduh SK biasa (tanda tangan basah) dan versi Srikandi tanpa tanda air"
                   >
                     {sibukSk === kgbId ? "Menyiapkan..." : "Cetak SK"}
                   </button>
-                  <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" onClick={() => setModal({ jenis: "unggah_sk", kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) })}>
+                  <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" style={{ order: -1 }} onClick={() => setModal({ jenis: "unggah_sk", kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) })}>
                     Unggah TTE
                   </button>
                 </>
@@ -1098,7 +1133,16 @@ function DashboardMain() {
               }))}
               keterangan={{
                 input: (() => { const n = antrian.filter((p) => posisiAntrian(p) === "lewat").length; return n > 0 ? `${n} lewat batas` : undefined; })(),
-                proses: (() => { const n = antrian.filter((p) => posisiAntrian(p) === "diproses" && p.skSudahDibuat).length; return n > 0 ? `${n} tunggu TTE` : undefined; })(),
+                proses: (() => {
+                  // Ringkasan menurut tindakan (ADR-089); yang menunggu UPT tidak disebut "tunggu TTE".
+                  const hitung = (t: TindakanProses) => antrian.filter((p) => posisiAntrian(p) === "diproses" && tindakanProses(p) === t).length;
+                  const bagian = [
+                    [hitung("perbaikan"), "perbaikan"],
+                    [hitung("siap"), "siap cetak"],
+                    [hitung("menunggu_upt"), "menunggu UPT"],
+                  ].filter(([n]) => (n as number) > 0).map(([n, teks]) => `${n} ${teks}`);
+                  return bagian.length > 0 ? bagian.join(" · ") : undefined;
+                })(),
               }}
               onPindah={pindahKartu}
             />

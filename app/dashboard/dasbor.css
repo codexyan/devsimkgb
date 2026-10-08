@@ -379,6 +379,10 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 
 .dsb-tombol[data-nada="hijau"]:hover:not(:disabled) { background: var(--tint-green-bg); }
 
+/* Langkah berikutnya pada kartu yang siap ditindaklanjuti (ADR-089): tombol utama hijau penuh. */
+.dsb-tombol[data-nada="hijau-penuh"] { border-color: var(--st-green); background: var(--st-green); color: #fff; }
+.dsb-tombol[data-nada="hijau-penuh"]:hover:not(:disabled) { opacity: 0.9; }
+
 /* Langkah yang tertahan usulan UPT (ADR-014): tombol utama berwarna ungu, warna yang dipakai untuk usulan. */
 .dsb-tombol[data-nada="ungu"] { border-color: var(--st-violet); background: var(--st-violet); color: #fff; }
 .dsb-tombol[data-nada="ungu"]:hover:not(:disabled) { opacity: 0.9; }
@@ -1553,6 +1557,24 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 .dsb-kartu-kgb[draggable="true"] { cursor: grab; }
 .dsb-kartu-kgb[draggable="true"]:hover { border-color: var(--ln0); box-shadow: 0 2px 8px rgba(12, 26, 56, 0.06); }
 .dsb-kartu-kgb[data-nada="merah"] { box-shadow: inset 3px 0 0 var(--st-red); }
+/* Kolom Sedang diproses (ADR-089): siap ditindaklanjuti Kanwil bergaris hijau, menunggu UPT diredupkan. */
+.dsb-kartu-kgb[data-nada="hijau"] { box-shadow: inset 3px 0 0 var(--st-green); }
+.dsb-kartu-kgb[data-redup] { border-style: dashed; background: var(--sub); }
+.dsb-kartu-kgb[data-redup] :is(.dsb-kartu-kepala, .dsb-kecil, .dsb-kartu-tanda) { opacity: 0.72; }
+.dsb-kartu-label-baris { margin: 0 0 5px; line-height: 1; }
+.dsb-kartu-label {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--sub);
+  color: var(--dt3);
+}
+.dsb-kartu-label[data-nada="hijau"] { background: var(--tint-green-bg); color: var(--st-green); }
+.dsb-kartu-label[data-nada="merah"] { background: var(--tint-red-bg); color: var(--st-red); }
 .dsb-kartu-kgb[data-seret] { opacity: 0.4; }
 
 /* Kepala kartu: nama pegawai dan penanda asalnya. Warna penanda membedakan pegawai Kanwil dari pegawai
