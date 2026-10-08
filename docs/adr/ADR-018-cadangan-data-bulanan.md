@@ -46,3 +46,5 @@ memegang salinan data mereka sendiri. Sebelumnya hanya ada ekspor CSV data pegaw
 - Berkas cadangan memuat data pribadi pegawai. Halaman cadangan dan `BACA-SAYA.txt` meminta pengguna
   menyimpannya di tempat aman dan tidak membagikannya.
 - Kewajiban ini ditinjau ulang setelah SIM-KGB dinyatakan stabil.
+- Sejak ADR-084 server juga mencadangkan seluruh basis data dua kali sehari ke R2. Cadangan bulanan per akun tetap
+  berlaku sebagai salinan di luar akun Cloudflare dan Supabase.

@@ -4,8 +4,8 @@
 // `fetch` (+ Durable Object). Cloudflare Cron Trigger memerlukan handler
 // `scheduled`, jadi worker ini membungkus output OpenNext: meneruskan `fetch`
 // apa adanya, mengekspor ulang Durable Object, dan menambahkan `scheduled` yang
-// memanggil endpoint cron internal (/api/cron/notifikasi) lewat self-reference
-// service binding. File .open-next/worker.js dibuat saat `opennextjs-cloudflare
+// memanggil endpoint cron internal (/api/cron/cadangan dan /api/cron/notifikasi)
+// lewat self-reference service binding. File .open-next/worker.js dibuat saat `opennextjs-cloudflare
 // build`, sebelum wrangler membundel entry ini.
 //
 // Wrapper ini juga membatasi permintaan cek status KGB publik (/api/public/cek-kgb) per alamat IP dan
@@ -235,31 +235,40 @@ async function layani(request, env, ctx) {
   return res;
 }
 
+/** Cron Trigger pagi (wrangler.jsonc): cadangan lalu notifikasi harian. Cron lainnya hanya cadangan (ADR-084). */
+const CRON_PAGI = "0 0 * * *";
+
+/** Panggil satu endpoint cron internal; galatnya dicatat, tidak dilempar. */
+async function panggilCron(env, nama, path) {
+  try {
+    const res = await env.WORKER_SELF_REFERENCE.fetch(
+      new Request(`https://sim-kgb.internal${path}`, {
+        headers: { authorization: `Bearer ${env.CRON_SECRET ?? ""}` },
+      }),
+    );
+    if (!res.ok) {
+      const keterangan =
+        res.status === 401
+          ? " (CRON_SECRET tidak cocok)"
+          : res.status === 503
+            ? " (CRON_SECRET belum dikonfigurasi)"
+            : "";
+      console.error(`[cron] ${nama} gagal: HTTP ${res.status}${keterangan}:`, await res.text());
+    }
+  } catch (err) {
+    console.error(`[cron] ${nama} error:`, err);
+  }
+}
+
 async function jadwal(controller, env, ctx) {
   ctx.waitUntil(
     (async () => {
-      try {
-        if (!env.CRON_SECRET) {
-          console.error("[cron] CRON_SECRET belum diset; endpoint cron akan menolak panggilan. Set dengan: wrangler secret put CRON_SECRET");
-        }
-        const res = await env.WORKER_SELF_REFERENCE.fetch(
-          new Request("https://sim-kgb.internal/api/cron/notifikasi", {
-            headers: { authorization: `Bearer ${env.CRON_SECRET ?? ""}` },
-          }),
-        );
-        if (!res.ok) {
-          const keterangan =
-            res.status === 401
-              ? " (CRON_SECRET tidak cocok)"
-              : res.status === 503
-                ? " (CRON_SECRET belum dikonfigurasi)"
-                : "";
-          console.error(`[cron] notifikasi gagal: HTTP ${res.status}${keterangan}:`, await res.text());
-        }
-      } catch (err) {
-        console.error("[cron] notifikasi error:", err);
+      if (!env.CRON_SECRET) {
+        console.error("[cron] CRON_SECRET belum diset; endpoint cron akan menolak panggilan. Set dengan: wrangler secret put CRON_SECRET");
       }
+      // Cadangan lebih dulu, supaya yang tersimpan adalah keadaan sebelum perubahan cron hari itu.
+      await panggilCron(env, "cadangan", "/api/cron/cadangan");
+      if (controller.cron === CRON_PAGI) await panggilCron(env, "notifikasi", "/api/cron/notifikasi");
     })(),
   );
 }
-

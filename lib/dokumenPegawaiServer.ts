@@ -7,6 +7,7 @@ import {
   kunciDaftarDokumen,
   type DokumenArsip,
 } from "./dokumenPegawai";
+import { pindahkanKeTerhapus } from "./r2Terhapus";
 
 async function bucket(): Promise<R2Bucket> {
   const { env } = await getCloudflareContext({ async: true });
@@ -65,17 +66,20 @@ export async function salinObjekKeArsip(pegawaiId: string, kunciAsal: string, do
   return true;
 }
 
-/** Hapus satu dokumen arsip; mengembalikan dokumen yang dihapus, atau null bila tidak ada. */
+/**
+ * Hapus satu dokumen arsip; mengembalikan dokumen yang dihapus, atau null bila tidak ada. Berkasnya dipindahkan ke
+ * terhapus/ dan baru dibuang sesudah 90 hari (ADR-084).
+ */
 export async function hapusDokumenArsip(pegawaiId: string, id: string): Promise<DokumenArsip | null> {
   const daftar = await daftarDokumenArsip(pegawaiId);
   const dokumen = daftar.find((d) => d.id === id) ?? null;
   if (!dokumen) return null;
   await tulisDaftar(pegawaiId, daftar.filter((d) => d.id !== id));
-  await (await bucket()).delete(kunciBerkasDokumen(pegawaiId, id));
+  await pindahkanKeTerhapus(await bucket(), [kunciBerkasDokumen(pegawaiId, id)]);
   return dokumen;
 }
 
-/** Hapus seluruh arsip dokumen pegawai (dipakai saat pegawai dihapus permanen). Best effort. */
+/** Hapus seluruh arsip dokumen pegawai (dipakai saat pegawai dihapus permanen), lewat terhapus/. Best effort. */
 export async function hapusSemuaDokumenArsip(pegawaiId: string): Promise<number> {
   const b = await bucket();
   let jumlah = 0;
@@ -83,8 +87,7 @@ export async function hapusSemuaDokumenArsip(pegawaiId: string): Promise<number>
   do {
     const hasil = await b.list({ prefix: awalanDokumen(pegawaiId), cursor: kursor });
     const kunci = hasil.objects.map((o) => o.key);
-    if (kunci.length > 0) await b.delete(kunci);
-    jumlah += kunci.length;
+    if (kunci.length > 0) jumlah += (await pindahkanKeTerhapus(b, kunci)).dipindah;
     kursor = hasil.truncated ? hasil.cursor : undefined;
   } while (kursor);
   return jumlah;

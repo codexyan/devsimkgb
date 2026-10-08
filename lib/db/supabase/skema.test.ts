@@ -11,6 +11,8 @@ import { KOLOM_URUTAN, keSnake, namaTabel } from "./nama";
 import { supabase } from "./tables";
 
 const FOLDER_MIGRASI = path.join(process.cwd(), "supabase", "migrations");
+/** Tabel yang hanya dipakai Postgres sendiri, bukan lewat lapisan data: jejak perubahan oleh trigger (ADR-084). */
+const TABEL_DI_LUAR_APLIKASI = new Set(["jejak_data"]);
 
 /** Seluruh migrasi, urut nama berkas (awalan tanggal) seperti urutan penerapannya. */
 function bacaSql(): string {
@@ -31,7 +33,7 @@ function tabelDiSql(sql: string): Map<string, string[]> {
       .map((baris) => baris.trim())
       .filter((baris) => baris && !baris.startsWith("--") && !baris.startsWith("check"))
       .map((baris) => baris.split(/\s+/)[0]);
-    hasil.set(cocok[1], kolom);
+    if (!TABEL_DI_LUAR_APLIKASI.has(cocok[1])) hasil.set(cocok[1], kolom);
   }
   for (const cocok of sql.matchAll(/alter table public\.(\w+) add column (?:if not exists )?(\w+)/g)) {
     const kolom = hasil.get(cocok[1]);
