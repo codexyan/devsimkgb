@@ -604,30 +604,8 @@ function DashboardMain() {
       aksi: { label: "Tampilkan", onClick: bukaAntrian("perlu") },
     });
 
-  // Usulan data UPT yang menunggu tinjauan: ditinjau langsung dari kartu atau baris (ADR-011).
-  // Yang menentukan mendesaknya adalah usulan terlama, bukan jumlahnya: selama usulan perbaikan
-  // menunggu, proses KGB pegawainya tertahan. Ambangnya memakai yang sudah dipakai di dasbor ini
-  // (7 hari untuk batas input) dan di Pantau satker (14 hari untuk satker yang perlu diingatkan).
-  if (usulanMenunggu.length > 0) {
-    const berdiajukan = usulanMenunggu.filter((u) => u.diajukanAt);
-    const terlama = berdiajukan.length
-      ? berdiajukan.reduce((a, b) => ((a.diajukanAt as string) <= (b.diajukanAt as string) ? a : b))
-      : null;
-    const hariTerlama = terlama ? hariSejak(terlama.diajukanAt as string) : 0;
-    const satkerTerlama = terlama ? cariSatker(terlama.unitKerja) : null;
-    const asalTerlama = satkerTerlama ? namaRingkasSatker(satkerTerlama) : terlama?.unitKerja ?? "";
-    tindakan.push({
-      id: "usulan-upt",
-      nada: hariTerlama > 14 ? "merah" : hariTerlama > 7 ? "kuning" : "ungu",
-      isi: (
-        <>
-          <strong>{usulanMenunggu.length} usulan data UPT</strong>
-          {` menunggu tinjauan${hariTerlama > 0 ? `, terlama ${hariTerlama} hari${asalTerlama ? ` (${asalTerlama})` : ""}` : ""}${usulanPerPegawai.size > 0 ? `; proses KGB ${usulanPerPegawai.size} pegawai tertahan sampai ditinjau` : ""}.`}
-        </>
-      ),
-      aksi: { label: "Semua usulan", href: "/dashboard/usulan" },
-    });
-  }
+  // Usulan data UPT yang menunggu tidak diulang di sini: panel Usulan UPT menunggu di atas Perlu tindakan sudah memuatnya
+  // per UPT beserta umur terlamanya, dan jumlah KGB yang tertahan ikut di kepalanya (ADR-092).
 
   // Permintaan follow up dari keuangan
   for (const notif of (followupNotifs ?? [])) {
@@ -987,47 +965,6 @@ function DashboardMain() {
         memuat={refreshing}
       />
 
-        {/* -- Usulan UPT yang menunggu: didahulukan karena menahan proses KGB pegawainya (ADR-014), dan karena modul
-             ini dibuka Super Admin sepanjang hari. Diringkas satu baris per UPT (ADR-076): yang meninjau tiap pegawai
-             dan menyetujui per surat bekerja di halaman Usulan UPT, yang dibuka dari tombol Tinjau sudah tersaring ke
-             UPT itu. Panel ini sengaja di luar .dsb-dasbor-isi: di dalam kisi itu ia merebut satu-satunya baris 1fr
-             pada mode "muat satu layar" dan menghimpit antrian menjadi sesobek garis. -- */}
-        {usulanMenunggu.length > 0 && (
-          <section id="panel-usulan-upt" className="dsb-panel usl-antrian-panel dsb-muncul" style={{ "--i": 0 } as React.CSSProperties} aria-labelledby="judul-usulan-upt">
-            <div className="dsb-panel-kepala">
-              <h2 id="judul-usulan-upt" className="dsb-panel-judul">
-                Usulan UPT menunggu <small>{usulanMenunggu.length} usulan dari {usulanPerUpt.length} UPT</small>
-              </h2>
-              <Link href="/dashboard/usulan" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" style={{ marginLeft: "auto" }}>
-                Semua usulan
-              </Link>
-            </div>
-            <ul className="usl-ringkas" aria-label="Usulan menunggu per UPT">
-              {usulanPerUpt.map((r) => {
-                const satker = cariSatker(r.unitKerja);
-                return (
-                  <li key={r.kode}>
-                    <span className="min-w-0">
-                      <strong title={satker?.nama ?? r.unitKerja}>{satker ? namaRingkasSatker(satker) : r.unitKerja}</strong>
-                      <span>{keteranganRingkasan(r)}</span>
-                    </span>
-                    <span className="dsb-tag" data-garis="" data-nada={nadaUmurUsulan(r.hariTerlama)} title="Jumlah usulan yang menunggu">
-                      {r.jumlah}
-                    </span>
-                    <Link
-                      href={`/dashboard/usulan?upt=${encodeURIComponent(r.kode)}`}
-                      className="dsb-tombol dsb-tombol-kecil"
-                      aria-label={`Tinjau ${r.jumlah} usulan dari ${satker ? namaRingkasSatker(satker) : r.unitKerja}`}
-                    >
-                      Tinjau
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
-
       <div className="dsb-dasbor-isi">
 
         {/* -- Antrian kerja KGB: kartu utama, mengisi tinggi layar -- */}
@@ -1158,6 +1095,49 @@ function DashboardMain() {
 
         {/* -- Rail: tindakan, jadwal input, dan pantau satker -- */}
         <aside className="dsb-samping dsb-muncul" style={{ "--i": 2 } as React.CSSProperties} aria-label="Ringkasan pendamping">
+          {/* Usulan UPT yang menunggu, paling atas di rel (ADR-092): didahulukan karena menahan proses KGB pegawainya
+              (ADR-014). Dulu panel ini selebar halaman di atas antrian dan memakan ±140 px tinggi papan. Diringkas satu
+              baris per UPT (ADR-076); peninjauan per pegawai dan per surat ada di halaman Usulan UPT. */}
+          {usulanMenunggu.length > 0 && (
+            <section id="panel-usulan-upt" className="dsb-panel usl-antrian-panel" aria-labelledby="judul-usulan-upt">
+              <div className="dsb-panel-kepala">
+                <h2 id="judul-usulan-upt" className="dsb-panel-judul">
+                  Usulan UPT menunggu <small>{usulanMenunggu.length}</small>
+                </h2>
+                <Link href="/dashboard/usulan" className="dsb-tautan" style={{ marginLeft: "auto" }}>
+                  Semua →
+                </Link>
+              </div>
+              <p className="usl-ringkas-sub">
+                {usulanPerUpt.length} UPT
+                {usulanPerPegawai.size > 0 && <> · proses KGB {usulanPerPegawai.size} pegawai tertahan sampai ditinjau</>}
+              </p>
+              <ul className="usl-ringkas" aria-label="Usulan menunggu per UPT">
+                {usulanPerUpt.map((r) => {
+                  const satker = cariSatker(r.unitKerja);
+                  return (
+                    <li key={r.kode}>
+                      <span className="min-w-0">
+                        <strong title={satker?.nama ?? r.unitKerja}>{satker ? namaRingkasSatker(satker) : r.unitKerja}</strong>
+                        <span>{keteranganRingkasan(r)}</span>
+                      </span>
+                      <span className="dsb-tag" data-garis="" data-nada={nadaUmurUsulan(r.hariTerlama)} title="Jumlah usulan yang menunggu">
+                        {r.jumlah}
+                      </span>
+                      <Link
+                        href={`/dashboard/usulan?upt=${encodeURIComponent(r.kode)}`}
+                        className="dsb-tombol dsb-tombol-kecil"
+                        aria-label={`Tinjau ${r.jumlah} usulan dari ${satker ? namaRingkasSatker(satker) : r.unitKerja}`}
+                      >
+                        Tinjau
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
           <PanelTindakan daftar={tindakan} kosong="Tidak ada KGB yang perlu ditindaklanjuti saat ini." lainnyaHref="/dashboard/notifikasi" />
 
           {/* Panel Jadwal input dilepas (ADR-036): rincian per bulan TMT kini melekat pada satkernya di
