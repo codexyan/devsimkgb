@@ -15,6 +15,9 @@ import {
   Memuat,
   PesanGalat,
 } from "./BidangForm";
+import PemeriksaanTte, { bolehUnggahTte, useTteBerkas } from "./PemeriksaanTte";
+import { BATAS_UNGGAH_SK_LABEL } from "@/lib/batasUnggah";
+import { PESAN_TANPA_TTE, PESAN_TTE_RUSAK } from "@/lib/tteSk";
 import {
   berkasPdfSah,
   formatMkg,
@@ -57,6 +60,8 @@ export default function ModalArsipKgb({ pegawai: ringkas, onTutup, onBerhasil }:
     gajiPokokSK: "",
   });
   const [berkas, setBerkas] = useState<File | null>(null);
+  const [basah, setBasah] = useState(false);
+  const tte = useTteBerkas(berkas);
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
   // Id record arsip yang sudah tersimpan: unggahan ulang tidak boleh membuat record arsip kedua.
@@ -118,6 +123,12 @@ export default function ModalArsipKgb({ pegawai: ringkas, onTutup, onBerhasil }:
       setGalat("Berkas SK harus berformat PDF.");
       return;
     }
+    if (tte === "memeriksa") return;
+    // Arsip pun berupa SK asli: TTE yang rusak ditolak, dan pindaian tanpa TTE dinyatakan sebagai tanda tangan basah (ADR-096).
+    if (!bolehUnggahTte(tte, basah)) {
+      setGalat(tte === "rusak" ? PESAN_TTE_RUSAK : PESAN_TANPA_TTE);
+      return;
+    }
     setSibuk(true);
     setGalat(null);
 
@@ -141,7 +152,7 @@ export default function ModalArsipKgb({ pegawai: ringkas, onTutup, onBerhasil }:
       setIdTersimpan(id);
     }
 
-    const unggah = await unggahSk(id, berkas, { nomorSurat: form.nomorSK, tanggalSurat: form.tanggalSK });
+    const unggah = await unggahSk(id, berkas, { nomorSurat: form.nomorSK, tanggalSurat: form.tanggalSK, ttdBasah: tte === "tanpa" && basah });
     setSibuk(false);
     if (!unggah.ok) {
       setGalat(
@@ -324,12 +335,14 @@ export default function ModalArsipKgb({ pegawai: ringkas, onTutup, onBerhasil }:
           berkas={berkas}
           onPilih={(b) => {
             setBerkas(b);
+            setBasah(false);
             setGalat(b && !berkasPdfSah(b) ? "Berkas SK harus berformat PDF." : null);
           }}
-          petunjuk="Pindaian atau berkas digital SK dari arsip kantor, paling besar 500 KB."
+          petunjuk={`Berkas asli SK dari arsip kantor atau Srikandi, tanpa dikompres, paling besar ${BATAS_UNGGAH_SK_LABEL}.`}
           nonaktif={sibuk}
           tinggiPratinjau={220}
         />
+        <PemeriksaanTte keadaan={tte} basah={basah} onBasah={setBasah} nonaktif={sibuk} />
       </BagianForm>
       <PesanGalat pesan={galat} />
     </KerangkaModal>

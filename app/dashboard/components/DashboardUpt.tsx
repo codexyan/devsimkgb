@@ -167,6 +167,8 @@ interface SkUpt {
   tanggalSurat: string | null;
   /** "menunggu_keuangan" (baru diunggah Tim SDM, menunggu keuangan UPT) atau "selesai". */
   status: string;
+  /** Status tanda tangan berkas SK (ADR-096): "tte", "tte_tak_terperiksa", "basah", atau kosong pada SK lama. */
+  statusTtd?: string | null;
   /** Waktu SK bertanda tangan diunggah Tim SDM Kanwil. */
   diunggahAt: string | null;
   konfirmasiKeuanganAt: string | null;
@@ -1387,6 +1389,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           catatan={
             [
               sk.nomorSurat ? `SK ${sk.nomorSurat}` : "",
+              // Status tanda tangan berkas (ADR-096); SK lama tanpa keterangan.
+              sk.statusTtd === "tte" ? "TTE utuh" : sk.statusTtd === "basah" ? "tanda tangan basah" : "",
               sk.status === "menunggu_keuangan"
                 ? sk.potensiRapelan ? "berpotensi rapelan" : ""
                 : sk.rapelan ? "dibayar sebagai rapelan" : "",

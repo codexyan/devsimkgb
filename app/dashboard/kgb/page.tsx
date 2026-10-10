@@ -34,6 +34,7 @@ import {
 import { BidangAlasan } from "@/app/dashboard/components/kgb/BidangForm";
 import { PESAN_GAGAL_JARINGAN, cetakSk, mintaReviewSkUpt, tautanBerkasSk, type VersiCetak } from "@/lib/kgbAksi";
 import TombolCetakSk from "@/app/dashboard/components/kgb/TombolCetakSk";
+import { LABEL_STATUS_TTD, type StatusTtdSk } from "@/lib/tteSk";
 import { LABEL_REVIEW_SK, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
@@ -63,7 +64,7 @@ interface KGB {
   rapelanDitetapkan?: boolean | null;
   isArsip?: boolean;
   createdAt: string | null;
-  surat: { nomorSurat: string; tanggalSurat?: string | null; pathFile?: string | null } | null;
+  surat: { nomorSurat: string; tanggalSurat?: string | null; pathFile?: string | null; statusTtd?: string | null } | null;
   /** Konfirmasi data oleh admin UPT untuk siklus ini (lib/konfirmasiUpt.ts). */
   konfirmasiUpt?: StatusKonfirmasiUpt;
   konfirmasiUptOleh?: string | null;
@@ -779,9 +780,17 @@ export default function KGBPage() {
               {
                 label: "SK tertandatangani",
                 nilai: pathFile ? (
-                  <a href={tautanBerkasSk(pathFile)} target="_blank" rel="noopener noreferrer" className="kgbm-tautan">
-                    Lihat SK Tertandatangani
-                  </a>
+                  <>
+                    <a href={tautanBerkasSk(pathFile)} target="_blank" rel="noopener noreferrer" className="kgbm-tautan">
+                      Lihat SK Tertandatangani
+                    </a>
+                    {/* Status tanda tangan berkas yang diunggah (ADR-096); SK lama tanpa label. */}
+                    {k.surat?.statusTtd && k.surat.statusTtd in LABEL_STATUS_TTD && (
+                      <span className="dsb-tag" data-garis="" data-nada={k.surat.statusTtd === "tte" ? "hijau" : undefined} style={{ marginLeft: 8 }}>
+                        {LABEL_STATUS_TTD[k.surat.statusTtd as StatusTtdSk]}
+                      </span>
+                    )}
+                  </>
                 ) : (
                   "Belum diunggah"
                 ),

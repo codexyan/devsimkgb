@@ -19,6 +19,7 @@ import { hariIniWita, isoTanggalLokal } from "@/lib/waktu";
 import { notifikasiSkDiunggah } from "@/lib/generateNotifikasi";
 import { alasanTolakTanpaReview, infoReviewSk, pegawaiPerluReviewSk } from "@/lib/reviewSkUpt";
 import { muatReviewSk } from "@/lib/reviewSkUptServer";
+import { PESAN_TANPA_TTE, PESAN_TTE_RUSAK, periksaTte, sha256Hex, type StatusTtdSk } from "@/lib/tteSk";
 
 export const runtime = "nodejs";
 
@@ -78,6 +79,8 @@ export async function POST(
     return NextResponse.json({ error: "Data unggahan tidak valid" }, { status: 400 });
   }
   const file = formData.get("file");
+  // Petugas menyatakan berkas tanpa TTE ini pindaian SK bertanda tangan basah (ADR-096).
+  const ttdBasah = formData.get("ttdBasah") === "1";
   const nomorSuratParam = (formData.get("nomorSurat") as string | null)?.trim() || null;
   const tanggalSuratParam = (formData.get("tanggalSurat") as string | null)?.trim() || null;
 
@@ -90,9 +93,21 @@ export async function POST(
   if (file.size > BATAS_UKURAN_SK_BYTE)
     return NextResponse.json({ error: PESAN_SK_TERLALU_BESAR }, { status: 413 });
 
+  // Isi berkas dibaca sekali dan dipakai untuk semua pemeriksaan serta penyimpanan. Berkas tidak pernah diubah: byte yang
+  // disimpan ke R2 sama persis dengan yang diunggah, sebab perubahan sekecil apa pun menghapus keabsahan TTE (ADR-096).
+  const isi = new Uint8Array(await file.arrayBuffer());
   // Jenis file dari peramban tidak dijamin benar, jadi isi file diperiksa memuat penanda PDF.
-  if (!adaPenandaPdf(new Uint8Array(await file.slice(0, 1024).arrayBuffer())))
+  if (!adaPenandaPdf(isi.subarray(0, 1024)))
     return NextResponse.json({ error: "File yang diunggah bukan PDF yang valid" }, { status: 400 });
+
+  // TTE yang isinya berubah sesudah ditandatangani ditolak; berkas tanpa TTE hanya diterima sebagai pindaian tanda tangan
+  // basah yang dinyatakan petugas.
+  const tte = await periksaTte(isi);
+  if (tte.keadaan === "rusak") return NextResponse.json({ error: PESAN_TTE_RUSAK, kode: "tte_rusak" }, { status: 400 });
+  if (tte.keadaan === "tanpa" && !ttdBasah)
+    return NextResponse.json({ error: PESAN_TANPA_TTE, kode: "tanpa_tte" }, { status: 400 });
+  const statusTtd: StatusTtdSk = tte.keadaan === "utuh" ? "tte" : tte.keadaan === "takTerperiksa" ? "tte_tak_terperiksa" : "basah";
+  const sha256Berkas = await sha256Hex(isi);
 
   const tanggalSuratInput = tanggalSuratParam ? bacaTanggalInput(tanggalSuratParam) : null;
   if (tanggalSuratParam && !tanggalSuratInput)
@@ -107,8 +122,11 @@ export async function POST(
     // tanpa perlu (ADR-037). Bukan file.stream(): R2 menolak aliran yang panjangnya tidak diketahui, dan di
     // `next dev` (proksi binding dari Node) aliran itu memang tidak membawa panjang, sehingga unggah SK selalu
     // gagal secara lokal. Blob membawa ukurannya di workerd maupun di proksi dev (ADR-051).
-    await env.SK_BUCKET.put(pathFile, file, {
+    await env.SK_BUCKET.put(pathFile, isi, {
       httpMetadata: { contentType: "application/pdf" },
+      customMetadata: { sha256: sha256Berkas, statusTtd },
+      // R2 memeriksa sidik saat menerima; berkas yang rusak di perjalanan ditolak, bukan tersimpan diam-diam.
+      sha256: sha256Berkas,
     });
   } catch {
     return NextResponse.json({ error: "Gagal menyimpan file. Coba lagi." }, { status: 500 });
@@ -119,6 +137,9 @@ export async function POST(
       { kgbId: id },
       {
         pathFile,
+        sha256Berkas,
+        ukuranBerkas: isi.length,
+        statusTtd,
         ...(nomorSuratParam ? { nomorSurat: nomorSuratParam } : {}),
         ...(tanggalSuratInput ? { tanggalSurat: tanggalSuratInput } : {}),
       },
@@ -135,6 +156,9 @@ export async function POST(
       pathFile,
       generatedAt: new Date(),
       generatedBy: userLogin.id,
+      sha256Berkas,
+      ukuranBerkas: isi.length,
+      statusTtd,
     });
   }
 
@@ -158,7 +182,10 @@ export async function POST(
   logAudit({
     userId: userLogin.id,
     aksi: "upload_sk",
-    detail: `Upload SK TTD untuk ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}), ${keterangan}`,
+    detail:
+      `Upload SK TTD untuk ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}), ${keterangan}; ` +
+      `${statusTtd === "tte" ? "TTE utuh" : statusTtd === "basah" ? "tanda tangan basah (tanpa TTE)" : "TTE tidak dapat diperiksa"}, ` +
+      `${Math.round(isi.length / 1024)} KB, SHA-256 ${sha256Berkas}`,
     targetNama: pegawai?.nama ?? "-",
   });
 

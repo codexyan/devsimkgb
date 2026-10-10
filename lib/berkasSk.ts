@@ -44,6 +44,9 @@ export async function responsBerkasSk(key: string, namaUnduhan?: string): Promis
       headers: {
         "Content-Type": obj.httpMetadata?.contentType ?? "application/pdf",
         "Content-Disposition": namaUnduhan ? `inline; filename="${namaUnduhan.replace(/["\\]/g, "")}"` : "inline",
+        // Berkas SK bertanda tangan harus sampai apa adanya: perantara tidak boleh mengompres atau mengubahnya (ADR-096).
+        "Cache-Control": "private, no-store, no-transform",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch {

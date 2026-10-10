@@ -251,6 +251,8 @@ export async function GET() {
         potensiRapelan: k.flagRapelan === true,
         rapelan: k.rapelanDitetapkan === true,
         berkasAda: !!surat?.pathFile,
+        // Status tanda tangan berkas SK (ADR-096); kosong pada SK yang diunggah sebelumnya.
+        statusTtd: (surat as { statusTtd?: string | null } | undefined)?.statusTtd ?? null,
         // Langkah terakhir milik UPT: merekam KGB di Gaji Web satkernya sendiri.
         gajiWebAt: k.inputGajiWebAt ? new Date(k.inputGajiWebAt).toISOString() : null,
         gajiWebOleh: k.inputGajiWebBy ?? null,
