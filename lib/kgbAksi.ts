@@ -6,7 +6,6 @@ import type { DokumenPegawai } from "./dokumenPegawai";
 import { BATAS_UKURAN_SK_BYTE, PESAN_SK_TERLALU_BESAR } from "./prosesKgb";
 import type { DataSuratKGB } from "./generateSuratKGB";
 import { TEKS_DRAF_KANWIL, TEKS_DRAF_UPT, type InfoReviewSk } from "./reviewSkUpt";
-import { tanggalKalender } from "./waktu";
 
 export type HasilAksi<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -380,8 +379,7 @@ export async function cetakSk(
   const hasil = await ambilPdf(url, { method: "POST" }, versi === "tte", "SK gagal diunduh.");
   if (!hasil.ok) return hasil;
   if (hasil.data.draf) return { ok: false, error: alasanBelumBolehCetak(hasil.data.reviewSk) };
-  const tahun = tanggalKalender(hasil.data.surat.tanggalSurat)?.getFullYear() ?? null;
-  unduhBlob(hasil.data.blob, namaFileSk({ nama: pegawai.nama, tahun, versi: versi === "tte" ? "srikandi" : "biasa" }));
+  unduhBlob(hasil.data.blob, namaBerkasSk({ nomorSurat: hasil.data.surat.nomorSurat, nama: pegawai.nama, versi }));
   return { ok: true, data: { jumlah: 1 } };
 }
 
@@ -391,11 +389,23 @@ function alasanBelumBolehCetak(reviewSk: InfoReviewSk | null): string {
     : "SK ini masih menunggu review Admin UPT, jadi belum dapat dicetak untuk ditandatangani.";
 }
 
-/** Nama berkas di dalam ZIP unduhan massal: nomor urut, nama pegawai, dan nomor SK (ADR-095). */
-export function namaBerkasZipSk(urut: number, nama: string, nomorSurat: string | null | undefined): string {
-  const bersih = (teks: string) => teks.replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim();
-  const nomor = nomorSurat?.trim() ? ` - ${bersih(nomorSurat)}` : "";
-  return `${String(urut).padStart(3, "0")} - ${bersih(nama) || "Pegawai"}${nomor}.pdf`;
+/** Angka urut di ujung nomor surat SK, mis. "1758" dari "WP.19-SA.04.04-1758"; tanpa angka di ujung, nomor utuh yang
+ * aman dipakai sebagai nama berkas; null bila nomornya kosong. */
+export function nomorUrutSk(nomorSurat: string | null | undefined): string | null {
+  const nomor = nomorSurat?.trim();
+  if (!nomor || nomor === "-") return null;
+  const angka = nomor.match(/(\d+)\s*$/);
+  if (angka) return angka[1];
+  return nomor.replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim() || null;
+}
+
+/**
+ * Nama berkas SK (ADR-097): nomor urut, TTE atau TTD, "KGB", lalu nama pegawai, mis. "1758 TTE KGB Abdul Hayat.pdf".
+ * Dipakai unduhan satuan maupun ZIP, sehingga satu SK selalu bernama sama dan berkas terurut menurut nomor agenda.
+ */
+export function namaBerkasSk(input: { nomorSurat?: string | null; nama: string; versi: VersiCetak }): string {
+  const nama = input.nama.replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim() || "Pegawai";
+  return [nomorUrutSk(input.nomorSurat), input.versi === "tte" ? "TTE" : "TTD", "KGB", nama].filter(Boolean).join(" ") + ".pdf";
 }
 
 /** Satu berkas ZIP tanpa kompresi ulang: PDF sudah terkompresi, jadi isinya disimpan apa adanya. */
@@ -407,33 +417,36 @@ export async function susunZipSk(berkas: readonly { nama: string; isi: Uint8Arra
 }
 
 /**
- * Unduh SK versi Srikandi untuk TTE dari banyak KGB sekaligus dalam satu ZIP (ADR-095). PDF disusun satu per satu di
- * peramban; SK yang belum boleh dicetak (menunggu review atau perbaikan UPT) dilewati dan namanya dilaporkan.
+ * Unduh SK dari banyak KGB sekaligus dalam satu ZIP (ADR-095, ADR-097): versi Srikandi untuk TTE, atau SK biasa untuk
+ * tanda tangan basah. PDF disusun satu per satu di peramban; SK yang belum boleh dicetak (menunggu review atau perbaikan
+ * UPT) dilewati dan namanya dilaporkan.
  */
 export async function unduhZipSiapCetak(
   daftar: readonly { kgbId: string; nama: string }[],
+  versi: VersiCetak,
   kemajuan?: (selesai: number, total: number) => void,
 ): Promise<HasilAksi<{ jumlah: number; dilewati: string[] }>> {
   const berkas: { nama: string; isi: Uint8Array }[] = [];
   const dilewati: string[] = [];
   for (const [i, d] of daftar.entries()) {
     kemajuan?.(i, daftar.length);
-    const hasil = await ambilPdf(`/api/kgb/${encodeURIComponent(d.kgbId)}/pdf?preview=true`, { method: "POST" }, true, "SK gagal disiapkan.");
+    const hasil = await ambilPdf(`/api/kgb/${encodeURIComponent(d.kgbId)}/pdf?preview=true`, { method: "POST" }, versi === "tte", "SK gagal disiapkan.");
     if (!hasil.ok || hasil.data.draf) {
       dilewati.push(d.nama);
       continue;
     }
-    berkas.push({
-      nama: namaBerkasZipSk(berkas.length + 1, d.nama, hasil.data.surat.nomorSurat),
-      isi: new Uint8Array(await hasil.data.blob.arrayBuffer()),
-    });
+    // Nama kembar (nomor urut sama dari kode klasifikasi lain) diberi akhiran agar tidak saling menimpa di dalam ZIP.
+    const dasar = namaBerkasSk({ nomorSurat: hasil.data.surat.nomorSurat, nama: d.nama, versi });
+    let nama = dasar;
+    for (let n = 2; berkas.some((b) => b.nama === nama); n++) nama = dasar.replace(/\.pdf$/, ` (${n}).pdf`);
+    berkas.push({ nama, isi: new Uint8Array(await hasil.data.blob.arrayBuffer()) });
   }
   kemajuan?.(daftar.length, daftar.length);
   if (berkas.length === 0) return { ok: false, error: "Tidak ada SK yang dapat diunduh; semuanya gagal disiapkan atau belum boleh dicetak." };
   const zip = await susunZipSk(berkas);
   const hariIni = new Date();
   const tanggal = `${hariIni.getFullYear()}-${String(hariIni.getMonth() + 1).padStart(2, "0")}-${String(hariIni.getDate()).padStart(2, "0")}`;
-  unduhBlob(new Blob([zip.slice().buffer], { type: "application/zip" }), `SK KGB untuk TTE ${tanggal}.zip`);
+  unduhBlob(new Blob([zip.slice().buffer], { type: "application/zip" }), `SK KGB ${versi === "tte" ? "TTE" : "TTD"} ${tanggal}.zip`);
   return { ok: true, data: { jumlah: berkas.length, dilewati } };
 }
 
@@ -522,21 +535,6 @@ export function tanggapiReviewSkUpt(
 /** Tautan berkas SK yang tersimpan (SK bertanda tangan atau berkas arsip). */
 export function tautanBerkasSk(pathFile: string): string {
   return `/api/blob/download?url=${encodeURIComponent(pathFile)}`;
-}
-
-/**
- * Nama berkas unduhan SK KGB. SK biasa: "KGB Kanwil <nama> <tahun>.pdf"; versi Srikandi:
- * "KGB <nama>.pdf". Karakter yang tidak sah untuk nama berkas diganti spasi.
- */
-export function namaFileSk(input: { nama: string; tahun?: number | null; versi: "biasa" | "srikandi" }): string {
-  const nama =
-    input.nama
-      .replace(/[\\/:*?"<>|]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim() || "Pegawai";
-  if (input.versi === "srikandi") return `KGB ${nama}.pdf`;
-  const tahun = typeof input.tahun === "number" && Number.isFinite(input.tahun) ? ` ${input.tahun}` : "";
-  return `KGB Kanwil ${nama}${tahun}.pdf`;
 }
 
 /** Unduh Blob sebagai berkas di peramban. */

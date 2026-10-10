@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { ambilDrafSk, buatPdfSk, buatSkDenganReview, namaFileSk, simpanDasarSk, simpanDrafSkServer, unduhBlob, type DataDasarSk } from "@/lib/kgbAksi";
+import { ambilDrafSk, buatPdfSk, buatSkDenganReview, namaBerkasSk, simpanDasarSk, simpanDrafSkServer, unduhBlob, type DataDasarSk } from "@/lib/kgbAksi";
 import type { InfoReviewSk } from "@/lib/reviewSkUpt";
 import type { SkGaji } from "@/lib/linimasaDasarSk";
 import { alasanTolakBuatSk } from "@/lib/prosesKgb";
@@ -385,7 +385,7 @@ export default function ModalBuatSk({
         setGalat(`SK sudah dibuat, tetapi versi Srikandi gagal disiapkan (${srikandiLama.error}). Unduh lagi dengan Unduh untuk TTE.`);
         return;
       }
-      unduhBlob(srikandiLama.data, namaFileSk({ nama: pegawai.nama, versi: "srikandi" }));
+      unduhBlob(srikandiLama.data, namaBerkasSk({ nomorSurat: isi.nomorSurat, nama: pegawai.nama, versi: "tte" }));
       onBerhasil(`SK KGB ${pegawai.nama} dibuat; versi Srikandi untuk TTE diunduh. Setelah SK ditandatangani, pilih Unggah SK bertanda tangan.`);
       return;
     }
@@ -407,7 +407,7 @@ export default function ModalBuatSk({
       setGalat(`SK sudah dibuat, tetapi versi Srikandi gagal disiapkan (${srikandi.error}). Unduh lagi dengan Unduh untuk TTE.`);
       return;
     }
-    unduhBlob(srikandi.data, namaFileSk({ nama: pegawai.nama, versi: "srikandi" }));
+    unduhBlob(srikandi.data, namaBerkasSk({ nomorSurat: isi.nomorSurat, nama: pegawai.nama, versi: "tte" }));
     onBerhasil(
       `SK KGB ${pegawai.nama} dibuat; versi Srikandi untuk TTE diunduh. Untuk tanda tangan basah, pilih panah di sebelah ` +
         "Unduh untuk TTE. Setelah SK ditandatangani, pilih Unggah SK bertanda tangan.",
@@ -741,7 +741,7 @@ export default function ModalBuatSk({
                   Buka pratinjau di tab baru
                 </a>
                 {tab === "srikandi" && (
-                  <a href={urlTab} download={namaFileSk({ nama: pegawai.nama, versi: "srikandi" })} className="kgbm-tautan">
+                  <a href={urlTab} download={namaBerkasSk({ nomorSurat: skBaru.nomorSurat, nama: pegawai.nama, versi: "tte" })} className="kgbm-tautan">
                     Unduh Versi Srikandi
                   </a>
                 )}

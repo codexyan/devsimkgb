@@ -16,6 +16,11 @@ export default function TombolCetakSk({
   nadaUtama = "hijau-penuh",
   kelasPanah,
   urutan,
+  labelUtama = "Unduh untuk TTE",
+  labelSibuk = "Menyiapkan...",
+  judulUtama = "Unduh SK versi Srikandi untuk ditandatangani secara elektronik (TTE), tanpa tanda air",
+  labelBasah = "Cetak untuk tanda tangan basah",
+  keteranganBasah = "SK biasa dengan ruang tanda tangan kosong, tanpa tanda air",
 }: {
   /** Nama pegawai, untuk label menu yang dibacakan pembaca layar. */
   nama: string;
@@ -29,6 +34,12 @@ export default function TombolCetakSk({
   kelasPanah?: string;
   /** Urutan flex pada deretan tombol kartu. */
   urutan?: number;
+  /** Label tombol utama dan pilihan menu; tombol ZIP memakai label sendiri (ADR-097). */
+  labelUtama?: string;
+  labelSibuk?: string;
+  judulUtama?: string;
+  labelBasah?: string;
+  keteranganBasah?: string;
 }) {
   return (
     <span className="ctk-belah" style={urutan === undefined ? undefined : { order: urutan }}>
@@ -38,19 +49,19 @@ export default function TombolCetakSk({
         data-nada={nadaUtama || undefined}
         disabled={sibuk}
         onClick={() => onCetak("tte")}
-        title="Unduh SK versi Srikandi untuk ditandatangani secara elektronik (TTE), tanpa tanda air"
+        title={judulUtama}
       >
-        {sibuk ? "Menyiapkan..." : "Unduh untuk TTE"}
+        {sibuk ? labelSibuk : labelUtama}
       </button>
       <MenuTindakan
-        judul={`Cara cetak lain untuk SK ${nama}`}
+        judul={`Cara cetak lain untuk ${nama}`}
         bentuk="panah"
         kelasPemicu={kelasPanah}
         nonaktif={sibuk}
         item={[
           {
-            label: "Cetak untuk tanda tangan basah",
-            keterangan: "SK biasa dengan ruang tanda tangan kosong, tanpa tanda air",
+            label: labelBasah,
+            keterangan: keteranganBasah,
             onPilih: () => onCetak("basah"),
           },
         ]}
