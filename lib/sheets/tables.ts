@@ -312,8 +312,9 @@ export const defs = {
     tab: "KonfigurasiKanwil",
     // namaKepala/nipKepala tidak dipakai lagi (pindah ke tab Penandatangan), tetapi kolomnya
     // tetap ada karena penulisan posisional. batasInputSdm: tanggal batas input Tim SDM (lib/batasInputSdm.ts).
-    // kppnSatker: JSON penyesuaian KPPN mitra per satker (lib/kppnSatker.ts).
-    columns: [s("id"), s("namaKepala"), s("nipKepala"), s("nomorPP"), s("tahunPP"), s("waAdmin"), i("notifKgbH1"), i("notifKgbH2"), i("sesiTimeoutMenit"), d("updatedAt"), s("updatedBy"), i("batasInputSdm"), s("kppnSatker")],
+    // kppnSatker: JSON penyesuaian KPPN mitra per satker (lib/kppnSatker.ts). batasKirimSurat: tanggal batas kirim
+    // surat usulan UPT (ADR-094).
+    columns: [s("id"), s("namaKepala"), s("nipKepala"), s("nomorPP"), s("tahunPP"), s("waAdmin"), i("notifKgbH1"), i("notifKgbH2"), i("sesiTimeoutMenit"), d("updatedAt"), s("updatedBy"), i("batasInputSdm"), s("kppnSatker"), i("batasKirimSurat")],
   },
   Penandatangan: {
     tab: "Penandatangan",

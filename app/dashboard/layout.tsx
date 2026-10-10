@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import DashboardShell from "./components/DashboardShell";
-import { normalisasiBatasInputSdm } from "@/lib/batasInputSdm";
+import { normalisasiBatasInputSdm, normalisasiBatasKirimSurat } from "@/lib/batasInputSdm";
 import "./dasbor.css";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -20,7 +20,7 @@ export default async function DashboardLayout({
   // Durasi auto-logout (fallback 60 mnt bila belum diatur) dan batas input Tim SDM dari Pengaturan
   const cfg = (await db.konfigurasiKanwil
     .findUnique({ id: "default" })
-    .catch(() => null)) as { sesiTimeoutMenit?: number; batasInputSdm?: number | null } | null;
+    .catch(() => null)) as { sesiTimeoutMenit?: number; batasInputSdm?: number | null; batasKirimSurat?: number | null } | null;
 
   return (
     <DashboardShell
@@ -29,6 +29,7 @@ export default async function DashboardLayout({
       role={session.user.role ?? ""}
       sesiTimeoutMenit={cfg?.sesiTimeoutMenit ?? 60}
       batasInputSdm={normalisasiBatasInputSdm(cfg?.batasInputSdm)}
+      batasKirimSurat={normalisasiBatasKirimSurat(cfg?.batasKirimSurat)}
     >
       {children}
     </DashboardShell>

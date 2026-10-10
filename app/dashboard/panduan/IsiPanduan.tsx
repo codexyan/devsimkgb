@@ -8,7 +8,7 @@ import { formatTanggalId } from "@/lib/waktu";
 import { DaftarIsiPanduan, LanjutBagian, PanduanPeran, PilihPeran } from "./NavigasiPanduan";
 import { BUTIR_KONFIRMASI_UPT } from "@/lib/konfirmasiUpt";
 import { ATURAN_DASAR_BARU, KOLOM_DASAR_BARU, LEMBAR_DATA_UPT, PANDUAN_DASAR_BARU } from "@/lib/imporUsulanUpt";
-import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
+import { batasKirimSurat } from "@/lib/batasInputSdm";
 import { bagianUntukPeran, peranUntuk, type IdBagian } from "./peran";
 // Replika layar SIM-KGB untuk bagian Admin UPT; alasan memakai HTML alih-alih tangkapan layar ada di berkasnya.
 import {
@@ -73,7 +73,7 @@ const GAJI_MKG_0 = getGajiPokok(GOLONGAN, 0, 0);
 const GAJI_MKG_1 = getGajiPokok(GOLONGAN, 1, 0);
 const GAJI_MKG_3 = getGajiPokok(GOLONGAN, 3, 0);
 
-/* Aturan praktis UPT: surat dikirim tanggal 1 sampai 10 bulan kedua sebelum TMT, yaitu bulan yang sama
+/* Aturan praktis UPT: surat dikirim tanggal 1 sampai batas kirim (Pengaturan) bulan kedua sebelum TMT, yaitu bulan yang sama
    dengan dibukanya jendela proses di SIM-KGB (lib/tabelGaji.ts, hitungKirimSurat). */
 const bulanKirim = (tmt: Date) => hitungKirimSurat(tmt).mulai;
 const jendelaKirim = (tmt: Date) => {
@@ -494,7 +494,7 @@ export default async function IsiPanduan({
                 <div className="pub-note">
                   <strong className="pub-note-title">Aturan praktis untuk UPT</strong>
                   <p>
-                    Ajukan usulan dan kirim suratnya tanggal 1 sampai 10 bulan kedua sebelum TMT, yaitu bulan yang sama
+                    Ajukan usulan dan kirim suratnya tanggal 1 sampai {batasKirimSurat()} bulan kedua sebelum TMT, yaitu bulan yang sama
                     dengan dibukanya jendela proses di SIM-KGB. Dengan begitu Tim SDM masih punya sisa bulan itu untuk input, membuat SK,
                     menandatanganinya lewat Srikandi, dan mengirimkannya sebelum keuangan merekon gaji bulan berikutnya.
                     Untuk TMT {tgl(TMT_KGB)}: kirim {jendelaKirim(TMT_KGB)}.
@@ -783,7 +783,7 @@ export default async function IsiPanduan({
 
                 <h3 className="pub-h3">Langkah 2: Kapan usulan harus dikirim</h3>
                 <p>
-                  Surat usulan dikirim ke Kanwil pada <strong>tanggal 1 sampai {KIRIM_SURAT_BATAS}</strong>, di{" "}
+                  Surat usulan dikirim ke Kanwil pada <strong>tanggal 1 sampai {batasKirimSurat()}</strong>, di{" "}
                   <strong>bulan kedua sebelum TMT</strong> KGB pegawainya. Untuk KGB yang TMT-nya{" "}
                   {bulanTahun(TMT_KGB)}, berarti suratnya dikirim {jendelaKirim(TMT_KGB)}. Jaraknya dibuat dua bulan
                   supaya Kanwil sempat meninjau, membuat SK, dan menandatanganinya sebelum gaji bulan itu dibayarkan.
@@ -1315,7 +1315,7 @@ export default async function IsiPanduan({
                     dari SK, bukan tanggal penetapan SK.
                   </li>
                   <li>
-                    Kirim tanggal 1 sampai 10 bulan kedua sebelum TMT; surat paling lambat diterima awal
+                    Kirim tanggal 1 sampai {batasKirimSurat()} bulan kedua sebelum TMT; surat paling lambat diterima awal
                     bulan kedua sebelum TMT agar dapat diinput sebelum batas proses Tim SDM (lihat{" "}
                     <a href="#jadwal">jadwal</a>).
                   </li>

@@ -95,7 +95,7 @@ function geserBulanKunci(bulan: string, n: number): string {
 
 /**
  * Draf usulan data yang dikunci di dasbor sampai masa usul KGB pegawainya dibuka (ADR-059). Surat usulan KGB
- * dikirim tanggal 1 sampai 10 bulan kedua sebelum TMT; `bulanUsulan` adalah bulan TMT yang suratnya dikirim bulan
+ * dikirim tanggal 1 sampai batas kirim (Pengaturan) bulan kedua sebelum TMT; `bulanUsulan` adalah bulan TMT yang suratnya dikirim bulan
  * ini, jadi draf terbuka sejak bulanTmt <= bulanUsulan, dan yang sudah lewat pun tetap terbuka.
  *
  * Tidak dikunci: draf pegawai baru (datanya belum ada di Kanwil sama sekali, sehingga pendataan tidak boleh menunggu

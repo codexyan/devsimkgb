@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { KerangkaModal } from "@/app/dashboard/components/kgb";
-import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
+import { tanggalBatasKirim } from "@/lib/batasInputSdm";
 import { formatTanggalId } from "@/lib/waktu";
 
-/* Pengingat periode pengusulan KGB untuk Admin UPT (ADR-029). Surat usulan dikirim ke Kanwil tanggal 1 sampai 10
+/* Pengingat periode pengusulan KGB untuk Admin UPT (ADR-029). Surat usulan dikirim ke Kanwil tanggal 1 sampai batas kirim (Pengaturan, bawaan 20)
    bulan kedua sebelum TMT. Begitu masa kirim dibuka, dashboard menampilkan jendela ini sekali per periode selama
    masih ada pegawai jatuh tempo yang belum diajukan, dengan pintasan ke Usul KGB Kolektif yang langsung mencentang
    pegawai itu. Setelah ditutup, jendela tidak tampil lagi untuk periode yang sama di perangkat ini. */
@@ -45,12 +45,12 @@ export default function PengingatUsulan({
   belumDiajukan: PegawaiJatuhTempo[];
 }) {
   const kunci = kunciSimpan(satker, bulanTmt);
-  // Masa kirim surat: tanggal 1 sampai 10 bulan ini (bulan kedua sebelum TMT).
-  const dalamMasaKirim = hariIni.getDate() <= KIRIM_SURAT_BATAS;
+  // Masa kirim surat: tanggal 1 sampai batas kirim (Pengaturan, bawaan 20) bulan ini, bulan kedua sebelum TMT (ADR-094).
+  const batas = tanggalBatasKirim(hariIni.getFullYear(), hariIni.getMonth());
+  const dalamMasaKirim = hariIni.getDate() <= batas.getDate();
   const [tutup, setTutup] = useState(() => sudahDitutup(kunci));
   if (tutup || !dalamMasaKirim || belumDiajukan.length === 0) return null;
 
-  const batas = new Date(hariIni.getFullYear(), hariIni.getMonth(), KIRIM_SURAT_BATAS);
   const sisaHari = Math.round((batas.getTime() - new Date(hariIni.getFullYear(), hariIni.getMonth(), hariIni.getDate()).getTime()) / 86_400_000);
   const selesai = () => {
     try {
@@ -82,7 +82,7 @@ export default function PengingatUsulan({
       <div className="pgu-batas">
         <span className="pgu-tanggal" aria-hidden="true">
           <small>{formatTanggalId(batas, { month: "short" })}</small>
-          <strong>{KIRIM_SURAT_BATAS}</strong>
+          <strong>{batas.getDate()}</strong>
         </span>
         <span className="min-w-0">
           <strong>Batas kirim surat {formatTanggalId(batas, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</strong>

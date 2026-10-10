@@ -6,9 +6,14 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   aturBatasInputSdm,
+  aturBatasKirimSurat,
   BATAS_INPUT_SDM_BAWAAN,
+  BATAS_KIRIM_SURAT_BAWAAN,
   batasInputSdm,
+  batasKirimSurat,
   normalisasiBatasInputSdm,
+  normalisasiBatasKirimSurat,
+  tanggalBatasKirim,
 } from "./batasInputSdm";
 import { hitungDeadlineSDM, hitungRekonGaji, jendelaProsesKgb } from "./tabelGaji";
 
@@ -32,6 +37,41 @@ test("batas input pada tanggal batas bulan kedua sebelum TMT, dijepit ke akhir b
   assert.deepEqual(hitungDeadlineSDM(tanggal(2028, 4), 31), tanggal(2028, 2, 29));
   // Pergantian tahun: TMT 1 Februari 2027 → batas 20 Desember 2026.
   assert.deepEqual(hitungDeadlineSDM(tanggal(2027, 2), 20), tanggal(2026, 12, 20));
+});
+
+test("batas kirim surat UPT: bawaan 20, dari Pengaturan, tidak melewati batas input, dijepit ke akhir bulan (ADR-094)", () => {
+  assert.equal(BATAS_KIRIM_SURAT_BAWAAN, 20);
+  for (const kosong of [null, undefined, "", 0, 32, "abc"]) assert.equal(normalisasiBatasKirimSurat(kosong), 20, String(kosong));
+  assert.equal(normalisasiBatasKirimSurat("15"), 15);
+  const semula = { input: batasInputSdm(), kirim: batasKirimSurat() };
+  try {
+    aturBatasInputSdm(31);
+    aturBatasKirimSurat(20);
+    assert.equal(batasKirimSurat(), 20);
+    assert.deepEqual(tanggalBatasKirim(2026, 9), tanggal(2026, 10, 20));
+    aturBatasInputSdm(18);
+    assert.equal(batasKirimSurat(), 18, "tidak melewati batas input");
+    aturBatasInputSdm(31);
+    aturBatasKirimSurat(30);
+    assert.deepEqual(tanggalBatasKirim(2027, 1), tanggal(2027, 2, 28), "Februari dijepit ke tanggal 28");
+  } finally {
+    aturBatasInputSdm(semula.input);
+    aturBatasKirimSurat(semula.kirim);
+  }
+});
+
+test("batas input akhir bulan (31): input sampai hari terakhir bulan, rapelan baru sesudahnya (ADR-094)", () => {
+  const semula = batasInputSdm();
+  try {
+    aturBatasInputSdm(31);
+    // TMT 1 Desember 2026: input sampai 31 Oktober; 1 November sudah berpotensi rapelan.
+    assert.equal(jendelaProsesKgb(tanggal(2026, 12), tanggal(2026, 10, 31))?.flagRapelan, false);
+    assert.equal(jendelaProsesKgb(tanggal(2026, 12), tanggal(2026, 11, 1))?.flagRapelan, true);
+    // TMT 1 Januari 2027: November 30 hari, jadi batasnya 30 November.
+    assert.deepEqual(jendelaProsesKgb(tanggal(2027, 1), tanggal(2026, 11, 30))?.deadlineSDM, tanggal(2026, 11, 30));
+  } finally {
+    aturBatasInputSdm(semula);
+  }
 });
 
 test("rekon gaji keuangan tanggal 1 sampai 15 bulan sebelum TMT", () => {

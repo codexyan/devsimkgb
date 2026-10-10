@@ -6,7 +6,14 @@ import { ROLES } from "@/lib/auth";
 import PenandatanganManager from "./PenandatanganManager";
 import PemeriksaanData from "./PemeriksaanData";
 import TemplateSuratManager from "./TemplateSuratManager";
-import { aturBatasInputSdm, BATAS_INPUT_SDM_BAWAAN, normalisasiBatasInputSdm } from "@/lib/batasInputSdm";
+import {
+  aturBatasInputSdm,
+  aturBatasKirimSurat,
+  BATAS_INPUT_SDM_BAWAAN,
+  BATAS_KIRIM_SURAT_BAWAAN,
+  normalisasiBatasInputSdm,
+  normalisasiBatasKirimSurat,
+} from "@/lib/batasInputSdm";
 import { hitungDeadlineSDM, hitungRekonGaji, hitungUnlockDate } from "@/lib/tabelGaji";
 import { formatTanggalId, hariIniWita } from "@/lib/waktu";
 
@@ -16,7 +23,7 @@ import { formatTanggalId, hariIniWita } from "@/lib/waktu";
      1. Penandatangan surat KGB: definitif, Plh, Plt, Dirjen, dengan masa berlaku
      1a. Template surat KGB:     kop, kertas, kalimat, tembusan; berversi per tanggal (ADR-019)
      2. Dasar hukum KGB
-     3. Jadwal proses KGB:       tanggal batas input Tim SDM
+     3. Jadwal proses KGB:       tanggal batas kirim surat UPT dan batas input Tim SDM (ADR-094)
      4. Notifikasi KGB:          ambang H-… peringatan
      5. Keamanan sesi:           durasi keluar otomatis
      6. Kontak WhatsApp:         dipakai tombol lupa password
@@ -27,6 +34,8 @@ interface Konfigurasi {
   nomorPP: string; tahunPP: string;
   waAdmin: string; notifKgbH1: number; notifKgbH2: number; sesiTimeoutMenit: number;
   batasInputSdm: number;
+  /** Tanggal batas kirim surat usulan UPT (ADR-094). */
+  batasKirimSurat: number;
   updatedAt?: string; updatedBy?: string | null;
 }
 
@@ -34,6 +43,7 @@ const KOSONG: Konfigurasi = {
   nomorPP: "Nomor 5 Tahun 2024", tahunPP: "2024",
   waAdmin: "", notifKgbH1: 14, notifKgbH2: 7, sesiTimeoutMenit: 60,
   batasInputSdm: BATAS_INPUT_SDM_BAWAAN,
+  batasKirimSurat: BATAS_KIRIM_SURAT_BAWAAN,
 };
 
 type IdBagian = "pejabat" | "template" | "dokumen" | "jadwal" | "kppn" | "notifikasi" | "keamanan" | "kontak" | "pemeriksaan";
@@ -72,11 +82,15 @@ function Bidang({ label, petunjuk, nilai, onUbah, contoh, jenis = "text", satuan
 
 /* Contoh jadwal untuk TMT dua bulan ke depan dengan batas yang sedang diisi: jendela input Tim SDM, lalu
    rekon gaji keuangan di Gaji Web. SK harus sudah dikonfirmasi keuangan sebelum rekon itu dikirim. */
-function ContohJadwal({ batas }: { batas: number }) {
+function ContohJadwal({ batas, kirim }: { batas: number; kirim: number }) {
   const hariIni = hariIniWita();
   const tmt = new Date(hariIni.getFullYear(), hariIni.getMonth() + 2, 1);
   const rekon = hitungRekonGaji(tmt);
+  const bulanKirim = hitungUnlockDate(tmt);
+  const hariTerakhir = new Date(bulanKirim.getFullYear(), bulanKirim.getMonth() + 1, 0).getDate();
+  const batasKirim = new Date(bulanKirim.getFullYear(), bulanKirim.getMonth(), Math.min(kirim, batas, hariTerakhir));
   const baris: [string, string][] = [
+    ["Kirim surat usulan UPT", `${formatTanggalId(bulanKirim, { day: "numeric", month: "short" })} – ${formatTanggalId(batasKirim)}`],
     ["Input Tim SDM", `${formatTanggalId(hitungUnlockDate(tmt), { day: "numeric", month: "short" })} – ${formatTanggalId(hitungDeadlineSDM(tmt, batas))}`],
     ["SK TTE, unggah, konfirmasi keuangan", "sebelum rekon dikirim"],
     ["Rekon gaji Gaji Web (keuangan)", `${formatTanggalId(rekon.mulai, { day: "numeric", month: "short" })} – ${formatTanggalId(rekon.batas)}`],
@@ -138,6 +152,7 @@ export default function PengaturanPage() {
             notifKgbH2: ambilAngka("notifKgbH2", 7),
             sesiTimeoutMenit: ambilAngka("sesiTimeoutMenit", 60),
             batasInputSdm: normalisasiBatasInputSdm(cfg.batasInputSdm),
+            batasKirimSurat: normalisasiBatasKirimSurat(cfg.batasKirimSurat),
             updatedAt: typeof cfg.updatedAt === "string" ? cfg.updatedAt : undefined,
             updatedBy: typeof cfg.updatedBy === "string" ? cfg.updatedBy : null,
           };
@@ -175,6 +190,7 @@ export default function PengaturanPage() {
           waAdmin: form.waAdmin.trim(), notifKgbH1: form.notifKgbH1,
           notifKgbH2: form.notifKgbH2, sesiTimeoutMenit: form.sesiTimeoutMenit,
           batasInputSdm: form.batasInputSdm,
+          batasKirimSurat: form.batasKirimSurat,
           kppnSatker: kppn,
         }),
       });
@@ -186,11 +202,13 @@ export default function PengaturanPage() {
         notifKgbH1: Number(d.notifKgbH1 ?? 14), notifKgbH2: Number(d.notifKgbH2 ?? 7),
         sesiTimeoutMenit: Number(d.sesiTimeoutMenit ?? 60),
         batasInputSdm: normalisasiBatasInputSdm(d.batasInputSdm),
+        batasKirimSurat: normalisasiBatasKirimSurat(d.batasKirimSurat),
         updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : undefined,
         updatedBy: typeof d.updatedBy === "string" ? d.updatedBy : null,
       };
       // Halaman dashboard lain di tab ini langsung memakai batas yang baru disimpan.
       aturBatasInputSdm(c.batasInputSdm);
+      aturBatasKirimSurat(c.batasKirimSurat);
       if (Array.isArray(d.satkerKppn)) {
         const daftar = d.satkerKppn as SatkerKppn[];
         const peta = Object.fromEntries(daftar.map((s) => [s.kode, s.kppn]));
@@ -213,7 +231,7 @@ export default function PengaturanPage() {
       { id: "pejabat" as const, label: "Penandatangan surat", ket: "Dipilih otomatis menurut tanggal surat", lengkap: adaPenandatangan },
       { id: "template" as const, label: "Template surat KGB", ket: "Kop, kertas, kalimat, dan tembusan berversi", lengkap: true, luar: true },
       { id: "dokumen" as const, label: "Dasar hukum KGB", ket: "Peraturan Pemerintah yang dirujuk SK", lengkap: !!form.nomorPP.trim() },
-      { id: "jadwal" as const, label: "Jadwal proses KGB", ket: "Batas input Tim SDM sebelum rekon gaji", lengkap: true },
+      { id: "jadwal" as const, label: "Jadwal proses KGB", ket: "Batas kirim surat UPT dan input Tim SDM sebelum rekon gaji", lengkap: true },
       { id: "kppn" as const, label: "KPPN mitra satker", ket: "Kantor bayar tujuan SK tiap satker", lengkap: true },
       { id: "notifikasi" as const, label: "Notifikasi KGB", ket: "Kapan pengingat mulai dikirim", lengkap: true },
       { id: "keamanan" as const, label: "Keamanan sesi", ket: "Keluar otomatis saat perangkat menganggur", lengkap: true },
@@ -304,7 +322,7 @@ export default function PengaturanPage() {
             <small>tiap bulan M-2</small>
           </span>
           <span className="dsb-angka-meta">
-            {form.batasInputSdm === 31 ? "31 berarti akhir bulan" : "Input setelahnya ditandai berpotensi rapelan"}
+            {`Surat UPT sampai tanggal ${form.batasKirimSurat}; ${form.batasInputSdm === 31 ? "31 berarti akhir bulan" : "input sesudahnya berpotensi rapelan"}`}
           </span>
         </div>
         <div className="dsb-angka">
@@ -359,6 +377,20 @@ export default function PengaturanPage() {
                 {bagian === "jadwal" && (
                   <>
                     <Bidang
+                      label="Batas kirim surat usulan UPT"
+                      jenis="number"
+                      satuan="tanggal"
+                      nilai={String(form.batasKirimSurat)}
+                      onUbah={(v) => setForm((f) => ({ ...f, batasKirimSurat: Math.min(31, Math.max(1, angka(v, BATAS_KIRIM_SURAT_BAWAAN))) }))}
+                      petunjuk="Tanggal 1–31 pada bulan kedua sebelum TMT. Tidak boleh melewati batas input Tim SDM, sebab surat yang tiba sesudah input ditutup tidak sempat diinput."
+                    />
+                    {form.batasKirimSurat > form.batasInputSdm && (
+                      <p role="alert" className="dsb-catatan" style={{ color: "var(--st-red)" }}>
+                        Batas kirim surat (tanggal {form.batasKirimSurat}) melewati batas input (tanggal {form.batasInputSdm}). Turunkan
+                        salah satunya.
+                      </p>
+                    )}
+                    <Bidang
                       label="Batas input Tim SDM"
                       jenis="number"
                       satuan="tanggal"
@@ -366,7 +398,7 @@ export default function PengaturanPage() {
                       onUbah={(v) => setForm((f) => ({ ...f, batasInputSdm: Math.min(31, Math.max(1, angka(v, BATAS_INPUT_SDM_BAWAAN))) }))}
                       petunjuk="Tanggal 1–31 pada bulan kedua sebelum TMT (31 berarti akhir bulan). Input setelah tanggal ini tetap diterima, tetapi ditandai berpotensi rapelan."
                     />
-                    <ContohJadwal batas={form.batasInputSdm} />
+                    <ContohJadwal batas={form.batasInputSdm} kirim={form.batasKirimSurat} />
                   </>
                 )}
 

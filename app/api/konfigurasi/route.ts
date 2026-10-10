@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
-import { BATAS_INPUT_SDM_BAWAAN, BATAS_INPUT_SDM_MAKS, BATAS_INPUT_SDM_MIN } from "@/lib/batasInputSdm";
+import { BATAS_INPUT_SDM_BAWAAN, BATAS_INPUT_SDM_MAKS, BATAS_INPUT_SDM_MIN, BATAS_KIRIM_SURAT_BAWAAN } from "@/lib/batasInputSdm";
 import { lupakanBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { lupakanKppnSatker, muatKppnSatker } from "@/lib/muatKppnSatker";
 import { aturKppnSatker, kppnBerlaku, normalisasiKppnSatker, pilihanKppn } from "@/lib/kppnSatker";
@@ -36,7 +36,7 @@ export async function PATCH(req: Request) {
 
   const body = (await req.json()) as {
     nomorPP?: string; tahunPP?: string; waAdmin?: unknown;
-    notifKgbH1?: unknown; notifKgbH2?: unknown; sesiTimeoutMenit?: unknown; batasInputSdm?: unknown;
+    notifKgbH1?: unknown; notifKgbH2?: unknown; sesiTimeoutMenit?: unknown; batasInputSdm?: unknown; batasKirimSurat?: unknown;
     kppnSatker?: unknown;
   };
 
@@ -50,6 +50,13 @@ export async function PATCH(req: Request) {
   if (notifKgbH2 > notifKgbH1) [notifKgbH1, notifKgbH2] = [notifKgbH2, notifKgbH1];
   const sesiTimeoutMenit = clampInt(body.sesiTimeoutMenit, 60, 5, 480);
   const batasInputSdm = clampInt(body.batasInputSdm, BATAS_INPUT_SDM_BAWAAN, BATAS_INPUT_SDM_MIN, BATAS_INPUT_SDM_MAKS);
+  // Batas kirim surat UPT (ADR-094): surat yang tiba sesudah input ditutup tidak sempat diinput.
+  const batasKirimSurat = clampInt(body.batasKirimSurat, BATAS_KIRIM_SURAT_BAWAAN, BATAS_INPUT_SDM_MIN, BATAS_INPUT_SDM_MAKS);
+  if (batasKirimSurat > batasInputSdm)
+    return NextResponse.json(
+      { error: `Batas kirim surat UPT (tanggal ${batasKirimSurat}) tidak boleh melewati batas input Tim SDM (tanggal ${batasInputSdm}).` },
+      { status: 400 },
+    );
   // Hanya satker yang KPPN-nya berbeda dari bawaan yang disimpan; sisanya mengikuti lib/satker.ts.
   const kppnSatker = normalisasiKppnSatker(body.kppnSatker);
   const jumlahKppnDisesuaikan = Object.keys(kppnSatker).length;
@@ -63,6 +70,7 @@ export async function PATCH(req: Request) {
     notifKgbH2,
     sesiTimeoutMenit,
     batasInputSdm,
+    batasKirimSurat,
     kppnSatker: jumlahKppnDisesuaikan > 0 ? JSON.stringify(kppnSatker) : "",
     updatedAt: new Date(),
     updatedBy: session.user.nip,
@@ -87,7 +95,7 @@ export async function PATCH(req: Request) {
     aksi: "edit_konfigurasi",
     detail:
       `Update konfigurasi kanwil: dasar hukum ${data.nomorPP}, notifikasi H-${notifKgbH1}/H-${notifKgbH2}, ` +
-      `sesi ${sesiTimeoutMenit} menit, batas input SDM tanggal ${batasInputSdm}, ` +
+      `sesi ${sesiTimeoutMenit} menit, batas kirim surat UPT tanggal ${batasKirimSurat}, batas input SDM tanggal ${batasInputSdm}, ` +
       (jumlahKppnDisesuaikan > 0
         ? `KPPN mitra disesuaikan untuk ${jumlahKppnDisesuaikan} satker (${Object.entries(kppnSatker).map(([kode, kppn]) => `${kode}: ${kppn}`).join(", ")})`
         : "KPPN mitra seluruhnya bawaan"),

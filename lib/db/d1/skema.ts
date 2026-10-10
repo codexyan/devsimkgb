@@ -53,7 +53,8 @@ export const SKEMA_D1: Readonly<Record<string, Readonly<Record<string, JenisKolo
     updated_by: "teks",
     urutan_sisip: "bilangan",
     batas_input_sdm: "bilangan",
-    kppn_satker: "teks"
+    kppn_satker: "teks",
+    batas_kirim_surat: "bilangan"
   },
   laporan_hukdis: {
     id: "teks",
