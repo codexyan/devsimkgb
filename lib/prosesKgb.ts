@@ -2,7 +2,7 @@
 // untuk membuat SK, mengubah data SK terakhir, dan mengunggah SK, penahanan oleh hukuman disiplin,
 // serta pemulihan jadwal saat KGB dibatalkan. Modul ini murni (tanpa akses data).
 
-import { BATAS_UNGGAH_BYTE, pesanBerkasTerlaluBesar } from "./batasUnggah";
+import { BATAS_UNGGAH_SK_BYTE, BATAS_UNGGAH_SK_LABEL } from "./batasUnggah";
 import { selisihBulan, tambahBulan } from "./tabelGaji";
 import { tanggalKalender, type NilaiTanggal } from "./waktu";
 
@@ -233,9 +233,12 @@ export function recordKgbKembarBerlebih(rows: { id: string }[]): string[] {
   return rows.slice(1).map((r) => r.id);
 }
 
-/** Batas ukuran berkas SK yang diunggah; satu angka untuk seluruh unggahan (ADR-037). */
-export const BATAS_UKURAN_SK_BYTE = BATAS_UNGGAH_BYTE;
-export const PESAN_SK_TERLALU_BESAR = pesanBerkasTerlaluBesar("berkas SK");
+/** Batas ukuran berkas SK bertanda tangan (ADR-096); unggahan lain tetap BATAS_UNGGAH_BYTE. */
+export const BATAS_UKURAN_SK_BYTE = BATAS_UNGGAH_SK_BYTE;
+/** Tidak menyarankan memperkecil berkas: kompresi menghapus TTE (ADR-096). */
+export const PESAN_SK_TERLALU_BESAR =
+  `Ukuran berkas SK paling besar ${BATAS_UNGGAH_SK_LABEL}. Unggah berkas asli hasil unduhan Srikandi; jangan dikompres, ` +
+  "sebab kompresi menghapus TTE-nya. Pindaian tanda tangan basah sebaiknya hitam putih.";
 
 const PENANDA_PDF = [0x25, 0x50, 0x44, 0x46, 0x2d]; // "%PDF-"
 

@@ -132,7 +132,16 @@ export async function GET(req: Request) {
     return {
       ...k,
       pegawai: p ? { nama: p.nama, nip: p.nip, unitKerja: p.unitKerja, jabatan: p.jabatan } : null,
-      surat: sRow ? { id: sRow.id, nomorSurat: sRow.nomorSurat, tanggalSurat: sRow.tanggalSurat, pathFile: sRow.pathFile } : null,
+      surat: sRow
+        ? {
+            id: sRow.id,
+            nomorSurat: sRow.nomorSurat,
+            tanggalSurat: sRow.tanggalSurat,
+            pathFile: sRow.pathFile,
+            // Status tanda tangan berkas yang diunggah (ADR-096); kosong pada SK lama.
+            statusTtd: (sRow as { statusTtd?: string | null }).statusTtd ?? null,
+          }
+        : null,
       // Syarat yang sama dengan POST /api/kgb/[id]/upload-sk: Unggah SK TTE hanya setelah Buat SK.
       skSudahDibuat: suratSudahDibuat(sRow),
       reviewSk: infoReviewSk(reviewSk.perKgb.get(k.id), { aktif: reviewSk.aktif, unitKerja: p?.unitKerja ?? null }),

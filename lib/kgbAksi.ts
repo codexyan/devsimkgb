@@ -278,7 +278,7 @@ export function simpanArsipKgb(pegawaiId: string, data: DataArsipKgb): Promise<H
 export function unggahSk(
   kgbId: string,
   berkas: File,
-  opsi: { nomorSurat?: string; tanggalSurat?: string } = {},
+  opsi: { nomorSurat?: string; tanggalSurat?: string; ttdBasah?: boolean } = {},
 ): Promise<HasilAksi<{ pathFile: string }>> {
   // Batas yang sama dengan server, diperiksa sebelum berkas dikirim.
   if (berkas.size > BATAS_UKURAN_SK_BYTE) return Promise.resolve({ ok: false, error: PESAN_SK_TERLALU_BESAR });
@@ -286,6 +286,8 @@ export function unggahSk(
   fd.append("file", berkas);
   if (opsi.nomorSurat?.trim()) fd.append("nomorSurat", opsi.nomorSurat.trim());
   if (opsi.tanggalSurat) fd.append("tanggalSurat", opsi.tanggalSurat);
+  // Berkas tanpa TTE hanya diterima bila dinyatakan pindaian tanda tangan basah (ADR-096).
+  if (opsi.ttdBasah) fd.append("ttdBasah", "1");
   return kirimJson<{ pathFile: string }>(
     `/api/kgb/${encodeURIComponent(kgbId)}/upload-sk`,
     { method: "POST", body: fd },

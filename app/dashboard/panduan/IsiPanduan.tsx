@@ -1793,11 +1793,18 @@ export default async function IsiPanduan({
                     <p className="pub-step-who">Tim SDM, kartu atau baris berstatus Sedang Diproses</p>
                     <p>
                       Tombol Unggah SK bertanda tangan muncul setelah SK dibuat dengan Buat SK. Unduh naskah yang sudah ditandatangani
-                      dari Srikandi, pilih Unggah SK bertanda tangan, pilih berkas PDF (paling besar 500 KB) pada jendela Unggah SK yang
-                      Sudah Ditandatangani, lalu pilih Unggah SK. Status berubah menjadi{" "}
+                      dari Srikandi, pilih Unggah SK bertanda tangan, pilih berkas PDF <strong>asli</strong> (paling besar 5 MB)
+                      pada jendela Unggah SK yang Sudah Ditandatangani, lalu pilih Unggah SK. Status berubah menjadi{" "}
                       <Status status="menunggu_keuangan" />. KGB pegawai Kanwil muncul di menu Keuangan; SK pegawai UPT
                       langsung dapat diunduh UPT-nya dan menunggu keuangan satker merekamnya di Gaji Web (ubin Di
                       keuangan, bagian rekam UPT).
+                    </p>
+                    <p>
+                      <strong>Jangan kompres SK TTE.</strong> TTE Srikandi tertanam di berkasnya. Kompresi, cetak ulang ke PDF,
+                      atau penggabungan menulis ulang berkas dan menghapus TTE-nya, walau kode QR masih tampak. Jendela unggah
+                      memeriksa TTE begitu berkas dipilih: TTE yang isinya berubah ditolak, dan berkas tanpa TTE hanya
+                      diterima bila dinyatakan sebagai pindaian SK bertanda tangan basah. SIM-KGB menyimpan berkas apa adanya
+                      beserta sidik SHA-256-nya, dan label <em>TTE utuh</em> atau <em>Tanda tangan basah</em> tampil pada SK.
                     </p>
                   </div>
                   </li>
@@ -1848,7 +1855,7 @@ export default async function IsiPanduan({
                     <strong>SK sudah terbit di luar SIM-KGB.</strong> Catat dengan Arsip KGB. Tombol ini ada pada kartu
                     Belum Diproses yang terlambat di Dashboard, pada baris Belum Diproses di menu Proses KGB setelah batas
                     proses lewat, dan sebagai tautan di jendela Input KGB bila data SK terakhir belum tercatat. Isi Nomor
-                    SK, Tanggal SK, TMT SK, dan Oleh bila diketahui, pilih Berkas SK (PDF) paling besar 500 KB,
+                    SK, Tanggal SK, TMT SK, dan Oleh bila diketahui, pilih Berkas SK (PDF) asli paling besar 5 MB,
                     lalu pilih Simpan Arsip. KGB langsung berstatus <Status status="selesai" /> tanpa konfirmasi keuangan, data gaji pegawai
                     diperbarui, dan jadwal KGB berikutnya dibuat. Arsip KGB mengikuti jendela proses yang sama dengan
                     Input KGB. Bila berkas SK gagal terunggah, unggah dari Detail KGB dengan Unggah SK bertanda tangan.

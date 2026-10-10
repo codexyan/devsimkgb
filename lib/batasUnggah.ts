@@ -13,6 +13,16 @@
 /** Batas ukuran satu berkas unggahan. */
 export const BATAS_UNGGAH_BYTE = 500 * 1024;
 
+/**
+ * Batas khusus SK bertanda tangan (ADR-096): 5 MB. SK TTE asli dari Srikandi berukuran 185 KB sampai 1 MB karena BSrE
+ * menambahkan data validasi jangka panjang (sertifikat, OCSP, CRL) sesudah tanda tangan. Batas 500 KB memaksa petugas
+ * mengompres SK, dan kompresi menghapus TTE-nya: 24 SK yang diunggah 5 Oktober 2026 tidak lagi memuat tanda tangan
+ * digital. Batas 500 KB dulu menahan error 1102 (ADR-037), yang ternyata berasal dari batas CPU paket Free; unggah SK kini
+ * hanya memegang satu salinan berkas di memori (ADR-051), jadi 5 MB aman untuk Worker.
+ */
+export const BATAS_UNGGAH_SK_BYTE = 5 * 1024 * 1024;
+export const BATAS_UNGGAH_SK_LABEL = "5 MB";
+
 /** Label yang dipakai pada pesan dan petunjuk layar, supaya angkanya tidak ditulis ulang di mana-mana. */
 export const BATAS_UNGGAH_LABEL = "500 KB";
 

@@ -352,7 +352,10 @@ export const SKEMA_D1: Readonly<Record<string, Readonly<Record<string, JenisKolo
     penandatangan_id: "teks",
     jenis_penandatangan: "teks",
     jabatan_penandatangan: "teks",
-    urutan_sisip: "bilangan"
+    urutan_sisip: "bilangan",
+    sha256_berkas: "teks",
+    ukuran_berkas: "bilangan",
+    status_ttd: "teks"
   },
   template_surat: {
     id: "teks",

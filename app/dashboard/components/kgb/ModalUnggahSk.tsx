@@ -4,6 +4,9 @@ import { useState } from "react";
 import { unggahSk } from "@/lib/kgbAksi";
 import KerangkaModal from "./KerangkaModal";
 import { BidangBerkasPdf, Catatan, PesanGalat } from "./BidangForm";
+import PemeriksaanTte, { bolehUnggahTte, useTteBerkas } from "./PemeriksaanTte";
+import { BATAS_UNGGAH_SK_LABEL } from "@/lib/batasUnggah";
+import { PESAN_TANPA_TTE, PESAN_TTE_RUSAK } from "@/lib/tteSk";
 import { berkasPdfSah, subjudulPegawai, type RingkasPegawai } from "./format";
 import { IkonUnggah } from "./ikon";
 
@@ -45,6 +48,8 @@ export default function ModalUnggahSk({
   onBerhasil,
 }: PropsModalUnggahSk) {
   const [berkas, setBerkas] = useState<File | null>(null);
+  const [basah, setBasah] = useState(false);
+  const tte = useTteBerkas(berkas);
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
   const keterangan = keteranganUnggah(status, isArsip);
@@ -59,9 +64,14 @@ export default function ModalUnggahSk({
       setGalat("Berkas SK harus berformat PDF.");
       return;
     }
+    if (tte === "memeriksa") return;
+    if (!bolehUnggahTte(tte, basah)) {
+      setGalat(tte === "rusak" ? PESAN_TTE_RUSAK : PESAN_TANPA_TTE);
+      return;
+    }
     setSibuk(true);
     setGalat(null);
-    const hasil = await unggahSk(kgbId, berkas);
+    const hasil = await unggahSk(kgbId, berkas, { ttdBasah: tte === "tanpa" && basah });
     setSibuk(false);
     if (!hasil.ok) {
       setGalat(hasil.error);
@@ -88,7 +98,7 @@ export default function ModalUnggahSk({
           <button type="button" className="kgbm-tombol kgbm-kedua" onClick={onTutup} disabled={sibuk}>
             Batal
           </button>
-          <button type="submit" className="kgbm-tombol kgbm-hijau" disabled={sibuk || !berkas}>
+          <button type="submit" className="kgbm-tombol kgbm-hijau" disabled={sibuk || !berkas || !bolehUnggahTte(tte, basah)}>
             {sibuk ? "Mengunggah..." : "Unggah SK"}
           </button>
         </>
@@ -101,12 +111,14 @@ export default function ModalUnggahSk({
         berkas={berkas}
         onPilih={(b) => {
           setBerkas(b);
+          setBasah(false);
           setGalat(b && !berkasPdfSah(b) ? "Berkas SK harus berformat PDF." : null);
         }}
         nonaktif={sibuk}
-        petunjuk="Ukuran berkas paling besar 500 KB."
+        petunjuk={`Unggah berkas asli hasil unduhan Srikandi tanpa dikompres, paling besar ${BATAS_UNGGAH_SK_LABEL}.`}
         tinggiPratinjau={300}
       />
+      <PemeriksaanTte keadaan={tte} basah={basah} onBasah={setBasah} nonaktif={sibuk} />
       <PesanGalat pesan={galat} />
     </KerangkaModal>
   );

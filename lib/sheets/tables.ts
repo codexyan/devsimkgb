@@ -302,6 +302,8 @@ export const defs = {
       s("id"), s("kgbId"), s("nomorSurat"), d("tanggalSurat"), s("namaKepalaKanwil"), s("nipKepalaKanwil"),
       s("pathFile"), d("generatedAt"), s("generatedBy"),
       s("penandatanganId"), s("jenisPenandatangan"), s("jabatanPenandatangan"),
+      // Berkas SK bertanda tangan (ADR-096): SHA-256 dan ukuran berkas asli, serta status tanda tangannya.
+      s("sha256Berkas"), i("ukuranBerkas"), s("statusTtd"),
     ],
   },
   SerahTerima: {
