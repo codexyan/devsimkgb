@@ -5,7 +5,8 @@ import { logAudit } from "@/lib/auditLog";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { db } from "@/lib/db";
 import { bacaKegiatan, bacaKiriman } from "@/lib/inventarisServer";
-import { berkasTersalin, salinBerkasKeArsip } from "@/lib/inventarisArsip";
+import { berkasTersalin, salinBerkasKeArsip, salinSemuaKeArsip } from "@/lib/inventarisArsip";
+import { ROLES } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
@@ -48,6 +49,25 @@ export async function POST(req: Request) {
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const teks = (k: string) => (typeof body[k] === "string" ? (body[k] as string) : "");
+
+  // Salin seluruh berkas yang belum tersalin, sekali jalan, sebelum modul dihapus (ADR-098). Khusus Super Admin.
+  if (body.semua === true) {
+    if (session.user.role !== ROLES.SUPER_ADMIN) return NextResponse.json({ error: "Khusus Super Admin" }, { status: 403 });
+    const hasil = await salinSemuaKeArsip(pengguna.nama);
+    logAudit({
+      userId: pengguna.id,
+      aksi: "arsip_berkas_inventarisasi",
+      targetNama: "Semua kiriman inventarisasi",
+      detail:
+        `Salin semua berkas kiriman inventarisasi ke arsip pegawai: ${hasil.disalin} disalin untuk ${hasil.pegawai.length} pegawai` +
+        (hasil.pegawai.length ? ` (${hasil.pegawai.join(", ")})` : "") +
+        `, ${hasil.sudah} sudah ada, ${hasil.tidakTerbaca} tidak terbaca` +
+        (hasil.tanpaPegawai.length
+          ? `; belum terdaftar di Data Pegawai: ${hasil.tanpaPegawai.map((t) => `${t.nama} (${t.nip}, ${t.berkas} berkas)`).join(", ")}`
+          : ""),
+    });
+    return NextResponse.json({ ok: true, ...hasil });
+  }
   const s = await sasaran(teks("kegiatan"), teks("nip"));
   if ("galat" in s) return s.galat;
   if (!s.pegawai)

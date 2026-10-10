@@ -97,6 +97,8 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
   const [galat, setGalat] = useState<string | null>(null);
   const [pesan, setPesan] = useState<string | null>(null);
   const [menyimpan, setMenyimpan] = useState(false);
+  /** Penyalinan seluruh berkas kiriman ke arsip pegawai sebelum modul dihapus (ADR-098). */
+  const [menyalinSemua, setMenyalinSemua] = useState(false);
   const [cari, setCari] = useState("");
   const [saring, setSaring] = useState<"semua" | KeadaanKgb>("semua");
   const [unduh, setUnduh] = useState<{ selesai: number; total: number } | null>(null);
@@ -262,6 +264,46 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
     setForm((f) => ({ ...f, satker: dipilih ? [...f.satker, kode] : f.satker.filter((s) => s !== kode) }));
   }
 
+  /** Salin seluruh berkas kiriman yang belum tersalin ke arsip pegawai, sekali jalan (ADR-098). */
+  async function salinSemua() {
+    if (
+      !window.confirm(
+        "Salin setiap berkas kiriman yang belum ada di arsip dokumen pegawainya? Berkas yang sudah tersalin dilewati, dan kiriman dari NIP yang belum terdaftar di Data Pegawai tidak dapat disalin.",
+      )
+    )
+      return;
+    setMenyalinSemua(true);
+    setGalat(null);
+    setPesan(null);
+    try {
+      const res = await fetch("/api/inventarisasi/arsip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ semua: true }),
+      });
+      const d = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        disalin?: number;
+        sudah?: number;
+        tidakTerbaca?: number;
+        pegawai?: string[];
+        tanpaPegawai?: { nip: string; nama: string; berkas: number }[];
+      };
+      if (!res.ok) throw new Error(d.error ?? "Penyalinan gagal");
+      setPesan(
+        `${d.disalin ?? 0} berkas disalin ke arsip ${d.pegawai?.length ?? 0} pegawai; ${d.sudah ?? 0} sudah ada sebelumnya.` +
+          (d.tidakTerbaca ? ` ${d.tidakTerbaca} berkas tidak terbaca.` : "") +
+          (d.tanpaPegawai?.length
+            ? ` Belum terdaftar di Data Pegawai, jadi tidak disalin: ${d.tanpaPegawai.map((t) => `${t.nama} (${t.nip}, ${t.berkas} berkas)`).join(", ")}.`
+            : ""),
+      );
+    } catch (e) {
+      setGalat(e instanceof Error ? e.message : "Penyalinan gagal");
+    } finally {
+      setMenyalinSemua(false);
+    }
+  }
+
   return (
     <div className="dsb-halaman">
       <header className="dsb-halaman-kepala dsb-muncul">
@@ -274,6 +316,18 @@ export default function HalamanInventarisasi({ superAdmin }: { superAdmin: boole
             sebagai ZIP yang foldernya siap diseret ke Google Drive.
           </p>
         </div>
+        {superAdmin && (
+          <button
+            type="button"
+            className="dsb-tombol"
+            data-jenis="garis"
+            onClick={() => void salinSemua()}
+            disabled={menyalinSemua}
+            title="Salin setiap berkas kiriman yang belum ada di arsip dokumen pegawainya, sebelum modul inventarisasi dihapus"
+          >
+            {menyalinSemua ? "Menyalin ke arsip…" : "Salin semua ke arsip pegawai"}
+          </button>
+        )}
         <button
           type="button"
           className="dsb-tombol"

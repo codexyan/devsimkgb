@@ -7,7 +7,8 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { newId } from "./sheets/id";
 import { daftarDokumenArsip, simpanDokumenArsip } from "./dokumenPegawaiServer";
 import type { JenisDokumen } from "./dokumenPegawai";
-import type { BerkasTersimpan } from "./inventarisServer";
+import { daftarKegiatan, daftarKiriman, type BerkasTersimpan } from "./inventarisServer";
+import { db } from "./db";
 
 /** Jenis dokumen arsip untuk tiap jenis berkas kiriman formulir. */
 export const JENIS_ARSIP_BERKAS: Record<string, JenisDokumen> = {
@@ -54,4 +55,48 @@ export async function salinBerkasKeArsip(
     await obj.arrayBuffer(),
   );
   return "disalin";
+}
+
+export interface HasilSalinSemua {
+  disalin: number;
+  sudah: number;
+  tidakTerbaca: number;
+  /** Kiriman yang NIP-nya belum terdaftar di Data Pegawai, sehingga belum punya arsip. */
+  tanpaPegawai: { nip: string; nama: string; berkas: number }[];
+  /** Pegawai yang menerima salinan baru. */
+  pegawai: string[];
+}
+
+/**
+ * Salin seluruh berkas kiriman yang belum tersalin ke arsip dokumen pegawainya, sekali jalan, sebelum modul
+ * inventarisasi dihapus (ADR-098). Memakai salinBerkasKeArsip yang sama dengan tombol per berkas, sehingga berkas yang
+ * sudah tersalin dilewati dan menjalankannya ulang aman.
+ */
+export async function salinSemuaKeArsip(oleh: string): Promise<HasilSalinSemua> {
+  const hasil: HasilSalinSemua = { disalin: 0, sudah: 0, tidakTerbaca: 0, tanpaPegawai: [], pegawai: [] };
+  for (const kegiatan of await daftarKegiatan()) {
+    for (const kiriman of await daftarKiriman(kegiatan.id)) {
+      if (kiriman.berkas.length === 0) continue;
+      const nip = kiriman.isian.nip;
+      const pegawai = /^\d{18}$/.test(nip ?? "") ? await db.pegawai.findUnique({ nip }) : null;
+      if (!pegawai) {
+        hasil.tanpaPegawai.push({ nip: nip ?? "-", nama: kiriman.isian.nama ?? "-", berkas: kiriman.berkas.length });
+        continue;
+      }
+      let baru = 0;
+      for (const berkas of kiriman.berkas) {
+        const h = await salinBerkasKeArsip(pegawai.id, berkas, {
+          oleh,
+          keterangan: `Dari kiriman ${kegiatan.nama}`,
+          nomorSK: kiriman.isian.nomorSkDasar ?? "",
+        });
+        if (h === "disalin") baru++;
+        else if (h === "sudah") hasil.sudah++;
+        else hasil.tidakTerbaca++;
+      }
+      hasil.disalin += baru;
+      if (baru > 0) hasil.pegawai.push(pegawai.nama);
+    }
+  }
+  return hasil;
 }
