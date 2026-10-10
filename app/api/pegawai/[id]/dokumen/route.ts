@@ -7,8 +7,6 @@ import { logAudit } from "@/lib/auditLog";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { adaPenandaPdf } from "@/lib/prosesKgb";
 import { BERKAS_USULAN } from "@/lib/usulanPegawai";
-// JEJAK-INVENTARISASI (ADR-027): sumber "Formulir inventarisasi"; hapus impor ini dan bagiannya di bawah bersama modul inventarisasi.
-import { kirimanPegawai } from "@/lib/inventarisServer";
 import { daftarDokumenArsip, simpanDokumenArsip } from "@/lib/dokumenPegawaiServer";
 import {
   JENIS_BERKAS_USULAN,
@@ -27,7 +25,7 @@ export const runtime = "nodejs";
 
 /*
  * Dokumen seorang pegawai dari semua sumber (ADR-023): arsip dokumen yang diunggah di tab ini, SK KGB bertanda
- * tangan di SIM-KGB, berkas usulan UPT, dan berkas formulir inventarisasi. Hanya Super Admin dan Tim SDM KGB.
+ * tangan di SIM-KGB, dan berkas usulan UPT. Hanya Super Admin dan Tim SDM KGB.
  */
 
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : "");
@@ -55,12 +53,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const pegawai = await db.pegawai.findUnique({ id });
   if (!pegawai) return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
 
-  const [arsip, kgb, surat, usulan, inventaris] = await Promise.all([
+  const [arsip, kgb, surat, usulan] = await Promise.all([
     daftarDokumenArsip(id),
     db.riwayatKGB.findMany({ where: { pegawaiId: id } }) as Promise<RiwayatKGBRow[]>,
     db.suratKGB.findMany() as Promise<(SuratKgbTersimpan & { kgbId: string; pathFile?: string | null })[]>,
     db.usulanPegawai.findMany({ where: { pegawaiId: id } }) as Promise<UsulanPegawaiRow[]>,
-    kirimanPegawai(pegawai.nip).catch(() => []),
   ]);
 
   const hasil: DokumenPegawai[] = [];
@@ -115,35 +112,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         bisaHapus: false,
         jenis: JENIS_BERKAS_USULAN[b.medan],
         status: u.status,
-      });
-    }
-  }
-
-  // Berkas kiriman yang sudah disalin ke arsip (ADR-024) tidak ditampilkan dua kali; yang tampil salinannya.
-  const sudahDiarsip = new Set(arsip.map((d) => d.asal).filter(Boolean));
-  // JEJAK-INVENTARISASI (ADR-027)
-  const JENIS_BERKAS_INVENTARIS: Record<string, JenisDokumen> = {
-    "SK-KGB-Terakhir": "sk_kgb",
-    "SK-KP-Terakhir": "sk_pangkat",
-    "SK-PMK": "sk_pmk",
-    "SK-CPNS": "sk_cpns",
-    "SK-PNS": "sk_pns",
-  };
-  for (const { kegiatan, kiriman } of inventaris) {
-    for (const b of kiriman.berkas) {
-      if (sudahDiarsip.has(b.kunci)) continue;
-      const tanggal = /_(\d{4}-\d{2}-\d{2})\.pdf$/.exec(b.nama)?.[1] ?? "";
-      hasil.push({
-        id: `inventaris-${kegiatan.id}-${b.jenis}`,
-        sumber: "inventaris",
-        judul: b.jenis.replace(/-/g, " ").replace(/^SK KP/, "SK kenaikan pangkat").replace(/Terakhir$/, "terakhir"),
-        nomorSK: b.jenis === "SK-KGB-Terakhir" || b.jenis === "SK-CPNS" ? kiriman.isian.nomorSkDasar : "",
-        tanggal,
-        keterangan: `${kegiatan.nama} · dikirim ${formatTanggalId(kiriman.waktu)}`,
-        ukuran: b.ukuran,
-        url: `/api/inventarisasi/berkas?kunci=${encodeURIComponent(b.kunci)}`,
-        bisaHapus: false,
-        jenis: JENIS_BERKAS_INVENTARIS[b.jenis],
       });
     }
   }

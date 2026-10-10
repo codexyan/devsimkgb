@@ -41,7 +41,6 @@ test("SK kenaikan pangkat dan PMK dicocokkan menurut jenis dan nomor SK; usulan 
     dok({ id: "usulan-u1-skPangkat", sumber: "usulan", jenis: "sk_pangkat", nomorSK: "W.17-PI-2026", status: "ditolak" }),
     dok({ id: "usulan-u2-skPangkat", sumber: "usulan", jenis: "sk_pangkat", nomorSK: "w.17-pi-2026", status: "disetujui" }),
     dok({ id: "usulan-u2-skPmk", sumber: "usulan", jenis: "sk_pmk", nomorSK: "W.17-PMK-1", status: "disetujui" }),
-    dok({ id: "inventaris-x", sumber: "inventaris", jenis: "sk_pangkat", nomorSK: "W.17-KP-LAIN" }),
   ];
   const kp = dokumenSk(sk({ kunci: "kp:r1", jenis: "kp", nomorSK: "W.17-PI-2026" }), dokumen, []);
   assert.deepEqual(kp, { jenis: "berkas", url: "/berkas/usulan-u2-skPangkat", sumber: "Berkas usulan UPT yang disetujui" });
@@ -52,8 +51,6 @@ test("SK kenaikan pangkat dan PMK dicocokkan menurut jenis dan nomor SK; usulan 
     sumber: "Berkas usulan UPT yang disetujui (diunggah sebagai SK peninjauan masa kerja)",
   });
   assert.equal(dokumenSk(sk({ kunci: "pmk:r3", jenis: "pmk", nomorSK: "W.17-PMK-1" }), dokumen, [])?.jenis, "berkas");
-  // Berkas formulir inventarisasi tidak dipakai (ADR-027).
-  assert.equal(dokumenSk(sk({ kunci: "kp:r4", jenis: "kp", nomorSK: "W.17-KP-LAIN" }), dokumen, []), null);
   // Tanpa nomor SK tidak ada yang dapat dicocokkan.
   assert.equal(dokumenSk(sk({ kunci: "kp:r5", jenis: "kp", nomorSK: null }), dokumen, []), null);
 });

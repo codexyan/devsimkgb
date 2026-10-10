@@ -43,7 +43,7 @@ export default function ModalKenaikanPangkat({
   onBerhasil,
 }: {
   pegawai: PegawaiPangkat;
-  /** Isian awal, mis. dari kiriman formulir pemutakhiran data (ADR-023); tetap dapat diubah. */
+  /** Isian awal; tetap dapat diubah. */
   awal?: { golonganBaru?: string; nomorSK?: string; tanggalSK?: string; tmtPangkat?: string };
   onTutup: () => void;
   /** Dipanggil setelah tersimpan; pesan sudah siap ditampilkan di halaman. */

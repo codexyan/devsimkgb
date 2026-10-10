@@ -71,14 +71,12 @@ export function periksaDokumen(isian: { jenis: unknown; tanggalSK: string; ukura
 }
 
 /** Sumber dokumen pada daftar gabungan di tab pegawai. */
-// JEJAK-INVENTARISASI (ADR-027): sumber "inventaris" dihapus bersama modul inventarisasi.
-export type SumberDokumen = "arsip" | "sk_kgb" | "usulan" | "inventaris";
+export type SumberDokumen = "arsip" | "sk_kgb" | "usulan";
 
 export const LABEL_SUMBER_DOKUMEN: Record<SumberDokumen, string> = {
   arsip: "Arsip dokumen",
   sk_kgb: "SK KGB SIM-KGB",
   usulan: "Usulan UPT",
-  inventaris: "Formulir inventarisasi",
 };
 
 /** Satu baris daftar dokumen gabungan (GET /api/pegawai/[id]/dokumen). */

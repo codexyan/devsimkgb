@@ -1,7 +1,7 @@
 // Batas ukuran satu berkas yang diunggah ke SIM-KGB (ADR-037).
 //
-// Satu angka untuk seluruh jalur unggahan: SK KGB, berkas usulan UPT, arsip dokumen pegawai, kiriman
-// inventarisasi, dan logo kop, supaya tidak ada satu pun yang tertinggal saat angkanya diubah, dan supaya
+// Satu angka untuk seluruh jalur unggahan: SK KGB, berkas usulan UPT, arsip dokumen pegawai, dan logo kop,
+// supaya tidak ada satu pun yang tertinggal saat angkanya diubah, dan supaya
 // operator tidak perlu mengingat batas yang berbeda-beda per layar.
 //
 // Alasan angkanya kecil: seluruh unggahan melewati Worker, dan Worker menyalin isi berkas ke memori dua

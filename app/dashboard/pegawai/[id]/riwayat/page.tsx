@@ -806,7 +806,7 @@ export default function RiwayatKGBPage() {
         ))}
 
       {activeTab === "dokumen" && bolehDokumen && (
-        <TabDokumenPemutakhiran pegawaiId={id} bolehUbah={bolehUbah} onDataBerubah={() => fetchData()} />
+        <TabDokumenPemutakhiran pegawaiId={id} onDataBerubah={() => fetchData()} />
       )}
 
       {/* Riwayat pangkat: dasar gaji setiap kali pangkat naik (lib/kenaikanPangkat.ts) */}

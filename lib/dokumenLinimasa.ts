@@ -3,7 +3,7 @@
 // Riwayat kenaikan pangkat dan PMK sengaja tidak menyimpan kunci berkas (ADR-028), jadi pindaiannya dicari menurut
 // jenis dan nomor SK di dokumen pegawai: arsip dokumen yang diunggah Kanwil, dan berkas usulan UPT yang disetujui.
 // SK KGB dari SIM-KGB ditautkan lewat KGB-nya: SK bertanda tangan bila sudah diunggah, selain itu draf cetakan
-// SIM-KGB tanpa tanda tangan. Berkas formulir inventarisasi tidak dipakai, sebab modul itu akan dihapus (ADR-027).
+// SIM-KGB tanpa tanda tangan.
 
 import { JENIS_DOKUMEN, type DokumenPegawai, type JenisDokumen } from "./dokumenPegawai";
 import type { JenisSkGaji, SkGaji } from "./linimasaDasarSk";
@@ -67,8 +67,7 @@ export function dokumenSk(sk: SkGaji, dokumen: readonly DokumenPegawai[], kgb: r
  * 2. nomor sama dengan jenis lain, sebab nomor SK sudah cukup menunjuk satu SK dan jenis unggahan sering keliru pilih
  *    (mis. SK kenaikan pangkat yang diunggah sebagai SK KGB lewat Ubah SK dasar);
  * 3. jenis sama, tanpa nomor, dan tanggal SK sama.
- * Di antara yang setara: SK bertanda tangan, arsip yang diunggah Kanwil, lalu berkas usulan UPT yang disetujui. Berkas
- * formulir inventarisasi tidak dipakai (ADR-027).
+ * Di antara yang setara: SK bertanda tangan, arsip yang diunggah Kanwil, lalu berkas usulan UPT yang disetujui.
  */
 export function cariDokumenMenurutSk(
   jenis: JenisDokumen,

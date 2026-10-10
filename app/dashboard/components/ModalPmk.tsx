@@ -45,7 +45,7 @@ export default function ModalPmk({
   onBerhasil,
 }: {
   pegawai: PegawaiPmk;
-  /** Isian awal, mis. dari kiriman formulir pemutakhiran data (ADR-023); tetap dapat diubah. */
+  /** Isian awal; tetap dapat diubah. */
   awal?: { tanggalSK?: string; tmtPmk?: string; mkgTahunSk?: string; mkgBulanSk?: string };
   onTutup: () => void;
   /** Dipanggil setelah tersimpan; pesan sudah siap ditampilkan di halaman. */

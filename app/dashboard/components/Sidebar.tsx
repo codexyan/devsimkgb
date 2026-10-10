@@ -86,9 +86,6 @@ const grupKepegawaian: Group = {
     { href: "/dashboard/pegawai", label: "Data Pegawai", icon: Ic.people    },
     { href: "/dashboard/kgb",     label: "Proses KGB",   icon: Ic.document  },
     { href: "/dashboard/usulan",  label: "Usulan UPT",   icon: Ic.edit      },
-    // Kiriman formulir publik /inventarisasi-kgb dari pegawai Kanwil; diunduh sebagai ZIP untuk Drive.
-    // JEJAK-INVENTARISASI (ADR-027): menu sementara, dihapus bersama modulnya.
-    { href: "/dashboard/inventarisasi", label: "Inventarisasi KGB", icon: Ic.document },
   ],
 };
 
