@@ -26,6 +26,8 @@ import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
 import PengingatUsulan from "@/app/dashboard/components/upt/PengingatUsulan";
 import ModalReviewSk from "@/app/dashboard/components/upt/ModalReviewSk";
 import { LABEL_REVIEW_SK, type InfoReviewSk } from "@/lib/reviewSkUpt";
+import { TAHAP_PITA, hitungPerTahap, susunPitaUpt, tahapPita, type TahapPita } from "@/lib/pitaJadwalUpt";
+import PitaJadwalUpt from "@/app/dashboard/components/upt/PitaJadwalUpt";
 
 /** Satu baris "Dasar KGB berikutnya": SK yang gaji pokoknya dipakai SK KGB berikutnya (ADR-030). */
 function teksDasarKgb(dasar: DasarKgbBerikutnya | null | undefined): string | null {
@@ -221,6 +223,25 @@ function keadaan(p: PegawaiUpt): { teks: string; nada?: Nada } {
   return { teks: "Menunggu diproses Kanwil", nada: "kuning" };
 }
 
+/**
+ * Label pegawai di jendela periode pita, selaras dengan tab tahapnya (ADR-101). Yang perlu diusulkan tidak disebut
+ * "menunggu diproses Kanwil": tindakannya ada di tangan UPT.
+ */
+function keadaanPeriode(p: PegawaiUpt): { teks: string; nada?: Nada } {
+  const tahap = tahapPita(p);
+  if (tahap === "usulkan") {
+    if (p.usulanBerjalan === "revisi") return { teks: "Dikembalikan Kanwil, perbaiki", nada: "merah" };
+    if (p.usulanBerjalan === "draf") return { teks: "Draf disiapkan, belum diajukan", nada: "kuning" };
+    if (p.terkunci) return { teks: "Belum masuk jadwal" };
+    return { teks: "Perlu diusulkan", nada: "kuning" };
+  }
+  if (tahap === "kanwil" && !p.statusKGB) {
+    if (p.usulanBerjalan === "menunggu") return { teks: "Usulan ditinjau Kanwil", nada: "navy" };
+    return p.terlambat ? { teks: "Lewat batas input Kanwil", nada: "merah" } : { teks: "Disetujui, menunggu input Kanwil", nada: "navy" };
+  }
+  return keadaan(p);
+}
+
 /** Satu dokumen di papan beserta cara menggambarnya; penggabungan per pegawai di lib/papanUpt.ts. */
 interface SumberPapan extends SumberKartu {
   /** Nama pegawai; dipakai pencarian di Perlu dikerjakan (ADR-060). */
@@ -397,6 +418,12 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const [dialogPeriode, setDialogPeriode] = useState<
     { jenis: "bulan"; bulanTmt: string } | { jenis: "terlambat" } | null
   >(null);
+  /** Tab tahap di jendela periode (ADR-101); kembali ke Semua setiap jendela dibuka. */
+  const [tabPeriode, setTabPeriode] = useState<"semua" | TahapPita>("semua");
+  const bukaPeriode = (periode: { jenis: "bulan"; bulanTmt: string } | { jenis: "terlambat" }) => {
+    setTabPeriode("semua");
+    setDialogPeriode(periode);
+  };
   const [pilihAjukan, setPilihAjukan] = useState<Set<string>>(() => new Set());
   const [cariPapan, setCariPapan] = useState("");
   const [dialogAjukan, setDialogAjukan] = useState(false);
@@ -725,7 +752,6 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const skSelesai = data?.sk ?? [];
   const nama = namaSapaan(dashUser.nama, "Admin UPT");
   const tahunIni = data?.tahunIni;
-  const pctSelesai = tahunIni && tahunIni.total > 0 ? Math.round((tahunIni.selesai / tahunIni.total) * 100) : 0;
 
   if (galat && !data) {
     return (
@@ -1083,10 +1109,10 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   // sama dengan jendela yang terbuka saat kartu ditekan, yaitu bulan TMT siklus KGB tiap pegawai (ADR-093). Dulu angka ini
   // memakai TMT KGB berikutnya di data pegawai, yang bergeser ke siklus sesudahnya begitu Kanwil menginput KGB, sehingga
   // "TMT Des 2026" menyusut ke 2 padahal 57 pegawai masih jatuh tempo bulan itu.
-  const jadwal = Array.from({ length: 4 }, (_, i) => {
-    const bulanTmt = geserBulan(bulanUsulan, i);
-    return { bulanTmt, jumlah: pegawai.filter((p) => p.bulanTmt === bulanTmt).length };
-  });
+  // Pita jadwal menurut bulan kirim, dengan jumlah per tahap papan dan hitung mundur jendela kirim (ADR-101).
+  const pita = susunPitaUpt(pegawai, hariIni, batasKirimSurat());
+  /** Usulan pegawai baru yang sudah dikirim: belum tercatat, jadi belum punya bulan TMT di pita. */
+  const baruMenunggu = terkirim.filter((u) => u.status === "menunggu" && u.jenis === "baru" && !u.pegawaiId && !u.nipTercatat).length;
   // Tombol Ajukan hanya bila ada draf yang memang dapat dicentang; draf terkunci tidak bercentang.
   const adaDraf = tugas.some((t) => t.usulanId && !t.terkunci);
   const tmtSingkat = (t: string | null) => (t ? `TMT ${formatTanggalId(t, { month: "short", year: "numeric" })}` : "TMT belum tercatat");
@@ -1539,61 +1565,20 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         onMuatUlang={muat}
         memuat={memuat}
       >
-        {/* Kapan surat usulan tiap bulan TMT dikirim; bulan yang jendela kirimnya sedang terbuka disorot.
-            Tiap kartu dapat dibuka untuk melihat siapa saja yang jatuh tempo pada periode itu, sebab angka
-            saja tidak dapat ditindaklanjuti: operator tetap harus tahu namanya. */}
-        <div className="upt-jadwal" aria-label="Jadwal surat usulan per bulan TMT">
-          {/* Yang TMT-nya sudah lewat jendela kirim namun belum selesai. Tanpa kartu ini mereka lenyap dari
-              pita, sebab pita hanya melihat ke depan, dan satker tidak punya penanda bahwa ada yang tertinggal. */}
-          {tertinggal.length > 0 && (
-            <button
-              type="button"
-              className="upt-jadwal-bulan"
-              data-terlambat=""
-              onClick={() => setDialogPeriode({ jenis: "terlambat" })}
-            >
-              <span className="upt-jadwal-nama">Terlambat</span>
-              <span className="upt-jadwal-angka">
-                {tertinggal.length}
-                <small> pegawai</small>
-              </span>
-              {/* Teksnya sengaja pendek: pita ini memotong keterangan yang melebihi satu baris. */}
-              <span className="upt-jadwal-ket">TMT sudah lewat</span>
-            </button>
-          )}
-          {jadwal.map((m) => {
-            const sekarang = m.bulanTmt === bulanUsulan;
-            return (
-              <button
-                key={m.bulanTmt}
-                type="button"
-                className="upt-jadwal-bulan"
-                data-sekarang={sekarang ? "" : undefined}
-                data-kosong={m.jumlah === 0 ? "" : undefined}
-                onClick={() => setDialogPeriode({ jenis: "bulan", bulanTmt: m.bulanTmt })}
-              >
-                <span className="upt-jadwal-nama">TMT {namaBulan(m.bulanTmt)}</span>
-                <span className="upt-jadwal-angka">
-                  {m.jumlah}
-                  <small> pegawai</small>
-                </span>
-                <span className="upt-jadwal-ket">
-                  {sekarang ? `kirim bulan ini, 1–${batasKirimSurat()}` : `kirim 1–${batasKirimSurat()} ${namaBulan(geserBulan(m.bulanTmt, -2))}`}
-                </span>
-              </button>
-            );
-          })}
-          <div className="upt-jadwal-bulan" data-ringkas="">
-            <span className="upt-jadwal-nama">Selesai TMT {hariIni.getFullYear()}</span>
-            <span className="upt-jadwal-angka">
-              {tahunIni?.selesai ?? 0}
-              <small> / {tahunIni?.total ?? 0}</small>
-            </span>
-            <span className="upt-jadwal-ket">
-              {(data?.kgbDitunda ?? 0) > 0 ? `${data?.kgbDitunda} KGB ditunda karena hukdis` : `${pctSelesai}% dari KGB tahun ini`}
-            </span>
-          </div>
-        </div>
+        {/* Kapan surat usulan dikirim, menurut bulan kirim (ADR-101). Tiap kartu dapat dibuka untuk melihat siapa saja
+            yang jatuh tempo pada periode itu, sebab angka saja tidak dapat ditindaklanjuti. */}
+        <PitaJadwalUpt
+          pita={pita}
+          batasKirim={batasKirimSurat()}
+          tertinggal={tertinggal.length}
+          tertinggalPerTahap={hitungPerTahap(tertinggal)}
+          tahun={hariIni.getFullYear()}
+          tahunIni={tahunIni ?? null}
+          kgbDitunda={data?.kgbDitunda ?? 0}
+          baruMenunggu={baruMenunggu}
+          onBukaBulan={(bulanTmt) => bukaPeriode({ jenis: "bulan", bulanTmt })}
+          onBukaTerlambat={() => bukaPeriode({ jenis: "terlambat" })}
+        />
       </PanelNavy>
       )}
 
@@ -1603,8 +1588,14 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         const daftar = terlambatMode
           ? tertinggal
           : pegawai.filter((p) => p.bulanTmt === dialogPeriode.bulanTmt);
-        // Yang masih menunggu tindakan UPT: tidak ada usulan yang sedang ditinjau, dan Kanwil belum memproses.
-        const perluDikerjakan = daftar.filter((p) => p.usulanBerjalan !== "menunggu" && !p.statusKGB);
+        // Tahap tiap pegawai sama dengan pita dan kolom papan (ADR-101); yang perlu diusulkan masih menunggu tindakan UPT.
+        const diTahap = (t: TahapPita) => daftar.filter((p) => tahapPita(p) === t);
+        const perluDikerjakan = diTahap("usulkan");
+        const tab = [
+          { kunci: "semua" as const, label: "Semua", jumlah: daftar.length },
+          ...TAHAP_PITA.map((t) => ({ kunci: t.kunci, label: t.label, jumlah: diTahap(t.kunci).length })),
+        ];
+        const tampil = tabPeriode === "semua" ? daftar : diTahap(tabPeriode);
         const tautan = terlambatMode
           ? "/dashboard/upt/kolektif?terlambat=1"
           : `/dashboard/upt/kolektif?bulan=${dialogPeriode.bulanTmt}`;
@@ -1614,7 +1605,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             subjudul={
               terlambatMode
                 ? "TMT-nya sudah lewat dan KGB-nya belum selesai"
-                : `Surat usulannya dikirim 1–${batasKirimSurat()} ${namaBulan(geserBulan(dialogPeriode.bulanTmt, -2))}`
+                : `Surat usulannya dikirim 1–${batasKirimSurat()} ${namaBulan(geserBulan(dialogPeriode.bulanTmt, -2), true)}`
             }
             nada={terlambatMode ? "amber" : undefined}
             ukuran="md"
@@ -1638,21 +1629,34 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               </p>
             ) : (
               <>
-                <div className="pgu-angka">
-                  <div>
-                    <strong>{daftar.length}</strong>
-                    <span>pegawai pada periode ini</span>
-                  </div>
-                  <div data-nada={perluDikerjakan.length > 0 ? "amber" : undefined}>
-                    <strong>{perluDikerjakan.length}</strong>
-                    <span>menunggu tindakan Anda</span>
-                  </div>
+                <div
+                  className="pjd-tab"
+                  role="tablist"
+                  aria-label="Saring menurut tahap"
+                  style={{ "--n": tab.length, "--x": Math.max(0, tab.findIndex((t) => t.kunci === tabPeriode)) } as React.CSSProperties}
+                >
+                  <span className="pjd-tab-penanda" aria-hidden="true" />
+                  {tab.map((t) => (
+                    <button
+                      key={t.kunci}
+                      type="button"
+                      role="tab"
+                      aria-selected={tabPeriode === t.kunci}
+                      data-tahap={t.kunci === "semua" ? undefined : t.kunci}
+                      disabled={t.kunci !== "semua" && t.jumlah === 0}
+                      onClick={() => setTabPeriode(t.kunci)}
+                    >
+                      <span>{t.label}</span>
+                      <span>{t.jumlah}</span>
+                    </button>
+                  ))}
                 </div>
-                <ul className="pgu-daftar upt-periode-daftar" aria-label="Pegawai pada periode ini">
-                  {daftar.map((p) => {
-                    const k = keadaan(p);
+                {/* Kunci per tab: daftar dipasang ulang agar barisnya muncul bergiliran lagi. */}
+                <ul key={tabPeriode} className="pgu-daftar upt-periode-daftar" aria-label="Pegawai pada periode ini">
+                  {tampil.map((p, i) => {
+                    const k = keadaanPeriode(p);
                     return (
-                      <li key={p.id}>
+                      <li key={p.id} className="pjd-baris" style={{ "--i": Math.min(i, 14) } as React.CSSProperties}>
                         <span className="min-w-0">
                           <strong>{p.nama}</strong>
                           <span>
