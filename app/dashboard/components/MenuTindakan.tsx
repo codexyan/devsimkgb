@@ -34,11 +34,17 @@ export default function MenuTindakan({
   judul,
   item,
   nonaktif,
+  bentuk = "titik",
+  kelasPemicu,
 }: {
   /** Dibacakan pembaca layar sebagai nama menunya, mis. "Tindakan lain untuk Budi". */
   judul: string;
   item: readonly ItemMenuTindakan[];
   nonaktif?: boolean;
+  /** "titik": ikon titik tiga; "panah": separuh kanan tombol berbelah, mis. Cetak SK (ADR-095). */
+  bentuk?: "titik" | "panah";
+  /** Kelas pemicu pengganti, mis. tombol kgbm di kaki jendela. */
+  kelasPemicu?: string;
 }) {
   const [buka, setBuka] = useState(false);
   const [posisi, setPosisi] = useState<{ top: number; left: number } | null>(null);
@@ -106,7 +112,7 @@ export default function MenuTindakan({
       <button
         ref={tombolRef}
         type="button"
-        className="dsb-ikon-tombol mnu-pemicu"
+        className={kelasPemicu ?? (bentuk === "panah" ? "dsb-tombol dsb-tombol-kecil mnu-pemicu mnu-pemicu-panah" : "dsb-ikon-tombol mnu-pemicu")}
         aria-haspopup="menu"
         aria-expanded={buka}
         aria-label={judul}
@@ -114,11 +120,17 @@ export default function MenuTindakan({
         disabled={nonaktif}
         onClick={() => (buka ? tutup() : setBuka(true))}
       >
-        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <circle cx="12" cy="5" r="1.8" />
-          <circle cx="12" cy="12" r="1.8" />
-          <circle cx="12" cy="19" r="1.8" />
-        </svg>
+        {bentuk === "panah" ? (
+          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        ) : (
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="12" cy="19" r="1.8" />
+          </svg>
+        )}
       </button>
 
       {buka &&

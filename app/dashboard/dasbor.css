@@ -3623,3 +3623,30 @@ html[data-gerak="kurangi"] .pmn-percik, html[data-gerak="kurangi"] .pmn-cincin {
   font-size: 22px; font-weight: 800; letter-spacing: .12em; color: rgba(192, 38, 38, .16); white-space: nowrap;
   animation: pmn-air .8s 2.3s ease-out backwards; }
 @keyframes pmn-air { from { opacity: 0 } to { opacity: 1 } }
+
+/* ── Tombol Cetak SK berbelah (ADR-095) ─────────────────────────────────────────────────────────
+   Klik utama mengunduh versi Srikandi untuk TTE; panah di kanannya membuka menu cetak tanda tangan basah. */
+.ctk-belah { display: inline-flex; align-items: stretch; }
+.ctk-belah > :first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ctk-belah > .mnu-pemicu-panah {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -1px;
+  padding-inline: 7px;
+  display: inline-flex;
+  align-items: center;
+}
+.ctk-belah > [data-nada="hijau-penuh"] + .mnu-pemicu-panah {
+  border-color: var(--st-green);
+  background: var(--st-green);
+  color: #fff;
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.35);
+}
+
+/* Label tombol di kartu papan boleh terlipat: kolom papan sempit, dan label seperti "Unggah SK bertanda tangan" lebih
+   panjang dari lebar kartu (ADR-095). */
+.dsb-kartu-kgb .dsb-kartu-aksi .dsb-tombol { max-width: 100%; white-space: normal; text-align: center; }
+
+/* Aksi untuk banyak kartu di bawah kepala kolom papan, mis. unduh semua SK siap cetak (ADR-095). */
+.dsb-papan-aksi { padding: 0 10px 8px; }
+.dsb-papan-aksi > .dsb-tombol { width: 100%; justify-content: center; white-space: normal; text-align: center; }

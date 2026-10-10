@@ -9,7 +9,8 @@ import type { KartuPapan, KolomPapan } from "@/app/dashboard/components/PapanAnt
 import type { UsulanMenunggu } from "@/app/dashboard/components/ModalUsulanUpt";
 import { keteranganRingkasan, nadaUmurUsulan, ringkasUsulanPerUpt } from "@/lib/ringkasUsulanUpt";
 import { LABEL_REVIEW_SK, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
-import { cetakSk, mintaReviewSkUpt } from "@/lib/kgbAksi";
+import { cetakSk, mintaReviewSkUpt, unduhZipSiapCetak, type VersiCetak } from "@/lib/kgbAksi";
+import TombolCetakSk from "@/app/dashboard/components/kgb/TombolCetakSk";
 
 /* Satu akun hanya memakai satu dashboard peran. Memuatnya sesuai kebutuhan menekan kerja server per
    permintaan dan biaya mulai isolate; tampilan sementaranya memakai kerangka yang sama dengan panel lain. */
@@ -281,6 +282,8 @@ function DashboardMain() {
   // Galat aksi langsung dari kartu (Cetak SK, Minta review UPT) dan KGB yang sedang dikerjakan aksinya (ADR-077).
   const [pesanGagal, setPesanGagal] = useState<string | null>(null);
   const [sibukSk, setSibukSk] = useState<string | null>(null);
+  /** Kemajuan unduhan massal SK siap cetak (ADR-095); null bila tidak berjalan. */
+  const [sibukZip, setSibukZip] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
@@ -687,18 +690,43 @@ function DashboardMain() {
     });
   }
 
-  /** Cetak SK: SK biasa untuk tanda tangan basah dan versi Srikandi, tanpa tanda air (ADR-077). */
-  async function cetakSkPegawai(p: PegawaiJatuhTempo) {
+  /** Cetak SK satu versi (ADR-095): versi Srikandi untuk TTE, atau SK biasa untuk tanda tangan basah. */
+  async function cetakSkPegawai(p: PegawaiJatuhTempo, versi: VersiCetak) {
     if (!p.kgbId || sibukSk) return;
     setSibukSk(p.kgbId);
     setPesanGagal(null);
-    const hasil = await cetakSk(p.kgbId, { nama: p.nama });
+    const hasil = await cetakSk(p.kgbId, { nama: p.nama }, versi);
     setSibukSk(null);
     if (!hasil.ok) {
       setPesanGagal(hasil.error);
       return;
     }
-    setPesanBerhasil(`SK ${p.nama} diunduh: SK biasa untuk tanda tangan basah dan versi Srikandi. Setelah ditandatangani, pilih Unggah TTE.`);
+    setPesanBerhasil(
+      versi === "tte"
+        ? `SK ${p.nama} versi Srikandi diunduh untuk TTE. Setelah ditandatangani, pilih Unggah SK bertanda tangan.`
+        : `SK ${p.nama} diunduh untuk tanda tangan basah. Setelah ditandatangani dan dipindai, pilih Unggah SK bertanda tangan.`,
+    );
+  }
+
+  /** Unduh SK siap cetak di kolom Sedang diproses sekaligus, satu ZIP versi Srikandi untuk TTE (ADR-095). */
+  async function unduhSemuaSiapCetak(daftar: PegawaiJatuhTempo[]) {
+    if (sibukZip || daftar.length === 0) return;
+    setPesanGagal(null);
+    setSibukZip(`Menyiapkan 0 dari ${daftar.length}…`);
+    const hasil = await unduhZipSiapCetak(
+      daftar.filter((p) => !!p.kgbId).map((p) => ({ kgbId: p.kgbId as string, nama: p.nama })),
+      (selesai, total) => setSibukZip(`Menyiapkan ${selesai} dari ${total}…`),
+    );
+    setSibukZip(null);
+    if (!hasil.ok) {
+      setPesanGagal(hasil.error);
+      return;
+    }
+    const { jumlah, dilewati } = hasil.data;
+    setPesanBerhasil(
+      `${jumlah} SK versi Srikandi untuk TTE diunduh dalam satu ZIP.` +
+        (dilewati.length > 0 ? ` ${dilewati.length} dilewati karena belum boleh dicetak atau gagal disiapkan: ${dilewati.join(", ")}.` : ""),
+    );
   }
 
   /** Minta review UPT untuk SK yang dibuat sebelum review aktif (ADR-077). */
@@ -736,7 +764,7 @@ function DashboardMain() {
       // Sesudah diunggah, SK pegawai UPT ditindaklanjuti keuangan UPT, bukan keuangan Kanwil (ADR-009).
       // SK pegawai UPT yang belum disetujui UPT tidak dapat diseret ke unggah TTE (ADR-077).
       if (!p.skSudahDibuat || skBolehDicetak(p.reviewSk))
-        pindah[dipegangKeuanganKanwil(p.unitKerja) ? "keuangan" : "rekam_upt"] = p.skSudahDibuat ? "Unggah SK TTE" : "Buat SK dulu";
+        pindah[dipegangKeuanganKanwil(p.unitKerja) ? "keuangan" : "rekam_upt"] = p.skSudahDibuat ? "Unggah SK bertanda tangan" : "Buat SK dulu";
       pindah.input = "Batalkan proses";
     }
     const tanda: NonNullable<KartuPapan["tanda"]> = [];
@@ -910,20 +938,11 @@ function DashboardMain() {
               )}
               {skBolehDicetak(p.reviewSk) && (
                 <>
-                  {/* Langkah berikutnya tampil paling depan dan Cetak SK menjadi tombol utama (ADR-089). */}
-                  <button
-                    type="button"
-                    className="dsb-tombol dsb-tombol-kecil"
-                    data-nada="hijau-penuh"
-                    style={{ order: -2 }}
-                    disabled={sibukSk === kgbId}
-                    onClick={() => void cetakSkPegawai(p)}
-                    title="Unduh SK biasa (tanda tangan basah) dan versi Srikandi tanpa tanda air"
-                  >
-                    {sibukSk === kgbId ? "Menyiapkan..." : "Cetak SK"}
-                  </button>
+                  {/* Langkah berikutnya tampil paling depan dan Cetak SK menjadi tombol utama (ADR-089). Klik utama
+                      mengunduh versi Srikandi untuk TTE; tanda tangan basah lewat panah di sebelahnya (ADR-095). */}
+                  <TombolCetakSk nama={p.nama} urutan={-2} sibuk={sibukSk === kgbId} onCetak={(versi) => void cetakSkPegawai(p, versi)} />
                   <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" style={{ order: -1 }} onClick={() => setModal({ jenis: "unggah_sk", kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) })}>
-                    Unggah TTE
+                    Unggah SK bertanda tangan
                   </button>
                 </>
               )}
@@ -1079,6 +1098,25 @@ function DashboardMain() {
                     [hitung("menunggu_upt"), "menunggu UPT"],
                   ].filter(([n]) => (n as number) > 0).map(([n, teks]) => `${n} ${teks}`);
                   return bagian.length > 0 ? bagian.join(" · ") : undefined;
+                })(),
+              }}
+              aksiKolom={{
+                proses: (() => {
+                  // Unduhan massal untuk TTE (ADR-095): SK siap cetak yang tampil di papan, menurut saringan yang berlaku.
+                  const siap = antrian.filter((p) => posisiAntrian(p) === "diproses" && tindakanProses(p) === "siap" && !!p.kgbId);
+                  if (siap.length < 2) return undefined;
+                  return (
+                    <button
+                      type="button"
+                      className="dsb-tombol dsb-tombol-kecil"
+                      data-nada="hijau"
+                      disabled={!!sibukZip}
+                      onClick={() => void unduhSemuaSiapCetak(siap)}
+                      title="Satu ZIP berisi SK versi Srikandi untuk ditandatangani elektronik, bernama nomor urut, pegawai, dan nomor SK"
+                    >
+                      {sibukZip ?? `Unduh ${siap.length} SK siap cetak (ZIP)`}
+                    </button>
+                  );
                 })(),
               }}
               onPindah={pindahKartu}

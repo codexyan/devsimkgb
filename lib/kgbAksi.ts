@@ -362,29 +362,77 @@ export function buatSkDenganReview(kgbId: string, skBaru: { nomorSurat: string; 
   );
 }
 
+/** Cara SK ditandatangani: TTE di Srikandi (versi Srikandi) atau tanda tangan basah (SK biasa). */
+export type VersiCetak = "tte" | "basah";
+
 /**
- * Cetak SK yang sudah dibuat: unduh SK biasa (untuk tanda tangan basah) dan versi Srikandi sekaligus, tanpa tanda air.
- * Ditolak bila SK pegawai UPT masih menunggu review atau diminta diperbaiki, supaya tidak ada SK DRAF yang tercetak
- * untuk ditandatangani (ADR-077).
+ * Cetak SK yang sudah dibuat, tanpa tanda air (ADR-095): versi Srikandi untuk TTE (bawaan), atau SK biasa untuk tanda
+ * tangan basah. Satu SK ditandatangani dengan satu cara, jadi yang diunduh hanya satu berkas; dulu keduanya sekaligus.
  */
-export async function cetakSk(kgbId: string, pegawai: { nama: string }): Promise<HasilAksi<{ jumlah: number }>> {
+export async function cetakSk(
+  kgbId: string,
+  pegawai: { nama: string },
+  versi: VersiCetak = "tte",
+): Promise<HasilAksi<{ jumlah: number }>> {
   const url = `/api/kgb/${encodeURIComponent(kgbId)}/pdf?preview=true`;
-  const biasa = await ambilPdf(url, { method: "POST" }, false, "SK gagal diunduh.");
-  if (!biasa.ok) return biasa;
-  if (biasa.data.draf)
-    return {
-      ok: false,
-      error:
-        biasa.data.reviewSk?.status === "perbaikan"
-          ? "UPT meminta perbaikan SK ini. Perbaiki SK lalu tunggu persetujuan UPT sebelum mencetak."
-          : "SK ini masih menunggu review Admin UPT, jadi belum dapat dicetak untuk ditandatangani.",
-    };
-  const srikandi = await ambilPdf(url, { method: "POST" }, true, "SK versi Srikandi gagal diunduh.");
-  const tahun = tanggalKalender(biasa.data.surat.tanggalSurat)?.getFullYear() ?? null;
-  unduhBlob(biasa.data.blob, namaFileSk({ nama: pegawai.nama, tahun, versi: "biasa" }));
-  if (!srikandi.ok) return { ok: false, error: `SK biasa sudah diunduh, tetapi versi Srikandi gagal (${srikandi.error}).` };
-  unduhBlob(srikandi.data.blob, namaFileSk({ nama: pegawai.nama, versi: "srikandi" }));
-  return { ok: true, data: { jumlah: 2 } };
+  const hasil = await ambilPdf(url, { method: "POST" }, versi === "tte", "SK gagal diunduh.");
+  if (!hasil.ok) return hasil;
+  if (hasil.data.draf) return { ok: false, error: alasanBelumBolehCetak(hasil.data.reviewSk) };
+  const tahun = tanggalKalender(hasil.data.surat.tanggalSurat)?.getFullYear() ?? null;
+  unduhBlob(hasil.data.blob, namaFileSk({ nama: pegawai.nama, tahun, versi: versi === "tte" ? "srikandi" : "biasa" }));
+  return { ok: true, data: { jumlah: 1 } };
+}
+
+function alasanBelumBolehCetak(reviewSk: InfoReviewSk | null): string {
+  return reviewSk?.status === "perbaikan"
+    ? "UPT meminta perbaikan SK ini. Perbaiki SK lalu tunggu persetujuan UPT sebelum mencetak."
+    : "SK ini masih menunggu review Admin UPT, jadi belum dapat dicetak untuk ditandatangani.";
+}
+
+/** Nama berkas di dalam ZIP unduhan massal: nomor urut, nama pegawai, dan nomor SK (ADR-095). */
+export function namaBerkasZipSk(urut: number, nama: string, nomorSurat: string | null | undefined): string {
+  const bersih = (teks: string) => teks.replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim();
+  const nomor = nomorSurat?.trim() ? ` - ${bersih(nomorSurat)}` : "";
+  return `${String(urut).padStart(3, "0")} - ${bersih(nama) || "Pegawai"}${nomor}.pdf`;
+}
+
+/** Satu berkas ZIP tanpa kompresi ulang: PDF sudah terkompresi, jadi isinya disimpan apa adanya. */
+export async function susunZipSk(berkas: readonly { nama: string; isi: Uint8Array }[]): Promise<Uint8Array> {
+  const { zipSync } = await import("fflate");
+  const isi: Record<string, [Uint8Array, { level: 0 }]> = {};
+  for (const b of berkas) isi[b.nama] = [b.isi, { level: 0 }];
+  return zipSync(isi);
+}
+
+/**
+ * Unduh SK versi Srikandi untuk TTE dari banyak KGB sekaligus dalam satu ZIP (ADR-095). PDF disusun satu per satu di
+ * peramban; SK yang belum boleh dicetak (menunggu review atau perbaikan UPT) dilewati dan namanya dilaporkan.
+ */
+export async function unduhZipSiapCetak(
+  daftar: readonly { kgbId: string; nama: string }[],
+  kemajuan?: (selesai: number, total: number) => void,
+): Promise<HasilAksi<{ jumlah: number; dilewati: string[] }>> {
+  const berkas: { nama: string; isi: Uint8Array }[] = [];
+  const dilewati: string[] = [];
+  for (const [i, d] of daftar.entries()) {
+    kemajuan?.(i, daftar.length);
+    const hasil = await ambilPdf(`/api/kgb/${encodeURIComponent(d.kgbId)}/pdf?preview=true`, { method: "POST" }, true, "SK gagal disiapkan.");
+    if (!hasil.ok || hasil.data.draf) {
+      dilewati.push(d.nama);
+      continue;
+    }
+    berkas.push({
+      nama: namaBerkasZipSk(berkas.length + 1, d.nama, hasil.data.surat.nomorSurat),
+      isi: new Uint8Array(await hasil.data.blob.arrayBuffer()),
+    });
+  }
+  kemajuan?.(daftar.length, daftar.length);
+  if (berkas.length === 0) return { ok: false, error: "Tidak ada SK yang dapat diunduh; semuanya gagal disiapkan atau belum boleh dicetak." };
+  const zip = await susunZipSk(berkas);
+  const hariIni = new Date();
+  const tanggal = `${hariIni.getFullYear()}-${String(hariIni.getMonth() + 1).padStart(2, "0")}-${String(hariIni.getDate()).padStart(2, "0")}`;
+  unduhBlob(new Blob([zip.slice().buffer], { type: "application/zip" }), `SK KGB untuk TTE ${tanggal}.zip`);
+  return { ok: true, data: { jumlah: berkas.length, dilewati } };
 }
 
 /** Minta review SK ke Admin UPT untuk SK yang dibuat sebelum review aktif (ADR-077). */

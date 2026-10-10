@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { badanArsipKgb, namaFileSk, tautanBerkasSk } from "./kgbAksi";
+import { unzipSync } from "fflate";
+import { badanArsipKgb, namaBerkasZipSk, namaFileSk, susunZipSk, tautanBerkasSk } from "./kgbAksi";
 
 test("namaFileSk: SK biasa memakai tahun, versi Srikandi tanpa tahun", () => {
   assert.equal(namaFileSk({ nama: "Pegawai Contoh", tahun: 2026, versi: "biasa" }), "KGB Kanwil Pegawai Contoh 2026.pdf");
@@ -56,4 +57,21 @@ test("badanArsipKgb: penetap kosong tidak dikirim, angka SK tetap ikut", () => {
 
 test("tautanBerkasSk: path berkas di-encode", () => {
   assert.equal(tautanBerkasSk("sk/1_2.pdf"), "/api/blob/download?url=sk%2F1_2.pdf");
+});
+
+test("namaBerkasZipSk: nomor urut, nama pegawai, dan nomor SK tanpa karakter terlarang (ADR-095)", () => {
+  assert.equal(namaBerkasZipSk(1, "Pegawai Contoh", "WP.19.PAS-SA.04.04/777"), "001 - Pegawai Contoh - WP.19.PAS-SA.04.04-777.pdf");
+  assert.equal(namaBerkasZipSk(57, 'A:B "C"', null), "057 - A-B -C-.pdf");
+  assert.equal(namaBerkasZipSk(3, "  ", "  "), "003 - Pegawai.pdf");
+});
+
+test("susunZipSk: satu ZIP berisi PDF apa adanya, urut sesuai daftar (ADR-095)", async () => {
+  const pdf = (isi: string) => new TextEncoder().encode(`%PDF-1.4 ${isi}`);
+  const zip = await susunZipSk([
+    { nama: "001 - A.pdf", isi: pdf("satu") },
+    { nama: "002 - B.pdf", isi: pdf("dua") },
+  ]);
+  const isi = unzipSync(zip);
+  assert.deepEqual(Object.keys(isi), ["001 - A.pdf", "002 - B.pdf"]);
+  assert.equal(new TextDecoder().decode(isi["002 - B.pdf"]), "%PDF-1.4 dua");
 });

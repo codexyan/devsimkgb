@@ -604,7 +604,7 @@ export default function RiwayatKGBPage() {
       if (r.skSudahDibuat === true) {
         tombol.push(
           <button key="unggah" type="button" className={`${kelasTombolKecil} kgbm-hijau`} onClick={() => bukaAksi({ jenis: "unggah_sk", kgb: r })}>
-            Unggah SK TTE
+            Unggah SK bertanda tangan
           </button>,
         );
       }
@@ -617,7 +617,7 @@ export default function RiwayatKGBPage() {
     if (r.status === "selesai" && r.isArsip && !r.surat?.pathFile) {
       tombol.push(
         <button key="unggah-arsip" type="button" className={`${kelasTombolKecil} kgbm-hijau`} onClick={() => bukaAksi({ jenis: "unggah_sk", kgb: r })}>
-          Unggah SK TTE
+          Unggah SK bertanda tangan
         </button>,
       );
     }

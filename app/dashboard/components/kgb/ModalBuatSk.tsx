@@ -28,7 +28,6 @@ import {
   nomorSkTerisi,
   pesanBidangWajib,
   subjudulPegawai,
-  tahunTanggalInput,
   type DasarSkAwal,
   type RingkasPegawai,
 } from "./format";
@@ -374,17 +373,20 @@ export default function ModalBuatSk({
       if (dibuat.data.reviewSk?.status === "menunggu") {
         setSibuk(false);
         onBerhasil(
-          `SK KGB ${pegawai.nama} dibuat dan dikirim ke Admin UPT untuk direview. Setelah UPT menyetujui, tekan Cetak SK ` +
-            "untuk mengunduh SK biasa dan versi Srikandi tanpa tanda air, lalu tanda tangani dan kirim lewat Srikandi.",
+          `SK KGB ${pegawai.nama} dibuat dan dikirim ke Admin UPT untuk direview. Setelah UPT menyetujui, tekan Unduh untuk ` +
+            "TTE (atau panah di sebelahnya untuk tanda tangan basah), lalu tanda tangani dan kirim lewat Srikandi.",
         );
         return;
       }
-      // Review ternyata belum aktif di server: perilaku lama, SK biasa dan versi Srikandi diunduh sekarang.
+      // Review ternyata belum aktif di server: SK langsung diunduh, versi Srikandi untuk TTE (ADR-095).
       const srikandiLama = await buatPdfSk(kgbId, isi, { pratinjau: true, srikandi: true });
       setSibuk(false);
-      unduhBlob(dibuat.data.blob, namaFileSk({ nama: pegawai.nama, tahun: tahunTanggalInput(isi.tanggalSurat), versi: "biasa" }));
-      if (srikandiLama.ok) unduhBlob(srikandiLama.data, namaFileSk({ nama: pegawai.nama, versi: "srikandi" }));
-      onBerhasil(`SK KGB ${pegawai.nama} dibuat dan diunduh. Setelah SK ditandatangani, pilih Unggah SK TTE.`);
+      if (!srikandiLama.ok) {
+        setGalat(`SK sudah dibuat, tetapi versi Srikandi gagal disiapkan (${srikandiLama.error}). Unduh lagi dengan Unduh untuk TTE.`);
+        return;
+      }
+      unduhBlob(srikandiLama.data, namaFileSk({ nama: pegawai.nama, versi: "srikandi" }));
+      onBerhasil(`SK KGB ${pegawai.nama} dibuat; versi Srikandi untuk TTE diunduh. Setelah SK ditandatangani, pilih Unggah SK bertanda tangan.`);
       return;
     }
     // Hanya SK biasa yang mencatat surat; versi Srikandi diminta sebagai pratinjau agar tidak tercatat dua kali.
@@ -400,16 +402,15 @@ export default function ModalBuatSk({
     perubahan.current = "sk";
     belumTersimpan.current = false;
     hapusDrafSk(kgbId);
-    unduhBlob(biasa.data, namaFileSk({ nama: pegawai.nama, tahun: tahunTanggalInput(isi.tanggalSurat), versi: "biasa" }));
+    // Hanya versi Srikandi yang diunduh (ADR-095); SK biasa untuk tanda tangan basah lewat panah di sebelah Unduh untuk TTE.
     if (!srikandi.ok) {
-      setGalat(
-        `SK biasa sudah dibuat dan diunduh, tetapi versi Srikandi gagal dibuat (${srikandi.error}). Pilih tab Versi Srikandi untuk mencoba lagi.`,
-      );
+      setGalat(`SK sudah dibuat, tetapi versi Srikandi gagal disiapkan (${srikandi.error}). Unduh lagi dengan Unduh untuk TTE.`);
       return;
     }
     unduhBlob(srikandi.data, namaFileSk({ nama: pegawai.nama, versi: "srikandi" }));
     onBerhasil(
-      `SK KGB ${pegawai.nama} dibuat dan diunduh sebagai SK biasa dan versi Srikandi. Setelah SK ditandatangani, pilih Unggah SK TTE.`,
+      `SK KGB ${pegawai.nama} dibuat; versi Srikandi untuk TTE diunduh. Untuk tanda tangan basah, pilih panah di sebelah ` +
+        "Unduh untuk TTE. Setelah SK ditandatangani, pilih Unggah SK bertanda tangan.",
     );
   }
 

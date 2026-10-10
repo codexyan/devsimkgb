@@ -31,7 +31,7 @@ function keteranganUnggah(status: string, isArsip: boolean): { teks: string; gan
     };
   }
   return {
-    teks: "Unggah PDF SK KGB yang sudah ditandatangani secara elektronik. Setelah diunggah, status KGB berpindah ke Menunggu Keuangan sampai bagian keuangan melakukan konfirmasi.",
+    teks: "Unggah PDF SK KGB yang sudah ditandatangani: hasil TTE dari Srikandi, atau pindaian SK bertanda tangan basah. Setelah diunggah, status KGB berpindah ke Menunggu Keuangan sampai bagian keuangan melakukan konfirmasi.",
     ganti: false,
   };
 }

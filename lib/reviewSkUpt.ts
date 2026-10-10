@@ -23,10 +23,10 @@ export const STATUS_REVIEW_SK: readonly StatusReviewSk[] = ["menunggu", "disetuj
 /** Label untuk Kanwil dan UPT; nada mengikuti penanda lain di dasbor. */
 export const LABEL_REVIEW_SK: Record<StatusReviewSk, { kanwil: string; upt: string; nada: "ungu" | "hijau" | "merah" | "kuning" }> = {
   menunggu: { kanwil: "Menunggu review UPT", upt: "SK menunggu review Anda", nada: "ungu" },
-  disetujui: { kanwil: "Disetujui UPT, siap cetak", upt: "SK disetujui, menunggu ttd dan TTE", nada: "hijau" },
+  disetujui: { kanwil: "Disetujui UPT, siap cetak", upt: "SK disetujui, menunggu tanda tangan", nada: "hijau" },
   perbaikan: { kanwil: "UPT minta perbaikan", upt: "Menunggu perbaikan SK di Kanwil", nada: "merah" },
   dilewati: { kanwil: "Review dilewati", upt: "SK dilanjutkan Kanwil tanpa review", nada: "kuning" },
-  sesuai: { kanwil: "Sesuai usulan UPT, siap cetak", upt: "SK sesuai usulan Anda, menunggu ttd dan TTE", nada: "hijau" },
+  sesuai: { kanwil: "Sesuai usulan UPT, siap cetak", upt: "SK sesuai usulan Anda, menunggu tanda tangan", nada: "hijau" },
 };
 
 /** Tanda air pada PDF SK yang belum boleh ditandatangani. */
@@ -106,5 +106,5 @@ export function alasanTolakTanpaReview(info: Pick<InfoReviewSk, "status" | "cata
     return `UPT meminta perbaikan SK ${namaPegawai}${info.catatan ? `: ${info.catatan}` : ""}. Perbaiki SK lalu tunggu persetujuan UPT sebelum mencetak dan mengunggah TTE.`;
   if (info && info.status === null)
     return `SK ${namaPegawai} dibuat sebelum review UPT aktif dan belum pernah diperiksa Admin UPT. Tekan Minta review UPT, lalu tunggu persetujuannya; Super Admin dapat melewati review dengan alasan.`;
-  return `SK ${namaPegawai} masih menunggu review Admin UPT. Cetak dan Unggah TTE baru dapat dilakukan setelah UPT menyatakan SK sudah benar, atau setelah Super Admin melewati review dengan alasan.`;
+  return `SK ${namaPegawai} masih menunggu review Admin UPT. Cetak dan Unggah SK bertanda tangan baru dapat dilakukan setelah UPT menyatakan SK sudah benar, atau setelah Super Admin melewati review dengan alasan.`;
 }
