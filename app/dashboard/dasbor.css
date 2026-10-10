@@ -1606,59 +1606,178 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 .dsb-kartu-tanda { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 6px 0 0; }
 .dsb-kartu-aksi { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--ln2); }
 
-/* ── Dasbor UPT: strip jadwal di pita navy dan papan alur KGB ──────────── */
-.upt-jadwal {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+/* ── Dasbor UPT: pita jadwal kirim surat usulan (ADR-101) ─────────────────
+   Linimasa empat bulan kirim di pita navy. Bulan berjalan paling lebar: garis jendela kirim, penanda hari ini, dan
+   hitung mundur. Batang empat tahap sama dengan kolom papan. Gerak mengikuti pilihan Animasi (lihat ujung bagian). */
+.pjd {
+  --pjd-usulkan: #f3c63f;
+  --pjd-kanwil: #8fb4ff;
+  --pjd-sk: #5fdcc0;
+  --pjd-selesai: #4fd18b;
+  position: relative;
   border-top: 1px solid var(--ln1);
 }
+.pjd [data-tahap="usulkan"] { --warna: var(--pjd-usulkan); }
+.pjd [data-tahap="kanwil"] { --warna: var(--pjd-kanwil); }
+.pjd [data-tahap="sk"] { --warna: var(--pjd-sk); }
+.pjd [data-tahap="selesai"] { --warna: var(--pjd-selesai); }
 
-/* Kartu ini <button>: tiap periode dapat dibuka untuk melihat siapa saja yang jatuh tempo di dalamnya.
-   Gaya bawaan tombol dinetralkan supaya tampilannya tetap sama dengan pita sebelumnya. */
-.upt-jadwal-bulan {
+.pjd-atas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 10px 22px 0; }
+.pjd-judul { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--dt4); }
+.pjd-legenda { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; padding: 0; list-style: none; font-size: 11px; color: var(--dt4); }
+.pjd-legenda li { display: inline-flex; align-items: center; gap: 5px; }
+.pjd-legenda li::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--warna); }
+.pjd-info { margin: 0 0 0 auto; font-size: 11.5px; color: var(--pjd-kanwil); }
+
+.pjd-rel { display: flex; padding: 8px 12px 12px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; }
+.pjd-rel::-webkit-scrollbar { display: none; }
+
+.pjd-kartu {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-  padding: 10px 22px 12px;
-  border: 0;
-  border-left: 1px solid var(--ln1);
+  gap: 2px;
+  flex: 1 1 0;
+  min-width: 168px;
+  margin: 0 3px;
+  padding: 16px 34px 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 14px;
   background: none;
   font: inherit;
+  color: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background .15s;
+  scroll-snap-align: start;
+  transition: background .2s, border-color .2s, transform .25s cubic-bezier(.2, .8, .2, 1), box-shadow .25s;
+  animation: pjdMasuk .55s cubic-bezier(.2, .8, .2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
 }
-.upt-jadwal-bulan:hover { background: var(--sub); }
-.upt-jadwal-bulan:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-/* Kartu ringkas "Selesai TMT" bukan tombol; kursornya tidak boleh menjanjikan klik. */
-.upt-jadwal-bulan[data-ringkas] { cursor: default; }
-.upt-jadwal-bulan[data-ringkas]:hover { background: var(--sub); }
+.pjd-kartu[data-aktif] { flex-grow: 2; min-width: 250px; background: rgba(243, 198, 63, .07); border-color: rgba(243, 198, 63, .28); }
+.pjd-kartu:not([data-tahun]):hover { background: rgba(255, 255, 255, .07); border-color: var(--ln1); transform: translateY(-2px); box-shadow: 0 16px 30px -20px rgba(0, 0, 0, .7); }
+.pjd-kartu[data-aktif]:hover { background: rgba(243, 198, 63, .11); border-color: rgba(243, 198, 63, .42); }
+.pjd-kartu:active:not([data-tahun]) { transform: translateY(0) scale(.99); }
+.pjd-kartu:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.pjd-kartu[data-tahun] { flex-grow: .95; cursor: default; background: rgba(255, 255, 255, .04); }
+.pjd-kartu[data-terlambat] { flex-grow: .9; background: rgba(255, 99, 99, .1); border-color: rgba(255, 130, 130, .35); }
+.pjd-kartu[data-terlambat]:hover { background: rgba(255, 99, 99, .16); border-color: rgba(255, 130, 130, .5); }
+.pjd-kartu[data-terlambat] :is(.pjd-bulan, .pjd-angka) { color: #ffb4b4; }
+.pjd-kartu[data-terlambat] .pjd-mundur { color: #ffc9c9; }
 
-.upt-jadwal-bulan:first-child { border-left: 0; }
+/* Linimasa di tepi atas kartu: sebulan penuh, jendela kirim, dan isi sampai hari ini */
+.pjd-garis { position: absolute; top: 7px; left: 14px; right: 14px; height: 3px; border-radius: 99px; background: var(--ln2); }
+.pjd-garis-jendela { position: absolute; inset: 0 auto 0 0; width: calc(var(--lebar) * 100%); border-radius: inherit; background: rgba(255, 255, 255, .18); }
+.pjd-kartu[data-aktif] .pjd-garis-jendela { background: rgba(243, 198, 63, .3); }
+.pjd-garis-isi {
+  position: absolute; inset: 0 auto 0 0; width: calc(var(--lebar) * 100%); border-radius: inherit; background: var(--emas-isi);
+  transform-origin: left; animation: pjdIsi .9s cubic-bezier(.2, .8, .2, 1) .25s backwards;
+}
+.pjd-hari-ini {
+  position: absolute; top: 50%; left: calc(var(--pos) * 100%); width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px var(--emas-isi);
+  animation: pjdTitik .45s cubic-bezier(.3, 1.6, .5, 1) 1s backwards, pjdDenyut 2.6s ease-out 1.6s infinite;
+}
+.pjd-kartu[data-terlambat] .pjd-garis { background: rgba(255, 130, 130, .7); }
+.pjd-kartu[data-tahun] .pjd-garis { background: rgba(79, 209, 139, .35); }
 
-/* KGB yang jendela kirimnya sudah terlewat: merah, dan selalu di kepala pita. Seluruh teksnya diberi warna
-   merah; memerahkan angkanya saja membuat nama dan satuannya nyaris hilang di atas latar bertint. */
-.upt-jadwal-bulan[data-terlambat] { box-shadow: inset 0 3px 0 var(--st-red); background: var(--tint-red-bg); }
-.upt-jadwal-bulan[data-terlambat] .upt-jadwal-nama,
-.upt-jadwal-bulan[data-terlambat] .upt-jadwal-angka,
-.upt-jadwal-bulan[data-terlambat] .upt-jadwal-angka small,
-.upt-jadwal-bulan[data-terlambat] .upt-jadwal-ket { color: var(--st-red); }
-.upt-jadwal-bulan[data-terlambat] .upt-jadwal-nama { font-weight: 600; }
-.upt-jadwal-bulan[data-terlambat] .upt-jadwal-ket { font-weight: 500; }
-.upt-jadwal-bulan[data-terlambat]:hover { background: var(--tint-red-bg); filter: brightness(0.98); }
+.pjd-kepala { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pjd-bulan { font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--dt2); white-space: nowrap; }
+.pjd-kartu[data-aktif] .pjd-bulan { font-size: 13px; color: #fff; }
+.pjd-pil { padding: 1px 8px; border-radius: 99px; font-size: 10.5px; font-weight: 600; background: rgba(243, 198, 63, .18); color: var(--emas-isi); white-space: nowrap; }
+.pjd-pil[data-keadaan="buka"]::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: currentColor;
+  vertical-align: 1px; animation: pjdKedip 1.6s ease-in-out infinite;
+}
+.pjd-pil[data-keadaan="tutup"] { background: rgba(255, 255, 255, .1); color: var(--dt3); }
+.pjd-tmt { font-size: 11.5px; color: var(--dt4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pjd-angka { margin-top: 4px; font-size: 22px; font-weight: 650; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums; }
+.pjd-kartu[data-aktif] .pjd-angka { font-size: 26px; }
+.pjd-angka small { font-size: 12px; font-weight: 400; color: var(--dt4); }
+.pjd-kartu[data-kosong] .pjd-angka { color: var(--dt3); }
+.pjd-mundur { font-size: 11.5px; color: var(--dt3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pjd-kartu[data-aktif][data-jendela="buka"] .pjd-mundur { color: var(--emas-isi); font-weight: 600; }
+.pjd-rentang { font-weight: 400; color: var(--dt4); }
+.pjd-status {
+  display: flex; gap: 2px; height: 6px; margin-top: 8px; border-radius: 99px; background: var(--ln2); overflow: hidden;
+  animation: pjdTumbuh .8s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(var(--i, 0) * 70ms + 250ms);
+}
+.pjd-status > span { min-width: 4px; background: var(--warna); }
+.pjd-rincian { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 5px; font-size: 11.5px; color: var(--dt3); }
+.pjd-chip { padding: 1px 7px; border-radius: 99px; background: rgba(243, 198, 63, .16); color: var(--emas-isi); font-size: 10.5px; font-weight: 600; }
+.pjd-panah {
+  position: absolute; top: 50%; right: 9px; display: grid; place-items: center; width: 22px; height: 22px; margin-top: -11px;
+  border-radius: 50%; color: var(--dt4); background: rgba(255, 255, 255, .06); transition: transform .25s, background .2s, color .2s;
+}
+.pjd-kartu:hover .pjd-panah { transform: translateX(3px); background: rgba(255, 255, 255, .15); color: #fff; }
+
+/* Kartu tahunan: cincin kemajuan */
+.pjd-tahun { display: flex; align-items: center; gap: 12px; min-width: 0; margin-top: 2px; }
+.pjd-tahun > .min-w-0 { display: flex; flex-direction: column; gap: 2px; }
+.pjd-cincin { position: relative; flex-shrink: 0; display: grid; place-items: center; width: 52px; height: 52px; font-size: 11.5px; font-weight: 650; color: #fff; }
+.pjd-cincin svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.pjd-cincin circle { fill: none; stroke-width: 4.5; }
+.pjd-cincin-jalur { stroke: var(--ln1); }
+.pjd-cincin-isi {
+  stroke: var(--pjd-selesai); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: calc(100 - var(--persen));
+  animation: pjdCincin 1.1s cubic-bezier(.2, .8, .2, 1) .4s backwards;
+}
+
+/* Ponsel: pita bergeser mendatar per kartu, tanpa menggeser halaman */
+@media (max-width: 760px) {
+  .pjd-atas { padding: 10px 14px 0; }
+  .pjd-info { margin-left: 0; }
+  .pjd-rel { padding: 8px 8px 12px; }
+  .pjd-kartu { flex: 0 0 64%; min-width: 0; }
+  .pjd-kartu[data-aktif] { flex-basis: 84%; }
+}
+
+/* Jendela periode: tab tahap dengan penanda bergeser, dan daftar yang muncul bergiliran */
+.pjd-tab {
+  position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); margin: 0 0 12px; padding: 3px;
+  border-radius: 12px; background: var(--sub); border: 1px solid var(--ln1);
+}
+.pjd-tab [data-tahap="usulkan"] { --warna: var(--st-amber); }
+.pjd-tab [data-tahap="kanwil"] { --warna: var(--st-blue); }
+.pjd-tab [data-tahap="sk"] { --warna: #0f8a7a; }
+.pjd-tab [data-tahap="selesai"] { --warna: var(--st-green); }
+html[data-dash-theme="dark"] .pjd-tab [data-tahap="sk"] { --warna: #5fdcc0; }
+.pjd-tab-penanda {
+  position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n)); border-radius: 9px;
+  background: var(--card); box-shadow: 0 1px 4px rgba(12, 26, 56, .14); transform: translateX(calc(var(--x) * 100%));
+  transition: transform .32s cubic-bezier(.2, .8, .2, 1);
+}
+.pjd-tab button {
+  position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; padding: 6px 4px;
+  border: 0; border-radius: 9px; background: none; font: inherit; font-size: 11px; font-weight: 600; color: var(--dt4); cursor: pointer;
+  transition: color .2s;
+}
+.pjd-tab button > span:first-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pjd-tab button > span:last-child { font-size: 16px; font-weight: 650; color: var(--warna, var(--dtn)); font-variant-numeric: tabular-nums; }
+.pjd-tab button[aria-selected="true"] { color: var(--dtn); }
+.pjd-tab button:disabled { opacity: .4; cursor: default; }
+.pjd-tab button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.pjd-baris { animation: pjdBaris .35s ease-out backwards; animation-delay: calc(var(--i, 0) * 28ms); }
+
+@keyframes pjdMasuk { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes pjdIsi { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes pjdTumbuh { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes pjdCincin { from { stroke-dashoffset: 100; } }
+@keyframes pjdTitik { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes pjdDenyut {
+  0% { box-shadow: 0 0 0 2px var(--emas-isi), 0 0 0 0 rgba(243, 198, 63, .55); }
+  70%, 100% { box-shadow: 0 0 0 2px var(--emas-isi), 0 0 0 10px rgba(243, 198, 63, 0); }
+}
+@keyframes pjdKedip { 50% { opacity: .35; } }
+@keyframes pjdBaris { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+
+/* Gerak dikurangi: pilihan pengguna (html[data-gerak], lib/ui/gerak.ts), atau pengaturan perangkat bila atribut belum terpasang. */
+html[data-gerak="kurangi"] :is(.pjd, .pjd *, .pjd *::before, .pjd-tab *, .pjd-baris) { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-gerak]) :is(.pjd, .pjd *, .pjd *::before, .pjd-tab *, .pjd-baris) { animation: none !important; transition: none !important; }
+}
 
 /* Daftar nama di dalam jendela periode: beri batas tinggi agar satker besar tetap dapat digulir. */
 .upt-periode-daftar { max-height: 46vh; overflow-y: auto; }
-.upt-jadwal-nama { font-size: 12px; color: var(--dt3); }
-.upt-jadwal-angka { font-size: 20px; font-weight: 600; line-height: 1.2; color: var(--dt1); font-variant-numeric: tabular-nums; }
-.upt-jadwal-angka small { font-size: 12px; font-weight: 400; color: var(--dt4); }
-.upt-jadwal-ket { font-size: 11.5px; color: var(--dt4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.upt-jadwal-bulan[data-kosong] .upt-jadwal-angka { color: var(--dt4); }
-/* Bulan yang jendela kirimnya sedang terbuka: emas berarti "sekarang" (ADR-003) */
-.upt-jadwal-bulan[data-sekarang] { box-shadow: inset 0 3px 0 var(--emas-isi); background: rgba(243, 198, 63, 0.08); }
-.upt-jadwal-bulan[data-sekarang] .upt-jadwal-ket { color: var(--emas-isi); font-weight: 500; }
-.upt-jadwal-bulan[data-ringkas] { background: var(--sub); }
 
 .upt-papan-ket { flex-basis: 100%; font-size: 11.5px; font-weight: 400; color: var(--dt5); }
 .upt-papan-kaki { flex: none; padding: 8px; border-top: 1px solid var(--ln2); }

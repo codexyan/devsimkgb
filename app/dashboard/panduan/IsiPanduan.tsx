@@ -774,6 +774,19 @@ export default async function IsiPanduan({
                   <li>Setelah SK terbit: unduh, rekam di Gaji Web satker, lalu tandai di SIM-KGB.</li>
                 </ol>
 
+                <h3 className="pub-h3">Membaca pita jadwal di dashboard</h3>
+                <p>
+                  Pita di kepala dashboard tersusun menurut <strong>bulan kirim</strong> surat usulan. Kartu paling lebar
+                  adalah bulan berjalan: garis emas menandai jendela kirim (tanggal 1 sampai batas kirim), titik putih
+                  menandai hari ini, dan hitung mundur menyebut sisa harinya. Di bawahnya tertulis bulan TMT yang
+                  diusulkan, dua bulan kemudian. Batang berwarna membagi pegawai menjadi <strong>Perlu diusulkan</strong>{" "}
+                  (kuning), <strong>Di Kanwil</strong> (biru), <strong>SK terbit</strong> (hijau toska), dan{" "}
+                  <strong>Selesai</strong> (hijau), sama dengan kolom papan Alur KGB. Klik kartu untuk melihat daftar
+                  pegawainya per tahap. Kartu <strong>Terlambat</strong> muncul bila ada TMT yang sudah lewat jadwal kirim
+                  dan KGB-nya belum selesai; yang perlu segera dikejar adalah angka &ldquo;perlu diusulkan&rdquo; di
+                  dalamnya. Kartu KGB tahun ini menunjukkan berapa yang sudah selesai.
+                </p>
+
                 <h3 className="pub-h3">Langkah 1: Kenali menu Anda</h3>
                 <p>
                   Sesudah masuk, menu di sisi kiri layar hanya berisi enam pilihan. Seluruhnya terbatas pada satker
