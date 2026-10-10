@@ -20,8 +20,8 @@ test("usulan dikelompokkan per UPT, terbanyak lebih dulu, dengan jumlah surat da
   ];
   const r = ringkasUsulanPerUpt(daftar, sekarang, kode);
   assert.equal(r.length, 2);
-  assert.deepEqual(r[0], { kode: "lpp-martapura", unitKerja: lpp, jumlah: 5, surat: 2, tanpaSurat: 0, hariTerlama: 5 });
-  assert.deepEqual(r[1], { kode: "rutan-rantau", unitKerja: rutan, jumlah: 1, surat: 1, tanpaSurat: 0, hariTerlama: 2 });
+  assert.deepEqual(r[0], { kode: "lpp-martapura", unitKerja: lpp, jumlah: 5, surat: 2, tanpaSurat: 0, hariTerlama: 5, bertanda: 0 });
+  assert.deepEqual(r[1], { kode: "rutan-rantau", unitKerja: rutan, jumlah: 1, surat: 1, tanpaSurat: 0, hariTerlama: 2, bertanda: 0 });
 });
 
 test("usulan tanpa nomor surat dihitung sebagai laporan SK, bukan sebagai surat", () => {
@@ -64,17 +64,30 @@ test("urutan: jumlah terbanyak, lalu nama", () => {
 
 test("keterangan memuat jumlah, surat, laporan SK, dan umur", () => {
   assert.equal(
-    keteranganRingkasan({ kode: "k", unitKerja: lpp, jumlah: 48, surat: 2, tanpaSurat: 3, hariTerlama: 5 }),
-    "48 usulan · 2 surat · 3 laporan SK · terlama 5 hari",
+    keteranganRingkasan({ kode: "k", unitKerja: lpp, jumlah: 48, surat: 2, tanpaSurat: 3, hariTerlama: 5, bertanda: 2 }),
+    "48 usulan · 2 surat · 3 laporan SK · 2 perlu dilihat · terlama 5 hari",
   );
   assert.equal(
-    keteranganRingkasan({ kode: "k", unitKerja: rutan, jumlah: 1, surat: 1, tanpaSurat: 0, hariTerlama: 0 }),
+    keteranganRingkasan({ kode: "k", unitKerja: rutan, jumlah: 1, surat: 1, tanpaSurat: 0, hariTerlama: 0, bertanda: 0 }),
     "1 usulan · 1 surat · diajukan hari ini",
   );
   assert.equal(
-    keteranganRingkasan({ kode: "k", unitKerja: rutan, jumlah: 2, surat: 0, tanpaSurat: 2, hariTerlama: 1 }),
+    keteranganRingkasan({ kode: "k", unitKerja: rutan, jumlah: 2, surat: 0, tanpaSurat: 2, hariTerlama: 1, bertanda: 0 }),
     "2 usulan · 2 laporan SK · terlama 1 hari",
   );
+});
+
+test("usulan bertanda dihitung per UPT untuk keterangan perlu dilihat (ADR-099)", () => {
+  const r = ringkasUsulanPerUpt(
+    [
+      { unitKerja: lpp, nomorSurat: "S-1", diajukanAt: hariLalu(1), bertanda: true },
+      { unitKerja: lpp, nomorSurat: "S-1", diajukanAt: hariLalu(1), bertanda: false },
+      { unitKerja: lpp, nomorSurat: "S-1", diajukanAt: hariLalu(1) },
+    ],
+    sekarang,
+    kode,
+  );
+  assert.equal(r[0].bertanda, 1);
 });
 
 test("nada umur memakai ambang 7 dan 14 hari seperti penanda usulan di dasbor", () => {

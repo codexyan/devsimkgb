@@ -10,6 +10,8 @@ export interface UsulanUntukRingkasan {
   unitKerja: string;
   nomorSurat: string | null;
   diajukanAt: string | null;
+  /** Bertanda menurut lib/tandaUsulan.ts: tidak ikut tercentang di Setujui yang dicentang (ADR-099). */
+  bertanda?: boolean;
 }
 
 export interface RingkasanUpt {
@@ -23,6 +25,8 @@ export interface RingkasanUpt {
   tanpaSurat: number;
   /** Umur usulan tertua dalam hari penuh; 0 bila belum genap sehari atau tanggalnya tidak diketahui. */
   hariTerlama: number;
+  /** Usulan bertanda yang perlu dilihat sebelum disetujui (ADR-099). */
+  bertanda: number;
 }
 
 const SEHARI = 86_400_000;
@@ -33,11 +37,15 @@ export function ringkasUsulanPerUpt(
   sekarang: Date,
   kodeDari: (unitKerja: string) => string,
 ): RingkasanUpt[] {
-  const peta = new Map<string, { unitKerja: string; jumlah: number; surat: Set<string>; tanpaSurat: number; tertua: number | null }>();
+  const peta = new Map<
+    string,
+    { unitKerja: string; jumlah: number; surat: Set<string>; tanpaSurat: number; tertua: number | null; bertanda: number }
+  >();
   for (const u of daftar) {
     const kode = kodeDari(u.unitKerja);
-    const butir = peta.get(kode) ?? { unitKerja: u.unitKerja, jumlah: 0, surat: new Set<string>(), tanpaSurat: 0, tertua: null };
+    const butir = peta.get(kode) ?? { unitKerja: u.unitKerja, jumlah: 0, surat: new Set<string>(), tanpaSurat: 0, tertua: null, bertanda: 0 };
     butir.jumlah += 1;
+    if (u.bertanda) butir.bertanda += 1;
     const surat = u.nomorSurat?.trim();
     if (surat) butir.surat.add(surat);
     else butir.tanpaSurat += 1;
@@ -53,16 +61,18 @@ export function ringkasUsulanPerUpt(
       surat: b.surat.size,
       tanpaSurat: b.tanpaSurat,
       hariTerlama: b.tertua === null ? 0 : Math.max(0, Math.floor((sekarang.getTime() - b.tertua) / SEHARI)),
+      bertanda: b.bertanda,
     }))
     .sort((a, b) => b.jumlah - a.jumlah || a.unitKerja.localeCompare(b.unitKerja, "id"));
 }
 
-/** Keterangan satu UPT dalam satu kalimat pendek: "48 usulan · 2 surat · 3 laporan SK · terlama 5 hari". */
+/** Keterangan satu UPT dalam satu kalimat pendek: "48 usulan · 2 surat · 3 laporan SK · 2 perlu dilihat · terlama 5 hari". */
 export function keteranganRingkasan(r: RingkasanUpt): string {
   return [
     `${r.jumlah} usulan`,
     r.surat > 0 ? `${r.surat} surat` : null,
     r.tanpaSurat > 0 ? `${r.tanpaSurat} laporan SK` : null,
+    r.bertanda > 0 ? `${r.bertanda} perlu dilihat` : null,
     r.hariTerlama > 0 ? `terlama ${r.hariTerlama} hari` : "diajukan hari ini",
   ]
     .filter(Boolean)

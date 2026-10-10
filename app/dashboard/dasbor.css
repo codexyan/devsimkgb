@@ -2271,11 +2271,6 @@ html[data-gerak="kurangi"] .dsb-putar {
 .usl-riwayat-butir .dsb-tag { grid-area: tag; font-size: 11px; }
 .usl-riwayat-judul { grid-area: judul; font-size: 12.5px; font-weight: 600; color: var(--dtn); }
 .usl-riwayat-sub { grid-area: sub; overflow: hidden; font-size: 11.5px; color: var(--dt5); text-overflow: ellipsis; white-space: nowrap; }
-/* Persetujuan sekaligus per surat, dari detail usulan yang menunggu */
-.usl-surat { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 14px; padding: 10px 12px;
-  border: 1px solid var(--tint-green-ln); border-radius: 10px; background: var(--tint-green-bg); }
-.usl-surat p { margin: 0; font-size: 12.5px; color: var(--dt2); }
-.usl-surat strong { color: var(--dtn); }
 
 .usl-tata { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); flex: 1 1 auto; min-height: 420px; }
 .usl-daftar-kolom { overflow-y: auto; border-right: 1px solid var(--ln2); background: var(--sub); scrollbar-width: thin; }
@@ -2314,6 +2309,23 @@ html[data-gerak="kurangi"] .dsb-putar {
 .usl-butir-sub { font-size: 11.5px; color: var(--dt5); font-variant-numeric: tabular-nums; }
 .usl-butir-tanda { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .usl-butir-tanda .dsb-tag { font-size: 11px; }
+/* Setujui yang dicentang (ADR-099): centang per pegawai dan per surat, bilah persetujuan menempel di bawah daftar */
+.usl-butir-baris { display: flex; align-items: flex-start; gap: 4px; }
+.usl-butir-baris > .usl-butir { flex: 1 1 auto; min-width: 0; }
+.usl-centang { flex-shrink: 0; width: 16px; height: 16px; margin: 11px 0 0 6px; accent-color: var(--navy-solid); cursor: pointer; }
+.usl-centang:disabled { cursor: not-allowed; opacity: .45; }
+.usl-surat-kepala { display: flex; align-items: center; gap: 10px; margin: 6px 6px 0; padding: 6px; border-radius: 8px; cursor: pointer; }
+.usl-surat-kepala:hover { background: var(--card); }
+.usl-surat-kepala .usl-centang { margin: 0; }
+.usl-surat-nomor { display: block; overflow-wrap: anywhere; font-size: 12px; font-weight: 600; color: var(--dt2); }
+.usl-surat-sub { display: block; font-size: 11px; color: var(--dt5); font-variant-numeric: tabular-nums; }
+.usl-dilihat { align-self: center; font-size: 11px; font-weight: 600; color: var(--st-green); }
+.usl-dilihat::before { content: "✓ "; }
+.usl-setuju-bilah { position: sticky; bottom: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px 12px; padding: 10px 12px; background: var(--card); border-top: 1px solid var(--ln1); box-shadow: 0 -10px 18px -14px rgba(12, 26, 56, .35); }
+.usl-setuju-bilah p { margin: 0; font-size: 12px; color: var(--dt3); }
+.usl-setuju-bilah strong { color: var(--dtn); font-variant-numeric: tabular-nums; }
+.usl-setuju-bilah .dsb-tombol { flex: 0 0 auto; }
 
 .usl-detail-kolom { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .usl-detail-kepala {

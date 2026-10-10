@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import type { KartuPapan, KolomPapan } from "@/app/dashboard/components/PapanAntrian";
 import type { UsulanMenunggu } from "@/app/dashboard/components/ModalUsulanUpt";
 import { keteranganRingkasan, nadaUmurUsulan, ringkasUsulanPerUpt } from "@/lib/ringkasUsulanUpt";
+import { tandaUsulan } from "@/lib/tandaUsulan";
 import { LABEL_REVIEW_SK, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
 import { cetakSk, mintaReviewSkUpt, unduhZipSiapCetak, type VersiCetak } from "@/lib/kgbAksi";
 import TombolCetakSk from "@/app/dashboard/components/kgb/TombolCetakSk";
@@ -511,7 +512,12 @@ function DashboardMain() {
    * sampai ratusan usulan sekaligus; daftar satu baris per pegawai memenuhi dasbor. Meninjau tiap pegawai dan menyetujui
    * per surat dikerjakan di halaman Usulan UPT, yang dibuka sudah tersaring ke UPT yang dipilih.
    */
-  const usulanPerUpt = ringkasUsulanPerUpt(usulanMenunggu, new Date(), (unitKerja) => cariSatker(unitKerja)?.kode ?? unitKerja.trim());
+  const usulanPerUpt = ringkasUsulanPerUpt(
+    // Yang bertanda tidak ikut tercentang di Setujui yang dicentang (ADR-099); dasbor menyebut jumlahnya per UPT.
+    usulanMenunggu.map((u) => ({ ...u, bertanda: tandaUsulan(u).length > 0 })),
+    new Date(),
+    (unitKerja) => cariSatker(unitKerja)?.kode ?? unitKerja.trim(),
+  );
 
   const namaSatkerKartu = (kode: string) => {
     const st = SATKER.find((s) => s.kode === kode);

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Catatan } from "@/app/dashboard/components/kgb";
 import { formatTanggalId } from "@/lib/waktu";
+import type { KeadaanSkDilaporkan } from "@/lib/dasarSkUsulan";
+import { KOLOM_DASAR_GAJI } from "@/lib/tandaUsulan";
 
 /* Isi tinjauan satu usulan data UPT (ADR-014): perubahan lama → baru, dampaknya pada KGB yang berjalan, laporan
    hukuman disiplin, SK dasar, catatan UPT, dan berkas pendukungnya. Dipakai halaman Usulan UPT (panel detail)
@@ -33,6 +35,8 @@ export interface UsulanKanwil {
    * dan cocok tidaknya masa kerja menurut SK kenaikan pangkat dengan hitungan sistem (ADR-078).
    */
   catatanSkBaru?: string | null;
+  /** Keadaan pencocokan yang sama, sebagai tanda untuk Setujui yang dicentang (ADR-099); hanya usulan yang menunggu. */
+  keadaanSk?: KeadaanSkDilaporkan | null;
   tanggalSkTerakhir: string | null;
   /** Pejabat penetap SK itu, isian UPT atau saran dari awalan nomornya (ADR-086). */
   penetapSkTerakhir?: string | null;
@@ -50,9 +54,6 @@ export interface UsulanKanwil {
    */
   nipTercatat?: { nama: string; unitKerja: string; satkerSama: boolean } | null;
 }
-
-/** Kolom yang menggeser hitungan KGB; ditandai agar peninjau tahu dampaknya pada uang. */
-export const KOLOM_DASAR_GAJI = new Set(["golonganRuang", "mkgTahun", "mkgBulan", "tmtKgbTerakhir", "tmtKgbBerikutnya", "gajiPokok"]);
 
 const tgl = (iso: string | null | undefined) => (iso ? formatTanggalId(iso, { day: "numeric", month: "short", year: "numeric" }) : "-");
 

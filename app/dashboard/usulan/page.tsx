@@ -7,6 +7,7 @@ import { canProcessKGB } from "@/lib/auth";
 import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
 import DetailUsulan, { type UsulanKanwil } from "@/app/dashboard/components/usulan/DetailUsulan";
 import { LABEL_JENIS_USULAN, STATUS_USULAN, type StatusUsulan } from "@/lib/usulanPegawai";
+import { bolehDicentang, dicentangAwal, tandaUsulan } from "@/lib/tandaUsulan";
 import { cariSatker } from "@/lib/satker";
 import { namaRingkasSatker } from "@/app/dashboard/satker/labelSatker";
 import { formatTanggalId } from "@/lib/waktu";
@@ -15,8 +16,12 @@ import { formatTanggalId } from "@/lib/waktu";
 
    Daftarnya satu butir per pegawai, dikelompokkan per UPT, dan dapat disaring per UPT. Satu pegawai bisa punya
    beberapa usulan (mis. pegawai baru lalu perbaikan data, atau usulan ulang setelah dikembalikan); semuanya
-   tampil sebagai riwayat di detail pegawai itu, bukan sebagai nama yang berulang di daftar. Persetujuan sekaligus
-   tetap per surat, dari detail usulan yang menunggu.
+   tampil sebagai riwayat di detail pegawai itu, bukan sebagai nama yang berulang di daftar.
+
+   Setujui yang dicentang (ADR-099): di tab Menunggu tiap pegawai bercentang, dikelompokkan per surat. Usulan tanpa
+   tanda (lib/tandaUsulan.ts) tercentang sejak awal; yang bertanda menunggu dicentang peninjau sendiri, dan yang pasti
+   ditolak server tidak dapat dicentang. Peninjau memeriksa sampel dan yang bertanda, lalu menyetujui semua yang
+   dicentang di UPT yang sedang disaring sekali tekan. Yang tidak dicentang tetap menunggu.
 
    Detailnya sama dengan jendela tinjauan di antrian kerja (DetailUsulan): perubahan lama → baru, dampaknya
    pada KGB yang berjalan, laporan hukdis, dan pratinjau berkas di tempat. Laporan mutasi dari UPT punya
@@ -79,8 +84,13 @@ export default function UsulanPage() {
   const [terpilih, setTerpilih] = useState<string | null>(null);
   const [dialogKembali, setDialogKembali] = useState<UsulanKanwil | null>(null);
   const [catatanKembali, setCatatanKembali] = useState("");
-  /** Persetujuan seluruh usulan pada satu surat; dikonfirmasi dulu karena tidak dapat dibatalkan. */
-  const [dialogMassal, setDialogMassal] = useState<{ nomorSurat: string; satker: string; isi: UsulanKanwil[] } | null>(null);
+  /** Centang yang diubah peninjau; usulan lain mengikuti dicentangAwal (ADR-099). */
+  const [centang, setCentang] = useState<Record<string, boolean>>({});
+  /** Usulan yang detailnya sudah dibuka di halaman ini: jejak sampel yang sudah diperiksa. */
+  const [dilihat, setDilihat] = useState<ReadonlySet<string>>(() => new Set());
+  const [hanyaBertanda, setHanyaBertanda] = useState(false);
+  /** Persetujuan usulan yang dicentang; dikonfirmasi dulu karena tidak dapat dibatalkan. */
+  const [dialogMassal, setDialogMassal] = useState<UsulanKanwil[] | null>(null);
   const [dialogLaporan, setDialogLaporan] = useState<LaporanMutasi | null>(null);
   const [catatanLaporan, setCatatanLaporan] = useState("");
   const [sibuk, setSibuk] = useState(false);
@@ -186,14 +196,14 @@ export default function UsulanPage() {
   }
 
   /**
-   * Setujui seluruh usulan pada satu surat, dikirim bertahap beberapa usulan per permintaan: satu permintaan
+   * Setujui usulan yang dicentang (ADR-099), dikirim bertahap beberapa usulan per permintaan: satu permintaan
    * untuk puluhan pegawai melampaui batas CPU Worker dan terputus di tengah jalan (ADR-079).
    */
-  async function setujuiSurat(sasaran: { nomorSurat: string; isi: UsulanKanwil[] }) {
+  async function setujuiTerpilih(isi: UsulanKanwil[]) {
     setSibuk(true);
     setGalat("");
     try {
-      const ids = sasaran.isi.map((u) => u.id);
+      const ids = isi.map((u) => u.id);
       const d = { berhasil: 0, gagal: 0, galat: [] as string[] };
       for (let i = 0; i < ids.length; i += 3) {
         if (ids.length > 3) beriKabar(`Menyetujui ${Math.min(i + 3, ids.length)} dari ${ids.length} usulan…`, 60000);
@@ -216,7 +226,7 @@ export default function UsulanPage() {
         d.galat.push(...(h.galat ?? []));
       }
       beriKabar(
-        `${d.berhasil ?? 0} usulan pada surat ${sasaran.nomorSurat} disetujui dan diterapkan ke data pegawai.` +
+        `${d.berhasil} usulan yang dicentang disetujui dan diterapkan ke data pegawai.` +
           (d.gagal ? ` ${d.gagal} gagal: ${(d.galat ?? []).slice(0, 3).join("; ")}` : ""),
         9000,
       );
@@ -226,7 +236,7 @@ export default function UsulanPage() {
       if (d.gagal) void muat();
       else {
         const ditinjauAt = new Date().toISOString();
-        const idDisetujui = new Set(sasaran.isi.map((u) => u.id));
+        const idDisetujui = new Set(isi.map((u) => u.id));
         setDaftar((lama) => lama.map((u) => (idDisetujui.has(u.id) ? { ...u, status: "disetujui", ditinjauAt } : u)));
         setPerluSegar(true);
       }
@@ -298,8 +308,9 @@ export default function UsulanPage() {
       daftar
         .filter((u) => cocokTab(u, tab))
         .filter((u) => uptAktif === "semua" || kunciUpt(u.unitKerja) === uptAktif)
-        .filter((u) => !q || `${u.nama} ${u.nip} ${u.unitKerja} ${u.nomorSurat ?? ""}`.toLowerCase().includes(q)),
-    [daftar, tab, q, uptAktif],
+        .filter((u) => !q || `${u.nama} ${u.nip} ${u.unitKerja} ${u.nomorSurat ?? ""}`.toLowerCase().includes(q))
+        .filter((u) => tab !== "menunggu" || !hanyaBertanda || tandaUsulan(u).length > 0),
+    [daftar, tab, q, uptAktif, hanyaBertanda],
   );
 
   /** Semua usulan satu pegawai dari semua status, terbaru lebih dulu: riwayat di detail. */
@@ -353,11 +364,40 @@ export default function UsulanPage() {
   const riwayatAktif = usulanAktif ? riwayatPer.get(kunciPegawai(usulanAktif)) ?? [usulanAktif] : [];
   /** Satu pegawai hanya boleh punya satu usulan yang belum selesai, jadi usulan selesai belum dapat dikembalikan selama itu ada. */
   const usulanLainBerjalan = usulanAktif ? riwayatAktif.find((r) => r.id !== usulanAktif.id && (r.status === "menunggu" || r.status === "revisi")) : undefined;
-  /** Usulan lain yang masih menunggu pada surat yang sama: dasar persetujuan sekaligus per surat. */
-  const suratAktif =
-    usulanAktif?.status === "menunggu" && usulanAktif.nomorSurat?.trim()
-      ? daftar.filter((u) => u.status === "menunggu" && u.nomorSurat?.trim() === usulanAktif.nomorSurat?.trim())
-      : [];
+
+  /**
+   * Lingkup Setujui yang dicentang: semua usulan menunggu di UPT yang sedang disaring, atau semua UPT. Pencarian dan
+   * saringan Perlu dilihat hanya menyaring tampilan, tidak menyaring yang disetujui; bilah dan konfirmasinya menyebut
+   * jumlahnya.
+   */
+  const lingkupSetuju = daftar.filter((u) => u.status === "menunggu" && (uptAktif === "semua" || kunciUpt(u.unitKerja) === uptAktif));
+  const tercentang = (u: UsulanKanwil) => bolehDicentang(u) && (centang[u.id] ?? dicentangAwal(u));
+  const dicentang = lingkupSetuju.filter(tercentang);
+  const jumlahBertanda = lingkupSetuju.filter((u) => tandaUsulan(u).length > 0).length;
+  const ubahCentang = (isi: UsulanKanwil[], nilai: boolean) =>
+    setCentang((c) => ({ ...c, ...Object.fromEntries(isi.filter(bolehDicentang).map((u) => [u.id, nilai])) }));
+  const pilih = (u: UsulanKanwil) => {
+    setTerpilih(u.id);
+    setDilihat((s) => new Set(s).add(u.id));
+  };
+  /** Butir daftar di tab Menunggu dikelompokkan per surat, menurut urutan kemunculannya. */
+  const perSurat = <B extends { utama: UsulanKanwil }>(butir: B[]) => {
+    const peta = new Map<string, B[]>();
+    for (const b of butir) {
+      const k = b.utama.nomorSurat?.trim() ?? "";
+      peta.set(k, [...(peta.get(k) ?? []), b]);
+    }
+    return [...peta.entries()].map(([nomor, isi]) => ({ nomor, isi }));
+  };
+  /** Ringkasan konfirmasi: jumlah per surat, dan yang bertanda tetapi dicentang peninjau sendiri. */
+  const ringkasDialog = dialogMassal
+    ? {
+        surat: perSurat(dialogMassal.map((u) => ({ utama: u }))).map((s) => ({ nomor: s.nomor, jumlah: s.isi.length })),
+        bertanda: dialogMassal.filter((u) => tandaUsulan(u).length > 0),
+        satker: [...new Set(dialogMassal.map((u) => ringkas(u.unitKerja)))].join(", "),
+        sisa: Math.max(0, lingkupSetuju.length - dialogMassal.length),
+      }
+    : null;
 
   if (!boleh) {
     return (
@@ -437,6 +477,18 @@ export default function UsulanPage() {
             ))}
           </div>
           <div className="usl-saring">
+            {tab === "menunggu" && (jumlahBertanda > 0 || hanyaBertanda) && (
+              <button
+                type="button"
+                className="dsb-tombol dsb-tombol-kecil usl-saring-tanda"
+                data-jenis={hanyaBertanda ? undefined : "garis"}
+                aria-pressed={hanyaBertanda}
+                title="Tampilkan hanya usulan yang bertanda: tidak ikut tercentang sampai Anda mencentangnya sendiri"
+                onClick={() => setHanyaBertanda((v) => !v)}
+              >
+                Perlu dilihat ({jumlahBertanda})
+              </button>
+            )}
             <select
               className="dsb-cari usl-upt"
               aria-label="Saring per UPT"
@@ -486,7 +538,7 @@ export default function UsulanPage() {
               )
             ) : kelompok.length === 0 ? (
               <p className="dsb-kosong">
-                {q || uptAktif !== "semua" ? "Tidak ada usulan yang cocok dengan saringan." : tab === "menunggu" ? "Tidak ada usulan yang menunggu tinjauan." : tab === "revisi" ? "Tidak ada usulan yang sedang diperbaiki UPT." : "Belum ada usulan yang selesai ditinjau."}
+                {q || uptAktif !== "semua" || (tab === "menunggu" && hanyaBertanda) ? "Tidak ada usulan yang cocok dengan saringan." : tab === "menunggu" ? "Tidak ada usulan yang menunggu tinjauan." : tab === "revisi" ? "Tidak ada usulan yang sedang diperbaiki UPT." : "Belum ada usulan yang selesai ditinjau."}
               </p>
             ) : (
               <>
@@ -502,54 +554,124 @@ export default function UsulanPage() {
                         <p className="usl-grup-sub">{g.butir.length} pegawai</p>
                       </div>
                     </div>
-                    <ul className="usl-grup-isi">
-                      {g.butir.map((b) => {
-                        const u = b.utama;
-                        const cfg = statusCfg(u.status);
-                        const semuaUsulan = riwayatPer.get(b.kunci)?.length ?? b.isi.length;
-                        return (
-                          <li key={b.kunci}>
-                            <button
-                              type="button"
-                              className="usl-butir"
-                              aria-pressed={!!usulanAktif && kunciPegawai(usulanAktif) === b.kunci}
-                              onClick={() => setTerpilih(u.id)}
-                            >
-                              <span className="usl-butir-nama">{u.nama}</span>
-                              <span className="usl-butir-sub">
-                                {u.nip}
-                                {u.nomorSurat ? ` · ${u.nomorSurat}` : ""}
+                    {(tab === "menunggu" ? perSurat(g.butir) : [{ nomor: null, isi: g.butir }]).map((sr) => {
+                      const usulanSurat = sr.isi.map((b) => b.utama).filter((u) => u.status === "menunggu");
+                      const bolehSurat = usulanSurat.filter(bolehDicentang);
+                      const nSurat = bolehSurat.filter(tercentang).length;
+                      const bertandaSurat = usulanSurat.filter((u) => tandaUsulan(u).length > 0).length;
+                      return (
+                        <div key={sr.nomor ?? "-"}>
+                          {sr.nomor !== null && (
+                            <label className="usl-surat-kepala">
+                              <input
+                                type="checkbox"
+                                className="usl-centang"
+                                checked={bolehSurat.length > 0 && nSurat === bolehSurat.length}
+                                ref={(el) => {
+                                  if (el) el.indeterminate = nSurat > 0 && nSurat < bolehSurat.length;
+                                }}
+                                disabled={sibuk || bolehSurat.length === 0}
+                                onChange={(e) => ubahCentang(usulanSurat, e.target.checked)}
+                              />
+                              <span className="min-w-0">
+                                <span className="usl-surat-nomor">{sr.nomor ? `Surat ${sr.nomor}` : "Tanpa surat usulan"}</span>
+                                <span className="usl-surat-sub">
+                                  {usulanSurat.length} usulan · {nSurat} dicentang
+                                  {bertandaSurat > 0 ? ` · ${bertandaSurat} perlu dilihat` : ""}
+                                </span>
                               </span>
-                              <span className="usl-butir-tanda">
-                                {u.jenis === "baru" && !u.nipTercatat && (
-                                  <span className="dsb-tag" data-garis="" data-nada="hijau">{LABEL_JENIS_USULAN.baru}</span>
+                            </label>
+                          )}
+                        <ul className="usl-grup-isi">
+                          {sr.isi.map((b) => {
+                            const u = b.utama;
+                            const cfg = statusCfg(u.status);
+                            const semuaUsulan = riwayatPer.get(b.kunci)?.length ?? b.isi.length;
+                            const tanda = tandaUsulan(u);
+                            const bercentang = tab === "menunggu" && u.status === "menunggu";
+                            return (
+                              <li key={b.kunci} className={bercentang ? "usl-butir-baris" : undefined}>
+                                {bercentang && (
+                                  <input
+                                    type="checkbox"
+                                    className="usl-centang"
+                                    checked={tercentang(u)}
+                                    disabled={sibuk || !bolehDicentang(u)}
+                                    onChange={(e) => ubahCentang([u], e.target.checked)}
+                                    aria-label={`Centang ${u.nama} untuk disetujui`}
+                                    title={
+                                      !bolehDicentang(u)
+                                        ? "Tidak dapat disetujui; lihat tandanya"
+                                        : tanda.length > 0
+                                          ? "Bertanda: tidak ikut tercentang sampai Anda mencentangnya"
+                                          : undefined
+                                    }
+                                  />
                                 )}
-                                {/* Diajukan sebagai pegawai baru padahal NIP-nya sudah tercatat (ADR-091). */}
-                                {u.nipTercatat && (
-                                  <span className="dsb-tag" data-garis="" data-nada={u.nipTercatat.satkerSama ? "kuning" : "merah"}>
-                                    {u.nipTercatat.satkerSama ? "NIP sudah tercatat" : "NIP di satker lain"}
+                                <button
+                                  type="button"
+                                  className="usl-butir"
+                                  aria-pressed={!!usulanAktif && kunciPegawai(usulanAktif) === b.kunci}
+                                  onClick={() => pilih(u)}
+                                >
+                                  <span className="usl-butir-nama">{u.nama}</span>
+                                  <span className="usl-butir-sub">
+                                    {u.nip}
+                                    {/* Di tab Menunggu nomor surat sudah ada di kepala kelompoknya. */}
+                                    {tab !== "menunggu" && u.nomorSurat ? ` · ${u.nomorSurat}` : ""}
                                   </span>
-                                )}
-                                {u.perubahan.length > 0 && <span className="dsb-tag" data-garis="">{u.perubahan.length} perubahan</span>}
-                                {u.hukdis && <span className="dsb-tag" data-garis="" data-nada="merah">Hukdis</span>}
-                                {u.status === "menunggu" && u.kgb && u.kgb.status !== "menunggu_keuangan" && (
-                                  <span className="dsb-tag" data-garis="" data-nada="ungu">KGB tertahan</span>
-                                )}
-                                {tab !== "menunggu" && <span className="dsb-tag" data-garis="" data-nada={cfg.nada}>{cfg.label}</span>}
-                                {semuaUsulan > 1 && (
-                                  <span className="dsb-tag" data-garis="" data-nada="biru" title="Riwayat usulan pegawai ini ada di detail">
-                                    {semuaUsulan} usulan
+                                  <span className="usl-butir-tanda">
+                                    {u.jenis === "baru" && !u.nipTercatat && (
+                                      <span className="dsb-tag" data-garis="" data-nada="hijau">{LABEL_JENIS_USULAN.baru}</span>
+                                    )}
+                                    {/* Tanda bersama (ADR-099): NIP tercatat (ADR-091), hukdis, masa kerja SK, dampak pada KGB. */}
+                                    {tanda.map((t) => (
+                                      <span key={t.kode} className="dsb-tag" data-garis="" data-nada={t.nada} title={t.ket}>
+                                        {t.teks}
+                                      </span>
+                                    ))}
+                                    {u.perubahan.length > 0 && <span className="dsb-tag" data-garis="">{u.perubahan.length} perubahan</span>}
+                                    {u.status === "menunggu" && u.kgb && u.kgb.status !== "menunggu_keuangan" && (
+                                      <span className="dsb-tag" data-garis="" data-nada="ungu">KGB tertahan</span>
+                                    )}
+                                    {tab !== "menunggu" && <span className="dsb-tag" data-garis="" data-nada={cfg.nada}>{cfg.label}</span>}
+                                    {bercentang && dilihat.has(u.id) && <span className="usl-dilihat">Dilihat</span>}
+                                    {semuaUsulan > 1 && (
+                                      <span className="dsb-tag" data-garis="" data-nada="biru" title="Riwayat usulan pegawai ini ada di detail">
+                                        {semuaUsulan} usulan
+                                      </span>
+                                    )}
                                   </span>
-                                )}
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        </div>
+                      );
+                    })}
                   </section>
                 ))}
               </>
+            )}
+            {!memuat && tab === "menunggu" && lingkupSetuju.length > 0 && (
+              <div className="usl-setuju-bilah">
+                <p>
+                  <strong>{dicentang.length}</strong> dari {lingkupSetuju.length} usulan dicentang
+                  {uptAktif === "semua" && pilihanUpt.length > 1 ? `, ${pilihanUpt.length} UPT` : ""}
+                </p>
+                <button
+                  type="button"
+                  className="dsb-tombol"
+                  disabled={sibuk || dicentang.length === 0}
+                  onClick={() => {
+                    setGalat("");
+                    setDialogMassal(dicentang);
+                  }}
+                >
+                  Setujui {dicentang.length} yang dicentang
+                </button>
+              </div>
             )}
           </div>
 
@@ -590,28 +712,6 @@ export default function UsulanPage() {
                           );
                         })}
                       </div>
-                    </div>
-                  )}
-                  {suratAktif.length > 1 && (
-                    <div className="usl-surat">
-                      <p>
-                        Surat <strong>{usulanAktif.nomorSurat}</strong> memuat {suratAktif.length} usulan yang menunggu tinjauan.
-                      </p>
-                      <button
-                        type="button"
-                        className="dsb-tombol dsb-tombol-kecil"
-                        data-nada="hijau"
-                        disabled={sibuk}
-                        onClick={() =>
-                          setDialogMassal({
-                            nomorSurat: usulanAktif.nomorSurat ?? "",
-                            satker: [...new Set(suratAktif.map((u) => ringkas(u.unitKerja)))].join(", "),
-                            isi: suratAktif,
-                          })
-                        }
-                      >
-                        Setujui {suratAktif.length} usulan pada surat ini
-                      </button>
                     </div>
                   )}
                   <DetailUsulan key={usulanAktif.id} usulan={usulanAktif} pratinjauDiTempat />
@@ -736,41 +836,49 @@ export default function UsulanPage() {
         </KerangkaModal>
       )}
 
-      {dialogMassal && (
+      {dialogMassal && ringkasDialog && (
         <KerangkaModal
-          judul="Setujui seluruh usulan pada surat ini"
-          subjudul={`${dialogMassal.satker} · surat ${dialogMassal.nomorSurat}`}
+          judul={`Setujui ${dialogMassal.length} usulan yang dicentang`}
+          subjudul={ringkasDialog.satker}
           ukuran="sm"
           sibuk={sibuk}
           onTutup={() => setDialogMassal(null)}
-          onKirim={() => void setujuiSurat(dialogMassal)}
+          onKirim={() => void setujuiTerpilih(dialogMassal)}
           kaki={
             <>
               <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogMassal(null)} disabled={sibuk}>Batal</button>
               <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk}>
-                {sibuk ? "Menerapkan…" : `Setujui ${dialogMassal.isi.length} usulan`}
+                {sibuk ? "Menerapkan…" : `Setujui ${dialogMassal.length} usulan`}
               </button>
             </>
           }
         >
           <PesanGalat pesan={galat || null} />
           <Catatan nada="amber">
-            Seluruh {dialogMassal.isi.length} usulan pada surat ini langsung diterapkan ke data pegawai dan tidak dapat
-            dibatalkan. KGB yang sedang berjalan ikut disesuaikan. Usulan yang perlu diperbaiki lebih baik dikembalikan
-            satu per satu lebih dulu, sebab persetujuan ini tidak memilah.
+            Usulan yang dicentang langsung diterapkan ke data pegawai dan tidak dapat dibatalkan; KGB yang sedang berjalan
+            ikut disesuaikan. Bila kemudian ada yang keliru, kembalikan usulannya ke UPT dari tab Selesai.
           </Catatan>
+          {ringkasDialog.bertanda.length > 0 && (
+            <Catatan nada="amber">
+              {ringkasDialog.bertanda.length} di antaranya bertanda dan Anda centang sendiri:{" "}
+              {ringkasDialog.bertanda.slice(0, 5).map((u) => `${u.nama} (${tandaUsulan(u).map((t) => t.teks.toLowerCase()).join(", ")})`).join("; ")}
+              {ringkasDialog.bertanda.length > 5 ? `; dan ${ringkasDialog.bertanda.length - 5} lainnya` : ""}.
+            </Catatan>
+          )}
+          {ringkasDialog.sisa > 0 && (
+            <Catatan>{ringkasDialog.sisa} usulan yang tidak dicentang tetap menunggu tinjauan.</Catatan>
+          )}
           <ul className="dsb-log-ringkas">
-            {dialogMassal.isi.slice(0, 8).map((u) => (
-              <li key={u.id}>
+            {ringkasDialog.surat.map((sr) => (
+              <li key={sr.nomor || "-"}>
                 <span className="dsb-titik" data-nada="kuning" aria-hidden="true" />
                 <span className="min-w-0">
-                  <span className="dsb-nama">{u.nama}</span>
-                  <span className="dsb-kecil"> · {u.perubahan.length} perubahan{u.hukdis ? " · hukdis" : ""}</span>
+                  <span className="dsb-nama">{sr.nomor ? `Surat ${sr.nomor}` : "Tanpa surat usulan"}</span>
+                  <span className="dsb-kecil"> · {sr.jumlah} usulan</span>
                 </span>
               </li>
             ))}
           </ul>
-          {dialogMassal.isi.length > 8 && <p className="dsb-kecil">dan {dialogMassal.isi.length - 8} pegawai lainnya.</p>}
         </KerangkaModal>
       )}
 
