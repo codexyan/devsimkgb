@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { canProcessKGB } from "@/lib/auth";
 import { BERKAS_USULAN, bandingkanUsulan, nilaiUsulan, perubahanPegawai, ringkasHukdisUsulan, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { ringkasDasarBaru } from "@/lib/dasarBaruUsulan";
-import { cariSkTercatat, catatanSkDilaporkan, usulanBaruMenurutSk, usulanMenurutSk } from "@/lib/dasarSkUsulan";
+import { cariSkTercatat, periksaSkDilaporkan, usulanBaruMenurutSk, usulanMenurutSk } from "@/lib/dasarSkUsulan";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
 import type { RiwayatKGBRow, RiwayatPangkatRow, RiwayatPmkRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
@@ -113,6 +113,7 @@ export async function GET(req: Request) {
         p && u.status === "menunggu"
           ? cariSkTercatat(u, { pangkat: pangkatPerPegawai.get(p.id), pmk: pmkPerPegawai.get(p.id) })
           : null;
+      const sk = u.jenis === "baru" || u.status === "menunggu" ? periksaSkDilaporkan(u, p, tercatat) : null;
       return {
         id: u.id,
         pegawaiId: u.pegawaiId,
@@ -139,7 +140,9 @@ export async function GET(req: Request) {
         // Hasil hitungan SK yang dilaporkan: pada pegawai baru, keadaan pada SK KGB terakhir atau hitungan mundurnya
         // (ADR-065); pada keduanya, masa kerja yang tertulis pada SK kenaikan pangkat dicocokkan dengan hitungan sistem
         // (ADR-078). Pegawai yang sudah disetujui tidak lagi dibandingkan, sebab data induknya sudah berubah.
-        catatanSkBaru: u.jenis === "baru" || u.status === "menunggu" ? catatanSkDilaporkan(u, p, tercatat) : null,
+        catatanSkBaru: sk?.catatan ?? null,
+        // Keadaan pencocokan yang sama sebagai tanda, untuk Setujui yang dicentang (ADR-099); hanya yang menunggu.
+        keadaanSk: u.status === "menunggu" ? sk?.keadaan ?? null : null,
         hukdisKeterangan: u.hukdisKeterangan,
         nomorSkTerakhir: u.nomorSkTerakhir,
         tanggalSkTerakhir: u.tanggalSkTerakhir ? new Date(u.tanggalSkTerakhir).toISOString() : null,

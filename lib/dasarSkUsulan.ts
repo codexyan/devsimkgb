@@ -585,6 +585,19 @@ export function usulanBaruMenurutSk<T extends Partial<UsulanPegawaiRow>>(usulan:
 }
 
 /**
+ * Hasil pencocokan SK yang dilaporkan, untuk tanda di daftar tinjauan (ADR-099):
+ * - `cocok`: masa kerja menurut SK kenaikan pangkat sama dengan hitungan sistem;
+ * - `beda`: tidak sama;
+ * - `belum_dicocokkan`: masa kerja menurut SK tidak diisi UPT;
+ * - `belum_dihitung`: SK-nya belum dapat dihitung dari isian UPT.
+ * null bila tidak ada yang dicocokkan (tanpa SK, SK PMK, atau usulan tanpa acuan).
+ */
+export type KeadaanSkDilaporkan = "cocok" | "beda" | "belum_dicocokkan" | "belum_dihitung";
+
+const keadaanCek = (cek: ReturnType<typeof cocokMkgSk>): KeadaanSkDilaporkan =>
+  !cek ? "belum_dicocokkan" : cek.cocok ? "cocok" : "beda";
+
+/**
  * Catatan untuk peninjau Kanwil tentang SK yang dilaporkan: keadaan pada SK acuan, masa kerja yang tertulis pada SK,
  * dan apakah cocok dengan hitungan sistem (ADR-078). null bila tidak ada yang perlu dicatat.
  */
@@ -594,29 +607,41 @@ export function catatanSkDilaporkan(
   /** SK yang dilaporkan dan sudah tercatat pada riwayat pegawai (ADR-079). */
   tercatat: SkTercatat | null = null,
 ): string | null {
+  return periksaSkDilaporkan(usulan, pegawai, tercatat).catatan;
+}
+
+/** Catatan untuk peninjau beserta keadaan pencocokannya, dari satu hitungan yang sama. */
+export function periksaSkDilaporkan(
+  usulan: UsulanPegawaiRow,
+  pegawai: PegawaiRow | null | undefined,
+  tercatat: SkTercatat | null = null,
+): { catatan: string | null; keadaan: KeadaanSkDilaporkan | null } {
+  const kosong = { catatan: null, keadaan: null };
   const jenis = usulan.dasarBaruJenis?.trim();
-  if (jenis !== "kp" && jenis !== "pmk") return null;
+  if (jenis !== "kp" && jenis !== "pmk") return kosong;
   const acuan = acuanUsulan(usulan);
   const label = jenis === "kp" ? "SK kenaikan pangkat" : "SK PMK";
 
   if (usulan.jenis === "baru") {
     const sk = hitungSkPegawaiBaru(usulan);
-    if (!sk.berlaku) return null;
-    if (!sk.ok) return `SK ini belum dapat dihitung: periksa ${sk.pesan}.`;
+    if (!sk.berlaku) return kosong;
+    if (!sk.ok) return { catatan: `SK ini belum dapat dihitung: periksa ${sk.pesan}.`, keadaan: "belum_dihitung" };
     const tmt = formatTanggalId(sk.tmtSk);
     if (!sk.acuan)
-      return (
-        `Masa kerja golongan pada SK ini ${teksMasaKerja(sk.mkgPadaSk)} (TMT ${tmt}), disalin UPT apa adanya. ` +
-        `Data di atas sudah dihitung mundur ke TMT KGB terakhir: ${sk.nilai.mkgTahun} tahun ${sk.nilai.mkgBulan} bulan.`
-      );
+      return {
+        catatan:
+          `Masa kerja golongan pada SK ini ${teksMasaKerja(sk.mkgPadaSk)} (TMT ${tmt}), disalin UPT apa adanya. ` +
+          `Data di atas sudah dihitung mundur ke TMT KGB terakhir: ${sk.nilai.mkgTahun} tahun ${sk.nilai.mkgBulan} bulan.`,
+        keadaan: null,
+      };
     const awal = `Pada SK KGB terakhir: ${sk.acuan.golongan}, ${sk.acuan.mkgTahun} tahun ${sk.acuan.mkgBulan} bulan. `;
-    if (jenis === "pmk") return `${awal}Menurut ${label} TMT ${tmt}: ${teksMasaKerja(sk.mkgPadaSk)}.`;
+    if (jenis === "pmk") return { catatan: `${awal}Menurut ${label} TMT ${tmt}: ${teksMasaKerja(sk.mkgPadaSk)}.`, keadaan: null };
     const cek = cocokMkgSk(sk.acuan.mkgHitunganPadaSk, sk.mkgPadaSk);
-    return awal + teksCocok(label, tmt, cek);
+    return { catatan: awal + teksCocok(label, tmt, cek), keadaan: keadaanCek(cek) };
   }
 
   // Pegawai tercatat: masa kerja menurut SK kenaikan pangkat baru ikut tersimpan sejak ADR-078, ditandai golongan acuan.
-  if (!pegawai) return null;
+  if (!pegawai) return kosong;
   const rencana = rencanaSkUsulan(pegawai, usulan, perubahanDariUsulan(usulan), tercatat);
   const bagian: string[] = [];
   if (rencana.jenis === "hitung" && rencana.koreksi)
@@ -629,11 +654,13 @@ export function catatanSkDilaporkan(
           ? `${label} ini sudah tercatat pada riwayat; persetujuan menghitung ulang riwayat itu dari keadaan yang dibetulkan, tanpa mencatatnya dua kali.`
           : `${label} ini sudah tercatat pada riwayat, tetapi data pegawainya belum ikut berubah (penerapan sebelumnya terputus). Persetujuan melengkapinya tanpa mencatat dua kali.`,
     );
+  let keadaan: KeadaanSkDilaporkan | null = null;
   if (acuan && jenis === "kp" && rencana.jenis === "hitung") {
     const cek = cocokMkgSk(rencana.sk.mkgPadaTmtSk, { tahun: usulan.mkgTahun, bulan: usulan.mkgBulan });
     bagian.push(teksCocok(label, formatTanggalId(rencana.tercatat?.tmt ?? usulan.dasarBaruTmt), cek));
+    keadaan = keadaanCek(cek);
   }
-  return bagian.length > 0 ? bagian.join(" ") : null;
+  return { catatan: bagian.length > 0 ? bagian.join(" ") : null, keadaan };
 }
 
 function teksCocok(label: string, tmt: string, cek: ReturnType<typeof cocokMkgSk>): string {

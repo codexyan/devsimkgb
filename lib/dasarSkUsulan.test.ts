@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   catatanSkDilaporkan,
+  periksaSkDilaporkan,
   cocokMkgSk,
   hitungDasarSkUsulan,
   hitungSkDilaporkan,
@@ -131,6 +132,10 @@ test("usulan pegawai tercatat ber-acuan: masa kerja menurut SK tidak ikut hitung
   assert.match(catatanSkDilaporkan(usulan, hafizaLama) ?? "", /3 tahun 2 bulan, sesuai hitungan sistem/);
   const keliru = { ...usulan, mkgTahun: 7, mkgBulan: 0 } as UsulanPegawaiRow;
   assert.match(catatanSkDilaporkan(keliru, hafizaLama) ?? "", /Perhatian: .*7 tahun 0 bulan, sedangkan hitungan sistem 3 tahun 2 bulan/);
+  // Tanda untuk daftar tinjauan (ADR-099) berasal dari pencocokan yang sama.
+  assert.equal(periksaSkDilaporkan(usulan, hafizaLama).keadaan, "cocok");
+  assert.equal(periksaSkDilaporkan(keliru, hafizaLama).keadaan, "beda");
+  assert.equal(periksaSkDilaporkan({ ...usulan, mkgTahun: null } as unknown as UsulanPegawaiRow, hafizaLama).keadaan, "belum_dicocokkan");
   // Usulan lama (tanpa acuan) tidak memuat masa kerja menurut SK, jadi tidak dicocokkan.
   assert.equal(catatanSkDilaporkan({ ...usulan, golonganAcuan: null } as UsulanPegawaiRow, hafizaLama), null);
 });
@@ -149,6 +154,8 @@ test("pegawai baru ber-acuan: dihitung dari SK KGB terakhir seperti pegawai terc
   assert.equal(sk.acuan?.golongan, "II/b");
   assert.deepEqual(sk.acuan?.mkgHitunganPadaSk, { tahun: 3, bulan: 2 });
   assert.match(catatanSkDilaporkan(baru, null) ?? "", /Pada SK KGB terakhir: II\/b, 7 tahun 0 bulan\. .*sesuai hitungan sistem/);
+  assert.equal(periksaSkDilaporkan(baru, null).keadaan, "cocok");
+  assert.equal(periksaSkDilaporkan({ ...baru, mkgTahunAcuan: null } as unknown as UsulanPegawaiRow, null).keadaan, "belum_dihitung");
   // Masa kerja pada SK KGB terakhir yang belum diisi ditagih, bukan dibaca nol tahun.
   const kosong = hitungSkPegawaiBaru({ ...baru, mkgTahunAcuan: null });
   assert.ok(kosong.berlaku && !kosong.ok);

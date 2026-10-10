@@ -1562,12 +1562,20 @@ export default async function IsiPanduan({
                       Tim SDM KGB atau Super Admin, menu Usulan UPT atau tombol Tinjau usulan UPT di Antrian kerja KGB
                     </p>
                     <p>
-                      Di Dashboard, usulan yang menunggu diringkas satu baris per UPT: jumlah usulan, jumlah surat, dan
-                      umur usulan tertua. Tombol <strong>Tinjau</strong> pada baris itu membuka menu Usulan UPT yang sudah
-                      tersaring ke UPT tersebut, tempat tiap pegawai ditinjau dan seluruh usulan pada satu surat dapat
-                      disetujui sekaligus. Persetujuan sekaligus dikirim tiga usulan per tahap; bila terputus, tekan Setujui
-                      lagi. Usulan yang SK-nya sudah tercatat oleh persetujuan yang terputus dilanjutkan, tidak ditolak
-                      sebagai SK ganda.
+                      Di Dashboard, usulan yang menunggu diringkas satu baris per UPT: jumlah usulan, jumlah surat, jumlah
+                      yang perlu dilihat, dan umur usulan tertua. Tombol <strong>Tinjau</strong> pada baris itu membuka menu
+                      Usulan UPT yang sudah tersaring ke UPT tersebut.
+                    </p>
+                    <p>
+                      <strong>Setujui yang dicentang.</strong> Di tab Menunggu tiap pegawai bercentang dan dikelompokkan per
+                      surat. Usulan tanpa tanda sudah tercentang. Usulan bertanda baru ikut bila Anda mencentangnya sendiri,
+                      misalnya masa kerja menurut SK kenaikan pangkat berbeda dengan hitungan sistem, ada laporan hukdis, NIP
+                      sudah tercatat, atau KGB yang sedang berjalan ikut berubah. Tombol <strong>Perlu dilihat</strong>{" "}
+                      menampilkan yang bertanda saja. Periksa yang bertanda dan beberapa sampel lewat detailnya (yang sudah
+                      dibuka bertanda Dilihat), hapus centang yang perlu diperbaiki, lalu tekan{" "}
+                      <strong>Setujui N yang dicentang</strong>. Yang tidak dicentang tetap menunggu dan dapat dikembalikan
+                      satu per satu. Persetujuan dikirim tiga usulan per tahap; bila terputus, tekan Setujui lagi. Usulan
+                      yang SK-nya sudah tercatat oleh persetujuan yang terputus dilanjutkan, tidak ditolak sebagai SK ganda.
                     </p>
                     <p>
                       Daftar berisi satu nama per pegawai, dikelompokkan per UPT dan dapat disaring per UPT; usulan lain
