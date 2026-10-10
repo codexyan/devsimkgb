@@ -10,19 +10,11 @@ import {
   type JenisDokumen,
   type SumberDokumen,
 } from "@/lib/dokumenPegawai";
-// JEJAK-INVENTARISASI (ADR-027): dihapus bersama modul inventarisasi.
-import KartuKiriman, { type Pemutakhiran } from "@/app/dashboard/components/inventarisasi/KartuKiriman";
 import { formatTanggalId } from "@/lib/waktu";
 
-/* Tab "Dokumen" di halaman pegawai (ADR-023, ADR-027, ADR-028). Arsip dokumen pegawai tampil lebih dulu; kiriman
-   formulir inventarisasi, yang hanya sementara, di bawahnya.
-
-   - Dokumen pegawai: arsip unggahan, SK KGB, berkas usulan UPT, dan berkas formulir, dapat dipratinjau di halaman.
-     Bagian ini milik modul pegawai dan tetap ada setelah modul inventarisasi dihapus.
-   - Kiriman formulir inventarisasi (JEJAK-INVENTARISASI): rujukan sementara selama pendataan berjalan. Hanya
-     perbandingan, berkas, dan status tindak lanjut; Data Pegawai diubah lewat bagian-bagian halaman ini sendiri
-     (Ubah data, Catat kenaikan pangkat, PMK), bukan dari kiriman. Bila bagian ini gagal dimuat atau modulnya sudah
-     dihapus, dokumen tetap tampil. */
+/* Tab "Dokumen" di halaman pegawai (ADR-023, ADR-028): arsip unggahan, SK KGB, dan berkas usulan UPT, dapat dipratinjau
+   di halaman. Kiriman formulir inventarisasi dihapus bersama modulnya (ADR-098); berkas kiriman yang disalin ke arsip
+   tetap tampil sebagai arsip dokumen. */
 
 const ukuranTeks = (b: number | null) =>
   b === null ? "" : b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
@@ -30,27 +22,18 @@ const tanggalTeks = (v: string) => (v ? formatTanggalId(v) : "");
 
 export default function TabDokumenPemutakhiran({
   pegawaiId,
-  bolehUbah,
   onDataBerubah,
 }: {
   pegawaiId: string;
-  /** Peran yang boleh mengelola dokumen dan mencatat tindak lanjut kiriman. */
-  bolehUbah: boolean;
   onDataBerubah: () => void;
 }) {
-  // null: sedang dimuat; "gagal": bagian kiriman tidak tersedia, dokumen tetap tampil.
-  const [daftar, setDaftar] = useState<Pemutakhiran[] | null | "gagal">(null);
   const [dokumen, setDokumen] = useState<DokumenPegawai[] | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
   const [pesan, setPesan] = useState<string | null>(null);
   const [pratinjau, setPratinjau] = useState<{ judul: string; subjudul?: string; url: string } | null>(null);
 
   const muat = useCallback(async () => {
-    const [rm, rd] = await Promise.all([
-      fetch(`/api/pegawai/${pegawaiId}/pemutakhiran`, { cache: "no-store" }).catch(() => null),
-      fetch(`/api/pegawai/${pegawaiId}/dokumen`, { cache: "no-store" }).catch(() => null),
-    ]);
-    setDaftar(rm?.ok ? ((await rm.json()) as Pemutakhiran[]) : "gagal");
+    const rd = await fetch(`/api/pegawai/${pegawaiId}/dokumen`, { cache: "no-store" }).catch(() => null);
     if (rd?.ok) setDokumen((await rd.json()) as DokumenPegawai[]);
     else setGalat("Dokumen pegawai gagal dimuat.");
   }, [pegawaiId]);
@@ -91,34 +74,6 @@ export default function TabDokumenPemutakhiran({
 
       <BagianDokumen pegawaiId={pegawaiId} dokumen={dokumen} onLihat={lihatDokumen} onGalat={setGalat} onBerhasil={berhasil} />
 
-      {/* JEJAK-INVENTARISASI (ADR-027): bagian ini dihapus bersama modul inventarisasi. */}
-      {daftar !== "gagal" && (
-        <section className="dsb-panel" aria-labelledby="judul-pemutakhiran">
-          <div className="dsb-panel-kepala">
-            <h2 id="judul-pemutakhiran" className="dsb-panel-judul">
-              Kiriman formulir inventarisasi <small>rujukan sementara</small>
-            </h2>
-          </div>
-          {!daftar ? (
-            <p className="dsb-kosong">Memuat…</p>
-          ) : daftar.length === 0 ? (
-            <p className="dsb-kosong">Pegawai ini belum mengirim formulir inventarisasi.</p>
-          ) : (
-            daftar.map((p) => (
-              <KartuKiriman
-                // Disusun ulang setiap kiriman atau tindak lanjutnya berubah, supaya isian status mengikuti yang tersimpan.
-                key={`${p.kegiatan.id}-${p.kiriman.waktu}-${p.kiriman.tindakLanjut?.at ?? ""}`}
-                p={p}
-                pegawaiId={pegawaiId}
-                bolehUbah={bolehUbah}
-                onBerhasil={berhasil}
-                onLihatBerkas={(b) => setPratinjau({ ...b, subjudul: `Kiriman ${p.kegiatan.nama}` })}
-              />
-            ))
-          )}
-        </section>
-      )}
-
       {pratinjau && (
         <ModalPratinjauBerkas judul={pratinjau.judul} subjudul={pratinjau.subjudul} url={pratinjau.url} onTutup={() => setPratinjau(null)} />
       )}
@@ -126,13 +81,12 @@ export default function TabDokumenPemutakhiran({
   );
 }
 
-const URUTAN_SUMBER: SumberDokumen[] = ["arsip", "sk_kgb", "inventaris", "usulan"];
+const URUTAN_SUMBER: SumberDokumen[] = ["arsip", "sk_kgb", "usulan"];
 
 /** Label sumber yang ringkas untuk saringan. */
 const SUMBER_RINGKAS: Record<SumberDokumen, string> = {
   arsip: "Arsip",
   sk_kgb: "SK KGB",
-  inventaris: "Formulir",
   usulan: "Usulan UPT",
 };
 
@@ -335,8 +289,7 @@ function BagianDokumen({
         <p className="dsb-kosong">Memuat…</p>
       ) : tampil.length === 0 ? (
         <p className="dsb-kosong">
-          Belum ada dokumen. Unggah SK pegawai, atau dokumen akan tampil sendiri dari SK KGB, usulan UPT, dan formulir
-          inventarisasi.
+          Belum ada dokumen. Unggah SK pegawai, atau dokumen akan tampil sendiri dari SK KGB dan usulan UPT.
         </p>
       ) : (
         <ul className="dok-kisi">

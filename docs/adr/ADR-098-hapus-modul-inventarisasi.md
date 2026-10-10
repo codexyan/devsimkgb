@@ -1,7 +1,7 @@
 # ADR-098: Modul inventarisasi dihapus; berkas kiriman disalin ke arsip pegawai dulu, data R2 disimpan
 
 Tanggal: 10 Oktober 2026
-Status: tahap 1 (salin semua) berlaku; tahap 2 (hapus modul) menyusul. Menjalankan rencana ADR-027.
+Status: berlaku, tahap 1 (salin semua) dan tahap 2 (hapus modul). Menjalankan rencana ADR-027.
 
 ## Konteks
 
@@ -24,10 +24,27 @@ Pilihan pengguna: salin semua ke arsip dulu, dan biarkan data R2 untuk dihapus n
      ulang aman.
    - Kiriman dari NIP yang belum terdaftar di Data Pegawai dilaporkan namanya.
    - Hasilnya tercatat di Log Aktivitas.
-2. **Tahap 2: hapus modul**, setelah penyalinan diperiksa. Yang dihapus mengikuti daftar ADR-027:
-   - semua titik `JEJAK-INVENTARISASI`;
-   - halaman, rute, dan pustaka modul beserta ujinya;
+2. **Tahap 2: hapus modul**, dirilis setelah penyalinan di produksi diperiksa: tidak ada berkas kiriman yang belum
+   tersalin, kecuali milik NIP yang belum terdaftar. Yang dihapus mengikuti daftar ADR-027:
+   - titik `JEJAK-INVENTARISASI`:
+     - penanda "Pemutakhiran" di daftar Data Pegawai;
+     - bagian "Kiriman formulir inventarisasi" dan saringan "Formulir" di tab Dokumen pegawai;
+     - sumber dokumen `inventaris` di `GET /api/pegawai/[id]/dokumen`;
+     - menu Inventarisasi KGB;
+     - pembatas `/api/public/inventarisasi` di `worker-entry.js`;
+   - halaman `/inventarisasi-kgb` dan `/dashboard/inventarisasi`;
+   - rute `/api/inventarisasi/*`, `/api/public/inventarisasi`, dan `/api/pegawai/[id]/pemutakhiran`;
+   - pustaka `inventarisKgb`, `inventarisServer`, `inventarisArsip`, `kegiatanInventaris`, `pemutakhiranPegawai` beserta
+     24 ujinya;
+   - aturan CSS modul (`inv-*`, `pmh-*`) yang tidak dipakai lagi;
    - skrip Google Form dan `docs/inventarisasi-kgb/`.
+
+   Yang tetap:
+   - salinan di arsip pegawai, yang tampil sebagai "Arsip dokumen" dengan keterangan "Dari kiriman …" dan dibuka lewat
+     rute dokumen pegawai, bukan rute modul;
+   - Durable Object pembatas, yang dipakai cek KGB (instance `global`; instance `inventarisasi` tidak dipanggil lagi);
+   - kelas `inv-atur`, `inv-bidang`, `inv-bantu`, `inv-lebar` (modal Ubah data pegawai) serta `pmh-galat` dan
+     `pmh-bidang`.
 3. **Data R2 `inventaris/` tidak disentuh.** Data itu tidak lagi terlihat di aplikasi, dapat dipulihkan bila perlu, dan
    dapat dihapus belakangan atas keputusan pengguna. ADR ini dan ADR terdahulu tetap disimpan sebagai riwayat keputusan.
 
@@ -37,3 +54,15 @@ Pilihan pengguna: salin semua ke arsip dulu, dan biarkan data R2 untuk dihapus n
   "Dari kiriman …".
 - Setelah tahap 2, formulir publik `/inventarisasi-kgb` dan menu Inventarisasi KGB tidak ada lagi. Data Pegawai, Usulan
   UPT, dan cek KGB tidak terpengaruh.
+- Tidak ada migrasi basis data; modul ini tidak punya tabel.
+
+## Uji tahap 2
+
+- tsc bersih. Galat eslint hanya di 14 berkas lama yang tidak disentuh.
+- 655 uji lulus: 679 sebelumnya dikurangi 24 uji modul yang dihapus.
+- Di server lokal:
+  - kedelapan halaman dan rute modul menjawab 404;
+  - Data Pegawai tampil, dan menu tanpa Inventarisasi KGB;
+  - `GET /api/pegawai/[id]/dokumen` menjawab 200 untuk 49 pegawai, tanpa sumber `inventaris`;
+  - salinan kiriman di tab Dokumen terbuka sebagai PDF lewat rute dokumen pegawai;
+  - modal Ubah data pegawai tetap bertata letak grid.

@@ -1880,7 +1880,7 @@ export default async function IsiPanduan({
                     Dasar KGB, serta Status &amp; mutasi, masing-masing dengan tombol ubah dan catatnya),{" "}
                     <strong>Riwayat KGB</strong>, <strong>Pangkat &amp; PMK</strong>, <strong>Dokumen</strong>, dan{" "}
                     <strong>Riwayat Hukdis</strong>. Tab Dokumen adalah arsip dokumen pegawai, tempat SK yang dilampirkan
-                    lewat panel Dokumen rujukan atau disalin dari kiriman inventarisasi tersimpan permanen; tab ini hanya
+                    lewat panel Dokumen rujukan tersimpan permanen; tab ini hanya
                     tampil bagi Super Admin dan Tim SDM KGB. Riwayat KGB menampilkan seluruh KGB pegawai. Di halaman riwayat pegawai, tombol Proses KGB membuka
                     tombol aksi yang sama dan tautan Buka di Halaman Proses KGB. Baris bertanda Dari Data Pegawai dibentuk
                     dari TMT KGB berikutnya di Data Pegawai, untuk pegawai aktif yang tidak memiliki entri KGB berstatus

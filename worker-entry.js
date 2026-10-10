@@ -22,9 +22,6 @@ export {
 } from "./.open-next/worker.js";
 
 const PATH_CEK_KGB = "/api/public/cek-kgb";
-// Kiriman formulir inventarisasi KGB pegawai Kanwil: kode akses salah (403) dihitung sebagai percobaan gagal.
-// JEJAK-INVENTARISASI (ADR-027): PATH_INVENTARIS dan layaniInventaris dihapus bersama modulnya; Durable Object tetap dipakai cek KGB.
-const PATH_INVENTARIS = "/api/public/inventarisasi";
 // Semua permintaan per IP dibatasi longgar, karena pegawai satu kantor (satu alamat IP) dapat
 // mengecek status bersamaan. Batas ketat hanya untuk NIP yang tidak ditemukan (jawaban 404),
 // yaitu pola menebak NIP.
@@ -82,30 +79,13 @@ export class PembatasCekKgb extends DurableObject {
   }
 }
 
-/** Stub Durable Object pembatas, atau null bila binding-nya tidak ada. Tiap formulir memakai instance sendiri. */
-function pembatas(env, nama = "global") {
+/** Stub Durable Object pembatas cek KGB, atau null bila binding-nya tidak ada. */
+function pembatas(env) {
   try {
-    return env.PEMBATAS_CEK_KGB ? env.PEMBATAS_CEK_KGB.get(env.PEMBATAS_CEK_KGB.idFromName(nama)) : null;
+    return env.PEMBATAS_CEK_KGB ? env.PEMBATAS_CEK_KGB.get(env.PEMBATAS_CEK_KGB.idFromName("global")) : null;
   } catch {
     return null;
   }
-}
-
-/** Pembatas formulir inventarisasi: per alamat IP saja, karena isinya multipart dan tidak dibaca di sini. */
-async function layaniInventaris(request, env, ctx) {
-  const ip = alamatIp(request);
-  const stub = pembatas(env, "inventarisasi");
-  if (stub) {
-    try {
-      const hasil = await stub.periksa(ip, "");
-      if (!hasil.boleh) return jawabDitahan(pesanDitahan(hasil), hasil.tunggu);
-    } catch (err) {
-      console.error("[inventarisasi] Durable Object pembatas gagal:", err);
-    }
-  }
-  const res = await openNextWorker.fetch(request, env, ctx);
-  if (res.status === 403 && stub) ctx.waitUntil(stub.catatGagal(ip, "").catch(() => {}));
-  return res;
 }
 
 /** NIP dari isi permintaan POST, tanpa menghabiskan isi aslinya. */
@@ -205,7 +185,6 @@ export default {
 async function layani(request, env, ctx) {
   const { pathname } = new URL(request.url);
   if (bolehDariCache(request, pathname)) return lewatCachePublik(request, pathname, env, ctx);
-  if (request.method === "POST" && pathname.replace(/\/+$/, "") === PATH_INVENTARIS) return layaniInventaris(request, env, ctx);
   if (pathname.replace(/\/+$/, "") !== PATH_CEK_KGB) return openNextWorker.fetch(request, env, ctx);
 
   // Hanya POST yang memeriksa data; GET lama langsung dijawab rute dengan pesan untuk memuat ulang halaman.
