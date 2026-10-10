@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ambilRiwayatKgb,
-  namaFileSk,
+  namaBerkasSk,
   tautanBerkasSk,
   unduhBlob,
   unduhUlangSk,
   type HasilAksi,
   type RiwayatKgbItem,
 } from "@/lib/kgbAksi";
-import { formatTanggalId, tanggalKalender } from "@/lib/waktu";
+import { formatTanggalId } from "@/lib/waktu";
 import KerangkaModal from "./KerangkaModal";
 import { Catatan, Lencana, LencanaRapelan, LencanaStatus, Memuat, PesanGalat } from "./BidangForm";
 import { formatMkg, formatRupiah, nomorSkTerisi, subjudulPegawai, type RingkasPegawai } from "./format";
@@ -48,8 +48,8 @@ export default function ModalRiwayatKgb({ pegawai, onTutup }: PropsModalRiwayatK
       setGalatUnduh(hasil.error);
       return;
     }
-    const tahun = tanggalKalender(k.surat?.tanggalSurat)?.getFullYear() ?? null;
-    unduhBlob(hasil.data, namaFileSk({ nama: pegawai.nama, tahun, versi: "biasa" }));
+    // SK biasa buatan SIM-KGB, untuk dicetak dan ditandatangani basah (ADR-097).
+    unduhBlob(hasil.data, namaBerkasSk({ nomorSurat: k.surat?.nomorSurat, nama: pegawai.nama, versi: "basah" }));
   }
 
   const identitas = [pegawai.jabatan, pegawai.golonganRuang].filter(Boolean).join(" · ");

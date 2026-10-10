@@ -3650,3 +3650,7 @@ html[data-gerak="kurangi"] .pmn-percik, html[data-gerak="kurangi"] .pmn-cincin {
 /* Aksi untuk banyak kartu di bawah kepala kolom papan, mis. unduh semua SK siap cetak (ADR-095). */
 .dsb-papan-aksi { padding: 0 10px 8px; }
 .dsb-papan-aksi > .dsb-tombol { width: 100%; justify-content: center; white-space: normal; text-align: center; }
+.dsb-papan-aksi > .ctk-belah { display: flex; width: 100%; }
+.dsb-papan-aksi > .ctk-belah > :first-child { flex: 1 1 auto; justify-content: center; white-space: normal; text-align: center; }
+.ctk-belah > [data-nada="hijau"] + .mnu-pemicu-panah { border-color: var(--tint-green-ln); background: var(--card); color: var(--st-green); }
+.ctk-belah > [data-nada="hijau"] + .mnu-pemicu-panah:hover:not(:disabled) { background: var(--tint-green-bg); }

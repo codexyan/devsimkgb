@@ -708,13 +708,14 @@ function DashboardMain() {
     );
   }
 
-  /** Unduh SK siap cetak di kolom Sedang diproses sekaligus, satu ZIP versi Srikandi untuk TTE (ADR-095). */
-  async function unduhSemuaSiapCetak(daftar: PegawaiJatuhTempo[]) {
+  /** Unduh SK siap cetak di kolom Sedang diproses sekaligus dalam satu ZIP, untuk TTE atau tanda tangan basah (ADR-095, ADR-097). */
+  async function unduhSemuaSiapCetak(daftar: PegawaiJatuhTempo[], versi: VersiCetak) {
     if (sibukZip || daftar.length === 0) return;
     setPesanGagal(null);
     setSibukZip(`Menyiapkan 0 dari ${daftar.length}…`);
     const hasil = await unduhZipSiapCetak(
       daftar.filter((p) => !!p.kgbId).map((p) => ({ kgbId: p.kgbId as string, nama: p.nama })),
+      versi,
       (selesai, total) => setSibukZip(`Menyiapkan ${selesai} dari ${total}…`),
     );
     setSibukZip(null);
@@ -724,7 +725,7 @@ function DashboardMain() {
     }
     const { jumlah, dilewati } = hasil.data;
     setPesanBerhasil(
-      `${jumlah} SK versi Srikandi untuk TTE diunduh dalam satu ZIP.` +
+      `${jumlah} SK ${versi === "tte" ? "versi Srikandi untuk TTE" : "untuk tanda tangan basah"} diunduh dalam satu ZIP.` +
         (dilewati.length > 0 ? ` ${dilewati.length} dilewati karena belum boleh dicetak atau gagal disiapkan: ${dilewati.join(", ")}.` : ""),
     );
   }
@@ -1106,16 +1107,17 @@ function DashboardMain() {
                   const siap = antrian.filter((p) => posisiAntrian(p) === "diproses" && tindakanProses(p) === "siap" && !!p.kgbId);
                   if (siap.length < 2) return undefined;
                   return (
-                    <button
-                      type="button"
-                      className="dsb-tombol dsb-tombol-kecil"
-                      data-nada="hijau"
-                      disabled={!!sibukZip}
-                      onClick={() => void unduhSemuaSiapCetak(siap)}
-                      title="Satu ZIP berisi SK versi Srikandi untuk ditandatangani elektronik, bernama nomor urut, pegawai, dan nomor SK"
-                    >
-                      {sibukZip ?? `Unduh ${siap.length} SK siap cetak (ZIP)`}
-                    </button>
+                    <TombolCetakSk
+                      nama={`${siap.length} SK siap cetak`}
+                      sibuk={!!sibukZip}
+                      nadaUtama="hijau"
+                      labelUtama={`ZIP ${siap.length} SK untuk TTE`}
+                      labelSibuk={sibukZip ?? "Menyiapkan..."}
+                      judulUtama="Satu ZIP berisi SK versi Srikandi untuk TTE, bernama nomor urut, TTE, KGB, dan nama pegawai"
+                      labelBasah="ZIP untuk tanda tangan basah"
+                      keteranganBasah="SK biasa semua pegawai siap cetak, tanpa tanda air"
+                      onCetak={(versi) => void unduhSemuaSiapCetak(siap, versi)}
+                    />
                   );
                 })(),
               }}

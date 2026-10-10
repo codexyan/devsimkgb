@@ -1755,7 +1755,9 @@ export default async function IsiPanduan({
                       review diminta ulang otomatis. Setelah UPT menyatakan SK sudah benar, tekan <strong>Unduh untuk TTE</strong>{" "}
                       untuk mengunduh versi Srikandi tanpa tanda air (panah di sebelahnya untuk SK tanda tangan basah),
                       kirim lewat Srikandi, lalu Unggah SK bertanda tangan. Bila banyak SK siap cetak, tombol{" "}
-                      <strong>Unduh semua siap cetak</strong> di kolom Sedang diproses mengunduh semuanya dalam satu ZIP. Untuk keadaan mendesak, Super Admin dapat memilih{" "}
+                      <strong>ZIP N SK untuk TTE</strong> di kolom Sedang diproses mengunduh semuanya dalam satu ZIP;
+                      panah di sebelahnya mengunduh ZIP untuk tanda tangan basah. Nama berkas SK berbentuk nomor urut surat,
+                      TTE atau TTD, KGB, lalu nama pegawai, mis. <code>1758 TTE KGB Abdul Hayat.pdf</code>. Untuk keadaan mendesak, Super Admin dapat memilih{" "}
                       <strong>Lewati review</strong> dengan alasan yang tercatat di Log Aktivitas. SK pegawai Kanwil tidak
                       melalui review ini. SK pegawai UPT yang dibuat sebelum review aktif juga tertahan sampai direview:
                       pilih <strong>Minta review UPT</strong>.
