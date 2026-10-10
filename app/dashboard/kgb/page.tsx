@@ -32,7 +32,8 @@ import {
   type RingkasanSk,
 } from "@/app/dashboard/components/kgb";
 import { BidangAlasan } from "@/app/dashboard/components/kgb/BidangForm";
-import { PESAN_GAGAL_JARINGAN, cetakSk, mintaReviewSkUpt, tautanBerkasSk } from "@/lib/kgbAksi";
+import { PESAN_GAGAL_JARINGAN, cetakSk, mintaReviewSkUpt, tautanBerkasSk, type VersiCetak } from "@/lib/kgbAksi";
+import TombolCetakSk from "@/app/dashboard/components/kgb/TombolCetakSk";
 import { LABEL_REVIEW_SK, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
@@ -403,17 +404,21 @@ export default function KGBPage() {
     void Promise.all([muatDaftar().catch(() => {}), fetchSummary()]);
   }
 
-  /** Cetak SK: SK biasa untuk tanda tangan basah dan versi Srikandi, tanpa tanda air (ADR-077). */
-  async function cetakDariDetail(k: KgbTersimpan) {
+  /** Cetak SK satu versi (ADR-095): versi Srikandi untuk TTE, atau SK biasa untuk tanda tangan basah. */
+  async function cetakDariDetail(k: KgbTersimpan, versi: VersiCetak) {
     setSibukDetail(true);
     setGalatDetail(null);
-    const hasil = await cetakSk(k.id, { nama: k.pegawai.nama });
+    const hasil = await cetakSk(k.id, { nama: k.pegawai.nama }, versi);
     setSibukDetail(false);
     if (!hasil.ok) {
       setGalatDetail(hasil.error);
       return;
     }
-    setPesanBerhasil(`SK ${k.pegawai.nama} diunduh: SK biasa untuk tanda tangan basah dan versi Srikandi. Setelah ditandatangani, pilih Unggah SK TTE.`);
+    setPesanBerhasil(
+      versi === "tte"
+        ? `SK ${k.pegawai.nama} versi Srikandi diunduh untuk TTE. Setelah ditandatangani, pilih Unggah SK bertanda tangan.`
+        : `SK ${k.pegawai.nama} diunduh untuk tanda tangan basah. Setelah ditandatangani dan dipindai, pilih Unggah SK bertanda tangan.`,
+    );
   }
 
   /** Minta review UPT untuk SK yang dibuat sebelum review aktif (ADR-077). */
@@ -520,7 +525,7 @@ export default function KGBPage() {
           </button>
           {skTercatat(k) && skBolehDicetak(k.reviewSk) && (
             <button type="button" onClick={() => bukaAksi({ jenis: "unggah_sk", kgb })} className="dsb-tombol dsb-tombol-kecil" data-nada="hijau">
-              Unggah SK TTE
+              Unggah SK bertanda tangan
             </button>
           )}
         </>
@@ -596,13 +601,18 @@ export default function KGBPage() {
               </button>
             )}
             {bolehProses && bisaCetak && kgb && (
-              <button type="button" className="kgbm-tombol kgbm-kedua" disabled={sibukDetail} onClick={() => void cetakDariDetail(kgb)}>
-                {sibukDetail ? "Menyiapkan..." : "Cetak SK"}
-              </button>
+              <TombolCetakSk
+                nama={kgb.pegawai.nama}
+                sibuk={sibukDetail}
+                kelasUtama="kgbm-tombol kgbm-kedua"
+                nadaUtama=""
+                kelasPanah="kgbm-tombol kgbm-kedua mnu-pemicu-panah"
+                onCetak={(versi) => void cetakDariDetail(kgb, versi)}
+              />
             )}
             {bolehProses && bisaUnggah && kgb && (
               <button type="button" className="kgbm-tombol kgbm-hijau" onClick={() => bukaAksi({ jenis: "unggah_sk", kgb })}>
-                Unggah SK TTE
+                Unggah SK bertanda tangan
               </button>
             )}
             {bolehProses && bisaBuatSk && kgb && (
@@ -677,18 +687,18 @@ export default function KGBPage() {
             {!skTercatat(k)
               ? k.reviewSk
                 ? "Langkah berikutnya: Buat SK. SK pegawai UPT dikirim ke Admin UPT untuk direview sebelum dicetak dan diunggah TTE."
-                : "Langkah berikutnya: Buat SK. Unggah SK TTE tersedia setelah SK dibuat."
+                : "Langkah berikutnya: Buat SK. Unggah SK bertanda tangan tersedia setelah SK dibuat."
               : k.reviewSk?.status === "menunggu"
-                ? "SK sudah dibuat dan menunggu review Admin UPT. Cetak SK dan Unggah SK TTE tersedia setelah UPT menyetujui; unduhan sebelum itu bertanda air DRAF."
+                ? "SK sudah dibuat dan menunggu review Admin UPT. Cetak SK dan Unggah SK bertanda tangan tersedia setelah UPT menyetujui; unduhan sebelum itu bertanda air DRAF."
                 : k.reviewSk?.status === "perbaikan"
                   ? `UPT meminta perbaikan SK${k.reviewSk.catatan ? `: ${k.reviewSk.catatan}` : ""}. Pilih Buat SK untuk memperbaikinya; review diminta ulang otomatis.`
                   : k.reviewSk?.status === "disetujui"
-                    ? "SK sudah disetujui Admin UPT. Pilih Cetak SK untuk tanda tangan basah dan versi Srikandi, lalu Unggah SK TTE setelah ditandatangani."
+                    ? "SK sudah disetujui Admin UPT. Pilih Unduh untuk TTE (panah di sebelahnya untuk tanda tangan basah), lalu Unggah SK bertanda tangan setelah ditandatangani."
                     : k.reviewSk && k.reviewSk.status === null
-                    ? "SK ini dibuat sebelum review UPT aktif dan belum pernah diperiksa Admin UPT. Pilih Minta review UPT; Cetak SK dan Unggah SK TTE tersedia setelah UPT menyetujui."
+                    ? "SK ini dibuat sebelum review UPT aktif dan belum pernah diperiksa Admin UPT. Pilih Minta review UPT; Cetak SK dan Unggah SK bertanda tangan tersedia setelah UPT menyetujui."
                     : k.reviewSk?.status === "dilewati"
-                      ? `Review UPT dilewati Super Admin${k.reviewSk.alasanLewati ? ` (${k.reviewSk.alasanLewati})` : ""}. Cetak SK lalu Unggah SK TTE setelah ditandatangani.`
-                      : "SK KGB sudah dibuat. Setelah SK ditandatangani secara elektronik, pilih Unggah SK TTE."}
+                      ? `Review UPT dilewati Super Admin${k.reviewSk.alasanLewati ? ` (${k.reviewSk.alasanLewati})` : ""}. Unduh untuk TTE, lalu Unggah SK bertanda tangan setelah ditandatangani.`
+                      : "SK KGB sudah dibuat. Setelah SK ditandatangani, pilih Unggah SK bertanda tangan."}
           </Catatan>
         )}
         <PesanGalat pesan={galatDetail} />
@@ -703,7 +713,7 @@ export default function KGBPage() {
             {k.isArsip
               ? pathFile
                 ? "KGB selesai dan dicatat melalui Arsip KGB."
-                : "KGB selesai dan dicatat melalui Arsip KGB, tetapi berkas SK belum diunggah. Pilih Unggah SK TTE untuk mengunggahnya."
+                : "KGB selesai dan dicatat melalui Arsip KGB, tetapi berkas SK belum diunggah. Pilih Unggah SK bertanda tangan untuk mengunggahnya."
               : "KGB selesai dan sudah dikonfirmasi bagian keuangan."}
           </Catatan>
         )}

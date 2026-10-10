@@ -57,6 +57,7 @@ const BATAS_SELESAI = 40;
 export default function PapanAntrian({
   kartu,
   keterangan,
+  aksiKolom,
   kolom,
   tersaring,
   onPindah,
@@ -65,6 +66,8 @@ export default function PapanAntrian({
   kartu: KartuPapan[];
   /** Keterangan kecil di kepala kolom, mis. "3 lewat batas". */
   keterangan?: Partial<Record<KolomPapan, string>>;
+  /** Tombol di bawah kepala kolom yang berlaku untuk banyak kartu, mis. unduh semua SK siap cetak (ADR-095). */
+  aksiKolom?: Partial<Record<KolomPapan, ReactNode>>;
   /**
    * Kolom yang ditampilkan; kosong berarti seluruhnya. Dipakai menyesuaikan papan dengan satker yang
    * sedang disaring (ADR-049): pegawai Kanwil berakhir di keuangan Kanwil, pegawai UPT di rekam UPT, dan
@@ -156,6 +159,8 @@ export default function PapanAntrian({
               <span className="dsb-papan-jumlah">{isi.length}</span>
               {!diciut && keterangan?.[k] && <span className="dsb-papan-ket">{keterangan[k]}</span>}
             </button>
+
+            {!diciut && aksiKolom?.[k] && <div className="dsb-papan-aksi">{aksiKolom[k]}</div>}
 
             {!diciut && (
               <div className="dsb-papan-isi">
