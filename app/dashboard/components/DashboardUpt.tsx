@@ -19,7 +19,7 @@ import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
 import MenuTindakan from "@/app/dashboard/components/MenuTindakan";
 import { PERISTIWA_BUKA_PENGUMUMAN_UPT } from "@/lib/pengumumanUpt";
 import type { JenisMutasi } from "@/lib/mutasiPegawai";
-import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
+import { batasKirimSurat } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
 import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
@@ -197,7 +197,7 @@ const fmtTgl = (s: string | null | undefined) => (s ? formatTanggalId(s, { day: 
 
 /** Bulan TMT yang suratnya dikirim bulan ini: surat UPT dikirim pada bulan ketiga sebelum TMT. */
 function bulanUsulanSekarang(hariIni: Date): string {
-  // Surat usulan dikirim tanggal 1 sampai 10 bulan kedua sebelum TMT, bulan yang sama dengan dibukanya
+  // Surat usulan dikirim tanggal 1 sampai batas kirim (Pengaturan, bawaan 20) bulan kedua sebelum TMT, bulan yang sama dengan dibukanya
   // input di SIM-KGB, sehingga TMT yang diusulkan bulan ini adalah TMT dua bulan ke depan.
   return geserBulan(kunciBulanTmt(hariIni) ?? "", 2);
 }
@@ -1574,7 +1574,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                   <small> pegawai</small>
                 </span>
                 <span className="upt-jadwal-ket">
-                  {sekarang ? `kirim bulan ini, 1–${KIRIM_SURAT_BATAS}` : `kirim 1–${KIRIM_SURAT_BATAS} ${namaBulan(geserBulan(m.bulanTmt, -2))}`}
+                  {sekarang ? `kirim bulan ini, 1–${batasKirimSurat()}` : `kirim 1–${batasKirimSurat()} ${namaBulan(geserBulan(m.bulanTmt, -2))}`}
                 </span>
               </button>
             );
@@ -1610,7 +1610,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             subjudul={
               terlambatMode
                 ? "TMT-nya sudah lewat dan KGB-nya belum selesai"
-                : `Surat usulannya dikirim 1–${KIRIM_SURAT_BATAS} ${namaBulan(geserBulan(dialogPeriode.bulanTmt, -2))}`
+                : `Surat usulannya dikirim 1–${batasKirimSurat()} ${namaBulan(geserBulan(dialogPeriode.bulanTmt, -2))}`
             }
             nada={terlambatMode ? "amber" : undefined}
             ukuran="md"

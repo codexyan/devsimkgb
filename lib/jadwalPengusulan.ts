@@ -1,5 +1,5 @@
 // Jadwal pengusulan KGB untuk beberapa bulan TMT ke depan, dipakai halaman publik /kgb.
-// Aturannya sama dengan panduan: surat UPT dikirim tanggal 1 sampai 10 bulan kedua sebelum TMT, input di SIM-KGB
+// Aturannya sama dengan panduan: surat UPT dikirim tanggal 1 sampai batas kirim (Pengaturan) bulan kedua sebelum TMT, input di SIM-KGB
 // dibuka tanggal 1 bulan kedua sebelum TMT dan berakhir pada tanggal batas input Tim SDM (Pengaturan,
 // lib/batasInputSdm.ts), lalu keuangan merekonsiliasi gaji di Gaji Web tanggal 1 sampai 15 bulan
 // sebelum TMT. Pemanggil di server memuat batas dari Pengaturan lebih dulu (muatBatasInputSdm).
@@ -23,7 +23,7 @@ export const LABEL_TAHAP: Record<TahapJadwal, string> = {
  * - "berjalan": hari ini di dalam jendela `tahap`; `sisaHari` menghitung hari ini dan hari batas (1 = hari terakhir).
  * - "menunggu": hari ini sebelum jendela `tahap` berikutnya dibuka; `sisaHari` adalah jarak hari sampai dibuka.
  * - "selesai": rekon gaji sudah lewat.
- * Jendela surat (1 sampai 10) dan input (1 sampai batas input) dibuka bersamaan; selama surat masih boleh
+ * Jendela surat (1 sampai batas kirim) dan input (1 sampai batas input) dibuka bersamaan; selama surat masih boleh
  * dikirim, tahap yang ditampilkan adalah surat, sebab itulah yang harus dikerjakan UPT lebih dulu.
  */
 export interface SekarangJadwal {

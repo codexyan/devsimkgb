@@ -9,7 +9,7 @@ import PengumumanUpt from "./upt/PengumumanUpt";
 import { RoleContext, UserContext } from "./RoleContext";
 import { useDialogModal } from "./useDialogModal";
 import { useThemeMode } from "@/lib/ui/themeMode";
-import { aturBatasInputSdm } from "@/lib/batasInputSdm";
+import { aturBatasInputSdm, aturBatasKirimSurat } from "@/lib/batasInputSdm";
 import { pasangFetchTangguh } from "@/lib/fetchTangguh";
 
 // Dipasang saat modul dimuat, sebelum halaman di dalam shell mulai memanggil API.
@@ -26,13 +26,16 @@ interface DashboardShellProps {
   sesiTimeoutMenit?: number;
   /** Tanggal batas input Tim SDM dari Pengaturan; kosong berarti bawaan (lib/batasInputSdm.ts). */
   batasInputSdm?: number | null;
+  /** Tanggal batas kirim surat usulan UPT dari Pengaturan (ADR-094); kosong berarti bawaan. */
+  batasKirimSurat?: number | null;
   children: React.ReactNode;
 }
 
-export default function DashboardShell({ nama, nip, role, sesiTimeoutMenit = 60, batasInputSdm, children }: DashboardShellProps) {
+export default function DashboardShell({ nama, nip, role, sesiTimeoutMenit = 60, batasInputSdm, batasKirimSurat, children }: DashboardShellProps) {
   // Ditetapkan saat render, sebelum halaman di dalamnya menghitung jendela proses KGB di peramban.
   // Idempoten: nilai yang sama untuk setiap render, jadi aman walau render diulang.
   aturBatasInputSdm(batasInputSdm);
+  aturBatasKirimSurat(batasKirimSurat);
   const IDLE_LIMIT = Math.max(5, sesiTimeoutMenit) * 60 * 1000;
   const WARN_AT    = Math.max(0, IDLE_LIMIT - WARN_LEAD);
 

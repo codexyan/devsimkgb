@@ -1,4 +1,4 @@
-import { KIRIM_SURAT_BATAS } from "@/lib/batasInputSdm";
+import { batasKirimSurat } from "@/lib/batasInputSdm";
 
 /* Replika layar SIM-KGB untuk panduan Admin UPT.
  *
@@ -149,7 +149,7 @@ export function LayarPengingat({ namaBulan, batas }: { namaBulan: string; batas:
       jalur="Dashboard"
       judul="Jendela yang muncul sendiri saat masa kirim dibuka"
       keterangan={[
-        `Batas mengirim surat dan sisa harinya. Masa kirim dibuka tanggal 1 sampai ${KIRIM_SURAT_BATAS} pada bulan kedua sebelum TMT.`,
+        `Batas mengirim surat dan sisa harinya. Masa kirim dibuka tanggal 1 sampai ${batasKirimSurat()} pada bulan kedua sebelum TMT.`,
         "Berapa pegawai yang jatuh tempo, dan berapa yang belum Anda ajukan ke Kanwil.",
         "Nama pegawai yang belum diajukan, supaya Anda tahu persis siapa yang tertinggal.",
         "Tombol ini membuka Usul KGB Kolektif dengan pegawai tersebut sudah tercentang.",
@@ -164,7 +164,7 @@ export function LayarPengingat({ namaBulan, batas }: { namaBulan: string; batas:
           <div className="lyr-batas">
             <span className="lyr-batas-tanggal" aria-hidden="true">
               <small>Tgl</small>
-              <strong>{KIRIM_SURAT_BATAS}</strong>
+              <strong>{batasKirimSurat()}</strong>
             </span>
             <span>
               <strong>Batas kirim surat {batas}</strong>

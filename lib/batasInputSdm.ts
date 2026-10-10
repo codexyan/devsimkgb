@@ -17,17 +17,19 @@ export const BATAS_INPUT_SDM_MIN = 1;
 export const BATAS_INPUT_SDM_MAKS = 31;
 
 /**
- * Batas tanggal pengiriman surat usulan UPT, pada bulan kedua sebelum TMT. Surat dikirim di awal bulan
- * yang sama dengan dibukanya input di SIM-KGB, sehingga Tim SDM masih punya sisa bulan itu untuk input,
- * membuat SK, menandatangani lewat Srikandi, dan mengirimkannya sebelum rekon gaji bulan berikutnya.
+ * Batas tanggal pengiriman surat usulan UPT, pada bulan kedua sebelum TMT (ADR-094). Surat dikirim pada bulan yang sama
+ * dengan dibukanya input di SIM-KGB, sehingga Tim SDM masih punya sisa bulan itu untuk input. Dulu tetap tanggal 10; sejak
+ * 10 Oktober 2026 diatur di Pengaturan dengan bawaan 20, sebab di UPT orang yang sama membuat surat dan mengerjakan rekon
+ * gaji. Tidak pernah melewati batas input: surat yang tiba sesudah input ditutup tidak sempat diinput.
  */
-export const KIRIM_SURAT_BATAS = 10;
+export const BATAS_KIRIM_SURAT_BAWAAN = 20;
 
 /** Tanggal mulai dan batas rekonsiliasi gaji oleh keuangan, pada bulan sebelum TMT. */
 export const REKON_GAJI_MULAI = 1;
 export const REKON_GAJI_BATAS = 15;
 
 let berlaku = BATAS_INPUT_SDM_BAWAAN;
+let kirimBerlaku = BATAS_KIRIM_SURAT_BAWAAN;
 
 /** Nilai tersimpan yang sah (bilangan bulat 1 sampai 31); selain itu, termasuk kosong, memakai bawaan. */
 export function normalisasiBatasInputSdm(nilai: unknown): number {
@@ -45,4 +47,28 @@ export function batasInputSdm(): number {
 export function aturBatasInputSdm(nilai: unknown): number {
   berlaku = normalisasiBatasInputSdm(nilai);
   return berlaku;
+}
+
+/** Nilai tersimpan batas kirim surat yang sah (1 sampai 31); selain itu, termasuk kosong, memakai bawaan 20. */
+export function normalisasiBatasKirimSurat(nilai: unknown): number {
+  if (nilai === null || nilai === undefined || nilai === "") return BATAS_KIRIM_SURAT_BAWAAN;
+  const n = Math.round(Number(nilai));
+  return Number.isFinite(n) && n >= BATAS_INPUT_SDM_MIN && n <= BATAS_INPUT_SDM_MAKS ? n : BATAS_KIRIM_SURAT_BAWAAN;
+}
+
+/** Tanggal batas kirim surat usulan UPT yang sedang berlaku; tidak pernah melewati batas input Tim SDM. */
+export function batasKirimSurat(): number {
+  return Math.min(kirimBerlaku, berlaku);
+}
+
+/** Menetapkan batas kirim surat yang berlaku dari nilai Pengaturan; mengembalikan nilai setelah dinormalkan. */
+export function aturBatasKirimSurat(nilai: unknown): number {
+  kirimBerlaku = normalisasiBatasKirimSurat(nilai);
+  return kirimBerlaku;
+}
+
+/** Tanggal batas kirim surat pada satu bulan, dijepit ke hari terakhir bulan itu. */
+export function tanggalBatasKirim(tahun: number, bulanIndeks: number): Date {
+  const hariTerakhir = new Date(tahun, bulanIndeks + 1, 0).getDate();
+  return new Date(tahun, bulanIndeks, Math.min(batasKirimSurat(), hariTerakhir));
 }
