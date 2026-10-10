@@ -56,6 +56,17 @@ Pilihan pengguna: salin semua ke arsip dulu, dan biarkan data R2 untuk dihapus n
   UPT, dan cek KGB tidak terpengaruh.
 - Tidak ada migrasi basis data; modul ini tidak punya tabel.
 
+## Pemeriksaan tahap 1 di produksi
+
+Tahap 1 dirilis 10 Oktober 2026 (versi 85da2d2c). Tombol Salin semua dijalankan pukul 22.35 WITA. Log Aktivitas
+mencatat 40 berkas disalin untuk 20 pegawai, 44 sudah ada, dan 0 tidak terbaca.
+
+Pemeriksaan hanya-baca lewat API R2 sesudahnya:
+- 84 berkas kiriman dari 42 pegawai, semuanya dirujuk `data.json`, dan tidak ada berkas yatim;
+- 84 berkas memiliki penanda asal di arsip pegawai (42 pegawai), dan 0 belum tersalin;
+- salinan sama byte demi byte dengan aslinya: ETag dan ukuran cocok untuk 84 berkas, dan tidak ada objek salinan yang
+  hilang.
+
 ## Uji tahap 2
 
 - tsc bersih. Galat eslint hanya di 14 berkas lama yang tidak disentuh.
