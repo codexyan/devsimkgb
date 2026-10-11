@@ -106,5 +106,5 @@ export function alasanTolakTanpaReview(info: Pick<InfoReviewSk, "status" | "cata
     return `UPT meminta perbaikan SK ${namaPegawai}${info.catatan ? `: ${info.catatan}` : ""}. Perbaiki SK lalu tunggu persetujuan UPT sebelum mencetak dan mengunggah TTE.`;
   if (info && info.status === null)
     return `SK ${namaPegawai} dibuat sebelum review UPT aktif dan belum pernah diperiksa Admin UPT. Tekan Minta review UPT, lalu tunggu persetujuannya; Super Admin dapat melewati review dengan alasan.`;
-  return `SK ${namaPegawai} masih menunggu review Admin UPT. Cetak dan Unggah SK bertanda tangan baru dapat dilakukan setelah UPT menyatakan SK sudah benar, atau setelah Super Admin melewati review dengan alasan.`;
+  return `SK ${namaPegawai} masih menunggu review Admin UPT. Cetak dan Unggah SK TTE Srikandi baru dapat dilakukan setelah UPT menyatakan SK sudah benar, atau setelah Super Admin melewati review dengan alasan.`;
 }

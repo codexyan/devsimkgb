@@ -1,7 +1,7 @@
 # ADR-095: Cetak SK mengunduh versi TTE sebagai tombol utama; tanda tangan basah di menu; unduhan massal ZIP
 
 Tanggal: 10 Oktober 2026
-Status: berlaku. Mengubah perilaku Cetak SK ADR-077 dan ADR-089.
+Status: berlaku. Mengubah perilaku Cetak SK ADR-077 dan ADR-089. Nama tombol unggah di butir 4 diubah ADR-105 menjadi "Unggah SK TTE Srikandi".
 
 ## Konteks
 

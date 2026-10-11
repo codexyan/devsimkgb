@@ -266,7 +266,7 @@ export function notifikasiHasilReviewSk(
   return hasil.keputusan === "setuju"
     ? {
         judul: `SK Disetujui UPT: ${nama}`,
-        pesan: `${hasil.satker} menyatakan ${sk} sudah benar. Unduh untuk TTE, tanda tangani dan kirim lewat Srikandi, lalu Unggah SK bertanda tangan.`,
+        pesan: `${hasil.satker} menyatakan ${sk} sudah benar. Unduh untuk TTE, tanda tangani dan kirim lewat Srikandi, lalu Unggah SK TTE Srikandi.`,
         tipe: T.REVIEW_SK_HASIL,
         referenceId: kgbId,
         prioritas: "info",
