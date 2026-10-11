@@ -4,6 +4,7 @@ import { pesanUsulanMenahan, usulanMenahan } from "@/lib/usulanMenahan";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
+import { AKSI_UNGGAH_SK, AKSI_UNGGAH_SK_ARSIP } from "@/lib/aksiAudit";
 import { canProcessKGB } from "@/lib/auth";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import {
@@ -181,7 +182,7 @@ export async function POST(
         : "file SK arsip";
   logAudit({
     userId: userLogin.id,
-    aksi: "upload_sk",
+    aksi: izin.jenis === "arsip" ? AKSI_UNGGAH_SK_ARSIP : AKSI_UNGGAH_SK,
     detail:
       `Upload SK TTD untuk ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}), ${keterangan}; ` +
       `${statusTtd === "tte" ? "TTE utuh" : statusTtd === "basah" ? "tanda tangan basah (tanpa TTE)" : "TTE tidak dapat diperiksa"}, ` +

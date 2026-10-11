@@ -30,8 +30,18 @@ sama: unduh versi Srikandi, tanda tangani dengan TTE di Srikandi, lalu unggah ha
    - Label ini dipakai di detail Proses KGB (bila `isArsip`) dan di riwayat pegawai.
    - Pesan sesudah Arsip KGB disimpan tanpa berkas, catatan detail KGB arsip, dan Panduan Arsip KGB ikut menyebutnya.
    - Jendela unggahnya tetap sama.
+5. **Log Aktivitas memisahkan unggahan berkas SK arsip dengan label "Unggah berkas SK"** (ditetapkan pengguna sesudah
+   butir 4).
+   - `POST /api/kgb/[id]/upload-sk` mencatat unggahan untuk KGB arsip sebagai aksi `upload_sk_arsip`; unggahan lain tetap
+     `upload_sk`. Ini sejalan dengan Arsip KGB yang sudah punya aksi sendiri (`input_kgb_arsip`).
+   - Entri lama tetap tersimpan sebagai `upload_sk`, tetapi detailnya memuat "file SK arsip". `aksiAudit`
+     (`lib/aksiAudit.ts`, diuji) membaca entri itu sebagai `upload_sk_arsip`, dan `GET /api/audit-log` memakainya untuk
+     saringan jenis aksi, ringkasan per jenis, dan data yang dikirim. Jadi entri lama dan baru tampil dengan label yang
+     sama tanpa mengubah satu baris pun di jejak audit.
 
 ## Akibat
 
-- Hanya teks antarmuka yang berubah. Tidak ada perubahan data, rute API, izin, atau migrasi.
-- Riwayat log aktivitas lama ikut tampil dengan label baru, karena labelnya dibaca dari jenis aksi `upload_sk`.
+- Butir 1 sampai 4 hanya mengubah teks antarmuka. Butir 5 menambah satu nilai aksi audit untuk entri baru; tidak ada
+  perubahan data lama, izin, atau migrasi.
+- Entri log aktivitas lama ikut tampil dengan label baru: unggahan biasa sebagai "Unggah SK TTE Srikandi", unggahan arsip
+  sebagai "Unggah berkas SK" (butir 5).
