@@ -613,7 +613,7 @@ export default function KGBPage() {
             )}
             {bolehProses && bisaUnggah && kgb && (
               <button type="button" className="kgbm-tombol kgbm-hijau" onClick={() => bukaAksi({ jenis: "unggah_sk", kgb })}>
-                Unggah SK TTE Srikandi
+                {k.isArsip ? "Unggah berkas SK" : "Unggah SK TTE Srikandi"}
               </button>
             )}
             {bolehProses && bisaBuatSk && kgb && (
@@ -714,7 +714,7 @@ export default function KGBPage() {
             {k.isArsip
               ? pathFile
                 ? "KGB selesai dan dicatat melalui Arsip KGB."
-                : "KGB selesai dan dicatat melalui Arsip KGB, tetapi berkas SK belum diunggah. Pilih Unggah SK TTE Srikandi untuk mengunggahnya."
+                : "KGB selesai dan dicatat melalui Arsip KGB, tetapi berkas SK belum diunggah. Pilih Unggah berkas SK untuk mengunggahnya."
               : "KGB selesai dan sudah dikonfirmasi bagian keuangan."}
           </Catatan>
         )}

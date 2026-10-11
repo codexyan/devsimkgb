@@ -1882,7 +1882,7 @@ export default async function IsiPanduan({
                     SK, Tanggal SK, TMT SK, dan Oleh bila diketahui, pilih Berkas SK (PDF) asli paling besar 5 MB,
                     lalu pilih Simpan Arsip. KGB langsung berstatus <Status status="selesai" /> tanpa konfirmasi keuangan, data gaji pegawai
                     diperbarui, dan jadwal KGB berikutnya dibuat. Arsip KGB mengikuti jendela proses yang sama dengan
-                    Input KGB. Bila berkas SK gagal terunggah, unggah dari Detail KGB dengan Unggah SK TTE Srikandi.
+                    Input KGB. Bila berkas SK gagal terunggah, unggah dari Detail KGB dengan Unggah berkas SK.
                   </li>
                   <li>
                     <strong>Angka pada SK dicocokkan lebih dulu.</strong> Jendela Arsip KGB meminta{" "}
