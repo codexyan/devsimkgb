@@ -1,13 +1,19 @@
 # ADR-102: Adaptor Supabase dan alat Pindah D1 dilepas; merge hanya sesudah gerbang data terpenuhi
 
 Tanggal: 11 Oktober 2026
-Status: diusulkan. Berlaku setelah PR dilebur, dan tidak sebelum 22 Oktober 2026. Menjalankan rencana pelepasan di ADR-085.
+Status: diusulkan. Berlaku setelah PR dilebur, dan tidak sebelum 17 Oktober 2026 (Sabtu). Menjalankan rencana pelepasan di ADR-085,
+dengan masa tunggu dipersingkat dari dua minggu menjadi sembilan hari atas pilihan pengguna.
 
 ## Konteks
 
 ADR-085 memindahkan basis data produksi dari Supabase ke Cloudflare D1 pada 8 Oktober 2026 pukul 20.25 WITA, dan
 menyimpan Supabase tanpa diubah selama dua minggu, lalu melepasnya "dalam ADR tersendiri (beserta adaptor Supabase dan
 uji kesejalanan migrasinya)". Ini ADR itu.
+
+Pengguna memajukan masa tunggu dua minggu itu (22 Oktober) menjadi **17 Oktober 2026**, sembilan hari sejak peralihan dan
+sesudah satu minggu kerja penuh (12 sampai 16 Oktober) di D1. Masa tunggu berguna untuk mengamati D1 di bawah beban nyata,
+termasuk jendela kirim UPT; ia bukan jaring pengaman data, karena Supabase sudah tertinggal sejak peralihan. Yang menjaga
+data adalah gerbang di bawah, dan seluruhnya tetap berlaku walau tanggalnya dimajukan.
 
 Menurut ADR-085, sejak peralihan Supabase tidak lagi menerima tulisan. Kembali ke Supabase berarti kehilangan data yang
 ditulis sesudahnya (misalnya SK yang diunggah 10 Oktober, ADR-096). Pengaman pemulihan yang nyata adalah Time Travel D1
@@ -68,7 +74,8 @@ sebelum gerbang data di bawah terpenuhi.
 Semua butir di bawah harus terpenuhi, dikerjakan pengelola (Super Admin) pada versi produksi **yang masih memuat alat
 Pindah D1**, lalu dicatat di PR sebelum dilebur.
 
-1. **Tanggal.** Tidak lebih awal dari 22 Oktober 2026.
+1. **Tanggal.** Tidak lebih awal dari 17 Oktober 2026, sesudah satu minggu kerja penuh di D1 (12 sampai 16 Oktober). Tanggal
+   ini mempersingkat dua minggu di ADR-085; butir 2 sampai 7 tidak ikut dipersingkat.
 2. **Tidak ada data Supabase yang belum ada di D1.** Menu Cadangkan data, panel Pemindahan basis data, tekan
    **Bandingkan**. Basis data aktif harus tertulis Cloudflare D1. Untuk setiap tabel, kolom **Belum di D1** harus `–`,
    atau setiap id-nya terbukti sengaja dihapus di D1 sesudah peralihan:
