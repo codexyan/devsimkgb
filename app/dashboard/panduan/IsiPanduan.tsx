@@ -1122,7 +1122,7 @@ export default async function IsiPanduan({
 
                 <h4 className="pub-h3">Memantau semuanya dari papan Alur KGB</h4>
                 <p>
-                  Dashboard Anda memuat satu papan berisi empat kolom. Tiap pegawai berada di kolom tahapnya, jadi
+                  Dashboard Anda memuat satu papan berisi lima kolom. Tiap pegawai berada di kolom tahapnya, jadi
                   cukup melihat papan ini untuk tahu apa yang masih menunggu Anda dan apa yang sedang di Kanwil.
                 </p>
                 <LayarPapan />
@@ -1145,8 +1145,8 @@ export default async function IsiPanduan({
                   disetujui, jendelanya menyebut apa saja yang berbeda. Tekan{" "}
                   <strong>Periksa SK</strong>: pratinjaunya bertanda air DRAF, dan isinya
                   sama dengan yang kelak dicetak. Periksa nama, NIP, pangkat dan golongan, gaji pokok, masa kerja, serta TMT.
-                  Bila semuanya benar, centang pernyataan lalu tekan <strong>SK sudah benar</strong>; Kanwil baru mencetaknya
-                  untuk ditandatangani basah, mengirimnya lewat Srikandi, dan mengunggah TTE-nya. Bila ada yang keliru, tekan{" "}
+                  Bila semuanya benar, centang pernyataan lalu tekan <strong>SK sudah benar</strong>; Kanwil baru mengunduhnya
+                  untuk ditandatangani dengan TTE, mengirimnya lewat Srikandi, dan mengunggah SK TTE-nya. Bila ada yang keliru, tekan{" "}
                   <strong>Minta perbaikan</strong> dan tulis apa yang harus dibetulkan; setelah Kanwil memperbaikinya,
                   permintaan review muncul lagi.
                 </p>

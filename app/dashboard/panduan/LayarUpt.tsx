@@ -222,7 +222,7 @@ export function LayarPapan() {
       keterangan={[
         "Perlu dikerjakan: draf yang belum Anda ajukan, dan usulan yang dikembalikan Kanwil beserta catatannya.",
         "Di Kanwil: sudah Anda ajukan. Datanya terkunci di sini, sebab peninjau harus melihat persis apa yang dikirim.",
-        "Periksa SK: SK KGB yang dibuat Kanwil dan berbeda dari usulan Anda; SK yang sama dengan usulan langsung dicetak Kanwil.",
+        "Periksa SK: setiap SK KGB yang dibuat Kanwil untuk pegawai Anda. Kanwil baru dapat mengunduhnya untuk TTE setelah Anda menyatakan SK sudah benar.",
         "SK terbit: SK sudah ditandatangani. Unduh SK-nya, rekam di Gaji Web satker, lalu tandai di sini.",
         "Selesai: KGB yang SK-nya sudah Anda rekam di Gaji Web. Hanya itu; usulan yang disetujui tidak masuk ke sini.",
       ]}
