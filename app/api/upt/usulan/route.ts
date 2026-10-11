@@ -7,7 +7,7 @@ import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
 import { pegawaiSatker } from "@/lib/aksesUpt";
-import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgbUsulan, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, hitungUsulan, kekuranganUsulan, pernahKgbUsulan, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan } from "@/lib/bawaanUsulan";
 import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, bacaKeadaanKgb, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
 import { tulisDenganAcuan } from "@/lib/acuanUsulanServer";
@@ -18,6 +18,20 @@ import { SATKER } from "@/lib/satker";
 import { bentrokNipUsulan } from "@/lib/nipUsulan";
 import type { PegawaiRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
 import { jadikanPerbaikan, nipBaruTercatat, pesanSatkerLainUpt } from "@/lib/usulanBaruTercatat";
+import { usulanBaruMenurutSk } from "@/lib/dasarSkUsulan";
+import { kunciBulanTmt } from "@/lib/rekapKgb";
+
+/**
+ * Bulan TMT KGB berikutnya menurut isian draf pegawai baru (ADR-104): hasil hitungan yang tersimpan bersama draf, atau
+ * dihitung ulang dari golongan, masa kerja, dan TMT KGB terakhir untuk draf lama yang belum menyimpannya.
+ */
+function bulanTmtDrafBaru(usulan: UsulanPegawaiRow): string | null {
+  const u = usulanBaruMenurutSk(usulan);
+  const tmt =
+    u.tmtKgbBerikutnya ??
+    hitungUsulan({ golonganRuang: u.golonganRuang, mkgTahun: u.mkgTahun, mkgBulan: u.mkgBulan, tmtKgbTerakhir: u.tmtKgbTerakhir }).tmtKgbBerikutnya;
+  return kunciBulanTmt(tmt);
+}
 
 export const runtime = "nodejs";
 
@@ -105,6 +119,9 @@ export async function GET(req: Request) {
         // Isi dikirim utuh agar formulirnya dapat dilanjutkan, baik draf maupun usulan yang
         // dikembalikan Kanwil; usulan yang sedang ditinjau atau sudah selesai tidak perlu.
         nilai: DIPEGANG_UPT.includes(u.status) ? nilaiFormulir(u) : null,
+        // Bulan TMT KGB berikutnya menurut isian draf pegawai baru, dengan hitungan yang sama dengan saat disetujui
+        // (SK sesudah SK KGB terakhir ikut dihitung); dasar penguncian draf itu di dasbor (ADR-104).
+        bulanTmtKgb: usulan.jenis === "baru" && DIPEGANG_UPT.includes(usulan.status) ? bulanTmtDrafBaru(usulan) : null,
         surat: DIPEGANG_UPT.includes(u.status)
           ? {
               nomorSurat: u.nomorSurat ?? "",

@@ -149,6 +149,8 @@ interface UsulanTerkirim extends DrafUsulanUpt {
    * data pegawai itu; di satker lain tidak dapat diajukan.
    */
   nipTercatat?: { nama?: string; satkerSama: boolean } | null;
+  /** Bulan TMT KGB berikutnya menurut isian draf pegawai baru; dasar penguncian draf itu di papan (ADR-104). */
+  bulanTmtKgb?: string | null;
   diajukanAt: string | null;
   ditinjauAt: string | null;
   ditinjauOleh: string | null;
@@ -728,7 +730,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
       daftarTugasUpt(
         usulan.map((u) => ({
           id: u.id, pegawaiId: u.pegawaiId, status: u.status, jenis: u.jenis,
-          nama: u.nama, nip: u.nip, kekurangan: u.kekurangan, alasanTolak: u.alasanTolak,
+          nama: u.nama, nip: u.nip, kekurangan: u.kekurangan, alasanTolak: u.alasanTolak, bulanTmt: u.bulanTmtKgb ?? null,
         })),
         pegawai.map((p) => ({
           id: p.id, nama: p.nama, nip: p.nip, tmtKgb: p.tmtKgb, bulanTmt: p.bulanTmt,
@@ -1214,8 +1216,13 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         waktu: u?.diajukanAt ?? null,
         // Draf lengkap yang dapat dicentang; dipakai "Centang semua yang siap" di Perlu dikerjakan (ADR-060).
         pilihSiap: u && !kunci && t.jenis === "ajukan" ? u.id : null,
-        kelompok: kelompokKerja({ bulanTmt: p?.bulanTmt, dikembalikan: t.jenis === "perbaiki", bulanUsulan }),
-        ringkas: kunci ? `draf data terkunci sampai ${namaBulan(kunci.bulanKirim)}` : cfg.judul.toLowerCase(),
+        // Draf pegawai baru belum punya data pegawai; bulan TMT-nya dari isian draf (ADR-104).
+        kelompok: kelompokKerja({ bulanTmt: p?.bulanTmt ?? u?.bulanTmtKgb, dikembalikan: t.jenis === "perbaiki", bulanUsulan }),
+        ringkas: kunci
+          ? kunci.bulanKirim
+            ? `draf data terkunci sampai ${namaBulan(kunci.bulanKirim)}`
+            : "draf pegawai baru, TMT KGB belum terisi"
+          : cfg.judul.toLowerCase(),
         render: (lain: string[]) => (
           <KartuUpt
             lain={lain}
@@ -1226,10 +1233,10 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             // Dulu baris ini hanya "TMT Jan 2028", sehingga draf yang siap diajukan terbaca sebagai KGB yang
             // seharusnya masih terkunci (ADR-057).
             sub={u ? `${t.nip} · ${labelJenis(u)}` : t.nip}
-            tmt={t.tmt ? tmtSingkat(t.tmt) : null}
+            tmt={t.tmt ? tmtSingkat(t.tmt) : u?.bulanTmtKgb ? `TMT ${namaBulan(u.bulanTmtKgb)}` : null}
             nada={kunci ? undefined : RUPA_TUGAS[t.jenis]?.nada}
             label={kunci ? undefined : (RUPA_TUGAS[t.jenis]?.label ?? { teks: cfg.judul })}
-            tanda={kunci ? { teks: `Terkunci sampai ${namaBulan(kunci.bulanKirim)}` } : undefined}
+            tanda={kunci ? { teks: kunci.bulanKirim ? `Terkunci sampai ${namaBulan(kunci.bulanKirim)}` : "TMT KGB belum terisi" } : undefined}
             // Penugasan BKO disebut di sini supaya tidak terkira orangnya sudah pindah dan usulannya
             // bukan urusan satker ini lagi; unit kerjanya memang tetap di satker ini.
             catatan={
@@ -1239,7 +1246,13 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 u?.nipTercatat?.satkerSama ? `NIP sudah tercatat atas nama ${u.nipTercatat.nama ?? t.nama}; diajukan sebagai perbaikan data` : "",
                 // Masa usul KGB-nya belum dibuka: kapan terbuka, dan jalan lain bila perbaikannya mendesak.
                 kunci
-                  ? `Masa usul KGB ${namaBulan(kunci.bulanTmt)} dibuka ${namaBulan(kunci.bulanKirim)}, 2 bulan sebelum TMT. Bila mendesak, ajukan lewat Usul KGB Kolektif`
+                  ? kunci.bulanKirim
+                    ? `Masa usul KGB ${namaBulan(kunci.bulanTmt)} dibuka ${namaBulan(kunci.bulanKirim)}, 2 bulan sebelum TMT. ${
+                        t.usulanId && u?.jenis === "baru"
+                          ? "Pendataan pegawai baru tetap dapat diajukan lebih awal lewat Usul KGB Kolektif"
+                          : "Bila mendesak, ajukan lewat Usul KGB Kolektif"
+                      }`
+                    : "TMT KGB terakhir atau golongannya belum diisi, jadi jadwal usul KGB-nya belum diketahui. Lengkapi drafnya; pendataan pegawai baru tetap dapat diajukan kapan saja lewat Usul KGB Kolektif"
                   : "",
                 p?.satkerTugas ? `Sedang BKO di ${namaUnitKerja(p.satkerTugas)}; KGB tetap diusulkan satker ini` : "",
               ]
@@ -2167,8 +2180,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                       : isi.map((g) => (
                           <React.Fragment key={g.kunci}>{g.utama.render(g.lain.map((l) => l.ringkas))}</React.Fragment>
                         ))}
-                    {/* Draf data yang masa usul KGB-nya belum dibuka (ADR-059): terlipat, tanpa centang, dan
-                        terbuka sendiri pada bulan kirimnya, 2 bulan sebelum TMT. */}
+                    {/* Draf data yang masa usul KGB-nya belum dibuka (ADR-059), termasuk draf pegawai baru (ADR-104):
+                        terlipat, tanpa centang, dan terbuka sendiri pada bulan kirimnya, 2 bulan sebelum TMT. */}
                     {k === "kerja" && kunciTampil.length > 0 && (
                       <details className="upt-terkunci" open={qPapan ? true : undefined}>
                         <summary>
@@ -2176,8 +2189,9 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                           <span className="dsb-papan-jumlah">{kunciTampil.length}</span>
                         </summary>
                         <p className="upt-terkunci-ket">
-                          Draf data pegawai yang KGB-nya belum masuk masa usul. Terbuka sendiri pada bulan kirimnya, 2 bulan
-                          sebelum TMT. Yang mendesak tetap dapat diajukan lewat Usul KGB Kolektif.
+                          Draf data pegawai, termasuk pegawai baru, yang KGB-nya belum masuk masa usul. Terbuka sendiri pada
+                          bulan kirimnya, 2 bulan sebelum TMT. Yang mendesak, dan pendataan pegawai baru, tetap dapat diajukan
+                          lewat Usul KGB Kolektif.
                         </p>
                         <div className="upt-terkunci-isi">
                           {kunciTampil.map((g) => (

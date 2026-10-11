@@ -740,8 +740,9 @@ export default function UnggahDaftar() {
             )}
 
             <p className="kgbm-bantuan">
-              Drafnya terlihat di tiga tempat: tabel <strong>Pegawai Satker</strong> (baris bertanda, sampai Kanwil menyetujui),{" "}
-              <strong>Perlu dikerjakan</strong> pada Dashboard, dan <strong>Usul KGB Kolektif</strong>. Langkah berikutnya: di Usul KGB
+              Drafnya terlihat di tabel <strong>Pegawai Satker</strong> (baris bertanda, sampai Kanwil menyetujui) dan di{" "}
+              <strong>Usul KGB Kolektif</strong>. Di Dashboard, draf baru tampil di <strong>Perlu dikerjakan</strong> saat
+              jendela kirim KGB-nya dibuka; sebelum itu terlipat di bagian Terkunci. Langkah berikutnya: di Usul KGB
               Kolektif, saringan Pegawai baru, pilih pegawai yang akan dikirim (bisa
               bertahap), lengkapi data dan berkasnya, lalu ajukan bersama satu surat usulan Srikandi. Pegawai baru tidak
               ikut usulan KGB periode berjalan kecuali dipilih.

@@ -39,7 +39,7 @@ export interface UsulanTugas {
   id: string;
   pegawaiId: string | null;
   status: string;
-  /** "perubahan" atau "baru"; draf pegawai baru tidak pernah dikunci (lihat drafTerkunci). */
+  /** "perubahan" atau "baru"; draf pegawai baru dikunci menurut TMT KGB dari isiannya sendiri (lihat drafTerkunci). */
   jenis?: string;
   nama: string;
   nip: string;
@@ -47,6 +47,11 @@ export interface UsulanTugas {
   kekurangan: string[];
   /** Catatan peninjau pada usulan yang dikembalikan. */
   alasanTolak?: string | null;
+  /**
+   * Bulan TMT KGB berikutnya menurut isian draf, "yyyy-mm"; dipakai draf pegawai baru, yang belum punya data pegawai
+   * (ADR-104). Kosong bila TMT KGB terakhir atau golongannya belum diisi.
+   */
+  bulanTmt?: string | null;
 }
 
 export interface PegawaiTugas {
@@ -81,10 +86,11 @@ export interface TugasUpt {
 }
 
 /** Bulan TMT KGB pegawai dan bulan dibukanya draf itu di dasbor, keduanya "yyyy-mm". */
-export interface DrafTerkunci {
-  bulanTmt: string;
-  bulanKirim: string;
-}
+/**
+ * Bulan TMT KGB pegawai dan bulan dibukanya draf itu di dasbor, keduanya "yyyy-mm". Keduanya null untuk draf pegawai
+ * baru yang TMT KGB-nya belum dapat dihitung dari isiannya (ADR-104).
+ */
+export type DrafTerkunci = { bulanTmt: string; bulanKirim: string } | { bulanTmt: null; bulanKirim: null };
 
 /** Kunci bulan "yyyy-mm" digeser n bulan. */
 function geserBulanKunci(bulan: string, n: number): string {
@@ -98,16 +104,21 @@ function geserBulanKunci(bulan: string, n: number): string {
  * dikirim tanggal 1 sampai batas kirim (Pengaturan) bulan kedua sebelum TMT; `bulanUsulan` adalah bulan TMT yang suratnya dikirim bulan
  * ini, jadi draf terbuka sejak bulanTmt <= bulanUsulan, dan yang sudah lewat pun tetap terbuka.
  *
- * Tidak dikunci: draf pegawai baru (datanya belum ada di Kanwil sama sekali, sehingga pendataan tidak boleh menunggu
- * jadwal KGB) dan usulan yang dikembalikan Kanwil (sudah pernah dikirim dan sedang ditunggu perbaikannya). Kuncinya
- * hanya di dasbor: Usul KGB Kolektif dan Pegawai Satker tetap dapat mengajukannya bila mendesak.
+ * Draf pegawai baru ikut dikunci menurut TMT KGB berikutnya dari isiannya sendiri (ADR-104, mengubah pengecualian di
+ * ADR-059): Perlu dikerjakan hanya memuat TMT yang jendela kirimnya sudah dibuka. Draf pegawai baru yang TMT KGB-nya
+ * belum dapat dihitung juga terlipat, dengan keterangan bahwa TMT-nya belum terisi.
+ *
+ * Tidak dikunci: usulan yang dikembalikan Kanwil (sudah pernah dikirim dan sedang ditunggu perbaikannya), dan draf
+ * perbaikan data pegawai yang TMT-nya tidak tercatat. Kuncinya hanya di dasbor: Usul KGB Kolektif dan Pegawai Satker
+ * tetap dapat mengajukannya kapan saja, termasuk pendataan pegawai baru.
  */
 export function drafTerkunci(
   usulan: { status: string; jenis?: string },
   bulanTmt: string | null | undefined,
   bulanUsulan: string | null,
 ): DrafTerkunci | null {
-  if (usulan.status !== "draf" || usulan.jenis === "baru" || !bulanTmt || !bulanUsulan) return null;
+  if (usulan.status !== "draf" || !bulanUsulan) return null;
+  if (!bulanTmt) return usulan.jenis === "baru" ? { bulanTmt: null, bulanKirim: null } : null;
   if (bulanTmt <= bulanUsulan) return null;
   return { bulanTmt, bulanKirim: geserBulanKunci(bulanTmt, -2) };
 }
@@ -146,7 +157,7 @@ export function daftarTugasUpt(
       continue;
     }
     if (u.status !== "draf") continue;
-    const terkunci = drafTerkunci(u, u.pegawaiId ? bulanPegawai.get(u.pegawaiId) : null, bulanUsulan);
+    const terkunci = drafTerkunci(u, u.pegawaiId ? bulanPegawai.get(u.pegawaiId) : u.bulanTmt, bulanUsulan);
     tugas.push(
       u.kekurangan.length > 0
         ? {
