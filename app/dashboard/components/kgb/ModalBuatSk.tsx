@@ -386,7 +386,7 @@ export default function ModalBuatSk({
         return;
       }
       unduhBlob(srikandiLama.data, namaBerkasSk({ nomorSurat: isi.nomorSurat, nama: pegawai.nama, versi: "tte" }));
-      onBerhasil(`SK KGB ${pegawai.nama} dibuat; versi Srikandi untuk TTE diunduh. Setelah SK ditandatangani, pilih Unggah SK bertanda tangan.`);
+      onBerhasil(`SK KGB ${pegawai.nama} dibuat; versi Srikandi untuk TTE diunduh. Setelah SK ditandatangani, pilih Unggah SK TTE Srikandi.`);
       return;
     }
     // Hanya SK biasa yang mencatat surat; versi Srikandi diminta sebagai pratinjau agar tidak tercatat dua kali.
@@ -410,7 +410,7 @@ export default function ModalBuatSk({
     unduhBlob(srikandi.data, namaBerkasSk({ nomorSurat: isi.nomorSurat, nama: pegawai.nama, versi: "tte" }));
     onBerhasil(
       `SK KGB ${pegawai.nama} dibuat; versi Srikandi untuk TTE diunduh. Untuk tanda tangan basah, pilih panah di sebelah ` +
-        "Unduh untuk TTE. Setelah SK ditandatangani, pilih Unggah SK bertanda tangan.",
+        "Unduh untuk TTE. Setelah SK ditandatangani, pilih Unggah SK TTE Srikandi.",
     );
   }
 

@@ -237,7 +237,7 @@ export default async function IsiPanduan({
                     <h3 className="pub-step-title">Unggah SK ke SIM-KGB</h3>
                     <p className="pub-step-who">Tim SDM KGB</p>
                     <p>
-                      Berkas PDF SK yang sudah ditandatangani diunggah dengan tombol Unggah SK bertanda tangan. SK pegawai UPT
+                      Berkas PDF SK yang sudah ditandatangani diunggah dengan tombol Unggah SK TTE Srikandi. SK pegawai UPT
                       langsung dapat diunduh UPT-nya.
                     </p>
                     <p className="pg-hasil">
@@ -1114,7 +1114,7 @@ export default async function IsiPanduan({
                   <em>sudah disetujui</em>, misalnya bila belakangan ketahuan datanya keliru. Data pegawai tidak berubah:
                   yang tampil di Perlu dikerjakan adalah usulan perbaikan baru yang sudah terisi sesuai data pegawai saat
                   ini beserta catatan Kanwil; perbaiki yang keliru lalu ajukan ulang seperti biasa. Selama usulan menunggu tinjauan, proses KGB
-                  pegawainya (Input KGB, Buat SK, Unggah SK bertanda tangan) tertahan agar SK dibuat dari data yang sudah
+                  pegawainya (Input KGB, Buat SK, Unggah SK TTE Srikandi) tertahan agar SK dibuat dari data yang sudah
                   diperbarui. Hasil tinjauan tercatat di <strong>Riwayat → Usulan dan laporan</strong>. Satu pegawai
                   hanya boleh punya satu usulan yang belum selesai, agar antrian tinjauan tidak berisi dua versi yang
                   saling menimpa.
@@ -1772,11 +1772,11 @@ export default async function IsiPanduan({
                       <strong>Buat SK dan minta review UPT</strong>: SK tercatat, tetapi tidak diunduh, dan Admin UPT satker
                       itu menerima permintaan review di lonceng dan di kolom Periksa SK, termasuk SK yang sama dengan usulan
                       UPT yang disetujui. Selama belum disetujui, kartu
-                      pegawai bertanda <em>Menunggu review UPT</em>, setiap unduhan SK bertanda air DRAF, dan Unggah SK bertanda tangan
+                      pegawai bertanda <em>Menunggu review UPT</em>, setiap unduhan SK bertanda air DRAF, dan Unggah SK TTE Srikandi
                       ditolak. Bila UPT meminta perbaikan, kartu bertanda merah beserta catatannya; pilih Perbaiki SK, dan
                       review diminta ulang otomatis. Setelah UPT menyatakan SK sudah benar, tekan <strong>Unduh untuk TTE</strong>{" "}
                       untuk mengunduh versi Srikandi tanpa tanda air (panah di sebelahnya untuk SK tanda tangan basah),
-                      kirim lewat Srikandi, lalu Unggah SK bertanda tangan. Bila banyak SK siap cetak, tombol{" "}
+                      kirim lewat Srikandi, lalu Unggah SK TTE Srikandi. Bila banyak SK siap cetak, tombol{" "}
                       <strong>ZIP N SK untuk TTE</strong> di kolom Sedang diproses mengunduh semuanya dalam satu ZIP;
                       panah di sebelahnya mengunduh ZIP untuk tanda tangan basah. Nama berkas SK berbentuk nomor urut surat,
                       TTE atau TTD, KGB, lalu nama pegawai, mis. <code>1758 TTE KGB Abdul Hayat.pdf</code>. Untuk keadaan mendesak, Super Admin dapat memilih{" "}
@@ -1788,7 +1788,7 @@ export default async function IsiPanduan({
                       Di papan antrian Dashboard, kolom <strong>Sedang diproses</strong> diurutkan menurut tindakan Kanwil.
                       Yang paling atas adalah SK yang diminta diperbaiki UPT (garis merah, label <em>Perbaiki SK</em>).
                       Sesudahnya SK yang <strong>siap cetak</strong> (garis hijau, tombol <strong>Unduh untuk TTE</strong> hijau
-                      di depan, lalu Unggah SK bertanda tangan), kemudian KGB yang perlu dibuat SK-nya. Paling bawah, dalam bingkai
+                      di depan, lalu Unggah SK TTE Srikandi), kemudian KGB yang perlu dibuat SK-nya. Paling bawah, dalam bingkai
                       putus-putus yang diredupkan, SK yang masih menunggu review UPT beserta lama menunggunya. Dalam
                       tiap kelompok, batas input terdekat di atas.
                     </p>
@@ -1816,8 +1816,8 @@ export default async function IsiPanduan({
                     <h3 className="pub-step-title">Unggah SK yang sudah ditandatangani</h3>
                     <p className="pub-step-who">Tim SDM, kartu atau baris berstatus Sedang Diproses</p>
                     <p>
-                      Tombol Unggah SK bertanda tangan muncul setelah SK dibuat dengan Buat SK. Unduh naskah yang sudah ditandatangani
-                      dari Srikandi, pilih Unggah SK bertanda tangan, pilih berkas PDF <strong>asli</strong> (paling besar 5 MB)
+                      Tombol Unggah SK TTE Srikandi muncul setelah SK dibuat dengan Buat SK. Unduh naskah yang sudah ditandatangani
+                      dari Srikandi, pilih Unggah SK TTE Srikandi, pilih berkas PDF <strong>asli</strong> (paling besar 5 MB)
                       pada jendela Unggah SK yang Sudah Ditandatangani, lalu pilih Unggah SK. Status berubah menjadi{" "}
                       <Status status="menunggu_keuangan" />. KGB pegawai Kanwil muncul di menu Keuangan; SK pegawai UPT
                       langsung dapat diunduh UPT-nya dan menunggu keuangan satker merekamnya di Gaji Web (ubin Di
@@ -1852,7 +1852,7 @@ export default async function IsiPanduan({
                       kembali ke <Status status="sedang_diproses" />, kartunya kembali ke kolom Sedang Diproses, dan
                       alasannya muncul di panel tindakan dasbor Tim SDM. Data pegawai belum berubah sama sekali, sebab
                       gaji pokok dan jadwal KGB berikutnya baru ditulis saat konfirmasi. Dari kolom itu, SK-nya dapat
-                      diganti dengan Unggah SK bertanda tangan, atau prosesnya dibatalkan sekalian bila yang keliru justru angkanya.
+                      diganti dengan Unggah SK TTE Srikandi, atau prosesnya dibatalkan sekalian bila yang keliru justru angkanya.
                     </p>
                     <p>
                       Bila selama KGB berjalan tercatat hukuman disiplin yang menunda KGB berikutnya, pembatalan ditolak.
@@ -1882,7 +1882,7 @@ export default async function IsiPanduan({
                     SK, Tanggal SK, TMT SK, dan Oleh bila diketahui, pilih Berkas SK (PDF) asli paling besar 5 MB,
                     lalu pilih Simpan Arsip. KGB langsung berstatus <Status status="selesai" /> tanpa konfirmasi keuangan, data gaji pegawai
                     diperbarui, dan jadwal KGB berikutnya dibuat. Arsip KGB mengikuti jendela proses yang sama dengan
-                    Input KGB. Bila berkas SK gagal terunggah, unggah dari Detail KGB dengan Unggah SK bertanda tangan.
+                    Input KGB. Bila berkas SK gagal terunggah, unggah dari Detail KGB dengan Unggah SK TTE Srikandi.
                   </li>
                   <li>
                     <strong>Angka pada SK dicocokkan lebih dulu.</strong> Jendela Arsip KGB meminta{" "}
@@ -2376,7 +2376,7 @@ export default async function IsiPanduan({
                         </th>
                         <td>
                           Keterangan di dashboard Kanwil, bukan status. UPT mengusulkan perbaikan data pegawai ini, dan
-                          Input KGB, Buat SK, serta Unggah SK bertanda tangan menunggu usulan itu ditinjau. Status KGB tidak berubah
+                          Input KGB, Buat SK, serta Unggah SK TTE Srikandi menunggu usulan itu ditinjau. Status KGB tidak berubah
                           sampai usulannya disetujui atau dikembalikan.
                         </td>
                       </tr>
@@ -2445,9 +2445,9 @@ export default async function IsiPanduan({
                     </p>
                   </details>
                   <details name="faq-panduan">
-                    <summary>Mengapa tombol Buat SK atau Unggah SK bertanda tangan tidak muncul?</summary>
+                    <summary>Mengapa tombol Buat SK atau Unggah SK TTE Srikandi tidak muncul?</summary>
                     <p>
-                      Buat SK baru tersedia setelah Input KGB disimpan dan status menjadi Sedang Diproses. Unggah SK bertanda tangan
+                      Buat SK baru tersedia setelah Input KGB disimpan dan status menjadi Sedang Diproses. Unggah SK TTE Srikandi
                       baru muncul setelah SK dibuat dengan Buat SK. KGB yang jendela prosesnya belum dibuka tidak tampil di
                       Dashboard dan bertuliskan Terkunci di menu Proses KGB, disertai tanggal jendela proses dibuka. Baris
                       bertanda Tertahan usulan UPT hanya menampilkan Tinjau usulan UPT sampai usulannya ditinjau.

@@ -417,8 +417,8 @@ export default function KGBPage() {
     }
     setPesanBerhasil(
       versi === "tte"
-        ? `SK ${k.pegawai.nama} versi Srikandi diunduh untuk TTE. Setelah ditandatangani, pilih Unggah SK bertanda tangan.`
-        : `SK ${k.pegawai.nama} diunduh untuk tanda tangan basah. Setelah ditandatangani dan dipindai, pilih Unggah SK bertanda tangan.`,
+        ? `SK ${k.pegawai.nama} versi Srikandi diunduh untuk TTE. Setelah ditandatangani, pilih Unggah SK TTE Srikandi.`
+        : `SK ${k.pegawai.nama} diunduh untuk tanda tangan basah. Setelah ditandatangani dan dipindai, unggah pindaiannya lewat Unggah SK TTE Srikandi dan centang pernyataan tanda tangan basah.`,
     );
   }
 
@@ -526,7 +526,7 @@ export default function KGBPage() {
           </button>
           {skTercatat(k) && skBolehDicetak(k.reviewSk) && (
             <button type="button" onClick={() => bukaAksi({ jenis: "unggah_sk", kgb })} className="dsb-tombol dsb-tombol-kecil" data-nada="hijau">
-              Unggah SK bertanda tangan
+              Unggah SK TTE Srikandi
             </button>
           )}
         </>
@@ -613,7 +613,7 @@ export default function KGBPage() {
             )}
             {bolehProses && bisaUnggah && kgb && (
               <button type="button" className="kgbm-tombol kgbm-hijau" onClick={() => bukaAksi({ jenis: "unggah_sk", kgb })}>
-                Unggah SK bertanda tangan
+                Unggah SK TTE Srikandi
               </button>
             )}
             {bolehProses && bisaBuatSk && kgb && (
@@ -688,18 +688,18 @@ export default function KGBPage() {
             {!skTercatat(k)
               ? k.reviewSk
                 ? "Langkah berikutnya: Buat SK. SK pegawai UPT dikirim ke Admin UPT untuk direview sebelum dicetak dan diunggah TTE."
-                : "Langkah berikutnya: Buat SK. Unggah SK bertanda tangan tersedia setelah SK dibuat."
+                : "Langkah berikutnya: Buat SK. Unggah SK TTE Srikandi tersedia setelah SK dibuat."
               : k.reviewSk?.status === "menunggu"
-                ? "SK sudah dibuat dan menunggu review Admin UPT. Cetak SK dan Unggah SK bertanda tangan tersedia setelah UPT menyetujui; unduhan sebelum itu bertanda air DRAF."
+                ? "SK sudah dibuat dan menunggu review Admin UPT. Cetak SK dan Unggah SK TTE Srikandi tersedia setelah UPT menyetujui; unduhan sebelum itu bertanda air DRAF."
                 : k.reviewSk?.status === "perbaikan"
                   ? `UPT meminta perbaikan SK${k.reviewSk.catatan ? `: ${k.reviewSk.catatan}` : ""}. Pilih Buat SK untuk memperbaikinya; review diminta ulang otomatis.`
                   : k.reviewSk?.status === "disetujui"
-                    ? "SK sudah disetujui Admin UPT. Pilih Unduh untuk TTE (panah di sebelahnya untuk tanda tangan basah), lalu Unggah SK bertanda tangan setelah ditandatangani."
+                    ? "SK sudah disetujui Admin UPT. Pilih Unduh untuk TTE (panah di sebelahnya untuk tanda tangan basah), lalu Unggah SK TTE Srikandi setelah ditandatangani."
                     : k.reviewSk && k.reviewSk.status === null
-                    ? "SK ini dibuat sebelum review UPT aktif dan belum pernah diperiksa Admin UPT. Pilih Minta review UPT; Cetak SK dan Unggah SK bertanda tangan tersedia setelah UPT menyetujui."
+                    ? "SK ini dibuat sebelum review UPT aktif dan belum pernah diperiksa Admin UPT. Pilih Minta review UPT; Cetak SK dan Unggah SK TTE Srikandi tersedia setelah UPT menyetujui."
                     : k.reviewSk?.status === "dilewati"
-                      ? `Review UPT dilewati Super Admin${k.reviewSk.alasanLewati ? ` (${k.reviewSk.alasanLewati})` : ""}. Unduh untuk TTE, lalu Unggah SK bertanda tangan setelah ditandatangani.`
-                      : "SK KGB sudah dibuat. Setelah SK ditandatangani, pilih Unggah SK bertanda tangan."}
+                      ? `Review UPT dilewati Super Admin${k.reviewSk.alasanLewati ? ` (${k.reviewSk.alasanLewati})` : ""}. Unduh untuk TTE, lalu Unggah SK TTE Srikandi setelah ditandatangani.`
+                      : "SK KGB sudah dibuat. Setelah SK ditandatangani, pilih Unggah SK TTE Srikandi."}
           </Catatan>
         )}
         <PesanGalat pesan={galatDetail} />
@@ -714,7 +714,7 @@ export default function KGBPage() {
             {k.isArsip
               ? pathFile
                 ? "KGB selesai dan dicatat melalui Arsip KGB."
-                : "KGB selesai dan dicatat melalui Arsip KGB, tetapi berkas SK belum diunggah. Pilih Unggah SK bertanda tangan untuk mengunggahnya."
+                : "KGB selesai dan dicatat melalui Arsip KGB, tetapi berkas SK belum diunggah. Pilih Unggah SK TTE Srikandi untuk mengunggahnya."
               : "KGB selesai dan sudah dikonfirmasi bagian keuangan."}
           </Catatan>
         )}

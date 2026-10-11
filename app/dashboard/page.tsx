@@ -709,8 +709,8 @@ function DashboardMain() {
     }
     setPesanBerhasil(
       versi === "tte"
-        ? `SK ${p.nama} versi Srikandi diunduh untuk TTE. Setelah ditandatangani, pilih Unggah SK bertanda tangan.`
-        : `SK ${p.nama} diunduh untuk tanda tangan basah. Setelah ditandatangani dan dipindai, pilih Unggah SK bertanda tangan.`,
+        ? `SK ${p.nama} versi Srikandi diunduh untuk TTE. Setelah ditandatangani, pilih Unggah SK TTE Srikandi.`
+        : `SK ${p.nama} diunduh untuk tanda tangan basah. Setelah ditandatangani dan dipindai, unggah pindaiannya lewat Unggah SK TTE Srikandi dan centang pernyataan tanda tangan basah.`,
     );
   }
 
@@ -771,7 +771,7 @@ function DashboardMain() {
       // Sesudah diunggah, SK pegawai UPT ditindaklanjuti keuangan UPT, bukan keuangan Kanwil (ADR-009).
       // SK pegawai UPT yang belum disetujui UPT tidak dapat diseret ke unggah TTE (ADR-077).
       if (!p.skSudahDibuat || skBolehDicetak(p.reviewSk))
-        pindah[dipegangKeuanganKanwil(p.unitKerja) ? "keuangan" : "rekam_upt"] = p.skSudahDibuat ? "Unggah SK bertanda tangan" : "Buat SK dulu";
+        pindah[dipegangKeuanganKanwil(p.unitKerja) ? "keuangan" : "rekam_upt"] = p.skSudahDibuat ? "Unggah SK TTE Srikandi" : "Buat SK dulu";
       pindah.input = "Batalkan proses";
     }
     const tanda: NonNullable<KartuPapan["tanda"]> = [];
@@ -949,7 +949,7 @@ function DashboardMain() {
                       mengunduh versi Srikandi untuk TTE; tanda tangan basah lewat panah di sebelahnya (ADR-095). */}
                   <TombolCetakSk nama={p.nama} urutan={-2} sibuk={sibukSk === kgbId} onCetak={(versi) => void cetakSkPegawai(p, versi)} />
                   <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" style={{ order: -1 }} onClick={() => setModal({ jenis: "unggah_sk", kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) })}>
-                    Unggah SK bertanda tangan
+                    Unggah SK TTE Srikandi
                   </button>
                 </>
               )}
