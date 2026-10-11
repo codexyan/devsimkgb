@@ -6,7 +6,6 @@ import { logAudit } from "@/lib/auditLog";
 import { BELUM_SELESAI, BERKAS_USULAN, DIPEGANG_UPT, pernahKgbUsulan } from "@/lib/usulanPegawai";
 import { bawaanPegawai, berkasPerluDisalin } from "@/lib/bawaanUsulan";
 import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, bacaKeadaanKgb, isiHitungan } from "@/lib/usulanFormulir";
-import { tulisDenganAcuan } from "@/lib/acuanUsulanServer";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, hapusBerkasUsulan, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { TIPE_NOTIFIKASI } from "@/lib/generateNotifikasi";
@@ -175,7 +174,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (form.has("nomorSurat")) perubahan.nomorSurat = teks("nomorSurat") || null;
   if (form.has("tanggalSurat")) perubahan.tanggalSurat = tanggalSurat;
 
-  await tulisDenganAcuan(perubahan, (isi) => db.usulanPegawai.update({ id }, isi));
+  await db.usulanPegawai.update({ id }, perubahan);
 
   logAudit({
     userId: akun.pengguna.id,

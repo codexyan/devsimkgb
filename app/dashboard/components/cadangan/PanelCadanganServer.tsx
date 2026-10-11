@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { formatTanggalId } from "@/lib/waktu";
 
 /* Cadangan otomatis seluruh basis data di server (ADR-084), khusus Super Admin. Berbeda dengan cadangan bulanan di
-   atasnya (CSV per akun), cadangan ini dibuat server sendiri dua kali sehari dan dapat dikembalikan ke Supabase. */
+   atasnya (CSV per akun), cadangan ini dibuat server sendiri dua kali sehari dan dapat dikembalikan ke D1. */
 
 interface CadanganTersimpan {
   kunci: string;
@@ -108,8 +108,8 @@ export default function PanelCadanganServer() {
               </>
             ) : (
               <>
-                <b>Jejak perubahan belum aktif.</b> Jalankan migrasi <code>20261008120000_jejak_data.sql</code> di Supabase
-                SQL Editor.
+                <b>Jejak perubahan belum aktif.</b> Terapkan migrasi D1 <code>0002_jejak_data.sql</code> dengan{" "}
+                <code>wrangler d1 migrations apply</code>.
               </>
             )}
           </p>

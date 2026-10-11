@@ -7,7 +7,6 @@ import { logAudit } from "@/lib/auditLog";
 import { BELUM_SELESAI, nilaiUsulan } from "@/lib/usulanPegawai";
 import { ringkasDasarBaru } from "@/lib/dasarBaruUsulan";
 import { KOSONG_ACUAN, isiHitungan } from "@/lib/usulanFormulir";
-import { tulisBanyakDenganAcuan } from "@/lib/acuanUsulanServer";
 import {
   BATAS_BARIS_IMPOR,
   dapatDisimpan,
@@ -188,7 +187,7 @@ export async function POST(req: Request) {
   };
 
   const rows = disimpan.map(barisUsulan);
-  if (rows.length > 0) await tulisBanyakDenganAcuan(rows, (isi) => db.usulanPegawai.createMany(isi));
+  if (rows.length > 0) await db.usulanPegawai.createMany(rows);
 
   const jumlahBaru = disimpan.filter((h) => h.hasil === "baru").length;
   const jumlahPerubahan = disimpan.length - jumlahBaru;

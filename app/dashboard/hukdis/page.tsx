@@ -378,7 +378,7 @@ export default function HukdisPage() {
       {/* Laporan dari UPT (ADR-016) */}
       {!laporanAktif && (
         <div role="status" className="dsb-pesan" data-nada="kuning">
-          <p>Laporan hukuman disiplin dari UPT belum aktif: tabel <code>laporan_hukdis</code> belum dibuat. Jalankan migrasi <code>20260927100000_laporan_hukdis.sql</code> di Supabase.</p>
+          <p>Laporan hukuman disiplin dari UPT belum aktif: tabel <code>laporan_hukdis</code> belum dibuat. Terapkan migrasi D1 dengan <code>wrangler d1 migrations apply</code>.</p>
         </div>
       )}
       {laporanUpt.length > 0 && (

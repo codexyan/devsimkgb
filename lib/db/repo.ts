@@ -1,5 +1,5 @@
-// Kontrak lapisan data yang dipakai route. Google Sheets (lib/sheets/table.ts) dan Supabase
-// (lib/db/supabase/table.ts) sama-sama memenuhinya, jadi penyimpanan bisa diganti tanpa
+// Kontrak lapisan data yang dipakai route. Google Sheets (lib/sheets/table.ts) dan Cloudflare D1
+// (lib/db/d1/table.ts) sama-sama memenuhinya, jadi penyimpanan bisa diganti tanpa
 // mengubah route.
 
 /** Filter gaya Prisma: kesetaraan, operator (in, notIn, not, contains, lt, ...), serta OR dan AND. */

@@ -2,8 +2,7 @@
 // Hukuman disiplin sedang (ketiga jenis pemotongan tunjangan kinerja) menunda KGB 12 bulan: menurut Pasal 42,
 // sebelum PP mengenai gaji dan tunjangan berlaku, hukuman sedang masih mengikuti Pasal 7 ayat (3) PP 53/2010,
 // termasuk penundaan KGB 1 tahun (panduan bagian hukdis; ADR-052). Sama dengan yang tercatat di produksi.
-// Dipakai scripts/seed-sheets-master.ts, scripts/seed-lokal.ts, scripts/migrasi-tahap1.ts,
-// dan scripts/salin-sheets-ke-supabase.ts.
+// Dipakai scripts/seed-sheets-master.ts, scripts/seed-lokal.ts, dan scripts/migrasi-tahap1.ts.
 
 export interface JenisHukdisSeed {
   kode: string;

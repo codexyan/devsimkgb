@@ -1,5 +1,5 @@
-// Contoh record dan filter yang dipakai bersama uji terjemahan filter Supabase (lib/db/supabase/filter.test.ts) dan
-// D1 (lib/db/d1/sql.test.ts): keduanya harus memberi hasil yang sama dengan pencocokan lapisan Sheets.
+// Contoh record dan filter yang dipakai bersama uji pohon Kondisi (lib/db/kondisi.test.ts) dan terjemahannya ke
+// SQLite (lib/db/d1/sql.test.ts): keduanya harus memberi hasil yang sama dengan pencocokan lapisan Sheets.
 
 import type { Where } from "./repo";
 

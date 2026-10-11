@@ -24,7 +24,7 @@ type JenisBaris = {
 type RegulasiBaris = { id: string; nomor: string; tahun: string; status: string };
 
 // Tab HukdisKonfigurasi (notifHariH1/H2) tidak dibaca lagi: tidak ada halaman yang memakainya dan
-// notifikasi hukdis memakai ambang tetap. Definisi tabnya tetap ada untuk migrasi Supabase.
+// notifikasi hukdis memakai ambang tetap. Definisi tabnya tetap ada karena tabelnya masih ada di skema D1.
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,5 +1,5 @@
 // Baris mentah (Postgres lewat PostgREST, atau D1) → baris kolom D1 (ADR-085): waktu ISO UTC, boolean 0/1, jsonb
-// sebagai teks. Dipakai pemindahan Supabase → D1 dan alat pemulihan cadangan; tanpa ketergantungan lain supaya dapat
+// sebagai teks. Dipakai alat pemulihan cadangan, termasuk cadangan bentuk Postgres dari masa Supabase; tanpa ketergantungan lain supaya dapat
 // diimpor skrip Node.
 
 import { SKEMA_D1, type JenisKolomD1 } from "./skema";

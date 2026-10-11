@@ -6,10 +6,10 @@ export function keSnake(nama: string): string {
     .toLowerCase();
 }
 
-/** Nama tabel Postgres untuk satu tab spreadsheet. "user" kata tercadang di Postgres, jadi User menjadi users. */
+/** Nama tabel SQL untuk satu tab spreadsheet. "user" kata tercadang di SQL, jadi User menjadi users. */
 export function namaTabel(tab: string): string {
   return tab === "User" ? "users" : keSnake(tab);
 }
 
-/** Kolom di setiap tabel Supabase yang mencatat urutan baris dimasukkan, pengganti urutan baris spreadsheet. */
+/** Kolom di setiap tabel SQL yang mencatat urutan baris dimasukkan, pengganti urutan baris spreadsheet. */
 export const KOLOM_URUTAN = "urutan_sisip";

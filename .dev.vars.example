@@ -10,10 +10,10 @@ NEXTAUTH_SECRET="ganti-dengan-rahasia-acak-panjang"
 # Rahasia untuk melindungi endpoint cron /api/cron/notifikasi
 CRON_SECRET="ganti-dengan-rahasia-acak-panjang"
 
-# ===== Supabase (penyimpanan produksi) =====
-# Secret key hanya untuk server karena melewati RLS.
-SUPABASE_URL="https://PROJECT_REF.supabase.co"
-SUPABASE_SECRET_KEY="sb_secret_XXXXXXXX"
+# ===== Penyimpanan data =====
+# Preview lokal memakai D1 lokal (Miniflare), bukan D1 produksi, selama tidak dijalankan dengan --remote.
+# Terapkan skemanya lebih dulu: npx wrangler d1 migrations apply sim-kgb --local. Di produksi nilainya juga "d1" (secret Worker).
+DATA_BACKEND="d1"
 
 # ===== Google Sheets (mode Sheets-as-backend) =====
 GOOGLE_SERVICE_ACCOUNT_EMAIL="nama-sa@project-id.iam.gserviceaccount.com"

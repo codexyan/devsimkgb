@@ -3,7 +3,7 @@
 // Meniru operasi mentah di lib/sheets/client.ts atas satu berkas JSON berisi tab dan sel, sehingga
 // lib/sheets/table.ts berjalan tanpa perubahan dan tanpa kredensial apa pun. Hanya untuk `npm run dev`
 // di komputer sendiri: berkasnya ada di .data-lokal/ (tidak ikut git) dan diisi oleh
-// scripts/seed-lokal.ts. Tidak pernah dipakai di Cloudflare Workers (produksi memakai Supabase).
+// scripts/seed-lokal.ts. Tidak pernah dipakai di Cloudflare Workers (produksi memakai D1).
 
 interface Berkas {
   tabs: Record<string, string[][]>;
