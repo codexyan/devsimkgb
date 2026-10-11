@@ -1,7 +1,7 @@
 # ADR-101: Pita jadwal Dasbor Admin UPT menjadi linimasa bulan kirim dengan tahap dan hitung mundur
 
 Tanggal: 11 Oktober 2026
-Status: berlaku. Mengganti pita jadwal per bulan TMT di Dasbor Admin UPT.
+Status: berlaku. Mengganti pita jadwal per bulan TMT di Dasbor Admin UPT. Tata letak empat kartunya diganti tiga zona oleh ADR-103; tahap, warna, dan jendela periode tetap.
 
 ## Konteks
 
