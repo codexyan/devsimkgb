@@ -382,7 +382,7 @@ export const ATURAN_DASAR_BARU: readonly string[] = [
   "Satu baris hanya menyebut satu SK, yaitu SK dengan TMT paling baru. SK itulah yang tercetak sebagai dasar pada SK KGB berikutnya.",
   "Pegawai baru yang melaporkan SK kp atau pmk boleh mengisi golonganAcuan, mkgTahunAcuan, dan mkgBulanAcuan: golongan dan masa kerja pada SK KGB terakhir. Dengan itu sistem menghitung dari SK KGB terakhir seperti pegawai yang sudah tercatat dan mencocokkan masa kerja yang tertulis pada SK kenaikan pangkat. Bagi pegawai yang sudah tercatat, ketiganya diabaikan.",
   "Untuk kp pada pegawai yang sudah tercatat, sistem menghitung sendiri masa kerja golongan, gaji pokok, dan TMT golongan dari data tercatat dan SK-nya; jadwal KGB tidak bergeser.",
-  "Untuk pmk, golongan tetap dan masa kerja golongan mengikuti SK PMK; jadwal KGB dapat maju.",
+  "Untuk pmk, golongan tetap dan masa kerja golongan mengikuti SK PMK; jadwal KGB tidak bergeser.",
   `Isian kosong atau belum lengkap tidak menolak baris; yang kurang, termasuk dasarBaruJenis yang belum dijawab, ditagih saat diajukan di Usul KGB Kolektif. Isian yang salah tulis (misalnya "KP" atau "naik pangkat") menolak barisnya. Tanggal ditulis ${FORMAT_TANGGAL_DITERIMA}.`,
 ];
 
