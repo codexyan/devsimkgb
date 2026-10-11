@@ -1264,8 +1264,9 @@ export default async function IsiPanduan({
                     pengingat <em>Perlu diperiksa</em>, lengkap dengan batas input Kanwil. Draf perbaikan data milik pegawai
                     yang masa usul KGB-nya belum dibuka disimpan terlipat di bagian <em>Terkunci sampai masa usul KGB</em>,
                     tanpa kotak centang, dan terbuka sendiri pada bulan kirimnya, 2 bulan sebelum TMT. Draf pegawai baru
-                    dan usulan yang dikembalikan Kanwil tidak pernah dikunci. Perbaikan yang mendesak tetap dapat
-                    diajukan lebih awal lewat <strong>Usul KGB Kolektif</strong>. Bila ada yang keliru, pilih{" "}
+                    ikut terlipat menurut TMT KGB pada isiannya; yang TMT-nya belum diisi juga terlipat. Usulan yang
+                    dikembalikan Kanwil tidak pernah dikunci. Perbaikan yang mendesak dan pendataan pegawai baru tetap
+                    dapat diajukan lebih awal lewat <strong>Usul KGB Kolektif</strong>. Bila ada yang keliru, pilih{" "}
                     <strong>Perbarui data</strong> sebelum batas itu. Hukuman disiplin yang belum dilaporkan
                     disampaikan lewat menu <strong>Lapor Hukdis</strong>; pegawai yang pindah, BKO, atau berhenti
                     dilaporkan dengan <strong>Laporkan mutasi</strong> pada barisnya. Pegawai yang sedang{" "}

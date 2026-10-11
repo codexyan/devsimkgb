@@ -95,8 +95,7 @@ test("draf perbaikan data terkunci sampai bulan kirim KGB-nya, 2 bulan sebelum T
   // Masa usulnya sudah dibuka (bulan ini) atau sudah lewat: terbuka.
   assert.equal(drafTerkunci({ status: "draf", jenis: "perubahan" }, "2026-12", "2026-12"), null);
   assert.equal(drafTerkunci({ status: "draf", jenis: "perubahan" }, "2026-08", "2026-12"), null);
-  // Pegawai baru, usulan yang dikembalikan Kanwil, dan pegawai tanpa TMT tidak pernah dikunci.
-  assert.equal(drafTerkunci({ status: "draf", jenis: "baru" }, "2028-01", "2026-12"), null);
+  // Usulan yang dikembalikan Kanwil dan draf perbaikan pegawai tanpa TMT tidak dikunci.
   assert.equal(drafTerkunci({ status: "revisi", jenis: "perubahan" }, "2028-01", "2026-12"), null);
   assert.equal(drafTerkunci({ status: "draf", jenis: "perubahan" }, null, "2026-12"), null);
   // Pergantian tahun.
@@ -115,4 +114,28 @@ test("daftar kerja: draf terkunci membawa bulan kirimnya dan selalu di belakang 
   assert.deepEqual(daftar.map((t) => t.usulanId), ["u-dekat", "u-jauh"]);
   assert.equal(daftar[0].terkunci, null);
   assert.deepEqual(daftar[1].terkunci, { bulanTmt: "2028-01", bulanKirim: "2027-11" });
+});
+
+test("draf pegawai baru dikunci menurut TMT KGB dari isiannya (ADR-104)", () => {
+  assert.deepEqual(drafTerkunci({ status: "draf", jenis: "baru" }, "2027-06", "2026-12"), { bulanTmt: "2027-06", bulanKirim: "2027-04" });
+  assert.equal(drafTerkunci({ status: "draf", jenis: "baru" }, "2026-12", "2026-12"), null);
+  // TMT KGB belum dapat dihitung: tetap terlipat, dengan keterangan TMT-nya belum terisi.
+  assert.deepEqual(drafTerkunci({ status: "draf", jenis: "baru" }, null, "2026-12"), { bulanTmt: null, bulanKirim: null });
+  assert.equal(drafTerkunci({ status: "revisi", jenis: "baru" }, null, "2026-12"), null);
+
+  const tugas = daftarTugasUpt(
+    [
+      { id: "a", pegawaiId: null, status: "draf", jenis: "baru", nama: "Anna", nip: "199106072025062004", kekurangan: [], bulanTmt: "2027-06" },
+      { id: "b", pegawaiId: null, status: "draf", jenis: "baru", nama: "Budi", nip: "199201012025061001", kekurangan: ["TMT KGB terakhir"] },
+      { id: "c", pegawaiId: null, status: "draf", jenis: "baru", nama: "Citra", nip: "199301012024061001", kekurangan: [], bulanTmt: "2026-12" },
+    ],
+    [],
+    "2026-12",
+  );
+  const kunci = Object.fromEntries(tugas.map((t) => [t.nama, t.terkunci]));
+  assert.deepEqual(kunci.Anna, { bulanTmt: "2027-06", bulanKirim: "2027-04" });
+  assert.deepEqual(kunci.Budi, { bulanTmt: null, bulanKirim: null });
+  assert.equal(kunci.Citra, null);
+  // Yang dapat dikerjakan sekarang tetap di depan yang terkunci.
+  assert.equal(tugas[0].nama, "Citra");
 });

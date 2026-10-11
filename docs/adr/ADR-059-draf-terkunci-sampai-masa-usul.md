@@ -1,7 +1,7 @@
 # ADR-059: Draf usulan data terkunci di dasbor sampai masa usul KGB-nya
 
 Tanggal: 5 Oktober 2026
-Status: berlaku
+Status: berlaku. Pengecualian draf pegawai baru diubah oleh ADR-104: kini ikut dikunci menurut TMT KGB pada isiannya.
 
 ## Konteks
 
