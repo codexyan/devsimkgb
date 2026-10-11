@@ -166,3 +166,32 @@ export function tahapProsesKgb(statusReview: string | null | undefined): Keadaan
   if (statusReview === "disetujui" || statusReview === "dilewati") return "tte";
   return "sk_dibuat";
 }
+
+/**
+ * Kelompok kartu di kolom Perlu dikerjakan (ADR-103), supaya terbaca bahwa yang tampil hanya TMT pada jendela kirim
+ * bulan ini, ditambah yang terlambat dan yang dikembalikan Kanwil. Yang terlambat didahulukan karena selisihnya
+ * menjadi rapelan; yang dikembalikan berikutnya karena Kanwil menunggu jawaban (ADR-090).
+ */
+export type KelompokKerja = "terlambat" | "kembali" | "jendela" | "lain";
+
+export const URUTAN_KELOMPOK_KERJA: readonly KelompokKerja[] = ["terlambat", "kembali", "jendela", "lain"];
+
+export function kelompokKerja(input: {
+  /** Bulan TMT pegawai, "yyyy-mm"; kosong untuk pegawai baru yang belum tercatat. */
+  bulanTmt: string | null | undefined;
+  /** Usulan atau laporan yang dikembalikan Kanwil. */
+  dikembalikan: boolean;
+  /** Bulan TMT yang suratnya dikirim bulan ini. */
+  bulanUsulan: string;
+}): KelompokKerja {
+  if (input.dikembalikan) return "kembali";
+  if (!input.bulanTmt) return "lain";
+  if (input.bulanTmt < input.bulanUsulan) return "terlambat";
+  if (input.bulanTmt === input.bulanUsulan) return "jendela";
+  return "lain";
+}
+
+/** Susun daftar menurut kelompoknya tanpa mengubah urutan di dalam kelompok; kelompok kosong tidak ikut. */
+export function susunKelompokKerja<T>(daftar: readonly T[], kelompok: (t: T) => KelompokKerja): { kelompok: KelompokKerja; isi: T[] }[] {
+  return URUTAN_KELOMPOK_KERJA.map((k) => ({ kelompok: k, isi: daftar.filter((t) => kelompok(t) === k) })).filter((g) => g.isi.length > 0);
+}

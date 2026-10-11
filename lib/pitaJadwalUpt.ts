@@ -128,3 +128,98 @@ export function teksJendela(j: JendelaKirim, batasKirim: number, namaBulanKirim:
   if (j.keadaan === "tutup") return `ditutup ${batasKirim} ${namaBulanKirim}`;
   return j.mulaiDalam <= 1 ? "dibuka besok" : `dibuka ${j.mulaiDalam} hari lagi`;
 }
+
+/* ── Pita ringkas tiga zona (ADR-103) ─────────────────────────────────────── */
+
+/**
+ * Keadaan satu bulan TMT di kalender tahunan:
+ * - "jendela": TMT yang surat usulannya dikirim bulan ini;
+ * - "terlambat": jendela kirimnya sudah lewat dan masih ada yang perlu diusulkan;
+ * - "berjalan": semua sudah diusulkan, sebagian masih di Kanwil atau menunggu direkam;
+ * - "selesai": semua sudah direkam di Gaji Web;
+ * - "belum": jendela kirimnya belum dibuka;
+ * - "kosong": tidak ada pegawai dengan TMT bulan itu.
+ */
+export type KeadaanBulanTmt = "jendela" | "terlambat" | "berjalan" | "selesai" | "belum" | "kosong";
+
+export interface BulanTmtKalender {
+  /** "yyyy-mm". */
+  bulanTmt: string;
+  jumlah: number;
+  perTahap: Record<TahapPita, number>;
+  keadaan: KeadaanBulanTmt;
+}
+
+/**
+ * Dua belas bulan TMT satu tahun kalender, Januari sampai Desember, dengan jumlah per tahap yang sama dengan pita dan
+ * papan. Sumbernya daftar pegawai dasbor: pegawai yang KGB-nya selesai tahun ini tetap tercatat di bulan TMT itu sampai
+ * masa usul siklus berikutnya dibuka (pilihKgbSiklus), jadi tahun berjalan dan tahun depan terbaca utuh.
+ */
+export function susunKalenderTmt(
+  pegawai: readonly PegawaiPita[],
+  tahun: number,
+  /** Bulan TMT yang suratnya dikirim bulan ini, "yyyy-mm". */
+  bulanUsulan: string,
+): BulanTmtKalender[] {
+  return Array.from({ length: 12 }, (_, i) => {
+    const bulanTmt = `${tahun}-${String(i + 1).padStart(2, "0")}`;
+    const isi = pegawai.filter((p) => p.bulanTmt === bulanTmt);
+    const perTahap = hitungPerTahap(isi);
+    const jumlah = isi.length;
+    let keadaan: KeadaanBulanTmt;
+    if (bulanTmt === bulanUsulan) keadaan = "jendela";
+    else if (bulanTmt > bulanUsulan) keadaan = jumlah > 0 ? "belum" : "kosong";
+    else if (perTahap.usulkan > 0) keadaan = "terlambat";
+    else if (perTahap.kanwil + perTahap.sk > 0) keadaan = "berjalan";
+    else keadaan = perTahap.selesai > 0 ? "selesai" : "kosong";
+    return { bulanTmt, jumlah, perTahap, keadaan };
+  });
+}
+
+/** Tahun yang dapat dipilih di kalender: tahun ini dan tahun depan, ditambah tahun lalu bila masih ada yang tertinggal. */
+export function tahunKalenderTmt(pegawai: readonly PegawaiPita[], tahunIni: number): number[] {
+  const tahun = new Set([tahunIni, tahunIni + 1]);
+  for (const p of pegawai) {
+    const t = p.bulanTmt ? Number(p.bulanTmt.slice(0, 4)) : NaN;
+    if (t === tahunIni - 1) tahun.add(t);
+  }
+  return [...tahun].sort((a, b) => a - b);
+}
+
+export type KeadaanLangkah = "selesai" | "aktif" | "belum";
+
+export interface LangkahJendela {
+  kunci: "surat" | "ajukan" | "input" | "rekon";
+  keadaan: KeadaanLangkah;
+}
+
+/**
+ * Empat langkah satu jendela kirim, dari kacamata UPT: kirim surat lewat Srikandi dan ajukan di SIM-KGB (keduanya
+ * selesai bila tidak ada lagi yang perlu diusulkan), input Kanwil sepanjang bulan kirim, lalu rekon Gaji Web tanggal
+ * 1–15 bulan sesudahnya. Surat dan pengajuan tidak dapat dipisahkan dari data: pengajuan selalu membawa nomor surat.
+ */
+export function langkahJendela(b: Pick<BulanPita, "jumlah" | "perTahap">): LangkahJendela[] {
+  const ada = b.jumlah > 0;
+  const sudahDiusulkan = ada && b.perTahap.usulkan === 0;
+  const lewatKanwil = sudahDiusulkan && b.perTahap.kanwil === 0;
+  const semuaSelesai = ada && b.perTahap.selesai === b.jumlah;
+  return [
+    { kunci: "surat", keadaan: sudahDiusulkan ? "selesai" : ada ? "aktif" : "belum" },
+    { kunci: "ajukan", keadaan: sudahDiusulkan ? "selesai" : ada ? "aktif" : "belum" },
+    { kunci: "input", keadaan: lewatKanwil ? "selesai" : sudahDiusulkan ? "aktif" : "belum" },
+    { kunci: "rekon", keadaan: semuaSelesai ? "selesai" : "belum" },
+  ];
+}
+
+/**
+ * Rekon Gaji Web yang berlangsung bulan ini: TMT bulan depan, yang suratnya dikirim bulan lalu. Ditampilkan sebagai
+ * "Juga bulan ini" agar jendela kirim yang sedang dibuka tidak menutupi pekerjaan siklus sebelumnya.
+ */
+export function rekonBulanIni(
+  pegawai: readonly PegawaiPita[],
+  bulanUsulan: string,
+): { bulanTmt: string; jumlah: number; selesai: number } {
+  const bulanTmt = geserKunciBulan(bulanUsulan, -1);
+  const isi = pegawai.filter((p) => p.bulanTmt === bulanTmt);
+  return { bulanTmt, jumlah: isi.length, selesai: hitungPerTahap(isi).selesai };
+}
