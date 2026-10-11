@@ -2,7 +2,7 @@
 
 SIM-KGB berjalan sebagai satu Worker Cloudflare bernama `sim-kgb`, dibangun dengan
 [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) (OpenNext). Berkas SK disimpan di
-Cloudflare R2, data dibaca dari Google Sheets atau Supabase, dan pekerjaan harian berjalan lewat
+Cloudflare R2, data disimpan di Cloudflare D1, dan pekerjaan harian berjalan lewat
 Cron Trigger. Semua perintah dijalankan dari akar repositori.
 
 ## 1. Susunan Worker
@@ -48,16 +48,15 @@ Saat `next dev`, binding tersedia lewat `initOpenNextCloudflareForDev()` di `nex
 Semua route memakai `import { db } from "@/lib/db"`. Penyimpanan dipilih di `lib/db/index.ts` setiap kali
 data diakses:
 
-- `DATA_BACKEND=d1` memakai Cloudflare D1 lewat binding `DB` (ADR-085). Produksi beralih ke sini sesudah data
-  disalin (lihat "Peralihan ke D1" di bawah).
-- `DATA_BACKEND=sheets` memakai Google Sheets.
-- `DATA_BACKEND=supabase` memakai Supabase (Postgres lewat REST). Dipakai produksi sampai peralihan ke D1.
-- Tanpa `DATA_BACKEND`, Supabase dipakai bila `SUPABASE_URL` terisi; selain itu Google Sheets.
-- Nilai `DATA_BACKEND` lain membuat request gagal dengan pesan galat yang jelas.
+- `DATA_BACKEND=d1` memakai Cloudflare D1 lewat binding `DB` (ADR-085). Ini basis data produksi.
+- `DATA_BACKEND=sheets` memakai Google Sheets, dan `DATA_BACKEND=lokal` berkas JSON lokal; keduanya untuk pengembangan.
+- Di produksi `DATA_BACKEND` wajib terisi. Bila kosong, aplikasi menolak berjalan dengan pesan yang jelas, bukan memilih
+  penyimpanan lain secara diam-diam (ADR-102).
+- `DATA_BACKEND=supabase` sudah dilepas dan ditolak dengan pesan yang menunjuk ke `d1` (ADR-102).
+- Nilai lain membuat request gagal dengan pesan galat yang jelas.
 
 Google Sheets membutuhkan akun layanan yang diberi akses Editor ke spreadsheet, dengan Google Sheets API
-aktif di project Google Cloud. Supabase membutuhkan secret key proyek; key itu melewati RLS, jadi hanya
-boleh dipakai di server.
+aktif di project Google Cloud. D1 tidak membutuhkan secret: aksesnya lewat binding di `wrangler.jsonc`.
 
 ### Migrasi D1
 
@@ -70,49 +69,30 @@ npx wrangler d1 migrations apply sim-kgb --remote
 
 Berkas SQL harus berakhir baris LF (`.gitattributes`). D1 menolak trigger yang memuat CR ("incomplete input"). Kolom
 baru pada tabel yang dijejak menuntut trigger jejaknya dibuat ulang di migrasi yang sama (contoh:
-`0003_usulan_penetap_sk_terakhir.sql`). `lib/db/d1/skema.test.ts` menagih keduanya, dan juga menagih agar selama
-Supabase masih aktif setiap kolom baru dibuat di kedua basis data.
+`0003_usulan_penetap_sk_terakhir.sql`). `lib/db/d1/skema.test.ts` menagih itu, dan menagih kesejalanan migrasi dengan
+`lib/db/d1/skema.ts` serta definisi kolom aplikasi.
 
-### Peralihan ke D1
+Kolom yang belum ada di D1 menggagalkan seluruh penulisan ke tabel itu; tidak ada isian yang diam-diam dibuang. Karena
+itu urutannya selalu: terapkan migrasi, baru deploy.
 
-1. Deploy kode yang memuat binding D1. `DATA_BACKEND` belum diatur, jadi basis data tetap Supabase.
-2. Super Admin, di menu Cadangkan data:
-   1. Tekan **Cadangkan sekarang**.
-   2. Tekan **Salin semua ke D1**: satu transaksi, berhasil seluruhnya atau tidak sama sekali.
-   3. Tekan **Bandingkan**.
-3. `npx wrangler secret put DATA_BACKEND` dengan nilai `d1`. Versi baru langsung aktif tanpa build ulang.
-4. **Bandingkan** lagi. Bila perlu, tekan **Salin yang tertinggal**.
-5. Untuk kembali ke Supabase: `npx wrangler secret delete DATA_BACKEND`.
+### Pemulihan data
 
-Pemulihan di D1: Time Travel (`npx wrangler d1 time-travel restore sim-kgb --timestamp=…`) untuk seluruh database,
-atau `scripts/pulihkan-cadangan.ts` untuk baris tertentu (ADR-084, ADR-085).
+Time Travel D1 memulihkan seluruh database ke menit mana pun dalam 30 hari terakhir
+(`npx wrangler d1 time-travel info sim-kgb`, lalu `npx wrangler d1 time-travel restore sim-kgb --timestamp=…`).
+Untuk baris tertentu, pakai `scripts/pulihkan-cadangan.ts` dengan cadangan otomatis di R2 atau dengan `jejak_data`
+(90 hari); lihat ADR-084 dan ADR-085.
 
-### Migrasi Supabase diterapkan manual
+### Riwayat: pindah dari Supabase
 
-Berkas di `supabase/migrations/` **tidak** dijalankan oleh deploy. Migrasi diterapkan dengan menempelkan
-isinya ke SQL Editor proyek Supabase, jadi kode yang sudah terpasang bisa mendahului tabelnya. Commit yang
-menambah kolom harus disertai migrasinya dijalankan; bila tidak, setiap penulisan ke tabel itu gagal dengan
-500 dan peramban hanya menampilkan pesan umum. Diagnosanya lewat `npx wrangler tail sim-kgb --format pretty`
-sambil memicu ulang galatnya.
+Basis data produksi berpindah dari Supabase ke D1 pada 8 Oktober 2026 pukul 20.25 WITA (ADR-085). Sejak itu Supabase
+tidak lagi dibaca atau ditulis aplikasi, dan adaptornya beserta alat pemindahannya dilepas di ADR-102.
 
-Setiap `create table` memakai `if not exists`, sehingga sebuah migrasi aman diputar ulang terhadap basis data
-yang skemanya sudah ada. Untuk memeriksa apakah produksi sinkron, jalankan dua query ini di SQL Editor lalu
-bandingkan hasilnya dengan `supabase/migrations/`:
-
-```sql
-select table_name, string_agg(column_name, ',' order by column_name) as kolom
-from information_schema.columns
-where table_schema = 'public'
-group by table_name
-order by table_name;
-
-select version, name from supabase_migrations.schema_migrations order by version;
-```
-
-Nomor versi di ledger tidak akan cocok dengan awalan nama berkas, karena migrasi tidak pernah diterapkan
-lewat `supabase db push`. Yang dibandingkan cakupannya, bukan angkanya. Ledger juga memuat dua entri tanpa
-berkas di repo, keduanya wajar: `arsip_tabel_prisma` (mengarsipkan tabel Prisma lama sebelum skema Supabase
-ada) dan `usulan_pegawai_urutan_sisip` (kolom yang di repo sudah menyatu di dalam `create table`).
+- Kembali ke Supabase sebagai basis data aktif tidak lagi didukung. Menghapus secret `DATA_BACKEND` **tidak** mengembalikan
+  Supabase: di produksi aplikasi justru menolak berjalan.
+- `supabase/migrations/` dan `docs/sql/*.sql` tinggal arsip untuk membaca atau memulihkan data semasa Supabase. Keduanya
+  tidak dijaga sejalan dengan D1.
+- Proyek Supabase tidak dihapus oleh PR mana pun. Ia dibiarkan sampai arsipnya terverifikasi di luar akun Cloudflare
+  (gerbang data di ADR-102); penghapusannya keputusan pengelola dan tidak dapat dibatalkan.
 
 ## 4. Variabel dan secret
 
@@ -121,25 +101,21 @@ Isi sebagai secret Worker, lewat dashboard (Worker `sim-kgb`, Settings, Variable
 ```bash
 npx wrangler secret put AUTH_SECRET
 npx wrangler secret put CRON_SECRET
-npx wrangler secret put DATA_BACKEND
+npx wrangler secret put DATA_BACKEND      # nilai: d1
+# hanya bila memakai Google Sheets (pengembangan)
 npx wrangler secret put GOOGLE_SHEET_ID
 npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_EMAIL
 npx wrangler secret put GOOGLE_PRIVATE_KEY
-# bila memakai Supabase
-npx wrangler secret put SUPABASE_URL
-npx wrangler secret put SUPABASE_SECRET_KEY
 ```
 
 | Variabel | Wajib | Kegunaan |
 |----------|-------|----------|
 | `AUTH_SECRET` | Ya | Kunci sesi NextAuth v5 (buat dengan `openssl rand -base64 32`). NextAuth juga membaca `NEXTAUTH_SECRET` sebagai nama lama. |
 | `CRON_SECRET` | Ya | Bearer token endpoint cron. Tanpa nilai ini endpoint cron menjawab 503. |
-| `DATA_BACKEND` | Tidak | `d1`, `sheets`, atau `supabase` (lihat bagian 3). Atur sebagai secret, bukan variabel teks di wrangler.jsonc, supaya peralihan tidak memerlukan build ulang. |
+| `DATA_BACKEND` | Ya, di produksi | `d1` (lihat bagian 3). Tanpa nilai ini aplikasi produksi menolak berjalan (ADR-102). Atur sebagai secret, bukan variabel teks di wrangler.jsonc. |
 | `GOOGLE_SHEET_ID` | Untuk Sheets | ID spreadsheet dari URL `docs.google.com/spreadsheets/d/<ID>/edit`. |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Untuk Sheets | Email akun layanan. |
 | `GOOGLE_PRIVATE_KEY` | Untuk Sheets | `private_key` dari JSON key; boleh ditulis satu baris dengan `\n`. |
-| `SUPABASE_URL` | Untuk Supabase | URL proyek, misalnya `https://PROJECT_REF.supabase.co`. |
-| `SUPABASE_SECRET_KEY` | Untuk Supabase | Secret key proyek (hanya server). |
 | `AUTH_URL` | Tidak | URL kanonik. Tidak diperlukan karena `auth.config.ts` memakai `trustHost: true`. |
 
 Nama variabel sama dengan `.env.example`. Sisa Neon dan Prisma (`DATABASE_URL`, `DIRECT_URL`,
@@ -206,8 +182,8 @@ mengubah binding di `wrangler.jsonc`.
 3. `app/api/cron/cadangan/route.ts` (ADR-084) menyimpan cadangan seluruh basis data ke R2
    `cadangan/otomatis/<waktu>.jsonl.gz`. Sesudahnya route membuang cadangan yang melewati masa simpan, berkas di
    `terhapus/` yang lebih tua dari 90 hari, dan `jejak_data` yang lebih tua dari 90 hari. Daftar dan unduhannya ada di
-   menu Cadangkan data (Super Admin). Pemulihan memakai `scripts/pulihkan-cadangan.ts` dan
-   `docs/sql/pulihkan-jejak-data.sql`.
+   menu Cadangkan data (Super Admin). Pemulihan memakai `scripts/pulihkan-cadangan.ts` (cadangan R2 dan
+   `jejak_data` D1). `docs/sql/pulihkan-jejak-data.sql` adalah arsip untuk jejak Postgres semasa Supabase.
 4. `app/api/cron/notifikasi/route.ts` menjawab 503 bila `CRON_SECRET` belum diisi dan 401 bila token
    tidak cocok. Bila token cocok, route menjalankan:
    - `bersihkanHukdisKedaluwarsa()` (`lib/hukdisKedaluwarsa.ts`): menonaktifkan penanda hukdis pegawai
@@ -231,9 +207,10 @@ npm run dev          # next dev di http://localhost:3100, variabel dari .env
 npm run cf:preview   # build OpenNext lalu jalankan di runtime Workers lokal, variabel dari .dev.vars
 ```
 
-`.env` dan `.dev.vars` tidak disimpan di Git. Isi dengan variabel di bagian 4. Dev server dan preview
-lokal memakai spreadsheet atau proyek Supabase yang ditunjuk variabel tersebut, jadi arahkan ke data uji
-bila tidak ingin mengubah data produksi.
+`.env` dan `.dev.vars` tidak disimpan di Git. Isi dengan variabel di bagian 4. Penyimpanan mengikuti `DATA_BACKEND`:
+`lokal` (berkas JSON, isi dengan `scripts/seed-lokal.ts`) atau `sheets` (spreadsheet yang ditunjuk variabel Google, jadi
+arahkan ke data uji) untuk `npm run dev`, dan `d1` untuk `npm run cf:preview`, yang memakai D1 lokal (Miniflare, skemanya diterapkan dengan
+`npx wrangler d1 migrations apply sim-kgb --local`), bukan D1 produksi.
 
 ## 8. Domain
 

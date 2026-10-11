@@ -10,7 +10,6 @@ import { pegawaiSatker } from "@/lib/aksesUpt";
 import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, kekuranganUsulan, pernahKgbUsulan, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan } from "@/lib/bawaanUsulan";
 import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, bacaKeadaanKgb, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
-import { tulisDenganAcuan } from "@/lib/acuanUsulanServer";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
@@ -343,7 +342,7 @@ export async function POST(req: Request) {
     ...isian,
   };
 
-  await tulisDenganAcuan(baris, (isi) => db.usulanPegawai.create(isi));
+  await db.usulanPegawai.create(baris);
 
   if (!draf) {
     // Notifikasi dibuat di sini, bukan menunggu pemeriksaan berkala, supaya Tim SDM Kanwil melihat usulan

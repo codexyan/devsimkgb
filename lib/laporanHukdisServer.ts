@@ -10,7 +10,7 @@ import { adaPenandaPdf } from "./prosesKgb";
 /** Nama field berkas pada formulir, sekaligus penanda jenis berkas di kunci objeknya. */
 export const MEDAN_SK_HUKDIS = "skHukdis";
 
-/** Pesan bagi pengguna selama tabel laporan_hukdis belum dibuat di Supabase. */
+/** Pesan bagi pengguna selama tabel laporan_hukdis belum dibuat di basis data. */
 export const PESAN_BELUM_AKTIF =
   "Modul laporan hukuman disiplin belum aktif: tabel laporan_hukdis belum dibuat di basis data. Minta pengelola menjalankan migrasinya.";
 

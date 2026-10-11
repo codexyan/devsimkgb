@@ -1,17 +1,17 @@
-// Memastikan terjemahan Where → PostgREST memberi hasil yang sama dengan pencocokan di lapisan
+// Memastikan terjemahan Where → Kondisi memberi hasil yang sama dengan pencocokan di lapisan
 // Google Sheets. Kondisi dievaluasi dengan semantik SQL (perbandingan dengan NULL tidak benar),
-// lalu dibandingkan dengan `matches` untuk setiap record contoh.
+// lalu dibandingkan dengan `matches` untuk setiap record contoh. Hasil akhirnya di SQLite diuji
+// terpisah oleh lib/db/d1/sql.test.ts.
 //
-// Jalankan: node --import tsx --test lib/db/supabase/*.test.ts
+// Jalankan: node --import tsx --test lib/db/kondisi.test.ts
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matches } from "../../sheets/table";
-import type { Where } from "../repo";
-import { keKondisi, keParameter, type Kondisi, type NilaiFilter } from "./filter";
+import { matches } from "../sheets/table";
+import { keKondisi, type Kondisi, type NilaiFilter } from "./kondisi";
 import { keSnake } from "./nama";
-import { dariJson, keJson } from "./nilai";
-import { KOLOM_CONTOH, RECORD_CONTOH as RECORD, T1, WHERE_CONTOH as WHERE } from "../contohFilter";
+import { keJson } from "./nilai";
+import { KOLOM_CONTOH, RECORD_CONTOH as RECORD, WHERE_CONTOH as WHERE } from "./contohFilter";
 
 type Rec = Record<string, unknown>;
 
@@ -98,23 +98,6 @@ test("terjemahan filter cocok dengan pencocokan lapisan Sheets", () => {
   }
 });
 
-test("serialisasi parameter PostgREST", () => {
-  const parameter = (where: Where) => {
-    const hasil = keParameter(keKondisi(where, keKolom));
-    return hasil === null ? null : decodeURIComponent(hasil);
-  };
-  assert.equal(parameter({}), null);
-  assert.equal(parameter({ status: "a" }), 'and=(status.eq."a")');
-  assert.equal(parameter({ tmtKgbBaru: T1 }), 'and=(tmt_kgb_baru.eq."2026-01-01T00:00:00.000Z")');
-  assert.equal(parameter({ status: { in: ["a", null] } }), 'or=(status.in.("a"),status.is.null)');
-  assert.equal(
-    parameter({ status: { not: "a" }, aktif: true }),
-    'and=(or(status.neq."a",status.is.null),aktif.eq."true")',
-  );
-  assert.equal(parameter({ nama: { contains: '50%"x' } }), 'and=(nama.ilike."%50\\\\%\\"x%")');
-  assert.throws(() => keParameter(keKondisi({ OR: [] }, keKolom)));
-});
-
 test("konversi nilai meniru lapisan Sheets", () => {
   assert.equal(keJson("", "string"), null);
   assert.equal(keJson("", "int"), null);
@@ -125,7 +108,4 @@ test("konversi nilai meniru lapisan Sheets", () => {
   assert.equal(keJson("12", "int"), 12);
   assert.equal(keJson(new Date("2026-01-01T00:00:00Z"), "datetime"), "2026-01-01T00:00:00.000Z");
   assert.equal(keJson("bukan tanggal", "datetime"), null);
-  assert.equal(dariJson("", "string"), null);
-  assert.equal(dariJson(null, "boolean"), null);
-  assert.deepEqual(dariJson("2026-01-01T00:00:00+00:00", "datetime"), new Date("2026-01-01T00:00:00Z"));
 });

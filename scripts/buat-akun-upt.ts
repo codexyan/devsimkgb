@@ -13,7 +13,8 @@
 // Tanpa --terapkan skrip hanya memeriksa dan melaporkan rencananya (uji kering). Dengan --terapkan
 // akun dibuat, lalu berkas kredensial ditulis di sebelah berkas daftar.
 //
-// Backend mengikuti DATA_BACKEND seperti aplikasi: lokal untuk uji coba, supabase untuk produksi.
+// Backend mengikuti DATA_BACKEND seperti aplikasi: lokal untuk uji coba. D1 produksi hanya terjangkau lewat binding Worker,
+// jadi skrip ini tidak dapat menulis ke produksi.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";

@@ -1,12 +1,12 @@
-// Repository generik di atas satu tabel Cloudflare D1 (ADR-085), dengan perilaku yang sama seperti SupabaseTable
-// (lib/db/supabase/table.ts) dan Table Sheets: urutan bawaan mengikuti urutan data dimasukkan (urutan_sisip), update dan
-// delete menyasar record pertama yang cocok, dan string kosong disimpan sebagai null.
+// Repository generik di atas satu tabel Cloudflare D1 (ADR-085), dengan perilaku yang sama seperti Table Sheets
+// (lib/sheets/table.ts): urutan bawaan mengikuti urutan data dimasukkan (urutan_sisip), update dan delete menyasar
+// record pertama yang cocok, dan string kosong disimpan sebagai null.
 
 import type { ColumnType, TableDef } from "../../sheets/table";
 import type { OrderBy, Repo, Where } from "../repo";
-import { keKondisi, type Kondisi } from "../supabase/filter";
-import { KOLOM_URUTAN, keSnake, namaTabel } from "../supabase/nama";
-import { keJson } from "../supabase/nilai";
+import { keKondisi, type Kondisi } from "../kondisi";
+import { KOLOM_URUTAN, keSnake, namaTabel } from "../nama";
+import { keJson } from "../nilai";
 import { BATAS_PARAMETER_D1, klienD1, type PernyataanD1 } from "./klien";
 import { keSql, type PotonganSql } from "./sql";
 
@@ -29,7 +29,7 @@ export function keD1(nilai: unknown, type: ColumnType): unknown {
   return v;
 }
 
-/** Nilai kolom D1 → nilai aplikasi (sama dengan dariJson Supabase untuk jenis yang dipakai aplikasi). */
+/** Nilai kolom D1 → nilai aplikasi. */
 export function dariD1(mentah: unknown, type: ColumnType): unknown {
   if (mentah === undefined || mentah === null) return null;
   switch (type) {

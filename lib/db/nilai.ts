@@ -1,10 +1,11 @@
-// Konversi nilai antara aplikasi dan JSON PostgREST. Aturannya meniru lapisan Google Sheets
+// Konversi nilai aplikasi ke nilai kolom SQL. Aturannya meniru lapisan Google Sheets
 // (serializeCell lalu parseCell di lib/sheets/table.ts) supaya perilaku aplikasi tidak berubah
 // saat penyimpanan diganti: string kosong dibaca sebagai null, dan boolean mengikuti truthy nilainya.
+// Arah sebaliknya (kolom → nilai aplikasi) ada di lib/db/d1/table.ts.
 
-import type { ColumnType } from "../../sheets/table";
+import type { ColumnType } from "../sheets/table";
 
-/** Nilai aplikasi → nilai JSON untuk kolom Postgres. */
+/** Nilai aplikasi → nilai untuk kolom SQL. */
 export function keJson(nilai: unknown, type: ColumnType): unknown {
   if (nilai === undefined || nilai === null) return null;
   if (type === "boolean") return Boolean(nilai);
@@ -26,26 +27,5 @@ export function keJson(nilai: unknown, type: ColumnType): unknown {
       return nilai;
     default:
       return String(nilai);
-  }
-}
-
-/** Nilai JSON dari PostgREST → nilai aplikasi. */
-export function dariJson(mentah: unknown, type: ColumnType): unknown {
-  if (mentah === undefined || mentah === null) return null;
-  switch (type) {
-    case "datetime":
-      return new Date(String(mentah));
-    case "int":
-      return typeof mentah === "number" ? mentah : Number.parseInt(String(mentah), 10);
-    case "float":
-      return typeof mentah === "number" ? mentah : Number.parseFloat(String(mentah));
-    case "boolean":
-      return mentah === true || mentah === "true";
-    case "json":
-      return mentah;
-    default: {
-      const teks = typeof mentah === "string" ? mentah : String(mentah);
-      return teks === "" ? null : teks;
-    }
   }
 }
