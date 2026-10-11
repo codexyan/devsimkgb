@@ -36,6 +36,7 @@ const AKSI_CONFIG: Record<string, { label: string; nada: NadaAksi; kelompok: str
   input_kgb_arsip:          { label: "Arsip KGB",              nada: "kuning", kelompok: "KGB" },
   generate_surat:           { label: "Buat SK",                nada: "hijau",  kelompok: "KGB" },
   upload_sk:                { label: "Unggah SK TTE Srikandi", nada: "hijau", kelompok: "KGB" },
+  upload_sk_arsip:          { label: "Unggah berkas SK",       nada: "hijau",  kelompok: "KGB" },
   ubah_penetap_sk:          { label: "Ubah penetap SK",        nada: "abu",    kelompok: "KGB" },
   reject_kgb:               { label: "Batalkan KGB",           nada: "merah",  kelompok: "KGB" },
   fix_arsip:                { label: "Koreksi arsip historis", nada: "kuning", kelompok: "KGB" },
