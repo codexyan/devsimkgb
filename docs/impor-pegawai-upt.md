@@ -45,7 +45,7 @@ Akun tersebut hanya dapat melihat, dan hanya satkernya sendiri:
 
 - daftar pegawai satker beserta status KGB-nya di Kanwil;
 - jadwal pengiriman surat usulan enam bulan ke depan;
-- SK yang sudah dikonfirmasi keuangan, untuk diunduh.
+- SK KGB yang sudah diunggah Tim SDM Kanwil (sejak berstatus Menunggu Keuangan), untuk diunduh.
 
 Yang tidak dapat dilakukan akun UPT: mengubah data apa pun, membuka modul Kanwil (Proses KGB, Laporan,
 Keuangan, Hukuman Disiplin, Satker & UPT), dan melihat rincian hukuman disiplin. Hukdis hanya tampil sebagai
@@ -56,8 +56,9 @@ akun lalu buat ulang.
 
 ## Yang perlu diingat
 
-- SK baru dapat diunduh UPT **setelah dikonfirmasi keuangan**; sebelum itu statusnya tetap terlihat, tetapi
-  berkasnya belum tersedia.
+- SK dapat diunduh UPT **begitu Tim SDM Kanwil mengunggah SK bertanda tangan** (status Menunggu Keuangan); UPT lalu
+  merekamnya di Gaji Web satker dan menandainya di SIM-KGB.
 - Surat usulan resmi tetap dikirim lewat Srikandi. SIM-KGB hanya menampilkan jadwal dan statusnya.
-- Jadwalnya: surat UPT dikirim pada bulan ketiga sebelum TMT dan diterima Kanwil paling lambat awal bulan
-  kedua sebelum TMT; batas input Tim SDM ada di Pengaturan (`batas_input_sdm`).
+- Jadwalnya (ADR-094): surat UPT dikirim tanggal 1 sampai batas kirim (Pengaturan, bawaan 20) pada bulan kedua
+  sebelum TMT; Tim SDM menginput sampai batas input pada bulan yang sama (Pengaturan, `batas_input_sdm`); rekon Gaji
+  Web tanggal 1–15 bulan sebelum TMT.

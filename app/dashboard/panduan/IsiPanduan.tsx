@@ -766,7 +766,7 @@ export default async function IsiPanduan({
 
                 <h3 className="pub-h3">Enam langkah yang berulang tiap periode</h3>
                 <ol>
-                  <li>Buka SIM-KGB dan kenali enam menu Anda.</li>
+                  <li>Buka SIM-KGB dan kenali menu Anda.</li>
                   <li>Tunggu pengingat masa kirim, atau lihat sendiri pita jadwal di dashboard.</li>
                   <li>Pastikan data pegawai sudah sama dengan SK; yang keliru dibetulkan lewat usulan.</li>
                   <li>Siapkan usulan di Usul KGB Kolektif: pilih pegawainya, lengkapi data dan berkasnya.</li>
@@ -776,21 +776,25 @@ export default async function IsiPanduan({
 
                 <h3 className="pub-h3">Membaca pita jadwal di dashboard</h3>
                 <p>
-                  Pita di kepala dashboard tersusun menurut <strong>bulan kirim</strong> surat usulan. Kartu paling lebar
-                  adalah bulan berjalan: garis emas menandai jendela kirim (tanggal 1 sampai batas kirim), titik putih
-                  menandai hari ini, dan hitung mundur menyebut sisa harinya. Di bawahnya tertulis bulan TMT yang
-                  diusulkan, dua bulan kemudian. Batang berwarna membagi pegawai menjadi <strong>Perlu diusulkan</strong>{" "}
-                  (kuning), <strong>Di Kanwil</strong> (biru), <strong>SK terbit</strong> (hijau toska), dan{" "}
-                  <strong>Selesai</strong> (hijau), sama dengan kolom papan Alur KGB. Klik kartu untuk melihat daftar
-                  pegawainya per tahap. Kartu <strong>Terlambat</strong> muncul bila ada TMT yang sudah lewat jadwal kirim
-                  dan KGB-nya belum selesai; yang perlu segera dikejar adalah angka &ldquo;perlu diusulkan&rdquo; di
-                  dalamnya. Kartu KGB tahun ini menunjukkan berapa yang sudah selesai.
+                  Pita di kepala dashboard punya tiga bagian. Bagian kiri adalah <strong>Kirim &lt;bulan&gt;</strong>, masa
+                  kirim yang sedang berjalan: lingkaran hitung mundur menyebut sisa harinya, label <em>Terbuka</em> atau{" "}
+                  <em>Ditutup</em>, bulan TMT yang diusulkan (dua bulan kemudian), jumlah pegawai beserta yang masih perlu
+                  diusulkan, dan empat langkah bertanggal: Surat, Ajukan, Kanwil, dan Rekon. Tombol{" "}
+                  <strong>Rincian</strong> membuka keterangan tiap langkah. Bagian tengah, <strong>KGB per bulan
+                  TMT</strong>, memuat batang Januari sampai Desember yang warnanya mengikuti kolom papan Alur KGB:{" "}
+                  <strong>Perlu diusulkan</strong> (kuning), <strong>Di Kanwil</strong> (biru), <strong>SK terbit</strong>{" "}
+                  (hijau toska), dan <strong>Selesai</strong> (hijau); panah di atasnya berganti tahun, dan klik batang
+                  untuk melihat daftar pegawainya per tahap. Bagian kanan, <strong>KGB &lt;tahun&gt;</strong>, menunjukkan
+                  berapa yang sudah selesai dan berapa KGB yang ditunda karena hukuman disiplin. Tombol{" "}
+                  <strong>N terlambat</strong> muncul bila ada TMT yang sudah lewat jadwal kirim dan KGB-nya belum selesai;
+                  yang perlu segera dikejar adalah angka &ldquo;perlu diusulkan&rdquo; di dalamnya.
                 </p>
 
                 <h3 className="pub-h3">Langkah 1: Kenali menu Anda</h3>
                 <p>
-                  Sesudah masuk, menu di sisi kiri layar hanya berisi enam pilihan. Seluruhnya terbatas pada satker
-                  Anda: pegawai satker lain tidak pernah tampil, dan tidak ada menu Kanwil di sana.
+                  Sesudah masuk, menu di sisi kiri layar berisi enam menu kerja, ditambah Panduan, Cadangkan data, dan
+                  Notifikasi. Seluruhnya terbatas pada satker Anda: pegawai satker lain tidak pernah tampil, dan tidak ada
+                  menu Kanwil di sana.
                 </p>
                 <LayarMenu />
 
@@ -1108,7 +1112,7 @@ export default async function IsiPanduan({
                 </p>
                 <p>
                   Usulan tidak langsung mengubah data. Super Admin atau Tim SDM KGB meninjaunya lebih dulu, lalu memilih{" "}
-                  <strong>Setujui</strong> atau <strong>Kembalikan</strong> untuk revisi dengan catatan. Usulan yang
+                  <strong>Setujui dan terapkan</strong> atau <strong>Kembalikan ke UPT</strong> dengan catatan. Usulan yang
                   dikembalikan muncul lagi di Perlu dikerjakan beserta catatannya: perbaiki, lalu ajukan ulang; nomor
                   surat yang lama sudah terisi di jendela Ajukan ke Kanwil. Kanwil juga dapat mengembalikan usulan yang
                   <em>sudah disetujui</em>, misalnya bila belakangan ketahuan datanya keliru. Data pegawai tidak berubah:
@@ -1284,9 +1288,9 @@ export default async function IsiPanduan({
                     golongan baru (kenaikan pangkat), masa kerja golongan menurut SK, nomor, tanggal, TMT, pejabat
                     penetapnya, dan unggah <strong>pindaian SK-nya</strong>. Kotak <em>Dihitung sistem</em> langsung
                     menunjukkan akibatnya seperti Kanwil saat menyetujui: naik dari golongan II ke III tetap memotong
-                    masa kerja 5 tahun, dan masa kerja yang Anda salin dari SK dicocokkan dengan hitungan itu. Bila
-                    KGB pegawai itu sedang diproses Kanwil, atau SK KGB-nya sudah ditandatangani, langkah ini memberi
-                    tahu dampaknya sebelum Anda mengirim.
+                    masa kerja 5 tahun, dan masa kerja yang Anda salin dari SK dicocokkan dengan hitungan itu. Di Usul KGB
+                    Kolektif, bila KGB pegawai itu sedang diproses Kanwil atau SK KGB-nya sudah ditandatangani, langkah
+                    ini memberi tahu dampaknya sebelum Anda mengirim.
                   </p>
                   <p>
                     Laporan SK <strong>tidak menumpang surat usulan Srikandi</strong>: bila semua yang Anda ajukan
@@ -1594,7 +1598,7 @@ export default async function IsiPanduan({
                     <p>
                       Daftar berisi satu nama per pegawai, dikelompokkan per UPT dan dapat disaring per UPT; usulan lain
                       pegawai yang sama ada di Riwayat usulan pada detailnya. Periksa perbedaan isian dengan data yang tercatat, berkas SK dasar,
-                      dan dampaknya pada KGB yang sedang berjalan, lalu pilih Setujui atau Kembalikan. Kembalikan wajib
+                      dan dampaknya pada KGB yang sedang berjalan, lalu pilih Setujui dan terapkan atau Kembalikan ke UPT. Kembalikan wajib
                       disertai catatan; UPT memperbaikinya lalu mengajukan ulang dengan surat yang sama.
                     </p>
                     <p>
@@ -1979,8 +1983,9 @@ export default async function IsiPanduan({
                 </ol>
                 <p>
                   Laporan belum mengubah data pegawai maupun jadwal KGB. Satu pegawai hanya boleh punya satu laporan yang
-                  belum selesai. Selama masih Menunggu tinjauan, laporan dapat dibatalkan. Laporan yang Dikembalikan untuk
-                  diperbaiki membawa catatan Kanwil; pilih <strong>Kirim ulang</strong>, betulkan isiannya, lalu kirim.
+                  belum selesai. Selama masih Menunggu tinjauan atau Dikembalikan, laporan dapat dibatalkan. Laporan yang
+                  Dikembalikan membawa catatan Kanwil; pilih <strong>Perbaiki dan kirim ulang</strong>, betulkan isiannya,
+                  lalu pilih <strong>Kirim ulang</strong>.
                 </p>
 
                 <h3 className="pub-h3">Di Kanwil: mencatat atau mengembalikan</h3>

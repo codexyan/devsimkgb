@@ -3,6 +3,7 @@
 import { useState, type CSSProperties } from "react";
 import AngkaNaik from "@/app/dashboard/components/AngkaNaik";
 import { geserBulan, namaBulan } from "@/app/dashboard/satker/labelSatker";
+import { batasInputSdm } from "@/lib/batasInputSdm";
 import {
   TAHAP_PITA,
   langkahJendela,
@@ -52,7 +53,8 @@ export function teksLangkah(l: LangkahJendela, b: BulanPita, batasKirim: number)
     case "ajukan":
       return { judul: "Ajukan", ket: `${b.jumlah - b.perTahap.usulkan}/${b.jumlah}` };
     case "input":
-      return { judul: "Kanwil", ket: `${b.hariDalamBulan} ${kirim}` };
+      // Batas input Kanwil dari Pengaturan, dijepit ke hari terakhir bulan kirim (31 berarti akhir bulan).
+      return { judul: "Kanwil", ket: `${Math.min(batasInputSdm(), b.hariDalamBulan)} ${kirim}` };
     case "rekon":
       return { judul: "Rekon", ket: `15 ${bulanSingkat(geserBulan(b.bulanKirim, 1))}` };
   }

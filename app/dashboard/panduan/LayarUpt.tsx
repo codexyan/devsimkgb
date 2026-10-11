@@ -506,7 +506,7 @@ export function LayarKolektif2() {
       judul="Langkah 2: Lengkapi data & berkas"
       keterangan={[
         "Daftar pegawai yang Anda pilih. Lingkaran di sebelah nama menunjukkan seberapa lengkap isiannya; kerjakan satu per satu sampai penuh. Bila lebih dari delapan pegawai, ada kotak cari dan saringan Kurang/Lengkap.",
-        "Pilih dulu keadaannya. Belum pernah KGB hanya meminta TMT CPNS dan masa kerjanya 0 tahun 0 bulan.",
+        "Pilih dulu keadaannya. Belum pernah KGB hanya meminta TMT CPNS; masa kerjanya terisi otomatis dari langkah awal tabel gaji (0 tahun bagi II/a dan III/a, 3 tahun bagi II/c).",
         "Salin golongan dan masa kerja golongan dari SK, jangan dihitung sendiri. Isian yang Anda ubah ditandai kuning.",
         "Gaji pokok dan TMT KGB berikutnya dihitung sistem dari tabel PP 5/2024. Keduanya tidak diketik, sebab salah ketik di sini langsung menggeser uang.",
         "Jawab untuk tiap pegawai: sesudah SK KGB terakhir, adakah SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang belum tercatat? Bila ada, isi SK-nya. Baris di bawahnya menunjukkan SK yang akan menjadi Atas dasar SK KGB berikutnya.",

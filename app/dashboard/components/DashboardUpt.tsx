@@ -29,7 +29,7 @@ import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
 import MenuTindakan from "@/app/dashboard/components/MenuTindakan";
 import { PERISTIWA_BUKA_PENGUMUMAN_UPT } from "@/lib/pengumumanUpt";
 import type { JenisMutasi } from "@/lib/mutasiPegawai";
-import { batasKirimSurat } from "@/lib/batasInputSdm";
+import { batasInputSdm, batasKirimSurat } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
 import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
@@ -49,6 +49,14 @@ import {
   type TahapPita,
 } from "@/lib/pitaJadwalUpt";
 import PitaJadwalUpt from "@/app/dashboard/components/upt/PitaJadwalUpt";
+
+/** Batas input Kanwil pada bulan kirim menurut Pengaturan: "akhir Oktober" bila jatuh di hari terakhir, selain itu "20 Oktober 2026". */
+function teksBatasInput(bulanKirim: string): string {
+  const [y, m] = bulanKirim.split("-").map(Number);
+  const hariTerakhir = new Date(y, m, 0).getDate();
+  const tanggal = Math.min(batasInputSdm(), hariTerakhir);
+  return tanggal >= hariTerakhir ? `akhir ${namaBulan(bulanKirim, true).split(" ")[0]}` : `${tanggal} ${namaBulan(bulanKirim, true)}`;
+}
 
 /** Satu baris "Dasar KGB berikutnya": SK yang gaji pokoknya dipakai SK KGB berikutnya (ADR-030). */
 function teksDasarKgb(dasar: DasarKgbBerikutnya | null | undefined): string | null {
@@ -865,7 +873,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 href="/dashboard/upt/unggah"
                 className="dsb-tombol dsb-tombol-kecil"
                 data-jenis="garis"
-                title="Satu berkas CSV berisi banyak pegawai, diperiksa dan dikonfirmasi per baris sebelum tersimpan"
+                title="Satu berkas Excel atau CSV berisi banyak pegawai, diperiksa dan dikonfirmasi per baris sebelum tersimpan"
               >
                 Unggah daftar
               </Link>
@@ -1723,7 +1731,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                   Kirim surat <strong>1–{batasKirimSurat()} {namaBulan(geserBulan(dialogPeriode.bulanTmt, -2), true)}</strong>
                 </span>
                 <span>
-                  Input SIM-KGB Kanwil <strong>s.d. akhir {namaBulan(geserBulan(dialogPeriode.bulanTmt, -2), true).split(" ")[0]}</strong>
+                  Input SIM-KGB Kanwil <strong>s.d. {teksBatasInput(geserBulan(dialogPeriode.bulanTmt, -2))}</strong>
                 </span>
                 <span>
                   Rekon Gaji Web <strong>1–15 {namaBulan(geserBulan(dialogPeriode.bulanTmt, -1), true)}</strong>
