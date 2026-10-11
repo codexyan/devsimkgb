@@ -100,7 +100,7 @@ export default function ModalArsipKgb({ pegawai: ringkas, onTutup, onBerhasil }:
     if (sibuk) return;
     if (idTersimpan) {
       onBerhasil(
-        `Arsip KGB ${ringkas.nama} tersimpan dengan status Selesai, tetapi berkas SK belum diunggah. Unggah berkas SK melalui menu Proses KGB: pilih Detail pada baris KGB ini, lalu Unggah SK TTE Srikandi.`,
+        `Arsip KGB ${ringkas.nama} tersimpan dengan status Selesai, tetapi berkas SK belum diunggah. Unggah berkas SK melalui menu Proses KGB: pilih Detail pada baris KGB ini, lalu Unggah berkas SK.`,
       );
       return;
     }

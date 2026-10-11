@@ -16,7 +16,7 @@ sama: unduh versi Srikandi, tanda tangani dengan TTE di Srikandi, lalu unggah ha
 
 1. **"Unggah SK bertanda tangan" menjadi "Unggah SK TTE Srikandi"** di semua tempat yang menyebut tombol itu:
    - kartu dasbor Kanwil, detail dan baris Proses KGB, dan riwayat pegawai;
-   - pesan sesudah Buat SK atau Cetak SK, dan pesan Arsip KGB;
+   - pesan sesudah Buat SK atau Cetak SK;
    - log aktivitas (`upload_sk`), notifikasi review SK, dan alasan penolakan review SK (`lib/reviewSkUpt.ts`);
    - Panduan.
 2. **Jalur tanda tangan basah tetap ada, lewat tombol yang sama.** Pesan sesudah "Cetak untuk tanda tangan basah" kini
@@ -24,6 +24,12 @@ sama: unduh versi Srikandi, tanda tangani dengan TTE di Srikandi, lalu unggah ha
    sudah ada di jendela unggah (`PemeriksaanTte`, ADR-096).
 3. Teks yang menyebut berkasnya, bukan tombolnya, tidak diubah, misalnya "Tim SDM Kanwil mengunggah SK bertanda tangan"
    dan "pindaian SK bertanda tangan basah". Jendela unggah tetap menyebut kedua bentuk berkas yang diterima.
+4. **KGB arsip memakai label "Unggah berkas SK"** (ditetapkan pengguna sesudah butir 1 berlaku). Tombol yang sama muncul
+   untuk KGB arsip berstatus Selesai yang belum punya berkas SK, padahal SK lama di arsip bisa saja bertanda tangan basah
+   dan tidak berasal dari Srikandi.
+   - Label ini dipakai di detail Proses KGB (bila `isArsip`) dan di riwayat pegawai.
+   - Pesan sesudah Arsip KGB disimpan tanpa berkas, catatan detail KGB arsip, dan Panduan Arsip KGB ikut menyebutnya.
+   - Jendela unggahnya tetap sama.
 
 ## Akibat
 
