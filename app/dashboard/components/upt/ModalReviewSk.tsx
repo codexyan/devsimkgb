@@ -7,7 +7,7 @@ import { ambilReviewSkUpt, pdfReviewSkUpt, tanggapiReviewSkUpt, type ReviewSkUnt
 import { formatTanggalId } from "@/lib/waktu";
 
 /* Review tampilan SK KGB oleh Admin UPT (ADR-077). Kanwil sudah membuat SK pegawai satker ini; Admin UPT memeriksa
-   tampilannya sebelum SK dicetak, ditandatangani basah, dan dikirim lewat Srikandi. PDF pratinjaunya disusun di
+   tampilannya sebelum SK ditandatangani dengan TTE dan dikirim lewat Srikandi. PDF pratinjaunya disusun di
    peramban dari isi yang sama dengan yang kelak dicetak Kanwil, dan selalu bertanda air DRAF. */
 
 const rupiah = (n: number | null | undefined) => (typeof n === "number" ? `Rp${n.toLocaleString("id-ID")}` : "-");
@@ -125,7 +125,7 @@ export default function ModalReviewSk({
         <div className="kgbm-kolom">
           <Catatan nada="navy">
             Kanwil sudah membuat SK KGB pegawai ini. Periksa nama, NIP, pangkat dan golongan, gaji pokok, masa kerja, serta TMT
-            sebelum SK dicetak, ditandatangani basah, dan dikirim lewat Srikandi. Pratinjau di samping bertanda air DRAF.
+            sebelum SK ditandatangani dengan TTE dan dikirim lewat Srikandi. Pratinjau di samping bertanda air DRAF.
           </Catatan>
           {data?.sesuaiUsulan && (
             <Catatan nada="hijau">
@@ -186,7 +186,7 @@ export default function ModalReviewSk({
                 fokusAwal
               />
               <Catatan>
-                Kanwil memperbaiki SK sesuai catatan ini, lalu permintaan review baru muncul lagi di Perlu dikerjakan. Bila yang
+                Kanwil memperbaiki SK sesuai catatan ini, lalu permintaan review baru muncul lagi di kolom Periksa SK. Bila yang
                 keliru adalah data pegawai (golongan, masa kerja, TMT), sebutkan juga dasarnya agar Kanwil dapat mencocokkannya.
               </Catatan>
             </>

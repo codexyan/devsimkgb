@@ -244,8 +244,8 @@ export function notifikasiReviewSk(
     pesan:
       `Kanwil ${ulang ? "sudah memperbaiki" : "sudah menyiapkan"} SK KGB ${nama} (${nip})` +
       `${kgb.tmtKgbBaru ? ` TMT ${formatTanggalId(kgb.tmtKgbBaru)}` : ""}${surat.nomorSurat ? `, nomor ${surat.nomorSurat}` : ""}. ` +
-      "Periksa tampilannya di Perlu dikerjakan, lalu nyatakan sudah benar atau minta perbaikan. SK baru dicetak, " +
-      "ditandatangani, dan dikirim lewat Srikandi setelah Anda menyetujuinya.",
+      "Periksa tampilannya di kolom Periksa SK, lalu nyatakan sudah benar atau minta perbaikan. SK baru ditandatangani " +
+      "dengan TTE dan dikirim lewat Srikandi setelah Anda menyetujuinya.",
     tipe: T.REVIEW_SK,
     referenceId: kgb.id,
     prioritas: "warning",
