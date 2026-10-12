@@ -266,7 +266,7 @@ export default function ProfilePage() {
               <Field label="NIP" value={profile?.nip ?? ""} readOnly hint="NIP tidak dapat diubah" />
               <Field label="Nama Lengkap" value={nama} onChange={hasPending ? undefined : setNama} readOnly={hasPending} placeholder="Masukkan nama lengkap" />
               <Field label="Jabatan" value={jabatan} onChange={hasPending ? undefined : setJabatan} readOnly={hasPending} placeholder="Contoh: Analis SDM" />
-              <Field label="Email" type="email" value={email} onChange={hasPending ? undefined : setEmail} readOnly={hasPending} placeholder="Contoh: nama@kemenkumham.go.id" />
+              <Field label="Email" type="email" value={email} onChange={hasPending ? undefined : setEmail} readOnly={hasPending} placeholder="Contoh: nama@kemenimipas.go.id" />
 
               {!hasPending && (
                 <div className="flex justify-end pt-1">
