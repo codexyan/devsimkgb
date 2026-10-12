@@ -7,7 +7,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { alasanTolakTanpaReview, infoReviewSk, pegawaiPerluReviewSk, skBolehDicetak } from "./reviewSkUpt";
+import {
+  alasanTolakTanpaReview,
+  formatSisaWaktu,
+  infoReviewSk,
+  kesempatanLewatiReview,
+  pegawaiPerluReviewSk,
+  pesanBelumBolehLewati,
+  skBolehDicetak,
+} from "./reviewSkUpt";
 
 const UPT = "Rumah Tahanan Negara Kelas IIB Rantau";
 const KANWIL = "Kantor Wilayah Direktorat Jenderal Pemasyarakatan Kalimantan Selatan";
@@ -114,23 +122,88 @@ test("permintaan, tanggapan setuju, dan permintaan ulang setelah SK diperbaiki",
   });
 });
 
-test("Super Admin melewati review dengan alasan; tidak ada yang dilewati tanpa permintaan", async () => {
+const JAM = 60 * 60 * 1000;
+const sesudah = (jam: number, menit = 0) => new Date(SEKARANG.getTime() + jam * JAM + menit * 60_000);
+
+test("Lewati review hanya terbuka sesudah UPT menunggu 24 jam (ADR-109)", () => {
+  const menunggu = (dimintaAt: string | Date | null) => ({ status: "menunggu" as const, dimintaAt });
+  const diminta = SEKARANG.toISOString();
+
+  assert.deepEqual(kesempatanLewatiReview(null, SEKARANG), { boleh: false, sebab: "bukan_menunggu" });
+  assert.equal(kesempatanLewatiReview({ status: null, dimintaAt: null }, SEKARANG).boleh, false, "SK lama: minta review dulu");
+  for (const status of ["perbaikan", "disetujui", "dilewati"] as const)
+    assert.deepEqual(kesempatanLewatiReview({ status, dimintaAt: diminta }, sesudah(100)), { boleh: false, sebab: "bukan_menunggu" }, status);
+
+  // Seketika dan 23 jam 59 menit: UPT masih dalam jendelanya, dengan sisa waktu yang tepat.
+  assert.deepEqual(kesempatanLewatiReview(menunggu(diminta), SEKARANG), { boleh: false, sebab: "belum_24_jam", sisaMs: 24 * JAM });
+  assert.deepEqual(kesempatanLewatiReview(menunggu(diminta), sesudah(23, 59)), { boleh: false, sebab: "belum_24_jam", sisaMs: 60_000 });
+  // Genap 24 jam dan sesudahnya: terbuka.
+  assert.deepEqual(kesempatanLewatiReview(menunggu(diminta), sesudah(24)), { boleh: true });
+  assert.deepEqual(kesempatanLewatiReview(menunggu(SEKARANG), sesudah(80)), { boleh: true }, "dimintaAt boleh berupa Date (sisi server)");
+  // Baris lama berstatus sesuai dibaca sebagai menunggu (normalReviewSk).
+  assert.equal(kesempatanLewatiReview({ status: "sesuai", dimintaAt: diminta }, sesudah(25)).boleh, true);
+  // Tanpa waktu permintaan, 24 jam tidak dapat dibuktikan.
+  assert.deepEqual(kesempatanLewatiReview(menunggu(null), sesudah(100)), { boleh: false, sebab: "tanpa_waktu" });
+  assert.deepEqual(kesempatanLewatiReview(menunggu("bukan tanggal"), sesudah(100)), { boleh: false, sebab: "tanpa_waktu" });
+
+  assert.equal(pesanBelumBolehLewati({ boleh: true }), null);
+  assert.match(pesanBelumBolehLewati({ boleh: false, sebab: "belum_24_jam", sisaMs: 7 * JAM + 20 * 60_000 }) ?? "", /24 jam.*7 jam 20 menit/);
+  assert.match(pesanBelumBolehLewati({ boleh: false, sebab: "bukan_menunggu" }) ?? "", /masih menunggu tanggapan UPT/);
+
+  assert.equal(formatSisaWaktu(7 * JAM + 20 * 60_000), "7 jam 20 menit");
+  assert.equal(formatSisaWaktu(2 * JAM), "2 jam");
+  assert.equal(formatSisaWaktu(35 * 60_000), "35 menit");
+  assert.equal(formatSisaWaktu(1_000), "1 menit", "dibulatkan ke atas, tidak pernah 0 menit");
+});
+
+test("Super Admin melewati review dengan alasan, hanya sesudah 24 jam; tidak ada yang dilewati tanpa permintaan", async () => {
   await denganDataLokal(async () => {
     const db = await siapkanKgb();
     const { mintaReviewSk, lewatiReviewSk, tanggapiReviewSk } = await import("./reviewSkUptServer");
-    assert.equal((await lewatiReviewSk({ kgbId: "k1", alasan: "mendesak", oleh: "SA", sekarang: SEKARANG })).ok, false, "belum pernah diminta");
+    assert.equal((await lewatiReviewSk({ kgbId: "k1", alasan: "mendesak", oleh: "SA", sekarang: sesudah(100) })).ok, false, "belum pernah diminta");
     await mintaReviewSk({ kgb: { id: "k1", tmtKgbBaru: null }, pegawai, nomorSurat: "W.19-2", tanggalSurat: SEKARANG, oleh: "SDM", sekarang: SEKARANG });
-    assert.equal((await lewatiReviewSk({ kgbId: "k1", alasan: " ", oleh: "SA", sekarang: SEKARANG })).ok, false, "alasan wajib");
-    const lewat = await lewatiReviewSk({ kgbId: "k1", alasan: "Batas proses hari ini", oleh: "SA (9)", sekarang: SEKARANG });
+    assert.equal((await lewatiReviewSk({ kgbId: "k1", alasan: " ", oleh: "SA", sekarang: sesudah(25) })).ok, false, "alasan wajib");
+
+    // Server menolak sebelum 24 jam, dengan sisa waktunya, dan tidak mengubah apa pun.
+    const terlalu = await lewatiReviewSk({ kgbId: "k1", alasan: "Batas proses hari ini", oleh: "SA (9)", sekarang: sesudah(23, 59) });
+    assert.equal(terlalu.ok, false);
+    if (!terlalu.ok) {
+      assert.equal(terlalu.status, 409);
+      assert.match(terlalu.pesan, /24 jam.*1 menit/);
+    }
+    assert.equal((await db.reviewSkUpt.findUnique({ id: "k1" }))?.status, "menunggu");
+    assert.equal((await db.notifikasi.findMany({ where: { tipe: "review_sk" } })).length, 1, "UPT tetap ditagih");
+
+    const lewat = await lewatiReviewSk({ kgbId: "k1", alasan: "Batas proses hari ini", oleh: "SA (9)", sekarang: sesudah(24) });
     assert.equal(lewat.ok, true);
     const r = await db.reviewSkUpt.findUnique({ id: "k1" });
     assert.equal(r?.status, "dilewati");
     assert.equal(r?.alasanLewati, "Batas proses hari ini");
     assert.equal((await db.notifikasi.findMany({ where: { tipe: "review_sk" } })).length, 0, "permintaan ke UPT ditutup");
     // UPT tidak lagi dapat menanggapi.
-    const telat = await tanggapiReviewSk({ kgbId: "k1", satker: "rutan-rantau", keputusan: "setuju", catatan: "", oleh: "UPT", sekarang: SEKARANG });
+    const telat = await tanggapiReviewSk({ kgbId: "k1", satker: "rutan-rantau", keputusan: "setuju", catatan: "", oleh: "UPT", sekarang: sesudah(24) });
     assert.equal(telat.ok, false);
     if (!telat.ok) assert.match(telat.pesan, /tanpa menunggu review/);
+  });
+});
+
+test("saat UPT meminta perbaikan tidak ada Lewati review; Perbaiki SK memulai jam 24 lagi (ADR-109)", async () => {
+  await denganDataLokal(async () => {
+    const db = await siapkanKgb();
+    const { mintaReviewSk, lewatiReviewSk, tanggapiReviewSk } = await import("./reviewSkUptServer");
+    await mintaReviewSk({ kgb: { id: "k1", tmtKgbBaru: null }, pegawai, nomorSurat: "W.19-4", tanggalSurat: SEKARANG, oleh: "SDM", sekarang: SEKARANG });
+    await tanggapiReviewSk({ kgbId: "k1", satker: "rutan-rantau", keputusan: "perbaikan", catatan: "Golongan keliru", oleh: "UPT", sekarang: sesudah(1) });
+
+    // Bolanya di Kanwil: berapa lama pun, Lewati review ditolak dan jalurnya Perbaiki SK.
+    const ditolak = await lewatiReviewSk({ kgbId: "k1", alasan: "mendesak", oleh: "SA", sekarang: sesudah(100) });
+    assert.equal(ditolak.ok, false);
+    if (!ditolak.ok) assert.match(ditolak.pesan, /meminta perbaikan.*Perbaiki SK/);
+    assert.equal((await db.reviewSkUpt.findUnique({ id: "k1" }))?.status, "perbaikan");
+
+    // Perbaiki SK meminta review ulang: jam 24 dihitung dari permintaan baru, bukan yang pertama.
+    await mintaReviewSk({ kgb: { id: "k1", tmtKgbBaru: null }, pegawai, nomorSurat: "W.19-4", tanggalSurat: SEKARANG, oleh: "SDM", sekarang: sesudah(48) });
+    assert.equal((await lewatiReviewSk({ kgbId: "k1", alasan: "mendesak", oleh: "SA", sekarang: sesudah(48 + 23) })).ok, false);
+    assert.equal((await lewatiReviewSk({ kgbId: "k1", alasan: "mendesak", oleh: "SA", sekarang: sesudah(48 + 24) })).ok, true);
   });
 });
 

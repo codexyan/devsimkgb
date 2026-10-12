@@ -11,7 +11,7 @@ import { TIPE_NOTIFIKASI, notifikasiHasilReviewSk, notifikasiReviewSk } from "./
 import { kodeSatkerPegawai } from "./rekapSatker";
 import { SATKER } from "./satker";
 import type { PegawaiRow, ReviewSkUptRow, RiwayatKGBRow } from "./sheets/tables";
-import { normalReviewSk } from "./reviewSkUpt";
+import { kesempatanLewatiReview, normalReviewSk, pesanBelumBolehLewati } from "./reviewSkUpt";
 
 type Gagal = { ok: false; status: number; pesan: string };
 const gagal = (status: number, pesan: string): Gagal => ({ ok: false, status, pesan });
@@ -161,7 +161,10 @@ export async function tanggapiReviewSk(input: {
   return { ok: true, review, pegawai };
 }
 
-/** Super Admin melanjutkan SK tanpa menunggu review UPT, dengan alasan yang tercatat. */
+/**
+ * Super Admin melanjutkan SK tanpa menunggu review UPT, dengan alasan yang tercatat. Hanya bila permintaannya sudah
+ * menunggu UPT lebih dari 24 jam (ADR-109); saat UPT meminta perbaikan jalurnya Perbaiki SK, bukan melewati.
+ */
 export async function lewatiReviewSk(input: {
   kgbId: string;
   alasan: string;
@@ -176,6 +179,11 @@ export async function lewatiReviewSk(input: {
   if (!ada.review) return gagal(404, "SK ini belum pernah dimintakan review ke UPT, jadi tidak ada yang dilewati.");
   if (ada.review.status !== "menunggu" && ada.review.status !== "perbaikan")
     return gagal(409, ada.review.status === "disetujui" ? "SK ini sudah disetujui UPT." : "Review SK ini sudah dilewati.");
+  // Semua SK pegawai UPT melalui review UPT lebih dulu; dilewati hanya sesudah UPT menunggu 24 jam (ADR-109).
+  if (ada.review.status === "perbaikan")
+    return gagal(409, "UPT meminta perbaikan SK ini. Perbaiki SK; review diminta ulang otomatis dan baru dapat dilewati bila UPT tidak menanggapi dalam 24 jam.");
+  const kesempatan = kesempatanLewatiReview({ status: "menunggu", dimintaAt: ada.review.dimintaAt }, sekarang);
+  if (!kesempatan.boleh) return gagal(409, pesanBelumBolehLewati(kesempatan) ?? "Review belum dapat dilewati.");
 
   const ubah = { status: "dilewati", alasanLewati: alasan, ditanggapiAt: sekarang, ditanggapiOleh: oleh };
   await db.reviewSkUpt.update({ id: kgbId }, ubah);

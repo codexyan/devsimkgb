@@ -1773,7 +1773,8 @@ export default async function IsiPanduan({
                     </p>
                     <p>
                       <strong>SK pegawai UPT direview Admin UPT lebih dulu.</strong> Untuk pegawai UPT, tombolnya menjadi{" "}
-                      <strong>Buat SK dan minta review UPT</strong>: SK tercatat, tetapi tidak diunduh, dan Admin UPT satker
+                      <strong>Buat SK dan Minta Review UPT</strong> (di kartu Sedang diproses: <strong>Perbaiki SK dan Minta Review UPT</strong>
+                      bila SK sudah pernah dibuat): SK tercatat, tetapi tidak diunduh, dan Admin UPT satker
                       itu menerima permintaan review di lonceng dan di kolom Periksa SK, termasuk SK yang sama dengan usulan
                       UPT yang disetujui. Selama belum disetujui, kartu
                       pegawai bertanda <em>Menunggu review UPT</em>, setiap unduhan SK bertanda air DRAF, dan Unggah SK TTE Srikandi
@@ -1783,8 +1784,11 @@ export default async function IsiPanduan({
                       kirim lewat Srikandi, lalu Unggah SK TTE Srikandi. Bila banyak SK siap cetak, tombol{" "}
                       <strong>ZIP N SK untuk TTE</strong> di kolom Sedang diproses mengunduh semuanya dalam satu ZIP;
                       panah di sebelahnya mengunduh ZIP untuk tanda tangan basah. Nama berkas SK berbentuk nomor urut surat,
-                      TTE atau TTD, KGB, lalu nama pegawai, mis. <code>1758 TTE KGB Abdul Hayat.pdf</code>. Untuk keadaan mendesak, Super Admin dapat memilih{" "}
-                      <strong>Lewati review</strong> dengan alasan yang tercatat di Log Aktivitas. SK pegawai Kanwil tidak
+                      TTE atau TTD, KGB, lalu nama pegawai, mis. <code>1758 TTE KGB Abdul Hayat.pdf</code>. Semua SK pegawai UPT melalui review UPT lebih dulu. Untuk keadaan mendesak, Super Admin dapat memilih{" "}
+                      <strong>Lewati review</strong> dengan alasan yang tercatat di Log Aktivitas, tetapi tombolnya baru muncul
+                      bila permintaan review sudah menunggu UPT <strong>lebih dari 24 jam</strong>; kartu menunjukkan sisa
+                      waktunya. Jam 24 dihitung dari permintaan terakhir, jadi Perbaiki SK memulainya lagi. Saat UPT meminta
+                      perbaikan tidak ada Lewati review: jalurnya Perbaiki SK. SK pegawai Kanwil tidak
                       melalui review ini. SK pegawai UPT yang dibuat sebelum review aktif juga tertahan sampai direview:
                       pilih <strong>Minta review UPT</strong>.
                     </p>

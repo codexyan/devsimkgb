@@ -9,8 +9,8 @@ import { subjudulPegawai, type RingkasPegawai } from "./format";
 import { IkonPeringatan } from "./ikon";
 
 /* Super Admin melanjutkan SK pegawai UPT tanpa menunggu review Admin UPT (ADR-077). Hanya untuk keadaan mendesak,
-   misalnya batas waktu; alasannya wajib dan tercatat di Log Aktivitas. Sesudahnya SK dapat dicetak tanpa tanda air
-   dan diunggah TTE. */
+   misalnya batas waktu, dan hanya sesudah UPT menunggu lebih dari 24 jam (ADR-109); alasannya wajib dan tercatat di
+   Log Aktivitas. Sesudahnya SK dapat dicetak tanpa tanda air dan diunggah TTE. */
 
 interface PropsModalLewatiReview {
   kgbId: string;
@@ -64,9 +64,9 @@ export default function ModalLewatiReview({ kgbId, pegawai, reviewSk, onTutup, o
       }
     >
       <Catatan nada="amber">
-        SK ini akan dicetak dan diunggah TTE tanpa persetujuan Admin UPT. Pakai hanya untuk keadaan mendesak, misalnya
-        batas waktu yang hampir lewat. Alasannya tercatat di Log Aktivitas, dan permintaan review di daftar kerja UPT
-        ditutup.
+        Permintaan review ini sudah menunggu Admin UPT lebih dari 24 jam. SK akan dicetak dan diunggah TTE tanpa
+        persetujuan Admin UPT. Pakai hanya untuk keadaan mendesak, misalnya batas waktu yang hampir lewat. Alasannya
+        tercatat di Log Aktivitas, dan permintaan review di daftar kerja UPT ditutup.
       </Catatan>
       {reviewSk?.status === "perbaikan" && reviewSk.catatan && (
         <Catatan nada="merah">UPT meminta perbaikan: {reviewSk.catatan}</Catatan>
