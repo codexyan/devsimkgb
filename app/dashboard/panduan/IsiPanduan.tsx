@@ -1787,7 +1787,9 @@ export default async function IsiPanduan({
                       TTE atau TTD, KGB, lalu nama pegawai, mis. <code>1758 TTE KGB Abdul Hayat.pdf</code>. Semua SK pegawai UPT melalui review UPT lebih dulu. Untuk keadaan mendesak, Super Admin dapat memilih{" "}
                       <strong>Lewati review</strong> dengan alasan yang tercatat di Log Aktivitas, tetapi tombolnya baru muncul
                       bila permintaan review sudah menunggu UPT <strong>lebih dari 24 jam</strong>; kartu menunjukkan sisa
-                      waktunya. Jam 24 dihitung dari permintaan terakhir, jadi Perbaiki SK memulainya lagi. Saat UPT meminta
+                      waktunya. Jam 24 dihitung dari permintaan terakhir, jadi Perbaiki SK memulainya lagi. Penantian itu hanya
+                      berlaku sampai batas input Kanwil (akhir bulan, dua bulan sebelum TMT): begitu batas input lewat dan
+                      masa input Kanwil habis, Lewati review langsung muncul tanpa menunggu 24 jam. Saat UPT meminta
                       perbaikan tidak ada Lewati review: jalurnya Perbaiki SK. SK pegawai Kanwil tidak
                       melalui review ini. SK pegawai UPT yang dibuat sebelum review aktif juga tertahan sampai direview:
                       pilih <strong>Minta review UPT</strong>.

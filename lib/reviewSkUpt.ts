@@ -5,13 +5,14 @@
 // ditandatangani basah dan dikirim lewat Srikandi, lalu mengunggah TTE. Sebelum disetujui, PDF yang diunduh bertanda air
 // DRAF dan Unggah TTE ditolak. Bila UPT meminta perbaikan, Kanwil memperbaiki SK dan review diminta lagi. Super Admin
 // dapat melewati review untuk keadaan mendesak, dengan alasan yang tercatat, tetapi hanya sesudah UPT menunggu lebih dari
-// 24 jam (ADR-109). Pegawai Kanwil tidak melalui review ini.
+// 24 jam, atau begitu batas input Kanwil lewat (ADR-109). Pegawai Kanwil tidak melalui review ini.
 //
 // Setiap SK pegawai UPT menunggu UPT, termasuk yang sama persis dengan usulannya (ADR-087, mengganti ADR-082) dan SK
 // lama yang dibuat sebelum review aktif.
 
 import { dipegangKeuanganKanwil } from "./aksesUpt";
 import type { ReviewSkUptRow } from "./sheets/tables";
+import { akhirHariWita } from "./waktu";
 
 /**
  * "sesuai": dulu SK yang sama dengan usulan UPT ditandai sendiri tanpa review (ADR-082). Sejak ADR-087 status ini tidak
@@ -109,13 +110,18 @@ const BATAS_LEWATI_REVIEW_MS = BATAS_LEWATI_REVIEW_JAM * 60 * 60 * 1000;
  * dulu, jadi Lewati review baru terbuka bila UPT sudah **menunggu** lebih dari 24 jam sejak review diminta. Jamnya
  * dihitung dari `dimintaAt`, yang diisi ulang tiap Buat SK, Perbaiki SK, atau Minta review UPT.
  *
+ * Penantian 24 jam itu hanya berlaku sampai batas input Kanwil (`batasInput`: tanggal akhir bulan, dua bulan sebelum TMT).
+ * Begitu hari batas itu berakhir, masa input Kanwil sudah habis dan menunggu lagi hanya menambah keterlambatan, jadi
+ * Lewati review terbuka tanpa menunggu 24 jam penuh: pada `min(dimintaAt + 24 jam, akhir hari batas input)`.
+ *
  * - `bukan_menunggu`: tidak ada yang ditunggu dari UPT. UPT sudah menanggapi (perbaikan: bolanya di Kanwil, jalurnya
- *   Perbaiki SK), atau review belum pernah diminta (jalurnya Minta review UPT).
- * - `belum_24_jam`: masih dalam jendela UPT; `sisaMs` sampai tombolnya terbuka.
- * - `tanpa_waktu`: menunggu, tetapi waktu permintaannya tidak tercatat sehingga 24 jam tidak dapat dibuktikan.
+ *   Perbaiki SK), atau review belum pernah diminta (jalurnya Minta review UPT). Batas input tidak mengubah ini.
+ * - `belum_24_jam`: masih dalam jendela UPT; `sisaMs` sampai tombolnya terbuka (sudah memperhitungkan batas input).
+ * - `tanpa_waktu`: menunggu, tetapi waktu permintaannya tidak tercatat dan batas input belum lewat, sehingga 24 jam
+ *   tidak dapat dibuktikan.
  */
 export type KesempatanLewatiReview =
-  | { boleh: true }
+  | { boleh: true; dasar: "24_jam" | "batas_input" }
   | { boleh: false; sebab: "bukan_menunggu" }
   | { boleh: false; sebab: "belum_24_jam"; sisaMs: number }
   | { boleh: false; sebab: "tanpa_waktu" };
@@ -123,13 +129,20 @@ export type KesempatanLewatiReview =
 export function kesempatanLewatiReview(
   info: { status: StatusReviewSk | null; dimintaAt: string | Date | null | undefined } | null | undefined,
   sekarang: Date,
+  /** Tanggal batas input Kanwil (kalender WITA, new Date(y, m, d)); kosong bila tidak diketahui. */
+  batasInput?: Date | null,
 ): KesempatanLewatiReview {
   // "sesuai" dibaca sebagai "menunggu" (normalReviewSk), seperti di sisi server.
   if (!info || (info.status !== "menunggu" && info.status !== "sesuai")) return { boleh: false, sebab: "bukan_menunggu" };
+  const sekarangMs = sekarang.getTime();
   const diminta = info.dimintaAt ? new Date(info.dimintaAt).getTime() : NaN;
-  if (Number.isNaN(diminta)) return { boleh: false, sebab: "tanpa_waktu" };
-  const sisaMs = diminta + BATAS_LEWATI_REVIEW_MS - sekarang.getTime();
-  return sisaMs > 0 ? { boleh: false, sebab: "belum_24_jam", sisaMs } : { boleh: true };
+  const bukaLewat24Jam = Number.isNaN(diminta) ? NaN : diminta + BATAS_LEWATI_REVIEW_MS;
+  const bukaAkhirBatas = batasInput ? akhirHariWita(batasInput) : NaN;
+  const kandidat = [bukaLewat24Jam, bukaAkhirBatas].filter((ms) => Number.isFinite(ms));
+  if (kandidat.length === 0) return { boleh: false, sebab: "tanpa_waktu" };
+  const buka = Math.min(...kandidat);
+  if (buka > sekarangMs) return { boleh: false, sebab: "belum_24_jam", sisaMs: buka - sekarangMs };
+  return { boleh: true, dasar: Number.isFinite(bukaLewat24Jam) && bukaLewat24Jam <= sekarangMs ? "24_jam" : "batas_input" };
 }
 
 /** "7 jam 20 menit", "35 menit": dibulatkan ke atas ke menit penuh. */
@@ -145,7 +158,7 @@ export function formatSisaWaktu(ms: number): string {
 export function pesanBelumBolehLewati(kesempatan: KesempatanLewatiReview): string | null {
   if (kesempatan.boleh) return null;
   if (kesempatan.sebab === "belum_24_jam")
-    return `Review UPT baru dapat dilewati setelah menunggu ${BATAS_LEWATI_REVIEW_JAM} jam sejak diminta. Sisa waktunya ${formatSisaWaktu(kesempatan.sisaMs)}.`;
+    return `Review UPT baru dapat dilewati setelah menunggu ${BATAS_LEWATI_REVIEW_JAM} jam sejak diminta, atau begitu batas input Kanwil lewat. Sisa waktunya ${formatSisaWaktu(kesempatan.sisaMs)}.`;
   if (kesempatan.sebab === "tanpa_waktu")
     return `Waktu permintaan review tidak tercatat, jadi ${BATAS_LEWATI_REVIEW_JAM} jam menunggu UPT tidak dapat dipastikan. Pilih Perbaiki SK agar review diminta ulang, lalu tunggu.`;
   return "Review UPT hanya dapat dilewati selama permintaannya masih menunggu tanggapan UPT.";
@@ -158,5 +171,5 @@ export function alasanTolakTanpaReview(info: Pick<InfoReviewSk, "status" | "cata
     return `UPT meminta perbaikan SK ${namaPegawai}${info.catatan ? `: ${info.catatan}` : ""}. Perbaiki SK lalu tunggu persetujuan UPT sebelum mencetak dan mengunggah TTE.`;
   if (info && info.status === null)
     return `SK ${namaPegawai} dibuat sebelum review UPT aktif dan belum pernah diperiksa Admin UPT. Tekan Minta review UPT, lalu tunggu persetujuannya.`;
-  return `SK ${namaPegawai} masih menunggu review Admin UPT. Cetak dan Unggah SK TTE Srikandi baru dapat dilakukan setelah UPT menyatakan SK sudah benar, atau setelah Super Admin melewati review dengan alasan sesudah menunggu ${BATAS_LEWATI_REVIEW_JAM} jam.`;
+  return `SK ${namaPegawai} masih menunggu review Admin UPT. Cetak dan Unggah SK TTE Srikandi baru dapat dilakukan setelah UPT menyatakan SK sudah benar, atau setelah Super Admin melewati review dengan alasan sesudah menunggu ${BATAS_LEWATI_REVIEW_JAM} jam (atau begitu batas input Kanwil lewat).`;
 }

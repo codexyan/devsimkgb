@@ -47,6 +47,14 @@ export function hariIniWita(sekarang: Date = new Date()): Date {
 }
 
 /**
+ * Instan berakhirnya sebuah tanggal kalender WITA (new Date(y, m, d)): tengah malam WITA yang membuka hari berikutnya.
+ * Untuk batas yang berlaku "sampai akhir hari", misalnya batas input Tim SDM.
+ */
+export function akhirHariWita(tanggal: Date): number {
+  return Date.UTC(tanggal.getFullYear(), tanggal.getMonth(), tanggal.getDate() + 1) - OFFSET_WITA_MS;
+}
+
+/**
  * Tanggal kalender WITA dari nilai tanggal yang tersimpan, sebagai new Date(y, m, d).
  * TMT 1 Juni 2026 bisa tersimpan sebagai 2026-06-01T00:00:00Z (ditulis dari proses UTC) atau
  * 2026-05-31T16:00:00Z (tengah malam WITA); keduanya menjadi 1 Juni 2026.
