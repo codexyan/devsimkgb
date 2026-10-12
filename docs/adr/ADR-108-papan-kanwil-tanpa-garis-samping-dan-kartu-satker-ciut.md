@@ -1,8 +1,11 @@
 # ADR-108: Kartu papan Kanwil tanpa garis warna di sisi kiri, dan kartu satker dapat diciutkan satu per satu
 
 Tanggal: 12 Oktober 2026
-Status: berlaku. Memperluas ADR-103 poin 4 (kartu papan tanpa garis samping) ke papan Kanwil, dan menambah ADR-050
-(panel rail dapat diciutkan) dengan kartu satker yang dapat diciutkan.
+Status: **berlaku sebagian.** Keputusan 2 sampai 5 (kartu satker dapat diciutkan) tetap berlaku dan menambah ADR-050
+(panel rail dapat diciutkan). **Keputusan 1 (kartu papan tanpa garis warna samping) dibatalkan pada hari yang sama:**
+pemilik meminta desain sebelumnya dikembalikan, jadi garis merah, hijau, kuning, dan ungu pada `.dsb-kartu-kgb[data-nada]`
+kembali seperti sebelum ADR ini, dan teks Panduan kolom Sedang diproses kembali menyebut garis merah dan hijau. Kartu
+papan Admin UPT tetap tanpa garis (ADR-103), karena itu bukan bagian dari permintaan pengembalian.
 
 ## Konteks
 
@@ -26,7 +29,7 @@ Pemeriksaan kodenya:
 
 ## Keputusan (pemilik, 12 Oktober 2026)
 
-1. **Kartu papan Kanwil tanpa garis warna di sisi kiri.** Aturan garis merah, hijau, kuning, dan ungu pada
+1. **(Dibatalkan, lihat status di atas.) Kartu papan Kanwil tanpa garis warna di sisi kiri.** Aturan garis merah, hijau, kuning, dan ungu pada
    `.dsb-kartu-kgb[data-nada]` dihapus. Kartu menjadi netral; keadaannya terbaca dari label, teks, dan titik di dalamnya.
    Kartu yang menunggu UPT tetap diredupkan dengan bingkai putus-putus (ADR-089). Tidak ada bingkai berwarna sebagai
    gantinya: itu bisa ditambahkan nanti bila kartu mendesak terasa kurang menonjol.
@@ -45,15 +48,13 @@ Pemeriksaan kodenya:
 - Tidak ada API, skema, atau data baru; hanya tampilan.
 - Kartu papan di dasbor peran lain tidak berubah: Admin UPT sudah tanpa garis (ADR-103), Keuangan dan SDM Hukdis tidak
   memakai kelas ini.
-- Tabel Proses KGB masih memakai garis warna di sisi baris (`.dsb-tabel tbody tr[data-nada]`). Itu bukan papan dan tidak
-  disentuh; bila tidak disukai juga, perubahannya terpisah.
 - Garis navy pada kartu satker yang sedang dikunci fokusnya (`.ksk-kartu[data-aktif]`) tetap ada. Itu penanda fokus di rail,
   bukan kartu papan.
-- Panduan diperbarui: kolom Sedang diproses tidak lagi disebut "garis merah" dan "garis hijau", melainkan label merah
-  Perbaiki SK dan label hijau Siap cetak.
+- Panduan tidak diubah oleh keputusan yang masih berlaku: ciut per satker tidak disebut di sana, sama seperti ciut panel
+  rail (ADR-050).
 
 ## Uji
 
-Tampilan diperiksa di peramban dengan data contoh lokal: kartu papan ber-`data-nada` tanpa `box-shadow`, ciut satu satker
+Tampilan diperiksa di peramban dengan data contoh lokal: ciut satu satker
 (baris TMT hilang, satker lain tetap terbentang), pilihan bertahan sesudah muat ulang, Ciutkan semua dan Bentangkan semua,
 dan kunci fokus dari kepala kartu tetap berfungsi.

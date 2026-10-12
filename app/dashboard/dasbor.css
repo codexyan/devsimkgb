@@ -1559,8 +1559,10 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 
 .dsb-kartu-kgb[draggable="true"] { cursor: grab; }
 .dsb-kartu-kgb[draggable="true"]:hover { border-color: var(--ln0); box-shadow: 0 2px 8px rgba(12, 26, 56, 0.06); }
-/* Kartu papan Kanwil tanpa garis warna di sisi kiri (ADR-108): keadaannya terbaca dari label, teks merah, dan titik tanda
-   di dalam kartu, sehingga tidak bergantung pada warna garis. Kolom Sedang diproses (ADR-089): yang menunggu UPT diredupkan. */
+.dsb-kartu-kgb[data-nada="merah"] { box-shadow: inset 3px 0 0 var(--st-red); }
+/* Kolom Sedang diproses (ADR-089): siap ditindaklanjuti Kanwil bergaris hijau, menunggu UPT diredupkan. */
+.dsb-kartu-kgb[data-nada="hijau"] { box-shadow: inset 3px 0 0 var(--st-green); }
+.dsb-kartu-kgb[data-nada="kuning"] { box-shadow: inset 3px 0 0 var(--st-amber); }
 .dsb-kartu-kgb[data-redup] { border-style: dashed; background: var(--sub); }
 .dsb-kartu-kgb[data-redup] :is(.dsb-kartu-kepala, .dsb-kecil, .dsb-kartu-tanda) { opacity: 0.72; }
 .dsb-kartu-label-baris { margin: 0 0 5px; line-height: 1; }
@@ -1978,6 +1980,7 @@ html[data-gerak="kurangi"] :is(.pjd, .pjd *, .pjd *::before, .pjd-tab *, .pjd-ba
 .upt-dasar-usulan { display: grid; justify-items: start; gap: 2px; min-width: 0; margin: 6px 0 0; padding-top: 6px; border-top: 1px dashed var(--ln1); }
 .upt-dasar-usulan .dsb-tag { font-size: 10.5px; }
 .upt-dasar-usulan p { max-width: 100%; }
+.dsb-kartu-kgb[data-nada="ungu"] { box-shadow: inset 3px 0 0 var(--st-violet); }
 
 .dsb-hanya-sempit { display: none; }
 
@@ -3789,50 +3792,3 @@ html[data-gerak="kurangi"] .pmn-percik, html[data-gerak="kurangi"] .pmn-cincin {
 .dsb-papan-aksi > .ctk-belah > :first-child { flex: 1 1 auto; justify-content: center; white-space: normal; text-align: center; }
 .ctk-belah > [data-nada="hijau"] + .mnu-pemicu-panah { border-color: var(--tint-green-ln); background: var(--card); color: var(--st-green); }
 .ctk-belah > [data-nada="hijau"] + .mnu-pemicu-panah:hover:not(:disabled) { background: var(--tint-green-bg); }
-
-/* ── Kalender KGB per bulan TMT di rail Kanwil (ADR-107) ─────────────────────────────────────────────────────────
-   Dua belas batang bertumpuk menurut posisi antrian. Bentuknya mengikuti kalender Admin UPT (.pjd-batang), tetapi di
-   kartu putih rail, bukan di pita navy, jadi warnanya memakai token status biasa. Menekan batang menyaring papan. */
-.kal-batang {
-  display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 2px;
-  margin: 0; padding: 10px 10px 4px; list-style: none;
-}
-.kal-batang > li { min-width: 0; }
-.kal-bulan {
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; width: 100%; height: 92px;
-  padding: 3px 0 4px; border: 0; border-radius: 9px; background: none; font: inherit; color: inherit; cursor: pointer;
-  transition: background .2s, box-shadow .2s;
-}
-.kal-bulan:hover:not(:disabled) { background: var(--sub); }
-.kal-bulan:disabled { cursor: default; }
-.kal-bulan:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.kal-bulan[aria-pressed="true"] { background: var(--tint-navy); box-shadow: inset 0 0 0 1.5px var(--navy-solid); }
-/* Emas berarti "sekarang" (ADR-003): jendela input yang sedang berjalan, sama dengan batang jendela di dasbor Admin UPT. */
-.kal-bulan[data-jendela] { background: rgba(243, 198, 63, .13); box-shadow: inset 0 0 0 1px rgba(243, 198, 63, .6); }
-.kal-bulan[data-jendela][aria-pressed="true"] { background: var(--tint-navy); box-shadow: inset 0 0 0 1.5px var(--navy-solid), 0 0 0 1px rgba(243, 198, 63, .6); }
-.kal-angka { min-height: 13px; font-size: 11px; font-weight: 650; line-height: 1.2; color: var(--dtn); font-variant-numeric: tabular-nums; }
-.kal-tiang {
-  display: flex; flex-direction: column; gap: 1px; width: 14px; max-width: 70%; overflow: hidden; border-radius: 4px 4px 1px 1px;
-  background: var(--ln1); transform-origin: bottom;
-  animation: pjdNaik .7s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(var(--j, 0) * 35ms + 150ms);
-}
-.kal-tiang > span { min-height: 2px; background: var(--warna); }
-.kal-label { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: var(--dt4); }
-.kal-bulan[data-jendela] .kal-label { color: var(--st-amber2); }
-.kal-bulan[data-terlambat] .kal-label { color: var(--st-red); }
-.kal-label i { width: 5px; height: 5px; border-radius: 50%; background: var(--st-red); box-shadow: 0 0 0 2px var(--tint-red-bg2); }
-
-.kal-legenda {
-  display: flex; flex-wrap: wrap; gap: 3px 12px; margin: 0; padding: 4px 16px 12px; list-style: none;
-  font-size: 11px; color: var(--dt4);
-}
-.kal-legenda li { display: inline-flex; align-items: center; gap: 5px; }
-.kal-legenda i { width: 8px; height: 8px; border-radius: 2px; background: var(--warna); }
-.kal-legenda i[data-jendela] { background: rgba(243, 198, 63, .25); box-shadow: inset 0 0 0 1px rgba(243, 198, 63, .85); }
-.kal-catatan { margin: 0; padding: 0 16px 12px; font-size: 11px; color: var(--dt5); }
-
-/* Gerak dikurangi: pilihan pengguna (html[data-gerak], lib/ui/gerak.ts), atau pengaturan perangkat bila atribut belum terpasang. */
-html[data-gerak="kurangi"] .kal :is(.kal-tiang, .kal-bulan) { animation: none !important; transition: none !important; }
-@media (prefers-reduced-motion: reduce) {
-  html:not([data-gerak]) .kal :is(.kal-tiang, .kal-bulan) { animation: none !important; transition: none !important; }
-}
