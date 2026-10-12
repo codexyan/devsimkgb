@@ -9,7 +9,7 @@ import type { KartuPapan, KolomPapan } from "@/app/dashboard/components/PapanAnt
 import type { UsulanMenunggu } from "@/app/dashboard/components/ModalUsulanUpt";
 import { keteranganRingkasan, nadaUmurUsulan, ringkasUsulanPerUpt } from "@/lib/ringkasUsulanUpt";
 import { tandaUsulan } from "@/lib/tandaUsulan";
-import { LABEL_REVIEW_SK, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
+import { BATAS_LEWATI_REVIEW_JAM, LABEL_REVIEW_SK, formatSisaWaktu, kesempatanLewatiReview, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
 import { cetakSk, mintaReviewSkUpt, unduhZipSiapCetak, type VersiCetak } from "@/lib/kgbAksi";
 import TombolCetakSk from "@/app/dashboard/components/kgb/TombolCetakSk";
 
@@ -151,6 +151,11 @@ function daysDiff(date: string) {
 /** Umur dalam hari penuh sejak sebuah waktu lampau; 0 bila belum genap sehari. */
 function hariSejak(iso: string) {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+}
+
+/** Apakah Super Admin boleh melewati review UPT ini sekarang: hanya sesudah UPT menunggu 24 jam (ADR-109). */
+function lewatiReviewSekarang(review: InfoReviewSk | null | undefined) {
+  return kesempatanLewatiReview(review, new Date());
 }
 
 /* -----------------------------------------
@@ -807,6 +812,10 @@ function DashboardMain() {
           teks: `Menunggu review UPT${hari === null ? "" : hari === 0 ? " sejak hari ini" : ` · ${hari} hari`}`,
           nada: "ungu",
         });
+        // Lewati review hanya terbuka sesudah 24 jam (ADR-109); Super Admin diberi tahu kapan tombolnya muncul.
+        const lewati = role === ROLES.SUPER_ADMIN ? lewatiReviewSekarang(review) : null;
+        if (lewati && !lewati.boleh && lewati.sebab === "belum_24_jam")
+          tanda.push({ teks: `Lewati review terbuka ${formatSisaWaktu(lewati.sisaMs)} lagi`, nada: "kuning" });
       }
     }
     if (dibatalkan) tanda.push({ teks: "Dibatalkan", nada: "merah" });
@@ -916,9 +925,13 @@ function DashboardMain() {
                 className="dsb-tombol dsb-tombol-kecil"
                 data-jenis={p.reviewSk?.status === "perbaikan" ? undefined : "garis"}
                 onClick={() => bukaBuatSk(p)}
-                title="Buat ulang SK: nomor, tanggal, dan isinya dicatat ulang"
+                title={
+                  p.reviewSk
+                    ? "Buat ulang SK: nomor, tanggal, dan isinya dicatat ulang, lalu review diminta ulang ke Admin UPT. SK tidak diunduh."
+                    : "Buat ulang SK: nomor, tanggal, dan isinya dicatat ulang"
+                }
               >
-                Perbaiki SK
+                {p.reviewSk ? "Perbaiki SK dan Minta Review UPT" : "Perbaiki SK"}
               </button>
               {p.reviewSk && p.reviewSk.status === null && (
                 <button
@@ -932,13 +945,15 @@ function DashboardMain() {
                   Minta review UPT
                 </button>
               )}
-              {!skBolehDicetak(p.reviewSk) && role === ROLES.SUPER_ADMIN && (
+              {/* Semua SK pegawai UPT melalui review UPT lebih dulu; Lewati review baru muncul bila UPT sudah menunggu
+                  lebih dari 24 jam (ADR-109). */}
+              {role === ROLES.SUPER_ADMIN && lewatiReviewSekarang(p.reviewSk).boleh && (
                 <button
                   type="button"
                   className="dsb-tombol dsb-tombol-kecil"
                   data-jenis="garis"
                   onClick={() => setModal({ jenis: "lewati_review", kgbId, pegawai: pegawaiModal(p), reviewSk: p.reviewSk ?? null })}
-                  title="Lanjutkan tanpa menunggu UPT, dengan alasan yang tercatat"
+                  title={`UPT sudah menunggu lebih dari ${BATAS_LEWATI_REVIEW_JAM} jam. Lanjutkan tanpa menunggu, dengan alasan yang tercatat`}
                 >
                   Lewati review
                 </button>
@@ -955,8 +970,13 @@ function DashboardMain() {
               )}
             </>
           ) : (
-            <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => bukaBuatSk(p)}>
-              Buat SK
+            <button
+              type="button"
+              className="dsb-tombol dsb-tombol-kecil"
+              onClick={() => bukaBuatSk(p)}
+              title={p.reviewSk ? "SK dicatat lalu diminta direview Admin UPT. SK tidak diunduh sampai UPT menyetujuinya." : undefined}
+            >
+              {p.reviewSk ? "Buat SK dan Minta Review UPT" : "Buat SK"}
             </button>
           )}
         </>

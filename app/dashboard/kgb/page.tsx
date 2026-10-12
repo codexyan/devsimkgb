@@ -35,7 +35,7 @@ import { BidangAlasan } from "@/app/dashboard/components/kgb/BidangForm";
 import { PESAN_GAGAL_JARINGAN, cetakSk, mintaReviewSkUpt, tautanBerkasSk, type VersiCetak } from "@/lib/kgbAksi";
 import TombolCetakSk from "@/app/dashboard/components/kgb/TombolCetakSk";
 import { LABEL_STATUS_TTD, type StatusTtdSk } from "@/lib/tteSk";
-import { LABEL_REVIEW_SK, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
+import { BATAS_LEWATI_REVIEW_JAM, LABEL_REVIEW_SK, formatSisaWaktu, kesempatanLewatiReview, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { formatTanggalId, hariIniWita, type NilaiTanggal } from "@/lib/waktu";
@@ -553,7 +553,9 @@ export default function KGBPage() {
       !!kgb && ((k.status === "sedang_diproses" && skTercatat(k) && reviewBoleh) || (k.status === "selesai" && !!k.isArsip && !pathFile));
     const bisaCetak = !!kgb && k.status === "sedang_diproses" && skTercatat(k) && reviewBoleh;
     const bisaMintaReview = !!kgb && k.status === "sedang_diproses" && skTercatat(k) && !!k.reviewSk && k.reviewSk.status === null;
-    const bisaLewati = !!kgb && superAdmin && k.status === "sedang_diproses" && skTercatat(k) && !reviewBoleh;
+    // Semua SK pegawai UPT melalui review UPT lebih dulu; Lewati review baru terbuka sesudah UPT menunggu 24 jam (ADR-109).
+    const kesempatanLewati = kesempatanLewatiReview(k.reviewSk, new Date());
+    const bisaLewati = !!kgb && superAdmin && k.status === "sedang_diproses" && skTercatat(k) && !reviewBoleh && kesempatanLewati.boleh;
     const bisaBatal = !!kgb && !k.isArsip && (k.status === "belum_diproses" || k.status === "sedang_diproses");
     // Input Ulang hanya untuk pembatalan terakhir: pegawai belum punya KGB aktif atau KGB yang lebih baru.
     const sudahDiganti = kgbList.some(
@@ -690,7 +692,10 @@ export default function KGBPage() {
                 ? "Langkah berikutnya: Buat SK. SK pegawai UPT dikirim ke Admin UPT untuk direview sebelum dicetak dan diunggah TTE."
                 : "Langkah berikutnya: Buat SK. Unggah SK TTE Srikandi tersedia setelah SK dibuat."
               : k.reviewSk?.status === "menunggu"
-                ? "SK sudah dibuat dan menunggu review Admin UPT. Cetak SK dan Unggah SK TTE Srikandi tersedia setelah UPT menyetujui; unduhan sebelum itu bertanda air DRAF."
+                ? "SK sudah dibuat dan menunggu review Admin UPT. Cetak SK dan Unggah SK TTE Srikandi tersedia setelah UPT menyetujui; unduhan sebelum itu bertanda air DRAF." +
+                  (superAdmin && !kesempatanLewati.boleh && kesempatanLewati.sebab === "belum_24_jam"
+                    ? ` Lewati review terbuka ${formatSisaWaktu(kesempatanLewati.sisaMs)} lagi (menunggu ${BATAS_LEWATI_REVIEW_JAM} jam).`
+                    : "")
                 : k.reviewSk?.status === "perbaikan"
                   ? `UPT meminta perbaikan SK${k.reviewSk.catatan ? `: ${k.reviewSk.catatan}` : ""}. Pilih Buat SK untuk memperbaikinya; review diminta ulang otomatis.`
                   : k.reviewSk?.status === "disetujui"

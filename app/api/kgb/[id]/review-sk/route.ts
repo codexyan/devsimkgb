@@ -19,7 +19,8 @@ export const runtime = "nodejs";
  * - `minta`: minta review ke Admin UPT untuk SK yang sudah dibuat. Buat SK dan Perbaiki SK sudah memintanya sendiri;
  *   aksi ini untuk SK yang dibuat sebelum review aktif. Super Admin dan Tim SDM KGB.
  * - `lewati`: lanjutkan tanpa menunggu UPT, untuk keadaan mendesak. Hanya Super Admin, alasan wajib, tercatat di Log
- *   Aktivitas. Sesudahnya SK dapat dicetak tanpa tanda air dan diunggah TTE.
+ *   Aktivitas, dan hanya bila permintaan review sudah menunggu UPT lebih dari 24 jam (ADR-109). Sesudahnya SK dapat
+ *   dicetak tanpa tanda air dan diunggah TTE.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();

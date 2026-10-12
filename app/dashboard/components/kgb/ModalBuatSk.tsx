@@ -98,6 +98,8 @@ export default function ModalBuatSk({
   // KGB yang golongan atau masa kerjanya berubah sesudah diinput tidak boleh dibuat SK-nya (ADR-062); server juga
   // menolaknya, tetapi tombolnya ditahan lebih dulu supaya alasannya terbaca sebelum mencoba.
   const ditahan = !!linimasa?.basi;
+  // Pegawai UPT: Buat SK hanya mencatat SK dan meminta review Admin UPT, tanpa mengunduh apa pun (ADR-077, ADR-109).
+  const labelBuat = reviewUpt ? "Buat SK dan Minta Review UPT" : "Buat dan Unduh SK";
   // Draf nomor SK baru tersimpan di SIM-KGB (ADR-011). Saat SK sudah pernah dibuat (Perbaiki SK), draf menyimpan
   // perbaikan yang belum dibuat ulang; SK yang tercatat tetap sampai Buat dan Unduh SK (ADR-071). Draf lama yang
   // sempat disimpan di peramban hanya dipakai sebelum SK pertama dibuat, sampai draf server termuat.
@@ -446,8 +448,8 @@ export default function ModalBuatSk({
     onBerhasil(
       skSudahDibuat
         ? samaTercatat
-          ? `Perbaikan data SK terakhir ${pegawai.nama} tersimpan. Buat dan Unduh SK untuk mencetak ulang SK ${nomorTercatat}.`
-          : `Draf perbaikan SK ${pegawai.nama} disimpan di SIM-KGB. SK yang tercatat tetap ${nomorTercatat} sampai Buat dan Unduh SK.`
+          ? `Perbaikan data SK terakhir ${pegawai.nama} tersimpan. ${labelBuat} untuk ${reviewUpt ? "membuat ulang" : "mencetak ulang"} SK ${nomorTercatat}.`
+          : `Draf perbaikan SK ${pegawai.nama} disimpan di SIM-KGB. SK yang tercatat tetap ${nomorTercatat} sampai ${labelBuat}.`
         : isi.nomorSurat
           ? `Draf SK ${pegawai.nama} disimpan di SIM-KGB. Nomornya tetap ada saat Buat SK dibuka lagi, dari komputer mana pun.`
           : `Data SK terakhir ${pegawai.nama} tersimpan.`,
@@ -501,7 +503,7 @@ export default function ModalBuatSk({
               {skSudahDibuat ? "Simpan draf perbaikan" : "Simpan draf"}
             </button>
             <button type="submit" className="kgbm-tombol kgbm-utama" disabled={sibuk || !!memuatVersi || ditahan}>
-              {sibuk ? "Membuat SK..." : reviewUpt ? "Buat SK dan minta review UPT" : "Buat dan Unduh SK"}
+              {sibuk ? "Membuat SK..." : labelBuat}
             </button>
           </>
         )
@@ -680,8 +682,8 @@ export default function ModalBuatSk({
               )}
               {skSudahDibuat && (
                 <Catatan nada="amber">
-                  SK baru untuk KGB ini sudah pernah dibuat. Buat dan Unduh SK akan mencatat ulang nomor, tanggal, dan
-                  penandatangan SK sesuai isian di atas.
+                  SK baru untuk KGB ini sudah pernah dibuat. {labelBuat} akan mencatat ulang nomor, tanggal, dan
+                  penandatangan SK sesuai isian di atas{reviewUpt ? ", lalu meminta review ulang ke Admin UPT tanpa mengunduh SK" : ""}.
                 </Catatan>
               )}
             </BagianForm>
