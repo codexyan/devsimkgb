@@ -48,13 +48,11 @@ import {
   type RingkasanSk,
 } from "@/app/dashboard/components/kgb";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
-import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
+import { formatTanggalId, tanggalKalender } from "@/lib/waktu";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
 import { kodeSatkerPegawai } from "@/lib/rekapSatker";
 import { susunKartuSatker } from "@/lib/kartuSatkerDasbor";
-import { susunKalenderKanwil } from "@/lib/kalenderKanwil";
-import PanelKalenderKgb from "@/app/dashboard/components/PanelKalenderKgb";
 import { bandingTindakan, tindakanProses, type TindakanProses } from "@/lib/tindakanProses";
 import {
   FOKUS_KOSONG,
@@ -456,14 +454,6 @@ function DashboardMain() {
         new Date(a.tmtKgbBerikutnya).getTime() - new Date(b.tmtKgbBerikutnya).getTime() || a.nama.localeCompare(b.nama, "id")
       );
     });
-  /**
-   * Kalender KGB per bulan TMT (ADR-107): daftar yang sama dengan antrian sebelum disaring bulan dan pencarian, jadi
-   * angkanya mengikuti saringan satker dan fokus papan, dan menekan satu bulan menyaring papan ke bulan itu.
-   */
-  const kalender = susunKalenderKanwil(
-    dalamSatker.map((p) => ({ bulanTmt: kunciBulan(p.tmtKgbBerikutnya) || null, posisi: posisiAntrian(p) })),
-    hariIniWita(),
-  );
   const jumlahTahap = (t: Tahap) => dalamBulan.filter((p) => cocokTahap(posisiAntrian(p), t)).length;
   const antrian = dalamBulan.filter((p) => cocokTahap(posisiAntrian(p), tahap));
   const jumlahPosisi = (...daftar: PosisiAntrian[]) => dalamBulan.filter((p) => daftar.includes(posisiAntrian(p))).length;
@@ -1196,17 +1186,8 @@ function DashboardMain() {
 
           <PanelTindakan daftar={tindakan} kosong="Tidak ada KGB yang perlu ditindaklanjuti saat ini." lainnyaHref="/dashboard/notifikasi" />
 
-          {/* Kalender KGB per bulan TMT (ADR-107). Panel Jadwal input pernah dilepas (ADR-036) karena lini masa se-Kanwil
-              mengulang rincian bulan di kartu satker; kalender ini kembali sebagai gambaran satu tahun yang bisa dibaca
-              sekilas, dan baris bulan per satker di bawahnya tetap ada. Ditaruh di bawah Perlu tindakan, bukan di
-              atasnya: susunan layar sempit (dasbor.css) menaikkan panel pertama rel ke atas antrian. */}
-          <PanelKalenderKgb
-            kalender={kalender}
-            terpilih={filterMonth}
-            cakupan={saringSatker === "semua" && !adaFokus ? null : labelSaringan}
-            onPilih={(bulan) => bukaAntrian("semua", bulan)()}
-          />
-
+          {/* Panel Jadwal input dilepas (ADR-036): rincian per bulan TMT kini melekat pada satkernya di
+              kartu di bawah, sehingga tidak lagi perlu lini masa se-Kanwil yang berdiri sendiri. */}
           <PanelKartuSatker
             kartu={kartuSatker}
             namaSatker={namaSatkerKartu}

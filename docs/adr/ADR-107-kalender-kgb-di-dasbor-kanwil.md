@@ -1,7 +1,11 @@
 # ADR-107: Kalender KGB per bulan TMT kembali ke dasbor Super Admin dan SDM KGB
 
 Tanggal: 12 Oktober 2026
-Status: berlaku. Menggantikan poin 4 ADR-036 (panel Jadwal input dilepas); sisanya ADR-036 tetap.
+Status: **dibatalkan pada hari yang sama.** Pemilik meminta desain dasbor sebelumnya dikembalikan sesudah kalender dirilis,
+jadi panel Kalender KGB dihapus dan poin 4 ADR-036 (panel Jadwal input dilepas) berlaku kembali. Isi di bawah tetap
+disimpan sebagai catatan keputusan dan alasannya; kodenya ada di PR #73 (commit 4ee87b3) bila kelak dibutuhkan lagi.
+
+~~Menggantikan poin 4 ADR-036 (panel Jadwal input dilepas); sisanya ADR-036 tetap.~~
 
 ## Konteks
 

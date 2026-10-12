@@ -1685,12 +1685,7 @@ export default async function IsiPanduan({
                     <p>
                       Di Dashboard, buka Antrian kerja KGB pada ubin Perlu diproses, lalu pilih Input KGB pada kartu
                       pegawai. Antrian itu kini hanya bertampilan papan; tampilan Daftar sudah dilepas karena kolom
-                      papan sudah menjawab pertanyaan yang sama. Panel <strong>Kalender KGB</strong> di sisi kanan
-                      menunjukkan jumlah KGB per bulan TMT sepanjang tahun berjalan, bertumpuk menurut kolom papan; bulan
-                      yang jendela inputnya sedang berjalan diberi bingkai emas, dan titik merah menandai bulan yang ada
-                      KGB-nya lewat batas input. Tekan satu bulan untuk menyaring papan ke TMT itu, tekan lagi untuk
-                      membukanya. Di layar yang pendek panel ini bawaannya tertutup; buka dengan panah di kepalanya.
-                      Untuk mengerjakan satu satker atau satu periode lebih
+                      papan sudah menjawab pertanyaan yang sama. Untuk mengerjakan satu satker atau satu periode lebih
                       dulu, tekan gembok satker atau baris TMT pada panel <strong>Pekerjaan per satker</strong>: papan
                       hanya menampilkan yang dikunci (boleh beberapa sekaligus), dan pilihan itu tetap tersimpan untuk
                       akun Anda di perangkat itu sampai Anda menekan <strong>Buka semua</strong> atau tanda silang pada
@@ -1795,8 +1790,8 @@ export default async function IsiPanduan({
                     </p>
                     <p>
                       Di papan antrian Dashboard, kolom <strong>Sedang diproses</strong> diurutkan menurut tindakan Kanwil.
-                      Yang paling atas adalah SK yang diminta diperbaiki UPT (label merah <em>Perbaiki SK</em>).
-                      Sesudahnya SK yang <strong>siap cetak</strong> (label hijau <em>Siap cetak</em>, tombol <strong>Unduh untuk TTE</strong> hijau
+                      Yang paling atas adalah SK yang diminta diperbaiki UPT (garis merah, label <em>Perbaiki SK</em>).
+                      Sesudahnya SK yang <strong>siap cetak</strong> (garis hijau, tombol <strong>Unduh untuk TTE</strong> hijau
                       di depan, lalu Unggah SK TTE Srikandi), kemudian KGB yang perlu dibuat SK-nya. Paling bawah, dalam bingkai
                       putus-putus yang diredupkan, SK yang masih menunggu review UPT beserta lama menunggunya. Dalam
                       tiap kelompok, batas input terdekat di atas.
