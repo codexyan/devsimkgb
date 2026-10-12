@@ -2862,6 +2862,9 @@ html[data-gerak="kurangi"] .dsb-putar {
 .pgw-koreksi-baris > label { display: grid; gap: 2px; font-size: 12px; font-weight: 600; color: var(--dt2); }
 .pgw-koreksi-baris > label small { font-size: 11px; font-weight: 400; line-height: 1.45; color: var(--dt5); }
 .pgw-koreksi-baris .dsb-cari { width: 100%; min-width: 0; }
+.pgw-koreksi-mkg { display: flex; gap: 6px; min-width: 0; }
+.pgw-koreksi-mkg .dsb-cari:first-child { flex: 1.6 1 0; }
+.pgw-koreksi-mkg .dsb-cari:last-child { flex: 1 1 0; }
 .pgw-koreksi-lama { font-size: 12.5px; color: var(--dt4); padding-top: 1px; }
 .pgw-koreksi-baru { display: grid; gap: 2px; font-size: 13px; font-weight: 600; color: var(--dtn); padding-top: 1px; }
 .pgw-koreksi-baru small { font-size: 11px; font-weight: 400; line-height: 1.45; color: var(--dt5); }
