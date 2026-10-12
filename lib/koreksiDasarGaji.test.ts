@@ -12,6 +12,7 @@ import {
   pesanGajiTurun,
   mkgSetelahGantiGolongan,
   mkgTerdekat,
+  pilihanTahunMkg,
   tmtKgbBerikutnyaHitung,
 } from "./koreksiDasarGaji";
 
@@ -38,11 +39,42 @@ test("golongan yang tidak dikenal tabel gaji menghasilkan null, bukan angka kara
   assert.equal(gajiPokokUntuk("V/z", 10, 0), null);
 });
 
-test("gaji pokok dibaca dari tabel PP 5/2024, dan langkah yang tidak ada menghasilkan null", () => {
+test("gaji pokok dibaca dari tabel PP 5/2024 pada langkahnya", () => {
   const contoh = getMKGOptions("III/b")[3];
   assert.equal(gajiPokokUntuk("III/b", contoh.tahun, contoh.bulan), contoh.gaji);
-  // Masa kerja dengan sisa bulan ganjil tidak ada di tabel; jangan ditebak.
-  assert.equal(gajiPokokUntuk("III/b", contoh.tahun, 7), null);
+});
+
+test("sisa bulan dan tahun di antara dua langkah tidak mengubah gaji pokok (ADR-106)", () => {
+  const [, kedua, ketiga] = getMKGOptions("III/b");
+  // SK dapat menulis 8 tahun 4 bulan: gajinya tetap langkah 8 tahun, bukan ditolak atau ditebak ke atas.
+  assert.equal(gajiPokokUntuk("III/b", kedua.tahun, 4), kedua.gaji);
+  assert.equal(gajiPokokUntuk("III/b", kedua.tahun, 11), kedua.gaji);
+  assert.equal(gajiPokokUntuk("III/b", kedua.tahun + 1, 6), kedua.gaji);
+  assert.equal(gajiPokokUntuk("III/b", ketiga.tahun, 0), ketiga.gaji);
+});
+
+test("masa kerja di luar rentang tabel golongan tidak bergaji", () => {
+  // Tabel II/c dimulai dari 3 tahun; di bawahnya tidak ada gaji pokok.
+  assert.equal(gajiPokokUntuk("II/c", 2, 11), null);
+  assert.ok(gajiPokokUntuk("II/c", 3, 0));
+  // Sampai satu siklus KGB sesudah langkah terakhir masih berlaku, sesudahnya tidak.
+  const terakhir = getMKGOptions("IV/e").at(-1)!;
+  assert.equal(gajiPokokUntuk("IV/e", terakhir.tahun + 1, 11), terakhir.gaji);
+  assert.equal(gajiPokokUntuk("IV/e", terakhir.tahun + 2, 0), null);
+  assert.equal(gajiPokokUntuk("IV/e", 10, 12), null);
+});
+
+test("pilihan tahun mencakup tahun di antara langkah, dari langkah pertama", () => {
+  const tahun = pilihanTahunMkg("II/c");
+  assert.equal(tahun[0], 3);
+  assert.ok(tahun.includes(4), "tahun di antara dua langkah ikut dapat dipilih");
+  assert.deepEqual(pilihanTahunMkg("V/z"), []);
+});
+
+test("mengganti golongan mempertahankan sisa bulan masa kerja", () => {
+  assert.deepEqual(mkgSetelahGantiGolongan("III/c", 8, 4), { tahun: 8, bulan: 4, disesuaikan: false });
+  // Di bawah langkah pertama golongan baru: digeser ke langkah itu dan ditandai.
+  assert.deepEqual(mkgSetelahGantiGolongan("II/c", 1, 6), { tahun: 3, bulan: 0, disesuaikan: true });
 });
 
 test("TMT KGB berikutnya dihitung dari TMT terakhir memakai langkah tabel gaji", () => {

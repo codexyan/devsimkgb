@@ -4,8 +4,8 @@ import { useState } from "react";
 import { KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiSaatIni } from "@/lib/pilihanPegawai";
 import { SATKER } from "@/lib/satker";
-import { GOLONGAN_PANGKAT, getMKGOptions } from "@/lib/tabelGaji";
-import { gajiPokokUntuk, mkgSetelahGantiGolongan, tmtKgbBerikutnyaHitung } from "@/lib/koreksiDasarGaji";
+import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
+import { gajiPokokUntuk, mkgSetelahGantiGolongan, pilihanTahunMkg, tmtKgbBerikutnyaHitung } from "@/lib/koreksiDasarGaji";
 import { formatTanggalId, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 import PanelDokumenRujukan, { unggahKeArsip, type LampiranSk } from "@/app/dashboard/components/pegawai/PanelDokumenRujukan";
 
@@ -132,7 +132,9 @@ export default function ModalUbahPegawai({
      dari langkah yang sama dengan yang dipakai impor maupun formulir UPT (bulanKeKgbBerikutnya).
      Keduanya ditampilkan hidup di layar, sebab akibat sebuah koreksi memang terletak di situ. */
   const [mkgTahunForm, mkgBulanForm] = (form.mkg ?? "0_0").split("_").map(Number);
-  const opsiMkg = getMKGOptions(form.golonganRuang);
+  // Tahun dan bulan dipilih terpisah agar masa kerja di antara dua langkah tabel tercatat sesuai SK (ADR-106). Nilai
+  // tersimpan di luar rentang tabel tetap ditampilkan, supaya membuka modal ini tidak diam-diam menggantinya.
+  const opsiTahunMkg = [...new Set([...pilihanTahunMkg(form.golonganRuang), mkgTahunForm])].sort((a, b) => a - b);
   const gajiBaru = gajiPokokUntuk(form.golonganRuang, mkgTahunForm, mkgBulanForm);
   const tmtBerikutnyaHitung = tmtKgbBerikutnyaHitung(form.golonganRuang, mkgTahunForm, mkgBulanForm, form.tmtKgbTerakhir);
   // Tanpa TMT KGB terakhir tidak ada yang dapat dihitung; jadwal yang sudah tercatat dipertahankan
@@ -367,16 +369,38 @@ export default function ModalUbahPegawai({
                         <div className="pgw-koreksi-baris">
                           <label htmlFor="koreksi-mkg">
                             Masa kerja golongan
-                            <small>Angka pada SK KGB atau SK pangkat terakhir. Inilah yang menentukan gaji pokok.</small>
+                            <small>
+                              Tahun dan bulan sesuai SK KGB atau SK pangkat terakhir. Gaji pokok mengikuti langkah tahun di tabel
+                              gaji; sisa bulan tidak mengubahnya.
+                            </small>
                           </label>
                           <span className="pgw-koreksi-lama">{labelMkg(pegawai.mkgTahun, pegawai.mkgBulan)}</span>
-                          <select id="koreksi-mkg" className="dsb-cari" value={form.mkg} onChange={(e) => ubah("mkg")(e.target.value)} disabled={sibuk}>
-                            {opsiMkg.map((m) => (
-                              <option key={`${m.tahun}_${m.bulan}`} value={`${m.tahun}_${m.bulan}`}>
-                                {labelMkg(m.tahun, m.bulan)} · {rp(m.gaji)}
-                              </option>
-                            ))}
-                          </select>
+                          <span className="pgw-koreksi-mkg">
+                            <select
+                              id="koreksi-mkg"
+                              className="dsb-cari"
+                              aria-label="Masa kerja golongan, tahun"
+                              value={mkgTahunForm}
+                              onChange={(e) => ubah("mkg")(`${e.target.value}_${mkgBulanForm}`)}
+                              disabled={sibuk}
+                            >
+                              {/* Gaji pokoknya tampil di baris Gaji pokok di bawah; kolom ini terlalu sempit untuk memuatnya. */}
+                              {opsiTahunMkg.map((tahun) => (
+                                <option key={tahun} value={tahun}>{tahun} thn</option>
+                              ))}
+                            </select>
+                            <select
+                              className="dsb-cari"
+                              aria-label="Masa kerja golongan, bulan"
+                              value={mkgBulanForm}
+                              onChange={(e) => ubah("mkg")(`${mkgTahunForm}_${e.target.value}`)}
+                              disabled={sibuk}
+                            >
+                              {Array.from({ length: 12 }, (_, bulan) => (
+                                <option key={bulan} value={bulan}>{bulan} bln</option>
+                              ))}
+                            </select>
+                          </span>
                         </div>
 
                         <div className="pgw-koreksi-baris">
