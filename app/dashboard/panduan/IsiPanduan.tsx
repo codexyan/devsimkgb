@@ -1795,8 +1795,8 @@ export default async function IsiPanduan({
                     </p>
                     <p>
                       Di papan antrian Dashboard, kolom <strong>Sedang diproses</strong> diurutkan menurut tindakan Kanwil.
-                      Yang paling atas adalah SK yang diminta diperbaiki UPT (garis merah, label <em>Perbaiki SK</em>).
-                      Sesudahnya SK yang <strong>siap cetak</strong> (garis hijau, tombol <strong>Unduh untuk TTE</strong> hijau
+                      Yang paling atas adalah SK yang diminta diperbaiki UPT (label merah <em>Perbaiki SK</em>).
+                      Sesudahnya SK yang <strong>siap cetak</strong> (label hijau <em>Siap cetak</em>, tombol <strong>Unduh untuk TTE</strong> hijau
                       di depan, lalu Unggah SK TTE Srikandi), kemudian KGB yang perlu dibuat SK-nya. Paling bawah, dalam bingkai
                       putus-putus yang diredupkan, SK yang masih menunggu review UPT beserta lama menunggunya. Dalam
                       tiap kelompok, batas input terdekat di atas.
