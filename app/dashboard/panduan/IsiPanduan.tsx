@@ -1685,7 +1685,12 @@ export default async function IsiPanduan({
                     <p>
                       Di Dashboard, buka Antrian kerja KGB pada ubin Perlu diproses, lalu pilih Input KGB pada kartu
                       pegawai. Antrian itu kini hanya bertampilan papan; tampilan Daftar sudah dilepas karena kolom
-                      papan sudah menjawab pertanyaan yang sama. Untuk mengerjakan satu satker atau satu periode lebih
+                      papan sudah menjawab pertanyaan yang sama. Panel <strong>Kalender KGB</strong> di sisi kanan
+                      menunjukkan jumlah KGB per bulan TMT sepanjang tahun berjalan, bertumpuk menurut kolom papan; bulan
+                      yang jendela inputnya sedang berjalan diberi bingkai emas, dan titik merah menandai bulan yang ada
+                      KGB-nya lewat batas input. Tekan satu bulan untuk menyaring papan ke TMT itu, tekan lagi untuk
+                      membukanya. Di layar yang pendek panel ini bawaannya tertutup; buka dengan panah di kepalanya.
+                      Untuk mengerjakan satu satker atau satu periode lebih
                       dulu, tekan gembok satker atau baris TMT pada panel <strong>Pekerjaan per satker</strong>: papan
                       hanya menampilkan yang dikunci (boleh beberapa sekaligus), dan pilihan itu tetap tersimpan untuk
                       akun Anda di perangkat itu sampai Anda menekan <strong>Buka semua</strong> atau tanda silang pada
