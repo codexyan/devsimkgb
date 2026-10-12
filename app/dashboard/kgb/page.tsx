@@ -553,8 +553,8 @@ export default function KGBPage() {
       !!kgb && ((k.status === "sedang_diproses" && skTercatat(k) && reviewBoleh) || (k.status === "selesai" && !!k.isArsip && !pathFile));
     const bisaCetak = !!kgb && k.status === "sedang_diproses" && skTercatat(k) && reviewBoleh;
     const bisaMintaReview = !!kgb && k.status === "sedang_diproses" && skTercatat(k) && !!k.reviewSk && k.reviewSk.status === null;
-    // Semua SK pegawai UPT melalui review UPT lebih dulu; Lewati review baru terbuka sesudah UPT menunggu 24 jam (ADR-109).
-    const kesempatanLewati = kesempatanLewatiReview(k.reviewSk, new Date());
+    // Semua SK pegawai UPT melalui review UPT lebih dulu; Lewati review baru terbuka sesudah UPT menunggu 24 jam, atau begitu batas input Kanwil lewat (ADR-109).
+    const kesempatanLewati = kesempatanLewatiReview(k.reviewSk, new Date(), jendela?.deadlineSDM);
     const bisaLewati = !!kgb && superAdmin && k.status === "sedang_diproses" && skTercatat(k) && !reviewBoleh && kesempatanLewati.boleh;
     const bisaBatal = !!kgb && !k.isArsip && (k.status === "belum_diproses" || k.status === "sedang_diproses");
     // Input Ulang hanya untuk pembatalan terakhir: pegawai belum punya KGB aktif atau KGB yang lebih baru.
@@ -694,7 +694,7 @@ export default function KGBPage() {
               : k.reviewSk?.status === "menunggu"
                 ? "SK sudah dibuat dan menunggu review Admin UPT. Cetak SK dan Unggah SK TTE Srikandi tersedia setelah UPT menyetujui; unduhan sebelum itu bertanda air DRAF." +
                   (superAdmin && !kesempatanLewati.boleh && kesempatanLewati.sebab === "belum_24_jam"
-                    ? ` Lewati review terbuka ${formatSisaWaktu(kesempatanLewati.sisaMs)} lagi (menunggu ${BATAS_LEWATI_REVIEW_JAM} jam).`
+                    ? ` Lewati review terbuka ${formatSisaWaktu(kesempatanLewati.sisaMs)} lagi (menunggu ${BATAS_LEWATI_REVIEW_JAM} jam, atau begitu batas input Kanwil lewat).`
                     : "")
                 : k.reviewSk?.status === "perbaikan"
                   ? `UPT meminta perbaikan SK${k.reviewSk.catatan ? `: ${k.reviewSk.catatan}` : ""}. Pilih Buat SK untuk memperbaikinya; review diminta ulang otomatis.`

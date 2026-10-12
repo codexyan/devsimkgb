@@ -163,15 +163,18 @@ export async function tanggapiReviewSk(input: {
 
 /**
  * Super Admin melanjutkan SK tanpa menunggu review UPT, dengan alasan yang tercatat. Hanya bila permintaannya sudah
- * menunggu UPT lebih dari 24 jam (ADR-109); saat UPT meminta perbaikan jalurnya Perbaiki SK, bukan melewati.
+ * menunggu UPT lebih dari 24 jam, atau batas input Kanwil sudah lewat (ADR-109); saat UPT meminta perbaikan jalurnya
+ * Perbaiki SK, bukan melewati.
  */
 export async function lewatiReviewSk(input: {
   kgbId: string;
   alasan: string;
   oleh: string;
   sekarang: Date;
+  /** Tanggal batas input Kanwil untuk TMT KGB ini (ADR-109); penantian 24 jam tidak melewati akhir hari itu. */
+  batasInput?: Date | null;
 }): Promise<{ ok: true; review: ReviewSkUptRow } | Gagal> {
-  const { kgbId, oleh, sekarang } = input;
+  const { kgbId, oleh, sekarang, batasInput } = input;
   const alasan = input.alasan.trim();
   if (!alasan) return gagal(400, "Alasan melewati review wajib diisi.");
   const ada = await muatReviewSk(kgbId);
@@ -181,8 +184,8 @@ export async function lewatiReviewSk(input: {
     return gagal(409, ada.review.status === "disetujui" ? "SK ini sudah disetujui UPT." : "Review SK ini sudah dilewati.");
   // Semua SK pegawai UPT melalui review UPT lebih dulu; dilewati hanya sesudah UPT menunggu 24 jam (ADR-109).
   if (ada.review.status === "perbaikan")
-    return gagal(409, "UPT meminta perbaikan SK ini. Perbaiki SK; review diminta ulang otomatis dan baru dapat dilewati bila UPT tidak menanggapi dalam 24 jam.");
-  const kesempatan = kesempatanLewatiReview({ status: "menunggu", dimintaAt: ada.review.dimintaAt }, sekarang);
+    return gagal(409, "UPT meminta perbaikan SK ini. Perbaiki SK; review diminta ulang otomatis dan baru dapat dilewati bila UPT tidak menanggapi dalam 24 jam atau batas input Kanwil lewat.");
+  const kesempatan = kesempatanLewatiReview({ status: "menunggu", dimintaAt: ada.review.dimintaAt }, sekarang, batasInput);
   if (!kesempatan.boleh) return gagal(409, pesanBelumBolehLewati(kesempatan) ?? "Review belum dapat dilewati.");
 
   const ubah = { status: "dilewati", alasanLewati: alasan, ditanggapiAt: sekarang, ditanggapiOleh: oleh };

@@ -153,9 +153,12 @@ function hariSejak(iso: string) {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
 }
 
-/** Apakah Super Admin boleh melewati review UPT ini sekarang: hanya sesudah UPT menunggu 24 jam (ADR-109). */
-function lewatiReviewSekarang(review: InfoReviewSk | null | undefined) {
-  return kesempatanLewatiReview(review, new Date());
+/**
+ * Apakah Super Admin boleh melewati review UPT ini sekarang: sesudah UPT menunggu 24 jam, atau begitu batas input Kanwil
+ * lewat (ADR-109). `deadlineSDM` adalah batas input KGB itu, yang juga tampil sebagai "batas 31 Okt" pada kartu.
+ */
+function lewatiReviewSekarang(review: InfoReviewSk | null | undefined, deadlineSDM: string | Date) {
+  return kesempatanLewatiReview(review, new Date(), tanggalKalender(deadlineSDM));
 }
 
 /* -----------------------------------------
@@ -813,7 +816,7 @@ function DashboardMain() {
           nada: "ungu",
         });
         // Lewati review hanya terbuka sesudah 24 jam (ADR-109); Super Admin diberi tahu kapan tombolnya muncul.
-        const lewati = role === ROLES.SUPER_ADMIN ? lewatiReviewSekarang(review) : null;
+        const lewati = role === ROLES.SUPER_ADMIN ? lewatiReviewSekarang(review, p.deadlineSDM) : null;
         if (lewati && !lewati.boleh && lewati.sebab === "belum_24_jam")
           tanda.push({ teks: `Lewati review terbuka ${formatSisaWaktu(lewati.sisaMs)} lagi`, nada: "kuning" });
       }
@@ -946,18 +949,26 @@ function DashboardMain() {
                 </button>
               )}
               {/* Semua SK pegawai UPT melalui review UPT lebih dulu; Lewati review baru muncul bila UPT sudah menunggu
-                  lebih dari 24 jam (ADR-109). */}
-              {role === ROLES.SUPER_ADMIN && lewatiReviewSekarang(p.reviewSk).boleh && (
-                <button
-                  type="button"
-                  className="dsb-tombol dsb-tombol-kecil"
-                  data-jenis="garis"
-                  onClick={() => setModal({ jenis: "lewati_review", kgbId, pegawai: pegawaiModal(p), reviewSk: p.reviewSk ?? null })}
-                  title={`UPT sudah menunggu lebih dari ${BATAS_LEWATI_REVIEW_JAM} jam. Lanjutkan tanpa menunggu, dengan alasan yang tercatat`}
-                >
-                  Lewati review
-                </button>
-              )}
+                  lebih dari 24 jam, atau begitu batas input Kanwil lewat (ADR-109). */}
+              {role === ROLES.SUPER_ADMIN && (() => {
+                const lewati = lewatiReviewSekarang(p.reviewSk, p.deadlineSDM);
+                if (!lewati.boleh) return null;
+                return (
+                  <button
+                    type="button"
+                    className="dsb-tombol dsb-tombol-kecil"
+                    data-jenis="garis"
+                    onClick={() => setModal({ jenis: "lewati_review", kgbId, pegawai: pegawaiModal(p), reviewSk: p.reviewSk ?? null })}
+                    title={
+                      lewati.dasar === "batas_input"
+                        ? "Batas input Kanwil sudah lewat. Lanjutkan tanpa menunggu UPT, dengan alasan yang tercatat"
+                        : `UPT sudah menunggu lebih dari ${BATAS_LEWATI_REVIEW_JAM} jam. Lanjutkan tanpa menunggu, dengan alasan yang tercatat`
+                    }
+                  >
+                    Lewati review
+                  </button>
+                );
+              })()}
               {skBolehDicetak(p.reviewSk) && (
                 <>
                   {/* Langkah berikutnya tampil paling depan dan Cetak SK menjadi tombol utama (ADR-089). Klik utama

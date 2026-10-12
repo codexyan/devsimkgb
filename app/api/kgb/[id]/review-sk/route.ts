@@ -8,6 +8,8 @@ import { suratSudahDibuat, type SuratKgbTersimpan } from "@/lib/prosesKgb";
 import { PESAN_REVIEW_BELUM_AKTIF, infoReviewSk, pegawaiPerluReviewSk } from "@/lib/reviewSkUpt";
 import { lewatiReviewSk, mintaReviewSk } from "@/lib/reviewSkUptServer";
 import { SATKER } from "@/lib/satker";
+import { jendelaProsesKgb } from "@/lib/tabelGaji";
+import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { kodeSatkerPegawai } from "@/lib/rekapSatker";
 import type { PegawaiRow, RiwayatKGBRow } from "@/lib/sheets/tables";
 
@@ -19,8 +21,8 @@ export const runtime = "nodejs";
  * - `minta`: minta review ke Admin UPT untuk SK yang sudah dibuat. Buat SK dan Perbaiki SK sudah memintanya sendiri;
  *   aksi ini untuk SK yang dibuat sebelum review aktif. Super Admin dan Tim SDM KGB.
  * - `lewati`: lanjutkan tanpa menunggu UPT, untuk keadaan mendesak. Hanya Super Admin, alasan wajib, tercatat di Log
- *   Aktivitas, dan hanya bila permintaan review sudah menunggu UPT lebih dari 24 jam (ADR-109). Sesudahnya SK dapat
- *   dicetak tanpa tanda air dan diunggah TTE.
+ *   Aktivitas, dan hanya bila permintaan review sudah menunggu UPT lebih dari 24 jam atau batas input Kanwil sudah
+ *   lewat (ADR-109). Sesudahnya SK dapat dicetak tanpa tanda air dan diunggah TTE.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -79,7 +81,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ ok: true, reviewSk: infoReviewSk(hasil.review, { aktif: true, unitKerja: pegawai.unitKerja }) });
   }
 
-  const hasil = await lewatiReviewSk({ kgbId: id, alasan, oleh, sekarang });
+  // Penantian 24 jam tidak melewati batas input Kanwil untuk TMT KGB ini (ADR-109).
+  await muatBatasInputSdm();
+  const batasInput = jendelaProsesKgb(kgb.tmtKgbBaru)?.deadlineSDM ?? null;
+  const hasil = await lewatiReviewSk({ kgbId: id, alasan, oleh, sekarang, batasInput });
   if (!hasil.ok) return NextResponse.json({ error: hasil.pesan }, { status: hasil.status });
   logAudit({
     userId: pengguna.id,

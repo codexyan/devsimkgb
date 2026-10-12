@@ -2,6 +2,7 @@
 
 Tanggal: 12 Oktober 2026
 Status: berlaku. Mengubah poin 5 ADR-077 dan baris "Lewati review tetap ada" di ADR-087; sisanya tetap.
+Ditambah pada hari yang sama (keputusan 6): penantian 24 jam tidak melewati batas input Kanwil.
 
 ## Konteks
 
@@ -45,10 +46,24 @@ Pemeriksaan kodenya:
    otomatis, seperti sebelumnya. Kartu pegawai Kanwil tetap "Buat SK" / "Perbaiki SK" dan modalnya tetap Buat dan Unduh
    SK, sebab tidak ada UPT yang mereview.
 
+6. **Penantian 24 jam hanya sampai batas input Kanwil.** Pemilik menunjuk bahwa menunggu 24 jam bisa menghabiskan masa
+   input Kanwil, yaitu akhir bulan, dua bulan sebelum TMT (`deadlineSDM`, mengikuti Pengaturan; di produksi 31). Jadi
+   Lewati review terbuka pada `min(diminta + 24 jam, akhir hari batas input)` menurut WITA: selama batas input belum
+   lewat, 24 jam berlaku penuh; begitu hari batas itu berakhir, Lewati review langsung terbuka tanpa menunggu sisa
+   jamnya. Contoh TMT Desember (batas 31 Oktober): review diminta 31 Oktober pagi terbuka 1 November 00.00 WITA, bukan
+   1 November pagi; review yang diminta 30 Oktober pagi terbuka 31 Oktober pagi seperti biasa. Aturan ini hanya
+   mengubah **kapan**; yang bukan *Menunggu* (UPT sudah meminta perbaikan, sudah menyetujui, sudah dilewati, atau SK
+   lama yang belum diminta review) tetap tidak dapat dilewati, dan syarat Super Admin, alasan wajib, serta catatan Log
+   Aktivitas tidak berubah. Sisa waktu di kartu, pesan server, dan modal mengikuti aturan yang sama.
+
 ## Akibat
 
 - Tidak ada skema, kolom, atau rute baru. Perubahan hanya aturan murni, satu penjagaan di `lewatiReviewSk`, dan teks.
-- Super Admin yang butuh melewati review di bawah 24 jam tidak lagi bisa. Keadaan mendesak yang sungguh tidak dapat
+- KGB yang batas inputnya sudah lewat (kartu bertanda "lewat batas", berpotensi rapelan) dan review-nya masih menunggu
+  UPT dapat langsung dilewati Super Admin, berapa pun lama menunggunya, asal sudah diminta. UPT tetap mendapat permintaan
+  review sejak Buat SK; yang hilang hanyalah jeda 24 jam, karena masa input Kanwil sudah habis dan menunggu lagi hanya
+  menambah rapelan.
+- Super Admin yang butuh melewati review di bawah 24 jam, selagi batas input belum lewat, tidak lagi bisa. Keadaan mendesak yang sungguh tidak dapat
   menunggu harus menghubungi Admin UPT; pemilik dapat menurunkan `BATAS_LEWATI_REVIEW_JAM` bila 24 jam terasa terlalu
   lama.
 - Tombol yang tersembunyi tidak diperbarui otomatis saat jam ke-24 lewat; muncul pada muat ulang atau penyegaran dasbor
@@ -57,7 +72,9 @@ Pemeriksaan kodenya:
 
 ## Uji
 
-`lib/reviewSkUpt.test.ts`: batas 24 jam tepat (23 jam 59 menit ditolak dengan sisa 1 menit, 24 jam diterima), status
+`lib/reviewSkUpt.test.ts`: pemotongan oleh batas input (batas hari ini: sisa 12 jam, bukan 24; sesudahnya langsung terbuka;
+batas jauh: 24 jam penuh; yang bukan menunggu tetap tertutup; batas tidak sah diabaikan), penolakan dan penerimaan di server
+dengan `batasInput`, ditambah batas 24 jam tepat (23 jam 59 menit ditolak dengan sisa 1 menit, 24 jam diterima), status
 bukan menunggu (perbaikan, disetujui, dilewati, belum diminta), `sesuai` dibaca sebagai menunggu, waktu permintaan hilang,
 pembulatan sisa waktu, penolakan server tanpa mengubah baris dan lonceng UPT, serta jam 24 yang mulai lagi sesudah
 Perbaiki SK. Tampilan diperiksa di peramban dengan data contoh lokal.

@@ -138,15 +138,15 @@ test("Lewati review hanya terbuka sesudah UPT menunggu 24 jam (ADR-109)", () => 
   assert.deepEqual(kesempatanLewatiReview(menunggu(diminta), SEKARANG), { boleh: false, sebab: "belum_24_jam", sisaMs: 24 * JAM });
   assert.deepEqual(kesempatanLewatiReview(menunggu(diminta), sesudah(23, 59)), { boleh: false, sebab: "belum_24_jam", sisaMs: 60_000 });
   // Genap 24 jam dan sesudahnya: terbuka.
-  assert.deepEqual(kesempatanLewatiReview(menunggu(diminta), sesudah(24)), { boleh: true });
-  assert.deepEqual(kesempatanLewatiReview(menunggu(SEKARANG), sesudah(80)), { boleh: true }, "dimintaAt boleh berupa Date (sisi server)");
+  assert.deepEqual(kesempatanLewatiReview(menunggu(diminta), sesudah(24)), { boleh: true, dasar: "24_jam" });
+  assert.deepEqual(kesempatanLewatiReview(menunggu(SEKARANG), sesudah(80)), { boleh: true, dasar: "24_jam" }, "dimintaAt boleh berupa Date (sisi server)");
   // Baris lama berstatus sesuai dibaca sebagai menunggu (normalReviewSk).
   assert.equal(kesempatanLewatiReview({ status: "sesuai", dimintaAt: diminta }, sesudah(25)).boleh, true);
   // Tanpa waktu permintaan, 24 jam tidak dapat dibuktikan.
   assert.deepEqual(kesempatanLewatiReview(menunggu(null), sesudah(100)), { boleh: false, sebab: "tanpa_waktu" });
   assert.deepEqual(kesempatanLewatiReview(menunggu("bukan tanggal"), sesudah(100)), { boleh: false, sebab: "tanpa_waktu" });
 
-  assert.equal(pesanBelumBolehLewati({ boleh: true }), null);
+  assert.equal(pesanBelumBolehLewati({ boleh: true, dasar: "24_jam" }), null);
   assert.match(pesanBelumBolehLewati({ boleh: false, sebab: "belum_24_jam", sisaMs: 7 * JAM + 20 * 60_000 }) ?? "", /24 jam.*7 jam 20 menit/);
   assert.match(pesanBelumBolehLewati({ boleh: false, sebab: "bukan_menunggu" }) ?? "", /masih menunggu tanggapan UPT/);
 
@@ -154,6 +154,32 @@ test("Lewati review hanya terbuka sesudah UPT menunggu 24 jam (ADR-109)", () => 
   assert.equal(formatSisaWaktu(2 * JAM), "2 jam");
   assert.equal(formatSisaWaktu(35 * 60_000), "35 menit");
   assert.equal(formatSisaWaktu(1_000), "1 menit", "dibulatkan ke atas, tidak pernah 0 menit");
+});
+
+test("penantian 24 jam tidak melewati batas input Kanwil: sesudahnya Lewati review langsung terbuka (ADR-109)", () => {
+  const menunggu = { status: "menunggu" as const, dimintaAt: SEKARANG.toISOString() };
+  // SEKARANG = 7 Okt 2026 12.00 WITA. Batas input jatuh 7 Okt: akhir harinya 8 Okt 00.00 WITA, 12 jam lagi.
+  const batasHariIni = new Date(2026, 9, 7);
+  assert.deepEqual(kesempatanLewatiReview(menunggu, SEKARANG, batasHariIni), { boleh: false, sebab: "belum_24_jam", sisaMs: 12 * JAM }, "dipotong batas input, bukan 24 jam");
+  assert.deepEqual(kesempatanLewatiReview(menunggu, sesudah(11, 59), batasHariIni), { boleh: false, sebab: "belum_24_jam", sisaMs: 60_000 });
+  assert.deepEqual(kesempatanLewatiReview(menunggu, sesudah(12), batasHariIni), { boleh: true, dasar: "batas_input" });
+
+  // Batas input sudah lewat (6 Okt): masa input Kanwil habis, tidak ada lagi yang ditunggu.
+  const batasKemarin = new Date(2026, 9, 6);
+  assert.deepEqual(kesempatanLewatiReview(menunggu, SEKARANG, batasKemarin), { boleh: true, dasar: "batas_input" });
+  assert.deepEqual(kesempatanLewatiReview({ status: "menunggu", dimintaAt: null }, SEKARANG, batasKemarin), { boleh: true, dasar: "batas_input" }, "tanpa waktu permintaan pun");
+
+  // Batas input masih jauh (31 Okt): 24 jam berlaku penuh.
+  const batasJauh = new Date(2026, 9, 31);
+  assert.deepEqual(kesempatanLewatiReview(menunggu, sesudah(23, 59), batasJauh), { boleh: false, sebab: "belum_24_jam", sisaMs: 60_000 });
+  assert.deepEqual(kesempatanLewatiReview(menunggu, sesudah(24), batasJauh), { boleh: true, dasar: "24_jam" });
+
+  // Batas input tidak membuka yang bukan menunggu: perbaikan, disetujui, dilewati, dan belum diminta tetap tertutup.
+  for (const status of ["perbaikan", "disetujui", "dilewati", null] as const)
+    assert.deepEqual(kesempatanLewatiReview({ status, dimintaAt: SEKARANG.toISOString() }, sesudah(100), batasKemarin), { boleh: false, sebab: "bukan_menunggu" }, String(status));
+  assert.deepEqual(kesempatanLewatiReview(null, sesudah(100), batasKemarin), { boleh: false, sebab: "bukan_menunggu" });
+  // Batas input tidak sah diabaikan seperti tidak ada.
+  assert.deepEqual(kesempatanLewatiReview(menunggu, sesudah(100), new Date("bukan tanggal")), { boleh: true, dasar: "24_jam" });
 });
 
 test("Super Admin melewati review dengan alasan, hanya sesudah 24 jam; tidak ada yang dilewati tanpa permintaan", async () => {
@@ -187,6 +213,26 @@ test("Super Admin melewati review dengan alasan, hanya sesudah 24 jam; tidak ada
   });
 });
 
+test("server: sesudah batas input Kanwil lewat, review yang menunggu dapat dilewati tanpa 24 jam (ADR-109)", async () => {
+  await denganDataLokal(async () => {
+    const db = await siapkanKgb();
+    const { mintaReviewSk, lewatiReviewSk } = await import("./reviewSkUptServer");
+    await mintaReviewSk({ kgb: { id: "k1", tmtKgbBaru: null }, pegawai, nomorSurat: "W.19-5", tanggalSurat: SEKARANG, oleh: "SDM", sekarang: SEKARANG });
+
+    // Batas input hari ini (akhir harinya 12 jam lagi): masih dalam jendela UPT, dengan sisa waktu yang dipotong batas.
+    const batasHariIni = new Date(2026, 9, 7);
+    const awal = await lewatiReviewSk({ kgbId: "k1", alasan: "mendesak", oleh: "SA", sekarang: SEKARANG, batasInput: batasHariIni });
+    assert.equal(awal.ok, false);
+    if (!awal.ok) assert.match(awal.pesan, /batas input Kanwil.*12 jam/);
+    assert.equal((await db.reviewSkUpt.findUnique({ id: "k1" }))?.status, "menunggu");
+
+    // Batas input kemarin: masa input Kanwil habis, langsung boleh meski baru satu jam diminta.
+    const lewat = await lewatiReviewSk({ kgbId: "k1", alasan: "batas input sudah lewat", oleh: "SA", sekarang: sesudah(1), batasInput: new Date(2026, 9, 6) });
+    assert.equal(lewat.ok, true);
+    assert.equal((await db.reviewSkUpt.findUnique({ id: "k1" }))?.status, "dilewati");
+  });
+});
+
 test("saat UPT meminta perbaikan tidak ada Lewati review; Perbaiki SK memulai jam 24 lagi (ADR-109)", async () => {
   await denganDataLokal(async () => {
     const db = await siapkanKgb();
@@ -199,6 +245,8 @@ test("saat UPT meminta perbaikan tidak ada Lewati review; Perbaiki SK memulai ja
     assert.equal(ditolak.ok, false);
     if (!ditolak.ok) assert.match(ditolak.pesan, /meminta perbaikan.*Perbaiki SK/);
     assert.equal((await db.reviewSkUpt.findUnique({ id: "k1" }))?.status, "perbaikan");
+    // Batas input yang sudah lewat tidak membuka Lewati review saat UPT meminta perbaikan.
+    assert.equal((await lewatiReviewSk({ kgbId: "k1", alasan: "mendesak", oleh: "SA", sekarang: sesudah(100), batasInput: new Date(2026, 9, 1) })).ok, false);
 
     // Perbaiki SK meminta review ulang: jam 24 dihitung dari permintaan baru, bukan yang pertama.
     await mintaReviewSk({ kgb: { id: "k1", tmtKgbBaru: null }, pegawai, nomorSurat: "W.19-4", tanggalSurat: SEKARANG, oleh: "SDM", sekarang: sesudah(48) });
