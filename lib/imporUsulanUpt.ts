@@ -19,9 +19,10 @@ import { JENIS_KP, isJenisKp } from "./kenaikanPangkat";
 import { bandingkanUsulan, kekuranganUsulan, type PerubahanUsulan } from "./usulanPegawai";
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "./dataPegawai";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR } from "./pilihanPegawai";
-import { periksaNip } from "./nipPns";
+import { nipTidakCocokDenganIsian, periksaNip } from "./nipPns";
 import { GOLONGAN_PANGKAT, isGolonganDikenal } from "./tabelGaji";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
+import type { NilaiTanggal } from "./waktu";
 
 /** Lembar templat Excel yang dibaca saat berkasnya diunggah; lembar lain hanya untuk dibaca operator. */
 export const LEMBAR_DATA_UPT = "Data Pegawai";
@@ -750,6 +751,12 @@ export function periksaImporUpt(
     const dasarBaru = bacaDasarBaru((kunci) => teks(seragam.row, kunci));
 
     if (!tercatat) {
+      // Pegawai baru: NIP harus cocok dengan tanggal lahir dan jenis kelamin pada baris yang sama (ADR-111).
+      const nipTidakCocok = nipTidakCocokDenganIsian(nip, {
+        tanggalLahir: dibaca.isian.tanggalLahir as NilaiTanggal | undefined,
+        jenisKelamin: (dibaca.isian.jenisKelamin as string | null | undefined) ?? null,
+      });
+      if (nipTidakCocok) return tolak(nipTidakCocok);
       // Keadaan pada SK KGB terakhir (ADR-078), hanya bersama SK kp atau pmk; golongan yang salah tulis menolak barisnya.
       const golonganAcuan = teks(seragam.row, "golonganAcuan");
       if (golonganAcuan && !isGolonganDikenal(golonganAcuan))

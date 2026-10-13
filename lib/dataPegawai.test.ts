@@ -105,6 +105,26 @@ test("bacaIsianPegawai menolak NIP, golongan, unit kerja, dan tanggal yang salah
   assert.match(bacaIsianPegawai({ ...ISIAN_DASAR, tmtGolongan: "" }, { denganNip: true }).galat ?? "", /TMT Golongan wajib/);
 });
 
+test("bacaIsianPegawai mencocokkan NIP pegawai baru dengan tanggal lahir dan jenis kelamin (ADR-111)", () => {
+  // NIP 199001012020121001: lahir 1 Januari 1990, laki-laki.
+  const cocok = bacaIsianPegawai({ ...ISIAN_DASAR, tanggalLahir: "01/01/1990", jenisKelamin: "Laki-laki" }, { denganNip: true });
+  assert.equal(cocok.galat, undefined);
+  // Tanpa tanggal lahir dan jenis kelamin, tidak ada yang dicocokkan (keduanya tidak selalu diisi).
+  assert.equal(bacaIsianPegawai(ISIAN_DASAR, { denganNip: true }).galat, undefined);
+
+  const tertukar = bacaIsianPegawai({ ...ISIAN_DASAR, tanggalLahir: "28/11/1989", jenisKelamin: "Laki-laki" }, { denganNip: true });
+  assert.match(tertukar.galat ?? "", /menunjukkan lahir 1 Januari 1990, tetapi tanggal lahir yang diisi 28 November 1989/);
+  assert.match(
+    bacaIsianPegawai({ ...ISIAN_DASAR, tanggalLahir: "01/01/1990", jenisKelamin: "Perempuan" }, { denganNip: true }).galat ?? "",
+    /angka ke-15 NIP \(1\) menunjukkan laki-laki/,
+  );
+  // Perbaikan data pegawai yang sudah ada (tanpa NIP) tidak diperiksa ulang: NIP lama yang polanya tidak baku tetap dapat disunting.
+  assert.equal(
+    bacaIsianPegawai({ ...ISIAN_DASAR, tanggalLahir: "28/11/1989", jenisKelamin: "Perempuan" }, { denganNip: false }).galat,
+    undefined,
+  );
+});
+
 test("kgbBerjalanTerbaru hanya memilih status sedang diproses atau menunggu keuangan", () => {
   const daftar = [
     { id: "a", status: "selesai", createdAt: utc(2026, 1, 1) },

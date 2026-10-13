@@ -18,6 +18,8 @@
 // Modul ini murni: tidak menyentuh basis data dan tidak membaca jam sistem kecuali lewat `tahunKini`
 // yang boleh diisi pemanggil, agar dapat diuji tanpa bergantung pada tanggal hari ini.
 
+import { formatTanggalId, tanggalKalender, type NilaiTanggal } from "./waktu";
+
 /** Susunan NIP yang berhasil dibaca; dipakai untuk menerangkan isinya, bukan untuk menyimpan data. */
 export interface NipTerbaca {
   /** Tanggal lahir yyyy-mm-dd. */
@@ -197,4 +199,52 @@ export function periksaNip(mentah: unknown, tahunKini: number = new Date().getFu
 /** Bentuk singkat: sah atau tidak, tanpa alasannya. */
 export function nipSah(mentah: unknown, tahunKini?: number): boolean {
   return periksaNip(mentah, tahunKini).ok;
+}
+
+/**
+ * Cocokkan NIP dengan tanggal lahir dan jenis kelamin yang diisikan untuk pegawai baru (ADR-111). Delapan angka pertama NIP
+ * adalah tanggal lahir dan angka ke-15 adalah jenis kelamin (1 laki-laki, 2 perempuan), jadi NIP orang lain yang tertukar
+ * atau tanggal lahir yang salah ketik langsung terbaca. Kejadian nyata 13 Oktober 2026: NIP 199304072017121006 (lahir 7 April
+ * 1993) diketik untuk pegawai yang lahir 28 November 1989; NIP itu milik pegawai lain.
+ *
+ * Mengembalikan null bila cocok, bila isiannya kosong (tanggal lahir tidak wajib), atau bila NIP bukan 18 digit; bentuk NIP
+ * diperiksa pemeriksa lain. Hanya untuk pegawai baru: data lama yang polanya tidak baku tidak diperiksa ulang.
+ */
+export function nipTidakCocokDenganIsian(
+  nip: string,
+  isian: { tanggalLahir?: NilaiTanggal; jenisKelamin?: string | null },
+): string | null {
+  if (!/^\d{18}$/.test(nip)) return null;
+  const sebab: string[] = [];
+
+  const lahir = tanggalKalender(isian.tanggalLahir);
+  if (lahir) {
+    const tahun = String(lahir.getFullYear()).padStart(4, "0");
+    const bulan = String(lahir.getMonth() + 1).padStart(2, "0");
+    const hari = String(lahir.getDate()).padStart(2, "0");
+    if (nip.slice(0, 8) !== `${tahun}${bulan}${hari}`) {
+      const dariNip = new Date(Number(nip.slice(0, 4)), Number(nip.slice(4, 6)) - 1, Number(nip.slice(6, 8)));
+      const nyata =
+        dariNip.getFullYear() === Number(nip.slice(0, 4)) &&
+        dariNip.getMonth() === Number(nip.slice(4, 6)) - 1 &&
+        dariNip.getDate() === Number(nip.slice(6, 8));
+      const diisi = formatTanggalId(lahir, { day: "numeric", month: "long", year: "numeric" });
+      sebab.push(
+        nyata
+          ? `delapan angka pertama NIP (${nip.slice(0, 8)}) menunjukkan lahir ${formatTanggalId(dariNip, { day: "numeric", month: "long", year: "numeric" })}, tetapi tanggal lahir yang diisi ${diisi}`
+          : `delapan angka pertama NIP (${nip.slice(0, 8)}) bukan tanggal lahir yang ada, sedangkan tanggal lahir yang diisi ${diisi}`,
+      );
+    }
+  }
+
+  const kelaminIsi = (isian.jenisKelamin ?? "").trim().toLowerCase();
+  const kelaminDiisi = kelaminIsi.startsWith("l") ? 1 : kelaminIsi.startsWith("p") ? 2 : null;
+  const kelaminNip = Number(nip.slice(14, 15));
+  if (kelaminDiisi !== null && (kelaminNip === 1 || kelaminNip === 2) && kelaminNip !== kelaminDiisi)
+    sebab.push(
+      `angka ke-15 NIP (${kelaminNip}) menunjukkan ${kelaminNip === 1 ? "laki-laki" : "perempuan"}, tetapi jenis kelamin yang dipilih ${kelaminDiisi === 1 ? "laki-laki" : "perempuan"}`,
+    );
+
+  if (sebab.length === 0) return null;
+  return `NIP ${nip} tidak cocok dengan isian: ${sebab.join("; ")}. Cocokkan dengan NIP pada SK pegawai; yang keliru bisa NIP-nya, bisa juga isian tanggal lahir atau jenis kelaminnya.`;
 }
