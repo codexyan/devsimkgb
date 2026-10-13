@@ -10,6 +10,7 @@ import { rencanaSiklusBerikutnya } from "@/lib/jadwalKgb";
 import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
 import { hariIniWita } from "@/lib/waktu";
 import { BELUM_SELESAI } from "@/lib/usulanPegawai";
+import { SATKER } from "@/lib/satker";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 
 export const runtime = "nodejs";
@@ -44,9 +45,9 @@ export async function POST(req: Request) {
   // NIP yang sedang diusulkan UPT dilewati: menyetujui usulannya yang akan menambahkan pegawai itu, sehingga
   // orang yang sama tidak masuk dua kali dan papan UPT tidak menampilkannya dua kartu (ADR-026).
   const diusulkan = new Map(
-    ((await db.usulanPegawai.findMany({ where: { status: { in: BELUM_SELESAI } } })) as { nip: string | null; satker: string }[])
+    ((await db.usulanPegawai.findMany({ where: { status: { in: BELUM_SELESAI } } })) as { nip: string | null; satker: string; status: string }[])
       .filter((u) => !!u.nip)
-      .map((u) => [u.nip as string, u.satker]),
+      .map((u) => [u.nip as string, u]),
   );
   const hariIni = hariIniWita();
   // Kolom hukdis di berkas hanya dipakai bila pengimpor mengelola hukdis (Super Admin); peran lain
@@ -76,10 +77,18 @@ export async function POST(req: Request) {
         results.errors.push(`${identitas}: NIP sudah terdaftar, dilewati`);
         continue;
       }
-      const satkerUsulan = diusulkan.get(isian.nip);
-      if (satkerUsulan) {
+      const usulan = diusulkan.get(isian.nip);
+      if (usulan) {
         results.gagal++;
-        results.errors.push(`${identitas}: sedang diusulkan ${satkerUsulan}, tinjau usulannya lebih dulu`);
+        const namaSatker = SATKER.find((s) => s.kode === usulan.satker)?.nama ?? usulan.satker;
+        // Draf dan usulan yang dikembalikan hanya ada di tangan UPT, jadi petunjuknya bukan "tinjau di Usulan UPT" (ADR-110).
+        const keadaan =
+          usulan.status === "menunggu"
+            ? "sedang diusulkan dan menunggu tinjauan, tinjau usulannya lebih dulu"
+            : usulan.status === "revisi"
+              ? "usulannya dikembalikan ke UPT untuk diperbaiki, tunggu UPT mengajukannya lagi atau minta UPT menghapusnya"
+              : "masih berupa draf Admin UPT yang belum diajukan, minta UPT menghapusnya atau mengajukannya";
+        results.errors.push(`${identitas}: ${namaSatker}: ${keadaan}`);
         continue;
       }
 

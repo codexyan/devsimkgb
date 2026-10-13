@@ -49,6 +49,26 @@ export const DIPEGANG_UPT: readonly string[] = ["draf", "revisi"];
  */
 export const BELUM_SELESAI: readonly string[] = ["draf", "menunggu", "revisi"];
 
+/**
+ * Pesan untuk Kanwil saat NIP yang akan dicatat langsung masih punya usulan pegawai baru yang belum selesai. Petunjuknya
+ * mengikuti siapa yang memegang usulan: hanya yang "menunggu" yang ada di Usulan UPT; draf dan usulan yang dikembalikan
+ * hanya ada di tangan UPT, jadi menyuruh meninjaunya di sana membuntukan pembacanya (ADR-110).
+ */
+export function pesanNipSedangDiusulkan(nip: string, usulan: { status: string; nama: string | null }, namaSatker: string): string {
+  const nama = usulan.nama || "-";
+  if (usulan.status === "menunggu")
+    return `NIP ${nip} sedang diusulkan ${namaSatker} atas nama ${nama}. Tinjau usulannya di Usulan UPT; menyetujuinya akan menambahkan pegawai ini.`;
+  if (usulan.status === "revisi")
+    return (
+      `NIP ${nip} sedang diusulkan ${namaSatker} atas nama ${nama} dan dikembalikan ke UPT untuk diperbaiki, jadi belum ada di Usulan UPT. ` +
+      "Tunggu UPT mengajukannya lagi, atau minta Admin UPT menghapus usulannya bila Kanwil yang akan mencatat pegawai ini."
+    );
+  return (
+    `NIP ${nip} sedang disiapkan Admin UPT ${namaSatker} sebagai draf pegawai baru atas nama ${nama} dan belum diajukan, jadi belum ada di Usulan UPT. ` +
+    "Minta Admin UPT menghapus drafnya (tombol Hapus pada baris pegawai di Pegawai Satker) bila Kanwil yang akan mencatat pegawai ini, atau mengajukannya lewat Usul KGB Kolektif."
+  );
+}
+
 export type JenisBidang = "teks" | "tanggal" | "angka" | "rupiah";
 
 /**
