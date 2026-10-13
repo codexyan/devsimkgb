@@ -175,7 +175,7 @@ test("pegawai yang sedang punya usulan berjalan ditolak walau usulan itu tidak m
     konteks({ pegawaiSatker: perNip(pegawai()), pegawaiIdUsulan: new Set(["p1"]) }),
   );
   assert.equal(h.hasil, "ditolak");
-  assert.equal(h.galat, "Pegawai ini sedang punya usulan yang belum selesai di Kanwil");
+  assert.equal(h.galat, "Pegawai ini sedang punya usulan yang belum selesai (draf, dikembalikan, atau menunggu Kanwil)");
 });
 
 test("NIP yang tidak sah, kembar, atau sudah diusulkan sebagai pegawai baru ditolak satu per satu", () => {

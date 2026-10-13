@@ -253,8 +253,8 @@ export async function POST(req: Request) {
   if (!pegawai)
     return NextResponse.json({ error: "Pegawai tidak ditemukan" }, { status: 404 });
   // Usulan UPT yang menunggu ditinjau dulu, agar KGB dihitung dari data yang sudah diperbarui (ADR-014).
-  if (await usulanMenahan(pegawai.id))
-    return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama) }, { status: 409 });
+  const menahan = await usulanMenahan(pegawai.id);
+  if (menahan) return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama, menahan) }, { status: 409 });
 
   if (!isGolonganDikenal(pegawai.golonganRuang)) {
     return NextResponse.json(

@@ -38,6 +38,8 @@ interface Pegawai {
   tmtKgbTerakhir?: string | null;
   statusHukdis: boolean;
   tanggalHukdisBerakhir?: string | null;
+  /** Didata UPT, tetapi usulan pegawai barunya belum disetujui Kanwil (ADR-112). */
+  dataBelumDitinjau?: boolean;
   jenisHukdis?: string | null;
   aktif: boolean;
   statusKGB?: string | null;
@@ -686,6 +688,9 @@ export default function PegawaiPage() {
                           <div className="min-w-0" style={{ lineHeight: 1.35 }}>
                             <p className="dsb-nama" style={{ margin: 0 }}>{p.nama}</p>
                             <p className="dsb-kecil" style={{ margin: 0 }}>{p.nip}</p>
+                            {p.dataBelumDitinjau && (
+                              <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-amber)" }}>Data belum ditinjau</p>
+                            )}
                             {(() => {
                               const keadaan = ringkasKeadaanPegawai(p, hariIniWita());
                               return keadaan ? (
@@ -786,6 +791,9 @@ export default function PegawaiPage() {
                     <div className="flex-1 min-w-0">
                       <p className="dsb-nama" style={{ margin: 0 }}>{p.nama}</p>
                       <p className="dsb-kecil" style={{ margin: 0 }}>{p.nip}</p>
+                      {p.dataBelumDitinjau && (
+                        <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-amber)" }}>Data belum ditinjau</p>
+                      )}
                       <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>{p.golonganRuang} · {p.jabatan}</p>
                       <p className="dsb-kecil" style={{ margin: "2px 0 0", color: uk.dikenal ? undefined : "var(--st-amber)" }}>
                         {uk.teks}{uk.dikenal ? "" : " (belum sesuai daftar satker)"}

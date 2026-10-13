@@ -347,3 +347,26 @@ test("usulan yang dikembalikan menunjuk ke usulannya, dan membawa catatan peninj
   // Tautannya ke dasbor UPT, tempat usulan itu menunggu diperbaiki, bukan ke antrian tinjauan Kanwil.
   assert.equal(n.linkHref, "/dashboard");
 });
+
+test("pegawai yang datanya belum ditinjau (ADR-112) tidak diingatkan Input KGB-nya, dan pengingat yang sudah ada ditutup", () => {
+  const lama = [notif("n1", "info", tanggal(2026, 4, 16, 8))];
+  const biasa = rencana(tanggal(2026, 4, 23), lama);
+  assert.equal(biasa.baru.length, 1, "tanpa penahan, pengingat H-7 muncul");
+
+  const ditahan = rencana(tanggal(2026, 4, 23), lama, { belumDitinjau: new Set(["p1"]) });
+  assert.equal(ditahan.baru.length, 0, "Input KGB ditahan, jadi pengingat batas input tidak dikirim");
+  assert.deepEqual(ditahan.tandaiDibaca, ["n1"], "pengingat lama ditutup bersama penahannya");
+
+  // Pegawai lain tidak terpengaruh.
+  assert.equal(rencana(tanggal(2026, 4, 23), lama, { belumDitinjau: new Set(["p2"]) }).baru.length, 1);
+});
+
+test("notifikasi usulan: pegawai baru yang sudah terdata disebut sudah terdata, bukan akan ditambahkan", async () => {
+  const { notifikasiUsulanUpt } = await import("./generateNotifikasi");
+  const pegawaiBaru = { nama: "BARU", nip: "199001012015031001" };
+  const lama = notifikasiUsulanUpt({ id: "u1", jenis: "baru", nomorSurat: "W.1", pegawaiId: null }, pegawaiBaru);
+  assert.match(lama.pesan, /sebelum pegawainya ditambahkan ke data induk/);
+  const terdata = notifikasiUsulanUpt({ id: "u1", jenis: "baru", nomorSurat: "W.1", pegawaiId: "p1" }, pegawaiBaru);
+  assert.match(terdata.pesan, /sudah terdata/);
+  assert.match(terdata.pesan, /sebelum KGB-nya diproses/);
+});

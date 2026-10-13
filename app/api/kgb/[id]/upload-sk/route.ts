@@ -57,8 +57,8 @@ export async function POST(
   if (!izin.ok)
     return NextResponse.json({ error: izin.error }, { status: 409 });
   // SK TTE tidak diunggah selama usulan UPT pegawai ini belum ditinjau (ADR-014); arsip lama tidak tertahan.
-  if (izin.jenis === "unggah" && pegawai && (await usulanMenahan(pegawai.id)))
-    return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama) }, { status: 409 });
+  const menahan = izin.jenis === "unggah" && pegawai ? await usulanMenahan(pegawai.id) : null;
+  if (menahan && pegawai) return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama, menahan) }, { status: 409 });
   // SK pegawai UPT baru boleh diunggah TTE-nya setelah disetujui Admin UPT atau dilewati Super Admin (ADR-077). SK yang
   // dibuat sebelum review aktif tidak punya permintaan review, jadi tidak tertahan.
   if (izin.jenis === "unggah" && pegawai && pegawaiPerluReviewSk(pegawai.unitKerja)) {

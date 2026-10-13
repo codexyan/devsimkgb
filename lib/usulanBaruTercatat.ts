@@ -5,6 +5,9 @@
 // Kanwil harus mengembalikannya dan UPT mengetik ulang usulan perbaikan. Kini usulan itu diperlakukan sebagai usulan
 // perbaikan data pegawai yang sudah tercatat, selama pegawainya di satker yang sama: saat diajukan UPT, dan saat disetujui
 // Kanwil. Pegawai di satker lain tetap ditolak, sebab pemindahan antarsatker dilakukan Kanwil, bukan lewat usulan.
+//
+// Pengecualian (ADR-112): pegawai yang dibuat langsung dari draf itu sendiri tertaut lewat `pegawaiId`; itu bukan bentrokan,
+// dan usulannya tetap usulan pegawai baru yang ditinjau penuh oleh Kanwil.
 
 import { kodeSatkerPegawai } from "./rekapSatker";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
@@ -16,11 +19,13 @@ export type KeadaanNipTercatat = "satker_sama" | "satker_lain";
  * baru, atau NIP-nya belum tercatat.
  */
 export function nipBaruTercatat(
-  usulan: Pick<UsulanPegawaiRow, "jenis" | "satker" | "nip">,
-  pegawai: Pick<PegawaiRow, "nip" | "unitKerja"> | null | undefined,
+  usulan: Pick<UsulanPegawaiRow, "jenis" | "satker" | "nip"> & Partial<Pick<UsulanPegawaiRow, "pegawaiId">>,
+  pegawai: (Pick<PegawaiRow, "nip" | "unitKerja"> & Partial<Pick<PegawaiRow, "id">>) | null | undefined,
 ): KeadaanNipTercatat | null {
   const nip = usulan.nip?.trim();
   if (usulan.jenis !== "baru" || !pegawai || !nip || pegawai.nip?.trim() !== nip) return null;
+  // Pegawai yang dibuat langsung dari draf ini (ADR-112) bukan bentrokan: usulannya tertaut kepadanya dan tetap berjenis baru.
+  if (usulan.pegawaiId && pegawai.id && usulan.pegawaiId === pegawai.id) return null;
   return kodeSatkerPegawai(pegawai.unitKerja) === usulan.satker ? "satker_sama" : "satker_lain";
 }
 

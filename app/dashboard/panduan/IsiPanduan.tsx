@@ -979,9 +979,10 @@ export default async function IsiPanduan({
                 <p>
                   Inilah tempat kerja utama Anda tiap periode. <strong>Usul KGB Kolektif</strong> menyiapkan usul KGB
                   beberapa pegawai untuk satu surat, dalam tiga langkah. Halamannya dibuka pada pegawai yang jatuh tempo
-                  periode ini. Draf pegawai baru hasil Unggah daftar tidak ikut kecuali dipilih di saringan{" "}
+                  periode ini. Draf pegawai baru yang belum lengkap tidak ikut kecuali dipilih di saringan{" "}
                   <em>Pegawai baru</em>, sehingga pendataan ratusan pegawai dapat dikirim bertahap dan tidak tercampur
-                  dengan usul KGB periode berjalan.
+                  dengan usul KGB periode berjalan. Draf yang sudah lengkap sudah terdata sebagai pegawai biasa, jadi
+                  ikut daftar periode bila TMT KGB-nya jatuh pada periode ini.
                 </p>
                 <LayarKolektif1 namaBulan={bulanTahun(TMT_KGB)} />
                 <p>
@@ -1064,8 +1065,12 @@ export default async function IsiPanduan({
                 </p>
                 <p>
                   Berkas wajib ditagih saat diajukan: bagi pegawai baru selalu, bagi usulan perbaikan hanya bila
-                  golongan, TMT golongan, masa kerja golongan, atau TMT KGB terakhirnya ikut diubah. Draf pegawai baru
-                  yang NIP-nya ternyata sudah tercatat di satker Anda ditandai di papan dan diajukan sebagai perbaikan
+                  golongan, TMT golongan, masa kerja golongan, atau TMT KGB terakhirnya ikut diubah. <strong>Pegawai baru
+                  langsung terdata</strong> begitu drafnya lengkap, tanpa surat dan tanpa menunggu Kanwil: ia tampil di
+                  Pegawai Satker sebagai pegawai biasa. Surat Srikandi dan tinjauan Kanwil baru diperlukan saat KGB-nya
+                  diusulkan, dan selama usulan pertamanya belum disetujui, Kanwil belum dapat memproses KGB-nya. Hapus
+                  pada draf yang sudah terdata menghapus drafnya dan menonaktifkan pegawainya; Kanwil dapat mengaktifkannya
+                  kembali. Draf pegawai baru yang NIP-nya ternyata sudah tercatat di satker Anda ditandai di papan dan diajukan sebagai perbaikan
                   data pegawai itu; yang tercatat di satker lain tidak dapat diajukan dan harus dihapus. Pada usulan
                   perbaikan berikutnya, nomor, tanggal, dan pejabat penetap SK dasar serta berkas terakhir yang sudah
                   disetujui Kanwil <strong>terisi sendiri</strong> dan bertanda <em>disetujui</em>; pilih PDF baru hanya
@@ -1631,10 +1636,13 @@ export default async function IsiPanduan({
                       dipakai apa adanya dan dasar KGB berikutnya tidak berpindah.
                     </p>
                     <p>
-                      Usulan pegawai baru yang disetujui langsung menambahkan pegawai beserta jadwal KGB-nya, dan SK yang
-                      diketik UPT (misalnya SK CPNS) menjadi SK dasar Input KGB pertama. Bila KGB pegawai sedang berjalan
-                      dan SK-nya belum diunggah, perhitungannya disesuaikan otomatis saat usulan disetujui. Selama usulan
-                      menunggu, baris pegawai bertanda Tertahan usulan UPT dan langkah prosesnya ditolak.
+                      Pegawai baru sudah terdata sejak Admin UPT melengkapi drafnya, dengan jadwal KGB-nya, dan SK yang
+                      diketik UPT (misalnya SK CPNS) menjadi SK dasar Input KGB pertama. Menyetujui usulannya menandai
+                      datanya sudah ditinjau dan membuka proses KGB-nya. Bila KGB pegawai sedang berjalan dan SK-nya belum
+                      diunggah, perhitungannya disesuaikan otomatis saat usulan disetujui. Selama usulan menunggu, baris
+                      pegawai bertanda Tertahan usulan UPT dan langkah prosesnya ditolak; selama UPT belum mengajukannya
+                      atau usulannya dikembalikan, kartunya bertanda Data belum ditinjau dan Data Pegawai memberi label
+                      yang sama.
                     </p>
                     <p>
                       Usulan pegawai baru yang NIP-nya ternyata sudah tercatat di satker yang sama bertanda{" "}
@@ -1650,8 +1658,8 @@ export default async function IsiPanduan({
                     <h3 className="pub-step-title">Periksa data pegawai</h3>
                     <p className="pub-step-who">Tim SDM, menu Data Pegawai</p>
                     <p>
-                      Cari setiap pegawai pada surat menurut NIP. Pegawai UPT yang belum terdaftar masuk lewat usulan
-                      pegawai baru dari UPT; pegawai Kanwil ditambahkan dengan tombol Tambah Pegawai, atau Impor CSV
+                      Cari setiap pegawai pada surat menurut NIP. Pegawai UPT terdata begitu Admin UPT melengkapi draf
+                      pegawai barunya (berlabel Data belum ditinjau sampai usulannya disetujui); pegawai Kanwil ditambahkan dengan tombol Tambah Pegawai, atau Impor CSV
                       untuk banyak pegawai sekaligus. Golongan, masa kerja golongan, dan TMT KGB
                       terakhir harus sama dengan SK yang dilampirkan UPT; gaji pokok dan TMT KGB berikutnya terisi
                       sendiri dari ketiganya menurut tabel PP 5/2024, sehingga tidak perlu diketik. Isi TMT KGB
@@ -2440,8 +2448,8 @@ export default async function IsiPanduan({
                   <details name="faq-panduan">
                     <summary>NIP pegawai tidak ditemukan di SIM-KGB</summary>
                     <p>
-                      Pegawai UPT yang belum tercatat ditambahkan Admin UPT dengan Tambah pegawai atau Unggah daftar, lalu
-                      diajukan ke Kanwil. NIP yang tercatat keliru dibetulkan lewat Perbarui data; Kanwil
+                      Pegawai UPT yang belum tercatat ditambahkan Admin UPT dengan Tambah pegawai atau Unggah daftar; ia
+                      terdata begitu drafnya lengkap, lalu diajukan ke Kanwil saat KGB-nya diusulkan. NIP yang tercatat keliru dibetulkan lewat Perbarui data; Kanwil
                       mencocokkannya dengan SK CPNS sebelum menyetujui.
                     </p>
                   </details>

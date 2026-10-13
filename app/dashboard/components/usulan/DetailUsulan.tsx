@@ -103,7 +103,9 @@ export default function DetailUsulan({ usulan: u, pratinjauDiTempat = false }: {
         </Catatan>
       ) : u.jenis === "baru" && (
         <Catatan nada="hijau">
-          Pegawai ini belum tercatat di SIM-KGB. Menyetujui usulan menambahkannya ke data induk beserta jadwal KGB-nya;
+          {u.pegawaiId
+            ? "Pegawai ini sudah terdata di SIM-KGB sejak UPT menyimpan drafnya, tetapi datanya belum ditinjau. Menyetujui usulan menandai datanya sudah ditinjau dan membuka proses KGB-nya; "
+            : "Pegawai ini belum tercatat di SIM-KGB. Menyetujui usulan menambahkannya ke data induk beserta jadwal KGB-nya; "}
           periksa NIP, golongan, masa kerja golongan, dan TMT terhadap berkasnya.
         </Catatan>
       )}

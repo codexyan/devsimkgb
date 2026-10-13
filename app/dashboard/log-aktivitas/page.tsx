@@ -53,6 +53,7 @@ const AKSI_CONFIG: Record<string, { label: string; nada: NadaAksi; kelompok: str
   simpan_draf_pegawai:      { label: "Simpan draf UPT",        nada: "abu",    kelompok: "Pegawai" },
   impor_draf_pegawai:       { label: "Unggah daftar UPT",      nada: "navy",   kelompok: "Pegawai" },
   hapus_draf_pegawai:       { label: "Hapus draf UPT",         nada: "merah",  kelompok: "Pegawai" },
+  terdata_pegawai_baru:     { label: "Pegawai baru terdata",   nada: "navy",   kelompok: "Pegawai" },
   usul_data_pegawai:        { label: "Usulan data dari UPT",   nada: "navy",   kelompok: "Pegawai" },
   batal_usulan:             { label: "Batal usulan UPT",       nada: "merah",  kelompok: "Pegawai" },
   setujui_usulan_pegawai:   { label: "Setujui usulan UPT",     nada: "hijau",  kelompok: "Pegawai" },
