@@ -19,6 +19,14 @@ interface LaporanApi extends LaporanHukdisAwal {
   dilaporkanAt: string | null;
   dilaporkanOleh: string | null;
   ditinjauAt: string | null;
+  /** Perkiraan jadwal KGB bila laporan ini dicatat Kanwil; hanya ada selama menunggu (ADR-114). */
+  proyeksi?: {
+    aksi: "geser" | "tolak" | "tidak_menunda";
+    dari?: string | null;
+    ke?: string | null;
+    bulan?: number;
+    alasan?: string;
+  } | null;
 }
 
 interface TercatatApi {
@@ -39,6 +47,7 @@ interface DataApi {
   jenis: JenisHukdisUpt[];
 }
 
+const bulanTahun = (t: string | null | undefined) => (t ? formatTanggalId(t, { month: "short", year: "numeric" }) : "-");
 const tgl = (t: string | null) => (t ? formatTanggalId(t, { day: "numeric", month: "short", year: "numeric" }) : "-");
 
 export default function HukdisUpt() {
@@ -236,6 +245,16 @@ export default function HukdisUpt() {
                           {cfg.label}
                         </span>
                         {l.ditinjauAt && <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>ditinjau {tgl(l.ditinjauAt)}</p>}
+                        {/* Perkiraan jadwal selama laporan menunggu Kanwil; data pegawai belum berubah (ADR-114). */}
+                        {l.status === "menunggu" && l.proyeksi && (
+                          <p className="dsb-kecil" style={{ margin: "2px 0 0", color: l.proyeksi.aksi === "tolak" ? "var(--st-red)" : "var(--st-amber)" }}>
+                            {l.proyeksi.aksi === "geser"
+                              ? `Perkiraan bila dicatat: TMT KGB ${bulanTahun(l.proyeksi.dari)} bergeser ke ${bulanTahun(l.proyeksi.ke)} (${l.proyeksi.bulan} bulan)`
+                              : l.proyeksi.aksi === "tidak_menunda"
+                                ? "Jenis hukuman ini tidak menunda KGB; jadwal tidak bergeser"
+                                : `Kanwil belum dapat memetakan pergeserannya: ${(l.proyeksi.alasan ?? "").split(/(?<=\.)\s/)[0]}`}
+                          </p>
+                        )}
                         {l.status === "dikembalikan" && l.catatanKanwil && (
                           <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-violet)" }}>Catatan Kanwil: {l.catatanKanwil}</p>
                         )}

@@ -162,7 +162,8 @@ export default function ModalLaporHukdis({
       ) : (
         <Catatan>
           Laporan ini belum mengubah data pegawai maupun jadwal KGB-nya. SDM Hukdis Kanwil mencocokkannya dengan
-          pindaian SK lalu mencatatnya; hukuman yang menunda KGB baru menggeser jadwal setelah dicatat.
+          pindaian SK lalu mencatatnya; hukuman yang menunda KGB baru menggeser jadwal setelah dicatat. Selama menunggu,
+          perkiraan pergeserannya tampil di Pegawai Satker dan di daftar laporan.
         </Catatan>
       )}
 

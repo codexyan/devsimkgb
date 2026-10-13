@@ -3,6 +3,7 @@ import { db, type Where } from "@/lib/db";
 import { cariDalam, idPegawaiSatker, pegawaiMenurutId } from "@/lib/dataSatker";
 import { auth } from "@/auth";
 import { hariIniWita, tanggalKalender } from "@/lib/waktu";
+import { proyeksiLaporanMenunggu } from "@/lib/proyeksiHukdisServer";
 import { penandaHukdisBerlaku, hukdisMasihBerlaku } from "@/lib/hukdisKedaluwarsa";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
 import { isoTanggalKalender, kunciBulanTmt, kunciTanggal, pilihKgbSiklus, rapelanSiklus } from "@/lib/rekapKgb";
@@ -121,6 +122,9 @@ export async function GET() {
   // Review SK yang diminta Kanwil untuk pegawai satker ini (ADR-077); kosong selama tabelnya belum ada.
   const reviewSatker = await muatSemuaReviewSk({ satker: kode });
 
+  // Perkiraan jadwal dari laporan hukdis yang masih menunggu Kanwil (ADR-114); hanya tampilan, data pegawai tidak berubah.
+  const perkiraanHukdis = await proyeksiLaporanMenunggu(kode, hariIni);
+
   const pegawai = milikSatker
     .filter((p) => p.aktif && berhakKgb(p, p.tmtKgbBerikutnya))
     .map((p) => {
@@ -171,6 +175,12 @@ export async function GET() {
         terlambat,
         // Hukdis hanya sebagai penanda; jenis dan keterangannya tidak dikirim ke UPT.
         kgbDitunda: kgbDitunda(hukdisRingkas, p.id),
+        // Laporan hukdis UPT yang menunggu Kanwil dan menunda KGB: TMT KGB berikutnya bergeser dari `dari` ke `ke` bila dicatat.
+        proyeksiHukdis: ((): { dari: string | null; ke: string | null } | null => {
+          const e = perkiraanHukdis.get(p.id);
+          if (!e || e.proyeksi.aksi !== "geser") return null;
+          return { dari: isoTanggalKalender(e.proyeksi.tmtSebelum), ke: isoTanggalKalender(e.proyeksi.tmtBaru) };
+        })(),
         // Konfirmasi siklus ini; kini hanya tercatat saat usulan perbaikan UPT disetujui Kanwil.
         konfirmasi: statusKonfirmasiUpt(p, tmt),
         konfirmasiAt: p.konfirmasiUptAt ? new Date(p.konfirmasiUptAt).toISOString() : null,
