@@ -2009,6 +2009,13 @@ export default async function IsiPanduan({
                   Dikembalikan membawa catatan Kanwil; pilih <strong>Perbaiki dan kirim ulang</strong>, betulkan isiannya,
                   lalu pilih <strong>Kirim ulang</strong>.
                 </p>
+                <p>
+                  Pegawai yang belum memasuki masa usul KGB (lebih dari dua bulan sebelum TMT) tetap dapat dilaporkan,
+                  termasuk pegawai baru yang drafnya sudah terdata. Selama laporan menunggu Kanwil dan hukumannya menunda
+                  KGB, Pegawai Satker dan daftar laporan menampilkan <em>perkiraan</em> pergeseran TMT KGB-nya, misalnya
+                  bergeser ke Juni 2028. Itu hanya tampilan: data dan jadwal pegawai baru bergeser setelah Kanwil mencatat,
+                  dan hasil pencatatan yang berlaku bila Kanwil mengubah jenis, masa penundaan, atau tanggalnya.
+                </p>
 
                 <h3 className="pub-h3">Di Kanwil: mencatat atau mengembalikan</h3>
                 <ol>

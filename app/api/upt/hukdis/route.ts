@@ -7,6 +7,7 @@ import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { pegawaiSatker } from "@/lib/aksesUpt";
 import { hukdisMasihBerlaku } from "@/lib/hukdisKedaluwarsa";
+import { proyeksiLaporanMenunggu } from "@/lib/proyeksiHukdisServer";
 import {
   LAPORAN_HUKDIS_DIPEGANG_UPT,
   adaLaporanHukdisBerjalan,
@@ -71,6 +72,8 @@ export async function GET() {
   const idSatker = new Set(milikSatker.map((p) => p.id));
   const labelJenis = new Map(semuaJenis.map((j) => [j.kode, j.label ?? j.kode]));
   const hariIni = hariIniWita();
+  // Perkiraan jadwal KGB untuk laporan yang masih menunggu Kanwil (ADR-114); hanya tampilan.
+  const perkiraan = new Map([...(await proyeksiLaporanMenunggu(akun.kode, hariIni)).values()].map((e) => [e.laporanId, e.proyeksi]));
 
   const daftarLaporan = laporan
     .map((l) => {
@@ -88,6 +91,13 @@ export async function GET() {
         tmtBerakhir: isoTanggalKalender(l.tmtBerakhir),
         keterangan: l.keterangan,
         berkas: l.pathBerkas ? { nama: namaAsliBerkas(l.pathBerkas) } : null,
+        proyeksi: ((): { aksi: "geser" | "tolak" | "tidak_menunda"; dari?: string | null; ke?: string | null; bulan?: number; alasan?: string } | null => {
+          const x = perkiraan.get(l.id);
+          if (!x) return null;
+          if (x.aksi === "geser")
+            return { aksi: "geser", dari: isoTanggalKalender(x.tmtSebelum), ke: isoTanggalKalender(x.tmtBaru), bulan: x.bulan };
+          return x.aksi === "tolak" ? { aksi: "tolak", alasan: x.alasan } : { aksi: "tidak_menunda" };
+        })(),
         status: l.status,
         catatanKanwil: l.catatanKanwil,
         dilaporkanOleh: l.dilaporkanOleh,

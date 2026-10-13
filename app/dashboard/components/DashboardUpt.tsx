@@ -98,6 +98,8 @@ interface PegawaiUpt {
   usulanBerjalan?: string | null;
   /** Pegawai ini didata dari draf pegawai baru dan datanya belum disetujui Kanwil; proses KGB-nya tertahan (ADR-112). */
   dataBelumDitinjau?: boolean;
+  /** Laporan hukdis UPT yang menunggu Kanwil dan menunda KGB: TMT KGB berikutnya bergeser dari `dari` ke `ke` bila dicatat (ADR-114). */
+  proyeksiHukdis?: { dari: string | null; ke: string | null } | null;
   /** SK yang menjadi dasar KGB berikutnya (ADR-030); null bila belum ada SK yang tercatat. */
   dasarKgb?: DasarKgbBerikutnya | null;
   /** SK dasar pada usulan UPT yang belum selesai; menjadi dasar setelah disetujui Kanwil (ADR-057). */
@@ -246,6 +248,13 @@ function bulanUsulanSekarang(hariIni: Date): string {
   // Surat usulan dikirim tanggal 1 sampai batas kirim (Pengaturan, bawaan 20) bulan kedua sebelum TMT, bulan yang sama dengan dibukanya
   // input di SIM-KGB, sehingga TMT yang diusulkan bulan ini adalah TMT dua bulan ke depan.
   return geserBulan(kunciBulanTmt(hariIni) ?? "", 2);
+}
+
+/** Perkiraan jadwal dari laporan hukdis yang masih menunggu Kanwil; null bila tidak ada (ADR-114). */
+function teksProyeksiHukdis(p: { proyeksiHukdis?: { dari: string | null; ke: string | null } | null }): string | null {
+  const x = p.proyeksiHukdis;
+  if (!x?.ke) return null;
+  return `Laporan hukdis menunggu Kanwil: bila dicatat, KGB bergeser ke ${formatTanggalId(x.ke, { month: "short", year: "numeric" })}`;
 }
 
 /** Keadaan KGB satu pegawai dari kacamata UPT. */
@@ -1070,6 +1079,9 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                               {batas && !p.terkunci ? ` · batas Kanwil ${formatTanggalId(batas, { day: "numeric", month: "short" })}` : ""}
                             </p>
                           )}
+                          {teksProyeksiHukdis(p) && (
+                            <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-amber)", whiteSpace: "normal", maxWidth: 220 }}>{teksProyeksiHukdis(p)}</p>
+                          )}
                         </td>
                         {/* SK yang gaji pokoknya dipakai SK KGB berikutnya; berpindah sendiri bila ada SK pangkat/PI atau PMK yang lebih baru (ADR-030). */}
                         <td style={{ maxWidth: "230px" }}>
@@ -1298,6 +1310,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                     : "TMT KGB terakhir atau golongannya belum diisi, jadi jadwal usul KGB-nya belum diketahui. Lengkapi drafnya; pendataan pegawai baru tetap dapat diajukan kapan saja lewat Usul KGB Kolektif"
                   : "",
                 p?.satkerTugas ? `Sedang BKO di ${namaUnitKerja(p.satkerTugas)}; KGB tetap diusulkan satker ini` : "",
+                p ? (teksProyeksiHukdis(p) ?? "") : "",
               ]
                 .filter(Boolean)
                 .join(" · ") || null
@@ -1812,6 +1825,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                           <span>
                             {p.nip} · {p.golonganRuang} · TMT {fmtTgl(p.tmtKgb)}
                           </span>
+                          {teksProyeksiHukdis(p) && <span style={{ color: "var(--st-amber)" }}>{teksProyeksiHukdis(p)}</span>}
                         </span>
                         <span className="dsb-tag" data-garis="" data-nada={k.nada}>
                           {k.teks}
