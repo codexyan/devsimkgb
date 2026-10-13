@@ -11,6 +11,9 @@ import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { TIPE_NOTIFIKASI } from "@/lib/generateNotifikasi";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { bentrokNipUsulan } from "@/lib/nipUsulan";
+import { nipTidakCocokDenganIsian } from "@/lib/nipPns";
+import { terdatakanPegawaiBaru } from "@/lib/terdatakanPegawaiBaru";
+import type { NilaiTanggal } from "@/lib/waktu";
 import type { PegawaiRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
@@ -26,8 +29,12 @@ async function usulanSatker(id: string, kode: string) {
   return { usulan };
 }
 
-/** Nama pegawai untuk catatan audit; pada usulan perubahan namanya ada di data induk. */
+/**
+ * Nama pegawai untuk catatan audit; pada usulan perubahan namanya ada di data induk. Pada usulan pegawai baru, termasuk yang
+ * pegawainya sudah terdata dari drafnya (ADR-112), isiannya sendirilah yang berlaku: baris pegawai itu bukan dasar hitungan.
+ */
 async function namaUsulan(usulan: UsulanPegawaiRow): Promise<{ nama: string; pegawai: PegawaiRow | null }> {
+  if (usulan.jenis === "baru") return { nama: usulan.nama ?? "-", pegawai: null };
   const pegawai = usulan.pegawaiId ? ((await db.pegawai.findUnique({ id: usulan.pegawaiId })) as PegawaiRow | null) : null;
   return { nama: pegawai?.nama ?? usulan.nama ?? "-", pegawai };
 }
@@ -86,6 +93,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // tidak boleh kosong; pada usulan perbaikan, kosong berarti NIP tidak diusulkan berubah.
   if (usulan.jenis === "baru" && !isian.nip)
     return NextResponse.json({ error: "NIP harus tepat 18 digit angka" }, { status: 400 });
+  // Pegawai baru: NIP harus cocok dengan tanggal lahir dan jenis kelamin pada draf (ADR-111). Usulan perbaikan tidak
+  // diperiksa, sebab data lama yang polanya tidak baku justru dibetulkan lewat jalur itu.
+  if (usulan.jenis === "baru" && isian.nip) {
+    // Isian yang dikirim formulir yang dipakai, termasuk yang sengaja dikosongkan; hanya formulir yang tidak memuat
+    // kolomnya (mis. perbaikan berkas saja) memakai nilai tersimpan pada draf.
+    const nipTidakCocok = nipTidakCocokDenganIsian(isian.nip, {
+      tanggalLahir: form.has("tanggalLahir") ? (isian.tanggalLahir as NilaiTanggal | null | undefined) : usulan.tanggalLahir,
+      jenisKelamin: form.has("jenisKelamin") ? ((isian.jenisKelamin as string | null | undefined) ?? null) : usulan.jenisKelamin,
+    });
+    if (nipTidakCocok) return NextResponse.json({ error: nipTidakCocok }, { status: 400 });
+  }
   if (isian.nip && isian.nip !== usulan.nip && isian.nip !== pegawai?.nip) {
     const bentrok = await bentrokNipUsulan(isian.nip, { usulanId: id, pegawaiId: usulan.pegawaiId });
     if (bentrok) return NextResponse.json({ error: bentrok }, { status: 409 });
@@ -176,6 +194,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   await db.usulanPegawai.update({ id }, perubahan);
 
+  // Draf pegawai baru yang lengkap langsung terdata, dan yang sudah terdata ikut diperbarui selama datanya belum ditinjau
+  // (ADR-112). Kegagalannya tidak membatalkan draf yang sudah tersimpan.
+  let terdata = false;
+  if (usulan.jenis === "baru") {
+    try {
+      const tersimpan = (await db.usulanPegawai.findUnique({ id })) as UsulanPegawaiRow | null;
+      if (tersimpan) {
+        const hasil = await terdatakanPegawaiBaru(tersimpan);
+        terdata = hasil.hasil === "dibuat" || hasil.hasil === "diperbarui";
+        if (hasil.hasil === "dibuat")
+          logAudit({
+            userId: akun.pengguna.id,
+            aksi: "terdata_pegawai_baru",
+            detail: `Pegawai baru ${String(isian.nama ?? nama)} (${tersimpan.nip ?? "-"}) langsung terdata dari draf; datanya belum ditinjau Kanwil`,
+            targetNama: String(isian.nama ?? nama),
+          });
+      }
+    } catch (e) {
+      console.error("[terdatakanPegawaiBaru] gagal:", e);
+    }
+  }
+
   logAudit({
     userId: akun.pengguna.id,
     aksi: usulan.status === "revisi" ? "perbaiki_usulan_pegawai" : "simpan_draf_pegawai",
@@ -185,7 +225,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     targetNama: String(isian.nama ?? nama),
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, terdata });
 }
 
 /**
@@ -219,6 +259,17 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   await db.notifikasi.deleteMany({ tipe: TIPE_NOTIFIKASI.USULAN_UPT, referenceId: id });
   await db.notifikasi.deleteMany({ tipe: TIPE_NOTIFIKASI.USULAN_REVISI, referenceId: id });
 
+  // Pegawai baru yang sudah terdata langsung dari usulan ini (ADR-112) dinonaktifkan, tidak dihapus: UPT bisa membatalkan
+  // input yang keliru, tetapi datanya tidak hilang. Kanwil dapat mengaktifkannya kembali atau menghapusnya permanen.
+  let dinonaktifkan = false;
+  if (usulan.jenis === "baru" && usulan.pegawaiId) {
+    const terdata = (await db.pegawai.findUnique({ id: usulan.pegawaiId })) as PegawaiRow | null;
+    if (terdata && terdata.aktif !== false) {
+      await db.pegawai.update({ id: terdata.id }, { aktif: false, updatedAt: new Date() });
+      dinonaktifkan = true;
+    }
+  }
+
   const aksiHapus =
     usulan.status === "draf" ? "hapus_draf_pegawai" : usulan.status === "revisi" ? "hapus_usulan_dikembalikan" : "batal_usulan";
   logAudit({
@@ -232,6 +283,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
           : `Usulan ${usulan.jenis === "baru" ? "pegawai baru " : "data "}${nama} dibatalkan UPT sebelum ditinjau, surat ${usulan.nomorSurat ?? "-"}`,
     targetNama: nama,
   });
+  if (dinonaktifkan)
+    logAudit({
+      userId: akun.pengguna.id,
+      aksi: "hapus_pegawai",
+      detail: `Nonaktifkan pegawai: ${nama} (${usulan.nip ?? "-"}), karena draf pegawai barunya dihapus UPT sebelum ditinjau Kanwil`,
+      targetNama: nama,
+    });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, pegawaiDinonaktifkan: dinonaktifkan });
 }

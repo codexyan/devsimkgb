@@ -49,6 +49,26 @@ export const DIPEGANG_UPT: readonly string[] = ["draf", "revisi"];
  */
 export const BELUM_SELESAI: readonly string[] = ["draf", "menunggu", "revisi"];
 
+/**
+ * Pesan untuk Kanwil saat NIP yang akan dicatat langsung masih punya usulan pegawai baru yang belum selesai. Petunjuknya
+ * mengikuti siapa yang memegang usulan: hanya yang "menunggu" yang ada di Usulan UPT; draf dan usulan yang dikembalikan
+ * hanya ada di tangan UPT, jadi menyuruh meninjaunya di sana membuntukan pembacanya (ADR-110).
+ */
+export function pesanNipSedangDiusulkan(nip: string, usulan: { status: string; nama: string | null }, namaSatker: string): string {
+  const nama = usulan.nama || "-";
+  if (usulan.status === "menunggu")
+    return `NIP ${nip} sedang diusulkan ${namaSatker} atas nama ${nama}. Tinjau usulannya di Usulan UPT; menyetujuinya akan menambahkan pegawai ini.`;
+  if (usulan.status === "revisi")
+    return (
+      `NIP ${nip} sedang diusulkan ${namaSatker} atas nama ${nama} dan dikembalikan ke UPT untuk diperbaiki, jadi belum ada di Usulan UPT. ` +
+      "Tunggu UPT mengajukannya lagi, atau minta Admin UPT menghapus usulannya bila Kanwil yang akan mencatat pegawai ini."
+    );
+  return (
+    `NIP ${nip} sedang disiapkan Admin UPT ${namaSatker} sebagai draf pegawai baru atas nama ${nama} dan belum diajukan, jadi belum ada di Usulan UPT. ` +
+    "Minta Admin UPT menghapus drafnya (tombol Hapus pada baris pegawai di Pegawai Satker) bila Kanwil yang akan mencatat pegawai ini, atau mengajukannya lewat Usul KGB Kolektif."
+  );
+}
+
 export type JenisBidang = "teks" | "tanggal" | "angka" | "rupiah";
 
 /**
@@ -390,11 +410,12 @@ export function hitungUsulan(isian: {
 }
 
 /**
- * Apa yang masih kurang sebelum sebuah draf boleh diajukan ke Kanwil. Draf sengaja boleh disimpan
- * setengah jadi (itu gunanya draf), sehingga pemeriksaan kelengkapan dilakukan di sini, sekali, pada
- * saat pengajuan. Daftar yang kosong berarti siap diajukan.
+ * Data utama yang masih kurang agar seorang pegawai dapat dibentuk dari usulan: identitas (nama, NIP, jabatan), golongan,
+ * TMT KGB terakhir, dan masa kerja golongan yang cocok dengan tabel gaji, sehingga gaji pokok dan jadwal KGB-nya dapat
+ * dihitung. Berkas, pejabat penetap, dan jawaban SK baru tidak termasuk: itu syarat mengajukan usulan, bukan syarat didata
+ * (ADR-113). Daftar kosong berarti pegawainya dapat terdata.
  */
-export function kekuranganUsulan(
+export function kekuranganDataUsulan(
   usulan: Partial<UsulanPegawaiRow>,
   jenis: string,
   pegawai?: Partial<PegawaiRow> | null,
@@ -427,6 +448,25 @@ export function kekuranganUsulan(
   if (golongan && hitung.gajiPokok === 0) {
     kurang.push(`masa kerja golongan yang cocok dengan tabel PP 5/2024 untuk golongan ${golongan}`);
   }
+  return kurang;
+}
+
+/** Syarat pegawai baru terdata dari drafnya, tanpa menunggu berkas dilengkapi (ADR-113). */
+export function kekuranganPendataanBaru(usulan: Partial<UsulanPegawaiRow>): string[] {
+  return kekuranganDataUsulan(usulan, "baru", null);
+}
+
+/**
+ * Apa yang masih kurang sebelum sebuah draf boleh diajukan ke Kanwil. Draf sengaja boleh disimpan
+ * setengah jadi (itu gunanya draf), sehingga pemeriksaan kelengkapan dilakukan di sini, sekali, pada
+ * saat pengajuan. Daftar yang kosong berarti siap diajukan.
+ */
+export function kekuranganUsulan(
+  usulan: Partial<UsulanPegawaiRow>,
+  jenis: string,
+  pegawai?: Partial<PegawaiRow> | null,
+): string[] {
+  const kurang: string[] = kekuranganDataUsulan(usulan, jenis, pegawai);
 
   const perubahan = pegawai ? bandingkanUsulan(pegawai, usulan) : [];
   const perluBerkas = jenis === "baru" || perubahan.some((p) => KOLOM_DASAR_GAJI.includes(p.kunci));

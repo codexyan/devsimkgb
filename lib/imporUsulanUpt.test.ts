@@ -175,7 +175,7 @@ test("pegawai yang sedang punya usulan berjalan ditolak walau usulan itu tidak m
     konteks({ pegawaiSatker: perNip(pegawai()), pegawaiIdUsulan: new Set(["p1"]) }),
   );
   assert.equal(h.hasil, "ditolak");
-  assert.equal(h.galat, "Pegawai ini sedang punya usulan yang belum selesai di Kanwil");
+  assert.equal(h.galat, "Pegawai ini sedang punya usulan yang belum selesai (draf, dikembalikan, atau menunggu Kanwil)");
 });
 
 test("NIP yang tidak sah, kembar, atau sudah diusulkan sebagai pegawai baru ditolak satu per satu", () => {
@@ -449,6 +449,31 @@ test("penyesuaian ijazah pada panduan: masa kerja golongan dipotong 5 tahun oleh
   assert.ok(sk.berlaku && sk.ok);
   assert.equal(sk.nilai.golonganRuang, "III/a");
   assert.equal(sk.nilai.mkgTahun, 4);
+});
+
+test("pegawai baru yang NIP-nya tidak cocok dengan tanggal lahir atau jenis kelaminnya ditolak (ADR-111)", () => {
+  const hasil = periksaImporUpt(
+    [
+      // 200509182025062002: lahir 18 September 2005, perempuan.
+      baris({ tanggalLahir: "2005-09-18", jenisKelamin: "Perempuan" }),
+      // 198911282017121003: lahir 28 November 1989, laki-laki; tanggal lahir yang diisi lain.
+      baris({ nip: "198911282017121003", tanggalLahir: "1993-04-07", jenisKelamin: "Laki-laki" }),
+      // 199001012020122001: lahir 1 Januari 1990, perempuan; jenis kelamin yang dipilih lain.
+      baris({ nip: "199001012020122001", tanggalLahir: "1990-01-01", jenisKelamin: "Laki-laki" }),
+      // Tanpa tanggal lahir dan jenis kelamin, tidak ada yang dicocokkan.
+      baris({ nip: "198809042025062014" }),
+    ],
+    kosong,
+  );
+  assert.deepEqual(hasil.map((h) => h.hasil), ["baru", "ditolak", "ditolak", "baru"]);
+  assert.match(hasil[1].galat ?? "", /menunjukkan lahir 28 November 1989, tetapi tanggal lahir yang diisi 7 April 1993/);
+  assert.match(hasil[2].galat ?? "", /angka ke-15 NIP \(2\) menunjukkan perempuan, tetapi jenis kelamin yang dipilih laki-laki/);
+  // Pegawai yang sudah tercatat tidak diperiksa ulang: perbaikan datanya justru jalan untuk membetulkan isian yang keliru.
+  const [lama] = periksaImporUpt(
+    [baris({ tanggalLahir: "1989-11-28", jenisKelamin: "Laki-laki" })],
+    konteks({ pegawaiSatker: perNip(pegawai()) }),
+  );
+  assert.notEqual(lama.hasil, "ditolak");
 });
 
 test("berkas bertanggal bulan/hari (CSV simpanan Excel berbahasa Inggris) ditolak, bukan dibaca tertukar", () => {

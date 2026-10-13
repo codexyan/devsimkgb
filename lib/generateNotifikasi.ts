@@ -126,7 +126,7 @@ type HukdisUntukNotifikasi = Pick<RiwayatHukdisRow, "pegawaiId" | "berdampakKGB"
 /** Usulan data dari UPT yang perlu ditinjau Kanwil (lib/usulanPegawai.ts). */
 type UsulanUntukNotifikasi = {
   id: string;
-  /** Kosong pada usulan pegawai baru: pegawainya belum ada sampai usulan disetujui. */
+  /** Terisi pada usulan pegawai baru yang pegawainya sudah terdata langsung dari drafnya (ADR-112); kosong pada usulan lama. */
   pegawaiId: string | null;
   status: string;
   nomorSurat: string | null;
@@ -140,7 +140,7 @@ type UsulanUntukNotifikasi = {
  * melihatnya seketika, dan saat pemeriksaan berkala, supaya usulan lama tidak ada yang terlewat.
  */
 export function notifikasiUsulanUpt(
-  usulan: { id: string; jenis?: string | null; nomorSurat: string | null },
+  usulan: { id: string; jenis?: string | null; nomorSurat: string | null; pegawaiId?: string | null },
   pegawai: { nama: string | null; nip: string | null } | null | undefined,
 ): Omit<NotifikasiRow, "id" | "dibaca" | "createdAt"> {
   const nama = pegawai?.nama?.trim() || "-";
@@ -152,7 +152,9 @@ export function notifikasiUsulanUpt(
     // Laporan SK kenaikan pangkat atau PMK berangkat tanpa surat usulan (ADR-046); menyebut "surat -"
     // di situ hanya membuat peninjau mencari surat yang memang tidak pernah ada.
     pesan: pegawaiBaru
-      ? `UPT mengusulkan pegawai baru ${nama} (${nip}) ${lewat}. Tinjau sebelum pegawainya ditambahkan ke data induk.`
+      ? usulan.pegawaiId
+        ? `UPT mengajukan data pegawai baru ${nama} (${nip}) ${lewat}. Pegawainya sudah terdata; tinjau datanya sebelum KGB-nya diproses.`
+        : `UPT mengusulkan pegawai baru ${nama} (${nip}) ${lewat}. Tinjau sebelum pegawainya ditambahkan ke data induk.`
       : `UPT mengusulkan perbaikan data ${nama} (${nip}) ${lewat}. Tinjau sebelum KGB pegawai ini diproses.`,
     tipe: T.USULAN_UPT,
     referenceId: usulan.id,
@@ -244,8 +246,8 @@ export function notifikasiReviewSk(
     pesan:
       `Kanwil ${ulang ? "sudah memperbaiki" : "sudah menyiapkan"} SK KGB ${nama} (${nip})` +
       `${kgb.tmtKgbBaru ? ` TMT ${formatTanggalId(kgb.tmtKgbBaru)}` : ""}${surat.nomorSurat ? `, nomor ${surat.nomorSurat}` : ""}. ` +
-      "Periksa tampilannya di Perlu dikerjakan, lalu nyatakan sudah benar atau minta perbaikan. SK baru dicetak, " +
-      "ditandatangani, dan dikirim lewat Srikandi setelah Anda menyetujuinya.",
+      "Periksa tampilannya di kolom Periksa SK, lalu nyatakan sudah benar atau minta perbaikan. SK baru ditandatangani " +
+      "dengan TTE dan dikirim lewat Srikandi setelah Anda menyetujuinya.",
     tipe: T.REVIEW_SK,
     referenceId: kgb.id,
     prioritas: "warning",
@@ -266,7 +268,7 @@ export function notifikasiHasilReviewSk(
   return hasil.keputusan === "setuju"
     ? {
         judul: `SK Disetujui UPT: ${nama}`,
-        pesan: `${hasil.satker} menyatakan ${sk} sudah benar. Unduh untuk TTE, tanda tangani dan kirim lewat Srikandi, lalu Unggah SK bertanda tangan.`,
+        pesan: `${hasil.satker} menyatakan ${sk} sudah benar. Unduh untuk TTE, tanda tangani dan kirim lewat Srikandi, lalu Unggah SK TTE Srikandi.`,
         tipe: T.REVIEW_SK_HASIL,
         referenceId: kgbId,
         prioritas: "info",
@@ -428,6 +430,11 @@ export function rencanaNotifikasi(input: {
   kgb: readonly KgbUntukNotifikasi[];
   riwayatHukdis: readonly HukdisUntukNotifikasi[];
   usulan?: readonly UsulanUntukNotifikasi[];
+  /**
+   * Pegawai yang didata UPT dan usulan pegawai barunya belum disetujui (ADR-112). Input KGB mereka ditahan, jadi pengingat
+   * batas input tidak dikirim: tindak lanjutnya ada pada usulan, bukan pada Input KGB.
+   */
+  belumDitinjau?: ReadonlySet<string>;
 }): RencanaNotifikasi {
   const { hariIni } = input;
   const h1 = Math.max(input.h1, input.h2);
@@ -468,7 +475,8 @@ export function rencanaNotifikasi(input: {
       }
     }
 
-    // 2. Pengingat deadline input KGB.
+    // 2. Pengingat deadline input KGB. Pegawai yang datanya belum ditinjau ditahan prosesnya (ADR-112).
+    if (input.belumDitinjau?.has(p.id)) continue;
     const tmt = tanggalKalender(p.tmtKgbBerikutnya);
     const jendela = jendelaProsesKgb(tmt, hariIni);
     if (!tmt || !jendela) continue;
@@ -628,6 +636,7 @@ export function rencanaNotifikasi(input: {
  */
 export async function generateNotifikasi(sekarang: Date = new Date()): Promise<NotifikasiResult> {
   const { db } = await import("./db");
+  const { idPegawaiBelumDitinjau } = await import("./terdatakanPegawaiBaru");
   const hariIni = hariIniWita(sekarang);
 
   const [cfg, allNotif, allPegawai, allKgb, allHukdis, allUsulan] = await Promise.all([
@@ -648,6 +657,7 @@ export async function generateNotifikasi(sekarang: Date = new Date()): Promise<N
     kgb: allKgb,
     riwayatHukdis: allHukdis,
     usulan: allUsulan,
+    belumDitinjau: await idPegawaiBelumDitinjau(),
   });
 
   const details: string[] = [];

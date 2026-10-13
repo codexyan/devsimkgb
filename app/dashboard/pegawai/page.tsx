@@ -14,6 +14,7 @@ import {
   tambahBulan,
 } from "@/lib/tabelGaji";
 import { ROLES } from "@/lib/auth";
+import { pilihanTahunMkg } from "@/lib/koreksiDasarGaji";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR, denganNilaiSaatIni } from "@/lib/pilihanPegawai";
 import { SATKER, SATKER_KANWIL, cariSatker } from "@/lib/satker";
 import { ringkasKeadaanPegawai } from "@/lib/mutasiPegawai";
@@ -37,6 +38,8 @@ interface Pegawai {
   tmtKgbTerakhir?: string | null;
   statusHukdis: boolean;
   tanggalHukdisBerakhir?: string | null;
+  /** Didata UPT, tetapi usulan pegawai barunya belum disetujui Kanwil (ADR-112). */
+  dataBelumDitinjau?: boolean;
   jenisHukdis?: string | null;
   aktif: boolean;
   statusKGB?: string | null;
@@ -685,6 +688,9 @@ export default function PegawaiPage() {
                           <div className="min-w-0" style={{ lineHeight: 1.35 }}>
                             <p className="dsb-nama" style={{ margin: 0 }}>{p.nama}</p>
                             <p className="dsb-kecil" style={{ margin: 0 }}>{p.nip}</p>
+                            {p.dataBelumDitinjau && (
+                              <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-amber)" }}>Data belum ditinjau</p>
+                            )}
                             {(() => {
                               const keadaan = ringkasKeadaanPegawai(p, hariIniWita());
                               return keadaan ? (
@@ -785,6 +791,9 @@ export default function PegawaiPage() {
                     <div className="flex-1 min-w-0">
                       <p className="dsb-nama" style={{ margin: 0 }}>{p.nama}</p>
                       <p className="dsb-kecil" style={{ margin: 0 }}>{p.nip}</p>
+                      {p.dataBelumDitinjau && (
+                        <p className="dsb-kecil" style={{ margin: "2px 0 0", color: "var(--st-amber)" }}>Data belum ditinjau</p>
+                      )}
                       <p className="dsb-kecil" style={{ margin: "2px 0 0" }}>{p.golonganRuang} · {p.jabatan}</p>
                       <p className="dsb-kecil" style={{ margin: "2px 0 0", color: uk.dikenal ? undefined : "var(--st-amber)" }}>
                         {uk.teks}{uk.dikenal ? "" : " (belum sesuai daftar satker)"}
@@ -1054,30 +1063,54 @@ export default function PegawaiPage() {
                     </div>
                     <div className="col-span-1 sm:col-span-2 min-w-0">
                       <label className={labelClass} style={{ color: "var(--dt2)" }}>Masa Kerja Golongan (MKG) <span style={{ color: "var(--st-red)" }}>*</span></label>
-                      <select
-                        className={inputClass}
-                        style={form.golonganRuang ? inputStyle : readonlyStyle}
-                        disabled={!form.golonganRuang}
-                        value={form.mkgTahun !== "" ? `${form.mkgTahun}_${form.mkgBulan}` : ""}
-                        onChange={(e) => {
-                          if (!e.target.value) return;
-                          const [tahun, bulan] = e.target.value.split("_").map(Number);
-                          setForm((p) => ({
-                            ...p,
-                            mkgTahun: tahun.toString(),
-                            mkgBulan: bulan.toString(),
-                            gajiPokok: getGajiPokok(p.golonganRuang, tahun, bulan).toString(),
-                            tmtKgbBerikutnya: tmtBerikutnyaOtomatis(p.golonganRuang, tahun, bulan, p.tmtKgbTerakhir) || p.tmtKgbBerikutnya,
-                          }));
-                        }}
-                      >
-                        <option value="">Pilih MKG</option>
-                        {getMKGOptions(form.golonganRuang).map((opt) => (
-                          <option key={`${opt.tahun}_${opt.bulan}`} value={`${opt.tahun}_${opt.bulan}`}>
-                            {opt.tahun} Tahun {opt.bulan} Bulan: Rp {opt.gaji.toLocaleString("id-ID")}
-                          </option>
+                      {/* Tahun dan bulan dipilih terpisah agar masa kerja di antara dua langkah tabel tercatat sesuai SK; gaji
+                          pokok tetap langkah tabel di bawahnya (ADR-106). */}
+                      <div className="flex gap-2 min-w-0">
+                        {(["mkgTahun", "mkgBulan"] as const).map((kolom) => (
+                          <select
+                            key={kolom}
+                            className={inputClass}
+                            style={form.golonganRuang ? inputStyle : readonlyStyle}
+                            disabled={!form.golonganRuang}
+                            aria-label={kolom === "mkgTahun" ? "Masa kerja golongan, tahun" : "Masa kerja golongan, bulan"}
+                            value={form[kolom]}
+                            onChange={(e) => {
+                              if (e.target.value === "") return;
+                              setForm((p) => {
+                                const tahun = kolom === "mkgTahun" ? Number(e.target.value) : parseInt(p.mkgTahun) || 0;
+                                const bulan = kolom === "mkgBulan" ? Number(e.target.value) : parseInt(p.mkgBulan) || 0;
+                                return {
+                                  ...p,
+                                  mkgTahun: tahun.toString(),
+                                  mkgBulan: bulan.toString(),
+                                  gajiPokok: getGajiPokok(p.golonganRuang, tahun, bulan).toString(),
+                                  tmtKgbBerikutnya: tmtBerikutnyaOtomatis(p.golonganRuang, tahun, bulan, p.tmtKgbTerakhir) || p.tmtKgbBerikutnya,
+                                };
+                              });
+                            }}
+                          >
+                            {kolom === "mkgTahun" ? (
+                              <>
+                                <option value="">Tahun</option>
+                                {[...new Set([...pilihanTahunMkg(form.golonganRuang), ...(form.mkgTahun !== "" ? [parseInt(form.mkgTahun) || 0] : [])])]
+                                  .sort((a, b) => a - b)
+                                  .map((tahun) => (
+                                    <option key={tahun} value={tahun}>
+                                      {tahun} Tahun: Rp {getGajiPokok(form.golonganRuang, tahun, 0).toLocaleString("id-ID")}
+                                    </option>
+                                  ))}
+                              </>
+                            ) : (
+                              <>
+                                <option value="">Bulan</option>
+                                {Array.from({ length: 12 }, (_, bulan) => (
+                                  <option key={bulan} value={bulan}>{bulan} Bulan</option>
+                                ))}
+                              </>
+                            )}
+                          </select>
                         ))}
-                      </select>
+                      </div>
                     </div>
                     {form.gajiPokok && (
                       <div className="col-span-1 sm:col-span-2 rounded-lg px-3 py-2 flex items-center gap-2" style={{ background: "var(--tint-navy)", border: "1px solid var(--ln0)" }}>

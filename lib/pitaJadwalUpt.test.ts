@@ -4,7 +4,19 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { geserKunciBulan, hitungPerTahap, perluPeriksaSk, susunPitaUpt, tahapPita, teksJendela, type PegawaiPita } from "./pitaJadwalUpt";
+import {
+  geserKunciBulan,
+  hitungPerTahap,
+  langkahJendela,
+  perluPeriksaSk,
+  rekonBulanIni,
+  susunKalenderTmt,
+  susunPitaUpt,
+  tahapPita,
+  tahunKalenderTmt,
+  teksJendela,
+  type PegawaiPita,
+} from "./pitaJadwalUpt";
 
 const p = (ubah: Partial<PegawaiPita> = {}): PegawaiPita => ({ bulanTmt: "2026-12", statusKGB: null, usulanBerjalan: null, konfirmasi: "belum", ...ubah });
 
@@ -85,4 +97,48 @@ test("kalimat hitung mundur", () => {
   assert.equal(teksJendela({ keadaan: "belum", mulaiDalam: 1 }, 20, "Nov"), "dibuka besok");
   assert.equal(teksJendela({ keadaan: "belum", mulaiDalam: 22 }, 20, "Nov"), "dibuka 22 hari lagi");
   assert.equal(geserKunciBulan("2026-11", 2), "2027-01");
+});
+
+test("kalender TMT setahun: jumlah per tahap dan keadaan tiap bulan", () => {
+  const pegawai = [
+    p({ bulanTmt: "2026-04", statusKGB: "selesai" }),
+    p({ bulanTmt: "2026-10", statusKGB: "menunggu_keuangan" }),
+    p({ bulanTmt: "2026-11" }), // lewat jendela, belum diusulkan
+    p({ bulanTmt: "2026-11", statusKGB: "sedang_diproses" }),
+    p({ bulanTmt: "2026-12", usulanBerjalan: "menunggu" }),
+    p({ bulanTmt: "2027-01" }),
+  ];
+  const k = susunKalenderTmt(pegawai, 2026, "2026-12");
+  assert.equal(k.length, 12);
+  assert.equal(k[0].bulanTmt, "2026-01");
+  assert.equal(k[0].keadaan, "kosong");
+  assert.equal(k[3].keadaan, "selesai");
+  assert.equal(k[9].keadaan, "berjalan");
+  assert.equal(k[10].keadaan, "terlambat");
+  assert.deepEqual(k[10].perTahap, { usulkan: 1, kanwil: 1, sk: 0, selesai: 0 });
+  assert.equal(k[11].keadaan, "jendela");
+  assert.equal(k[11].jumlah, 1);
+  const depan = susunKalenderTmt(pegawai, 2027, "2026-12");
+  assert.equal(depan[0].keadaan, "belum");
+  assert.equal(depan[1].keadaan, "kosong");
+});
+
+test("tahun kalender: tahun ini dan depan, tahun lalu hanya bila masih ada yang tertinggal", () => {
+  assert.deepEqual(tahunKalenderTmt([p({ bulanTmt: "2026-12" })], 2026), [2026, 2027]);
+  assert.deepEqual(tahunKalenderTmt([p({ bulanTmt: "2025-12" }), p({ bulanTmt: "2023-01" })], 2026), [2025, 2026, 2027]);
+});
+
+test("langkah jendela kirim mengikuti tahap pegawai", () => {
+  const keadaan = (perTahap: Record<string, number>) =>
+    langkahJendela({ jumlah: Object.values(perTahap).reduce((a, b) => a + b, 0), perTahap: { usulkan: 0, kanwil: 0, sk: 0, selesai: 0, ...perTahap } }).map((l) => l.keadaan);
+  assert.deepEqual(keadaan({}), ["belum", "belum", "belum", "belum"]);
+  assert.deepEqual(keadaan({ usulkan: 12, kanwil: 6 }), ["aktif", "aktif", "belum", "belum"]);
+  assert.deepEqual(keadaan({ kanwil: 57 }), ["selesai", "selesai", "aktif", "belum"]);
+  assert.deepEqual(keadaan({ sk: 3, selesai: 2 }), ["selesai", "selesai", "selesai", "belum"]);
+  assert.deepEqual(keadaan({ selesai: 4 }), ["selesai", "selesai", "selesai", "selesai"]);
+});
+
+test("rekon bulan ini: TMT bulan depan dan yang sudah direkam", () => {
+  const r = rekonBulanIni([p({ bulanTmt: "2026-11", statusKGB: "selesai" }), p({ bulanTmt: "2026-11", statusKGB: "menunggu_keuangan" }), p()], "2026-12");
+  assert.deepEqual(r, { bulanTmt: "2026-11", jumlah: 2, selesai: 1 });
 });

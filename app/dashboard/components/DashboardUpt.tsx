@@ -12,22 +12,51 @@ import { LABEL_KONFIRMASI_UPT, type StatusKonfirmasiUpt } from "@/lib/konfirmasi
 import { BELUM_SELESAI, LABEL_JENIS_USULAN } from "@/lib/usulanPegawai";
 import { kunciNomorSk } from "@/lib/nomorSurat";
 import { TUGAS_UPT, daftarTugasUpt } from "@/lib/tugasUpt";
-import { TAHAP_KGB_UPT, indeksTahap, kartuPerKolom, tahapProsesKgb, type KolomUpt, type SumberKartu } from "@/lib/papanUpt";
+import {
+  TAHAP_KGB_UPT,
+  indeksTahap,
+  kartuPerKolom,
+  kelompokKerja,
+  susunKelompokKerja,
+  tahapProsesKgb,
+  type KelompokKerja,
+  type KolomUpt,
+  type SumberKartu,
+} from "@/lib/papanUpt";
 import { UKURAN_KIRIMAN, ajukanBertahap, kabarJadiPerbaikan } from "./upt/ajukanBertahap";
 import FormulirUsulan, { type DrafUsulanUpt, type PegawaiUntukUsulan } from "@/app/dashboard/components/upt/FormulirUsulan";
 import ModalLaporMutasi from "@/app/dashboard/components/upt/ModalLaporMutasi";
 import MenuTindakan from "@/app/dashboard/components/MenuTindakan";
 import { PERISTIWA_BUKA_PENGUMUMAN_UPT } from "@/lib/pengumumanUpt";
 import type { JenisMutasi } from "@/lib/mutasiPegawai";
-import { batasKirimSurat } from "@/lib/batasInputSdm";
+import { batasInputSdm, batasKirimSurat } from "@/lib/batasInputSdm";
 import { KerangkaModal, Catatan, ModalPratinjauBerkas, PesanGalat } from "@/app/dashboard/components/kgb";
 import type { Satker } from "@/lib/satker";
 import type { DasarKgbBerikutnya } from "@/lib/dasarKgbBerikutnya";
 import PengingatUsulan from "@/app/dashboard/components/upt/PengingatUsulan";
 import ModalReviewSk from "@/app/dashboard/components/upt/ModalReviewSk";
 import { LABEL_REVIEW_SK, type InfoReviewSk } from "@/lib/reviewSkUpt";
-import { TAHAP_PITA, hitungPerTahap, susunPitaUpt, tahapPita, type TahapPita } from "@/lib/pitaJadwalUpt";
+import {
+  TAHAP_PITA,
+  hitungPerTahap,
+  langkahJendela,
+  rekonBulanIni,
+  susunKalenderTmt,
+  susunPitaUpt,
+  tahapPita,
+  tahunKalenderTmt,
+  teksJendela,
+  type TahapPita,
+} from "@/lib/pitaJadwalUpt";
 import PitaJadwalUpt from "@/app/dashboard/components/upt/PitaJadwalUpt";
+
+/** Batas input Kanwil pada bulan kirim menurut Pengaturan: "akhir Oktober" bila jatuh di hari terakhir, selain itu "20 Oktober 2026". */
+function teksBatasInput(bulanKirim: string): string {
+  const [y, m] = bulanKirim.split("-").map(Number);
+  const hariTerakhir = new Date(y, m, 0).getDate();
+  const tanggal = Math.min(batasInputSdm(), hariTerakhir);
+  return tanggal >= hariTerakhir ? `akhir ${namaBulan(bulanKirim, true).split(" ")[0]}` : `${tanggal} ${namaBulan(bulanKirim, true)}`;
+}
 
 /** Satu baris "Dasar KGB berikutnya": SK yang gaji pokoknya dipakai SK KGB berikutnya (ADR-030). */
 function teksDasarKgb(dasar: DasarKgbBerikutnya | null | undefined): string | null {
@@ -67,6 +96,8 @@ interface PegawaiUpt {
   perluDiperiksa: boolean;
   /** "draf", "menunggu", atau "revisi" bila ada usulan berjalan. */
   usulanBerjalan?: string | null;
+  /** Pegawai ini didata dari draf pegawai baru dan datanya belum disetujui Kanwil; proses KGB-nya tertahan (ADR-112). */
+  dataBelumDitinjau?: boolean;
   /** SK yang menjadi dasar KGB berikutnya (ADR-030); null bila belum ada SK yang tercatat. */
   dasarKgb?: DasarKgbBerikutnya | null;
   /** SK dasar pada usulan UPT yang belum selesai; menjadi dasar setelah disetujui Kanwil (ADR-057). */
@@ -89,7 +120,16 @@ const dipegangUpt = (status: string) => status === "draf" || status === "revisi"
  * akibatnya berbeda di mata UPT: draf belum pernah dilihat siapa pun, usulan terkirim sedang ditunggu
  * Kanwil, dan yang dikembalikan justru sedang ditunggu perbaikannya.
  */
-function salinanHapusUsulan(status: string) {
+function salinanHapusUsulan(status: string, pegawaiTerdata = false) {
+  // Draf pegawai baru yang sudah terdata (ADR-112): menghapusnya juga menonaktifkan pegawainya, dan Kanwil sudah dapat
+  // melihat pegawai itu di Data Pegawai.
+  if (pegawaiTerdata && status !== "menunggu")
+    return {
+      judul: status === "revisi" ? "Hapus usulan yang dikembalikan" : "Hapus data yang disiapkan",
+      tombol: status === "revisi" ? "Hapus usulan" : "Hapus data",
+      peringatan:
+        "Pegawai ini sudah terdata di SIM-KGB. Menghapusnya menghapus draf beserta berkas yang diunggah, dan pegawainya dinonaktifkan: ia hilang dari Pegawai Satker. Kanwil dapat mengaktifkannya kembali bila terhapus karena keliru.",
+    };
   if (status === "draf")
     return {
       judul: "Hapus data yang disiapkan",
@@ -128,6 +168,8 @@ interface UsulanTerkirim extends DrafUsulanUpt {
    * data pegawai itu; di satker lain tidak dapat diajukan.
    */
   nipTercatat?: { nama?: string; satkerSama: boolean } | null;
+  /** Bulan TMT KGB berikutnya menurut isian draf pegawai baru; dasar penguncian draf itu di papan (ADR-104). */
+  bulanTmtKgb?: string | null;
   diajukanAt: string | null;
   ditinjauAt: string | null;
   ditinjauOleh: string | null;
@@ -219,6 +261,12 @@ function keadaan(p: PegawaiUpt): { teks: string; nada?: Nada } {
     return { teks: "Sedang diproses Kanwil", nada: "navy" };
   }
   if (p.terkunci) return { teks: "Belum masuk jadwal" };
+  // Pegawai yang didata UPT belum dapat diproses Kanwil sampai usulan pegawai barunya disetujui (ADR-112).
+  if (p.dataBelumDitinjau) {
+    if (p.usulanBerjalan === "revisi") return { teks: "Dikembalikan Kanwil, perbaiki", nada: "merah" };
+    if (p.usulanBerjalan === "draf") return { teks: "Data baru, belum diajukan ke Kanwil", nada: "kuning" };
+    return { teks: "Data baru ditinjau Kanwil", nada: "navy" };
+  }
   if (p.terlambat) return { teks: "Lewat batas input Kanwil", nada: "merah" };
   return { teks: "Menunggu diproses Kanwil", nada: "kuning" };
 }
@@ -248,6 +296,8 @@ interface SumberPapan extends SumberKartu {
   nama: string;
   /** Id usulan bila kartu ini draf lengkap yang dapat dicentang untuk diajukan. */
   pilihSiap?: string | null;
+  /** Kelompok di kolom Perlu dikerjakan: terlambat, dikembalikan, jendela kirim, atau lainnya (ADR-103). */
+  kelompok?: KelompokKerja;
   render: (lain: string[]) => React.ReactNode;
 }
 
@@ -263,6 +313,14 @@ const KOLOM_UPT: { k: KolomUpt; judul: string; ket: string; nada: Nada }[] = [
   // dipegang Admin UPT. Usulan data yang ditinjau Kanwil tidak masuk sini (lihat sumberPapan).
   { k: "selesai", judul: "Selesai", ket: "Sudah direkam di Gaji Web", nada: "hijau" },
 ];
+
+/** Subjudul kelompok di Perlu dikerjakan (ADR-103). */
+const JUDUL_KELOMPOK: Record<KelompokKerja, (bulanUsulan: string) => string> = {
+  terlambat: () => "Terlambat",
+  kembali: () => "Dikembalikan Kanwil",
+  jendela: (b) => `Jendela TMT ${namaBulan(b, true)}`,
+  lain: () => "Data pegawai lainnya",
+};
 
 const KOSONG_UPT: Record<KolomUpt, string> = {
   kerja: "Tidak ada yang perlu dikerjakan. Pegawai baru ditambahkan dari Pegawai Satker.",
@@ -292,10 +350,32 @@ function TahapKartu({ aktif }: { aktif: number }) {
   );
 }
 
-/** Satu kartu di papan: nama, satu baris keterangan, satu label, catatan pendek, dan tombol. */
+/** Ikon pil keadaan kartu menurut nadanya, agar keadaan tidak dibaca dari warna saja (ADR-103). */
+function IkonPil({ nada }: { nada?: Nada }) {
+  const garis = {
+    merah: <><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5M12 16.5v.01" /></>,
+    hijau: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+    kuning: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    ungu: <><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></>,
+    biru: <path d="M21 12a9 9 0 1 1-9-9" />,
+    navy: <><path d="M4 21V6l8-3v18M12 9h8v12" /></>,
+    emas: <circle cx="12" cy="12" r="4" />,
+  } as const;
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {nada ? garis[nada] : <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>}
+    </svg>
+  );
+}
+
+/**
+ * Satu kartu di papan: keadaan sebagai pil berikon di kiri atas dan TMT di kanan atas (ADR-103), lalu nama, satu baris
+ * keterangan, catatan pendek, dan tombol.
+ */
 function KartuUpt({
   nama,
   sub,
+  tmt,
   nada,
   label,
   redup,
@@ -310,6 +390,8 @@ function KartuUpt({
 }: {
   nama: string;
   sub: string;
+  /** TMT KGB singkat di kanan atas, mis. "TMT Jan 2027". */
+  tmt?: string | null;
   nada?: Nada;
   /** Label keadaan di atas nama, mis. SIAP DIAJUKAN (ADR-090). */
   label?: { teks: string; nada?: Nada };
@@ -337,9 +419,17 @@ function KartuUpt({
       title={petunjuk}
       aria-label={nama}
     >
-      {label && (
-        <p className="dsb-kartu-label-baris">
-          <span className="dsb-kartu-label" data-nada={label.nada}>{label.teks}</span>
+      {(label || tanda || tmt) && (
+        <p className="upt-kartu-atas">
+          {label || tanda ? (
+            <span className="upt-pil" data-nada={(label ?? tanda)?.nada}>
+              <IkonPil nada={(label ?? tanda)?.nada} />
+              {(label ?? tanda)?.teks}
+            </span>
+          ) : (
+            <span />
+          )}
+          {tmt && <span className="upt-kartu-tmt">{tmt}</span>}
         </p>
       )}
       <p className="dsb-kartu-kepala">
@@ -347,7 +437,8 @@ function KartuUpt({
         <span className="dsb-nama truncate">{nama}</span>
       </p>
       <p className="dsb-kecil truncate" style={{ margin: 0 }} title={sub}>{sub}</p>
-      {tanda && (
+      {/* Penanda kedua, bila kartu sudah berlabel: mis. laporan yang menunggu di samping keadaan KGB-nya. */}
+      {label && tanda && (
         <p className="dsb-kartu-tanda">
           <span className="dsb-tag" data-garis="" data-nada={tanda.nada}>{tanda.teks}</span>
         </p>
@@ -424,6 +515,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     setTabPeriode("semua");
     setDialogPeriode(periode);
   };
+  /** Jendela Rincian zona jendela kirim: empat langkah bulan ini dan rekon yang juga berlangsung (ADR-103). */
+  const [dialogRincian, setDialogRincian] = useState(false);
   const [pilihAjukan, setPilihAjukan] = useState<Set<string>>(() => new Set());
   const [cariPapan, setCariPapan] = useState("");
   const [dialogAjukan, setDialogAjukan] = useState(false);
@@ -479,10 +572,16 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   }
 
   function bukaUsulan(p: PegawaiUpt) {
+    const d = drafPegawai(p.id);
+    // Pegawai yang didata dari draf pegawai baru (ADR-112) membuka formulir pegawai barunya, bukan formulir perbaikan.
+    if (d?.jenis === "baru") {
+      setFormulir({ jenis: "baru", pegawai: null, draf: d });
+      return;
+    }
     setFormulir({
       jenis: "perubahan",
       pegawai: { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan, dasarKgb: p.dasarKgb },
-      draf: drafPegawai(p.id),
+      draf: d,
     });
   }
 
@@ -491,7 +590,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   }
 
   function lanjutkanDraf(u: UsulanTerkirim) {
-    const p = (data?.pegawai ?? []).find((x) => x.id === u.pegawaiId) ?? null;
+    // Draf pegawai baru tidak memakai baris pegawainya sebagai dasar, juga yang sudah terdata dari draf itu (ADR-112).
+    const p = u.jenis === "baru" ? null : ((data?.pegawai ?? []).find((x) => x.id === u.pegawaiId) ?? null);
     setFormulir({
       jenis: u.jenis === "baru" ? "baru" : "perubahan",
       pegawai: p ? { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan, dasarKgb: p.dasarKgb } : null,
@@ -586,13 +686,17 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     setMembatalkan(true);
     try {
       const res = await fetch(`/api/upt/usulan/${dialogBatal.id}`, { method: "DELETE" });
-      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      const d = (await res.json().catch(() => ({}))) as { error?: string; pegawaiDinonaktifkan?: boolean };
       if (!res.ok) {
         setGalat(d.error ?? "Usulan gagal dibatalkan");
         return;
       }
+      // Pegawai yang didata dari draf ini ikut dinonaktifkan (ADR-112); tabel dimuat ulang supaya barisnya hilang.
+      if (d.pegawaiDinonaktifkan) muat();
       setKabar(
-        dialogBatal.status === "draf"
+        d.pegawaiDinonaktifkan
+          ? `Data ${dialogBatal.nama} yang disiapkan sudah dihapus dan pegawainya dinonaktifkan. Kanwil dapat mengaktifkannya kembali.`
+          : dialogBatal.status === "draf"
           ? `Data ${dialogBatal.nama} yang disiapkan sudah dihapus.`
           : dialogBatal.status === "revisi"
             ? `Usulan ${dialogBatal.nama} yang dikembalikan Kanwil sudah dihapus.`
@@ -662,7 +766,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
       daftarTugasUpt(
         usulan.map((u) => ({
           id: u.id, pegawaiId: u.pegawaiId, status: u.status, jenis: u.jenis,
-          nama: u.nama, nip: u.nip, kekurangan: u.kekurangan, alasanTolak: u.alasanTolak,
+          nama: u.nama, nip: u.nip, kekurangan: u.kekurangan, alasanTolak: u.alasanTolak, bulanTmt: u.bulanTmtKgb ?? null,
         })),
         pegawai.map((p) => ({
           id: p.id, nama: p.nama, nip: p.nip, tmtKgb: p.tmtKgb, bulanTmt: p.bulanTmt,
@@ -709,16 +813,23 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const q = cari.trim().toLowerCase();
   /**
    * Pegawai baru yang belum tercatat di SIM-KGB tampil di tabel sebagai baris bertanda, supaya tabel memuat semua orang
-   * satker, termasuk hasil Unggah daftar. Barisnya hilang sendiri setelah Kanwil menyetujui dan pegawainya tercatat
-   * (ADR-072). Yang dikembalikan Kanwil didahulukan, lalu draf, lalu yang menunggu tinjauan.
+   * satker, termasuk hasil Unggah daftar. Draf yang lengkap langsung terdata dan tampil sebagai baris pegawainya sendiri
+   * (ADR-112), jadi barisnya di sini hilang begitu pegawainya ada di tabel. Yang dikembalikan Kanwil didahulukan, lalu
+   * draf, lalu yang menunggu tinjauan.
    */
   const barisBaru = useMemo(() => {
     const urut: Record<string, number> = { revisi: 0, draf: 1, menunggu: 2 };
     return usulan
       // Yang NIP-nya sudah tercatat di satker ini sudah punya baris pegawainya sendiri (ADR-091).
-      .filter((u) => u.jenis === "baru" && u.status in urut && !u.nipTercatat?.satkerSama)
+      .filter(
+        (u) =>
+          u.jenis === "baru" &&
+          u.status in urut &&
+          !u.nipTercatat?.satkerSama &&
+          !(u.pegawaiId && pegawai.some((p) => p.id === u.pegawaiId)),
+      )
       .sort((a, b) => urut[a.status] - urut[b.status] || a.nama.localeCompare(b.nama, "id"));
-  }, [usulan]);
+  }, [usulan, pegawai]);
   // Saringan Belum tercatat hilang bersama barisnya; tanpa ini tabel kosong tanpa tombol untuk kembali.
   const saringAktif: Saring = saring === "baru" && barisBaru.length === 0 ? "semua" : saring;
   const tampil = useMemo(
@@ -797,7 +908,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 href="/dashboard/upt/unggah"
                 className="dsb-tombol dsb-tombol-kecil"
                 data-jenis="garis"
-                title="Satu berkas CSV berisi banyak pegawai, diperiksa dan dikonfirmasi per baris sebelum tersimpan"
+                title="Satu berkas Excel atau CSV berisi banyak pegawai, diperiksa dan dikonfirmasi per baris sebelum tersimpan"
               >
                 Unggah daftar
               </Link>
@@ -1111,6 +1222,11 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   // "TMT Des 2026" menyusut ke 2 padahal 57 pegawai masih jatuh tempo bulan itu.
   // Pita jadwal menurut bulan kirim, dengan jumlah per tahap papan dan hitung mundur jendela kirim (ADR-101).
   const pita = susunPitaUpt(pegawai, hariIni, batasKirimSurat());
+  // Kalender setahun menurut bulan TMT dan rekon Gaji Web yang juga berlangsung bulan ini (ADR-103).
+  const kalenderTmt = Object.fromEntries(
+    tahunKalenderTmt(pegawai, hariIni.getFullYear()).map((t) => [t, susunKalenderTmt(pegawai, t, bulanUsulan)]),
+  );
+  const rekonIni = rekonBulanIni(pegawai, bulanUsulan);
   /** Usulan pegawai baru yang sudah dikirim: belum tercatat, jadi belum punya bulan TMT di pita. */
   const baruMenunggu = terkirim.filter((u) => u.status === "menunggu" && u.jenis === "baru" && !u.pegawaiId && !u.nipTercatat).length;
   // Tombol Ajukan hanya bila ada draf yang memang dapat dicentang; draf terkunci tidak bercentang.
@@ -1143,7 +1259,13 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
         waktu: u?.diajukanAt ?? null,
         // Draf lengkap yang dapat dicentang; dipakai "Centang semua yang siap" di Perlu dikerjakan (ADR-060).
         pilihSiap: u && !kunci && t.jenis === "ajukan" ? u.id : null,
-        ringkas: kunci ? `draf data terkunci sampai ${namaBulan(kunci.bulanKirim)}` : cfg.judul.toLowerCase(),
+        // Draf pegawai baru belum punya data pegawai; bulan TMT-nya dari isian draf (ADR-104).
+        kelompok: kelompokKerja({ bulanTmt: p?.bulanTmt ?? u?.bulanTmtKgb, dikembalikan: t.jenis === "perbaiki", bulanUsulan }),
+        ringkas: kunci
+          ? kunci.bulanKirim
+            ? `draf data terkunci sampai ${namaBulan(kunci.bulanKirim)}`
+            : "draf pegawai baru, TMT KGB belum terisi"
+          : cfg.judul.toLowerCase(),
         render: (lain: string[]) => (
           <KartuUpt
             lain={lain}
@@ -1153,10 +1275,11 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             // Kartu draf adalah usulan DATA (perbaikan atau pegawai baru), bukan usulan KGB; jenisnya disebut di sini.
             // Dulu baris ini hanya "TMT Jan 2028", sehingga draf yang siap diajukan terbaca sebagai KGB yang
             // seharusnya masih terkunci (ADR-057).
-            sub={u ? `${t.nip} · ${labelJenis(u)}` : `${t.nip} · ${tmtSingkat(t.tmt)}`}
+            sub={u ? `${t.nip} · ${labelJenis(u)}` : t.nip}
+            tmt={t.tmt ? tmtSingkat(t.tmt) : u?.bulanTmtKgb ? `TMT ${namaBulan(u.bulanTmtKgb)}` : null}
             nada={kunci ? undefined : RUPA_TUGAS[t.jenis]?.nada}
             label={kunci ? undefined : (RUPA_TUGAS[t.jenis]?.label ?? { teks: cfg.judul })}
-            tanda={kunci ? { teks: `Terkunci sampai ${namaBulan(kunci.bulanKirim)}` } : undefined}
+            tanda={kunci ? { teks: kunci.bulanKirim ? `Terkunci sampai ${namaBulan(kunci.bulanKirim)}` : "TMT KGB belum terisi" } : undefined}
             // Penugasan BKO disebut di sini supaya tidak terkira orangnya sudah pindah dan usulannya
             // bukan urusan satker ini lagi; unit kerjanya memang tetap di satker ini.
             catatan={
@@ -1166,7 +1289,13 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 u?.nipTercatat?.satkerSama ? `NIP sudah tercatat atas nama ${u.nipTercatat.nama ?? t.nama}; diajukan sebagai perbaikan data` : "",
                 // Masa usul KGB-nya belum dibuka: kapan terbuka, dan jalan lain bila perbaikannya mendesak.
                 kunci
-                  ? `Masa usul KGB ${namaBulan(kunci.bulanTmt)} dibuka ${namaBulan(kunci.bulanKirim)}, 2 bulan sebelum TMT. Bila mendesak, ajukan lewat Usul KGB Kolektif`
+                  ? kunci.bulanKirim
+                    ? `Masa usul KGB ${namaBulan(kunci.bulanTmt)} dibuka ${namaBulan(kunci.bulanKirim)}, 2 bulan sebelum TMT. ${
+                        t.usulanId && u?.jenis === "baru"
+                          ? "Pendataan pegawai baru tetap dapat diajukan lebih awal lewat Usul KGB Kolektif"
+                          : "Bila mendesak, ajukan lewat Usul KGB Kolektif"
+                      }`
+                    : "TMT KGB terakhir atau golongannya belum diisi, jadi jadwal usul KGB-nya belum diketahui. Lengkapi drafnya; pendataan pegawai baru tetap dapat diajukan kapan saja lewat Usul KGB Kolektif"
                   : "",
                 p?.satkerTugas ? `Sedang BKO di ${namaUnitKerja(p.satkerTugas)}; KGB tetap diusulkan satker ini` : "",
               ]
@@ -1220,6 +1349,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
       .filter((l) => l.status === "dikembalikan")
       .map((l) => ({
         kolom: "kerja" as const,
+        kelompok: "kembali" as const,
         kunci: `laporan:${l.id}`,
         pegawaiId: l.pegawaiId ?? null,
         nip: l.nip,
@@ -1260,6 +1390,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             tahap={1}
             nama={u.nama}
             sub={`${u.nip} · dikirim ${fmtTgl(u.diajukanAt)}`}
+            tmt={pegawaiById(u.pegawaiId)?.tmtKgb ? tmtSingkat(pegawaiById(u.pegawaiId)?.tmtKgb ?? null) : null}
             tanda={{ teks: `${labelJenis(u)}: menunggu tinjauan`, nada: "kuning" }}
             catatan={
               [
@@ -1304,7 +1435,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             lain={lain}
             tahap={indeksTahap(tahapProsesKgb(review?.status))}
             nama={p.nama}
-            sub={`${p.nip} · ${tmtSingkat(p.tmtKgb)}`}
+            sub={p.nip}
+            tmt={tmtSingkat(p.tmtKgb)}
             // Periksa SK menunggu Anda; selebihnya sedang dikerjakan Kanwil (ADR-090).
             nada={minta ? "kuning" : undefined}
             label={minta ? { teks: review && review.versi > 1 ? "Periksa lagi" : "Periksa SK", nada: "kuning" } : undefined}
@@ -1354,7 +1486,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             redup
             tahap={2}
             nama={p.nama}
-            sub={`${p.nip} · ${tmtSingkat(p.tmtKgb)}`}
+            sub={p.nip}
+            tmt={tmtSingkat(p.tmtKgb)}
             tanda={
               p.terlambat
                 ? { teks: "Lewat batas input Kanwil", nada: "merah" }
@@ -1408,7 +1541,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           label={sk.berkasAda ? { teks: "Siap direkam", nada: "hijau" } : undefined}
           redup={!sk.berkasAda}
           nama={sk.nama}
-          sub={`TMT ${fmtTgl(sk.tmtKgbBaru)} · ${sk.golonganBaru} · ${fmtRp(sk.gajiPokokBaru)}`}
+          sub={`${sk.golonganBaru} · ${fmtRp(sk.gajiPokokBaru)}`}
+          tmt={tmtSingkat(sk.tmtKgbBaru)}
           // Berkas SK yang belum diunggah Tim SDM berarti belum dapat direkam; rapelan tetap disebut di catatan.
           // Yang siap direkam sudah disebut labelnya; penanda hanya untuk berkas yang belum diunggah Tim SDM.
           tanda={sk.berkasAda ? undefined : { teks: "Menunggu berkas SK dari Tim SDM", nada: "kuning" }}
@@ -1464,7 +1598,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             lain={lain}
             tahap={6}
             nama={sk.nama}
-            sub={`TMT ${fmtTgl(sk.tmtKgbBaru)} · ${fmtRp(sk.gajiPokokBaru)}`}
+            sub={fmtRp(sk.gajiPokokBaru)}
+            tmt={tmtSingkat(sk.tmtKgbBaru)}
             tanda={{ teks: `Direkam di Gaji Web ${fmtTgl(sk.gajiWebAt)}`, nada: "hijau" }}
             // SK yang sudah direkam menjadi dasar KGB berikutnya, kecuali nanti ada SK pangkat/PI atau PMK.
             catatan={
@@ -1538,8 +1673,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             <h1 className="dsb-halaman-judul">{data ? namaTampilSatker(data.satker) : "Satker Anda"}</h1>
             <p className="dsb-sub">
               Status KGB setiap pegawai di Kanwil. Dari sini pegawai baru ditambahkan, daftar pegawai diunggah
-              sekaligus, perbaikan data diusulkan, dan mutasi atau pemberhentian dilaporkan. Pegawai baru yang belum
-              disetujui Kanwil tampil sebagai baris bertanda; memilih dan mengajukannya lewat Usul KGB Kolektif.
+              sekaligus, perbaikan data diusulkan, dan mutasi atau pemberhentian dilaporkan. Pegawai baru terdata begitu
+              data utama drafnya terisi; yang belum cukup tampil sebagai baris bertanda. KGB-nya diusulkan lewat Usul KGB Kolektif.
             </p>
           </div>
           <button
@@ -1576,8 +1711,10 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
           tahunIni={tahunIni ?? null}
           kgbDitunda={data?.kgbDitunda ?? 0}
           baruMenunggu={baruMenunggu}
+          kalender={kalenderTmt}
           onBukaBulan={(bulanTmt) => bukaPeriode({ jenis: "bulan", bulanTmt })}
           onBukaTerlambat={() => bukaPeriode({ jenis: "terlambat" })}
+          onBukaRincian={() => setDialogRincian(true)}
         />
       </PanelNavy>
       )}
@@ -1623,6 +1760,19 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
               </>
             }
           >
+            {!terlambatMode && (
+              <p className="pjd-jadwal">
+                <span>
+                  Kirim surat <strong>1–{batasKirimSurat()} {namaBulan(geserBulan(dialogPeriode.bulanTmt, -2), true)}</strong>
+                </span>
+                <span>
+                  Input SIM-KGB Kanwil <strong>s.d. {teksBatasInput(geserBulan(dialogPeriode.bulanTmt, -2))}</strong>
+                </span>
+                <span>
+                  Rekon Gaji Web <strong>1–15 {namaBulan(geserBulan(dialogPeriode.bulanTmt, -1), true)}</strong>
+                </span>
+              </p>
+            )}
             {daftar.length === 0 ? (
               <p className="dsb-kosong" style={{ padding: "18px 0" }}>
                 Tidak ada pegawai dengan KGB pada periode ini.
@@ -1678,6 +1828,95 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                   </p>
                 )}
               </>
+            )}
+          </KerangkaModal>
+        );
+      })()}
+
+      {/* Rincian zona jendela kirim: empat langkah bulan ini, siapa yang mengerjakan, dan rekon Gaji Web siklus sebelumnya
+          yang juga berlangsung bulan ini (ADR-103). */}
+      {dialogRincian && pita[0] && (() => {
+        const b = pita[0];
+        const batas = batasKirimSurat();
+        const kirimSingkat = namaBulan(b.bulanKirim).split(" ")[0];
+        const bulanRekon = geserBulan(b.bulanKirim, 1);
+        const diajukan = b.jumlah - b.perTahap.usulkan;
+        const langkah = langkahJendela(b);
+        const isi = [
+          {
+            judul: "Kirim surat usulan lewat Srikandi",
+            ket: `1–${batas} ${kirimSingkat} · Admin UPT`,
+            keadaan:
+              langkah[0].keadaan === "selesai"
+                ? "selesai"
+                : b.jendela.keadaan === "buka"
+                  ? teksJendela(b.jendela, batas, kirimSingkat)
+                  : `ditutup ${batas} ${kirimSingkat}`,
+          },
+          {
+            judul: "Ajukan di SIM-KGB",
+            ket: b.jumlah > 0 ? `${diajukan} dari ${b.jumlah} pegawai sudah diajukan` : "Tidak ada pegawai dengan TMT ini",
+            keadaan: `${diajukan}/${b.jumlah}`,
+          },
+          {
+            judul: "Input SIM-KGB oleh Kanwil",
+            ket: `s.d. ${b.hariDalamBulan} ${kirimSingkat} · Tim SDM Kanwil${b.perTahap.kanwil > 0 ? ` · ${b.perTahap.kanwil} di Kanwil` : ""}`,
+            keadaan: langkah[2].keadaan === "selesai" ? "selesai" : langkah[2].keadaan === "aktif" ? "berjalan" : "menunggu usulan",
+          },
+          {
+            judul: "Rekon Gaji Web",
+            ket: `1–15 ${namaBulan(bulanRekon, true)} · Keuangan`,
+            keadaan: langkah[3].keadaan === "selesai" ? "selesai" : `mulai 1 ${namaBulan(bulanRekon).split(" ")[0]}`,
+          },
+        ];
+        return (
+          <KerangkaModal
+            judul={`Bulan ini · ${namaBulan(b.bulanKirim, true)}`}
+            subjudul={`Kirim surat untuk KGB TMT ${namaBulan(b.bulanTmt, true)} · ${b.jumlah} pegawai`}
+            ukuran="md"
+            onTutup={() => setDialogRincian(false)}
+            kaki={
+              <>
+                <button type="button" className="kgbm-tombol kgbm-kedua" onClick={() => setDialogRincian(false)}>
+                  Tutup
+                </button>
+                {b.jumlah > 0 && (
+                  <button
+                    type="button"
+                    className="kgbm-tombol kgbm-kedua"
+                    onClick={() => {
+                      setDialogRincian(false);
+                      bukaPeriode({ jenis: "bulan", bulanTmt: b.bulanTmt });
+                    }}
+                  >
+                    Lihat daftar pegawai
+                  </button>
+                )}
+                {b.perTahap.usulkan > 0 && (
+                  <Link href={`/dashboard/upt/kolektif?bulan=${b.bulanTmt}`} className="kgbm-tombol kgbm-utama" onClick={() => setDialogRincian(false)}>
+                    Siapkan usul KGB kolektif
+                  </Link>
+                )}
+              </>
+            }
+          >
+            <ol className="pjd-rincian">
+              {isi.map((l, i) => (
+                <li key={l.judul} data-keadaan={langkah[i].keadaan}>
+                  <span aria-hidden="true">{langkah[i].keadaan === "selesai" ? "✓" : i + 1}</span>
+                  <span className="min-w-0">
+                    <strong>{l.judul}</strong>
+                    <small>{l.ket}</small>
+                  </span>
+                  <em>{l.keadaan}</em>
+                </li>
+              ))}
+            </ol>
+            {rekonIni.jumlah > 0 && (
+              <Catatan nada={rekonIni.selesai === rekonIni.jumlah ? undefined : "amber"}>
+                Juga bulan ini: rekon Gaji Web KGB TMT {namaBulan(rekonIni.bulanTmt, true)}, tanggal 1–15 {kirimSingkat}.{" "}
+                {rekonIni.selesai} dari {rekonIni.jumlah} sudah direkam.
+              </Catatan>
             )}
           </KerangkaModal>
         );
@@ -1766,7 +2005,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
 
       {dialogBatal && (
         <KerangkaModal
-          judul={salinanHapusUsulan(dialogBatal.status).judul}
+          judul={salinanHapusUsulan(dialogBatal.status, !!dialogBatal.pegawaiId && dialogBatal.jenis === "baru").judul}
           subjudul={
             dialogBatal.status === "draf"
               ? `${dialogBatal.nama} · belum diajukan ke Kanwil`
@@ -1783,12 +2022,12 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 Tidak jadi
               </button>
               <button type="submit" className="kgbm-tombol kgbm-utama" disabled={membatalkan}>
-                {membatalkan ? "Menghapus…" : salinanHapusUsulan(dialogBatal.status).tombol}
+                {membatalkan ? "Menghapus…" : salinanHapusUsulan(dialogBatal.status, !!dialogBatal.pegawaiId && dialogBatal.jenis === "baru").tombol}
               </button>
             </>
           }
         >
-          <Catatan nada="amber">{salinanHapusUsulan(dialogBatal.status).peringatan}</Catatan>
+          <Catatan nada="amber">{salinanHapusUsulan(dialogBatal.status, !!dialogBatal.pegawaiId && dialogBatal.jenis === "baru").peringatan}</Catatan>
         </KerangkaModal>
       )}
 
@@ -1970,11 +2209,22 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                         {memuat && !data ? "Memuat…" : qPapan ? "Tidak ada yang cocok dengan pencarian." : KOSONG_UPT[k]}
                       </p>
                     )}
-                    {isi.map((g) => (
-                      <React.Fragment key={g.kunci}>{g.utama.render(g.lain.map((l) => l.ringkas))}</React.Fragment>
-                    ))}
-                    {/* Draf data yang masa usul KGB-nya belum dibuka (ADR-059): terlipat, tanpa centang, dan
-                        terbuka sendiri pada bulan kirimnya, 2 bulan sebelum TMT. */}
+                    {k === "kerja"
+                      ? susunKelompokKerja(isi, (g) => g.utama.kelompok ?? "lain").map(({ kelompok, isi: kartu }) => (
+                          <React.Fragment key={kelompok}>
+                            <p className="upt-kelompok" data-nada={kelompok === "terlambat" || kelompok === "kembali" ? "merah" : undefined}>
+                              {JUDUL_KELOMPOK[kelompok](bulanUsulan)} <span>{kartu.length}</span>
+                            </p>
+                            {kartu.map((g) => (
+                              <React.Fragment key={g.kunci}>{g.utama.render(g.lain.map((l) => l.ringkas))}</React.Fragment>
+                            ))}
+                          </React.Fragment>
+                        ))
+                      : isi.map((g) => (
+                          <React.Fragment key={g.kunci}>{g.utama.render(g.lain.map((l) => l.ringkas))}</React.Fragment>
+                        ))}
+                    {/* Draf data yang masa usul KGB-nya belum dibuka (ADR-059), termasuk draf pegawai baru (ADR-104):
+                        terlipat, tanpa centang, dan terbuka sendiri pada bulan kirimnya, 2 bulan sebelum TMT. */}
                     {k === "kerja" && kunciTampil.length > 0 && (
                       <details className="upt-terkunci" open={qPapan ? true : undefined}>
                         <summary>
@@ -1982,8 +2232,9 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                           <span className="dsb-papan-jumlah">{kunciTampil.length}</span>
                         </summary>
                         <p className="upt-terkunci-ket">
-                          Draf data pegawai yang KGB-nya belum masuk masa usul. Terbuka sendiri pada bulan kirimnya, 2 bulan
-                          sebelum TMT. Yang mendesak tetap dapat diajukan lewat Usul KGB Kolektif.
+                          Draf data pegawai, termasuk pegawai baru, yang KGB-nya belum masuk masa usul. Terbuka sendiri pada
+                          bulan kirimnya, 2 bulan sebelum TMT. Yang mendesak, dan pendataan pegawai baru, tetap dapat diajukan
+                          lewat Usul KGB Kolektif.
                         </p>
                         <div className="upt-terkunci-isi">
                           {kunciTampil.map((g) => (

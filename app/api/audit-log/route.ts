@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
+import { aksiAudit } from "@/lib/aksiAudit";
 import { hariIniWita, tanggalKalender } from "@/lib/waktu";
 
 export const runtime = "nodejs";
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 
     const filtered = logs.filter((l) => {
       const uname = l.userId ? namaById.get(l.userId) ?? "" : "";
-      if (aksi && l.aksi !== aksi) return false;
+      if (aksi && aksiAudit(l) !== aksi) return false;
       if (user && !uname.toLowerCase().includes(ul)) return false;
       if (dariDate && !(l.waktu && l.waktu >= dariDate)) return false;
       if (sampaiDate && !(l.waktu && l.waktu <= sampaiDate)) return false;
@@ -59,7 +60,8 @@ export async function GET(req: NextRequest) {
     const kunciHariIni = hariIniWita().getTime();
     let hariIni = 0;
     for (const l of filtered) {
-      perAksi.set(l.aksi, (perAksi.get(l.aksi) ?? 0) + 1);
+      const jenis = aksiAudit(l);
+      perAksi.set(jenis, (perAksi.get(jenis) ?? 0) + 1);
       pelaku.add(l.userId ? namaById.get(l.userId) ?? "Pengguna dihapus" : "Sistem");
       if (tanggalKalender(l.waktu)?.getTime() === kunciHariIni) hariIni++;
     }
@@ -77,7 +79,7 @@ export async function GET(req: NextRequest) {
         waktu: item.waktu ? item.waktu.toISOString() : "",
         // Entri milik pengguna yang sudah dihapus tetap menyimpan id-nya; nama dan NIP-nya ada pada entri hapus_pengguna.
         user: item.userId ? namaById.get(item.userId) || "Pengguna dihapus" : "Sistem",
-        aksi: item.aksi,
+        aksi: aksiAudit(item),
         detail: item.detail,
         ipAddress: item.ipAddress || null,
         targetNama: item.targetNama || null,

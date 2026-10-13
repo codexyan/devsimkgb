@@ -22,7 +22,7 @@ export const LABEL_DASAR_BARU: Record<JenisDasarBaru, string> = {
 /** Penjelasan singkat tiap pilihan, untuk formulir UPT dan tinjauan Kanwil. */
 export const KETERANGAN_DASAR_BARU: Record<JenisDasarBaru, string> = {
   kp: "Golongan naik karena kenaikan pangkat reguler, pilihan, atau penyesuaian ijazah. Gaji pokok dan masa kerja golongan dihitung ulang dari SK ini, dan SK inilah dasar SK KGB berikutnya.",
-  pmk: "Masa kerja golongan bertambah karena masa kerja sebelumnya diperhitungkan. Jadwal KGB berikutnya dapat maju, dan SK inilah dasar SK KGB berikutnya.",
+  pmk: "Masa kerja golongan bertambah karena masa kerja sebelumnya diperhitungkan, sehingga gaji pokok naik sejak TMT PMK. Jadwal KGB berikutnya tidak bergeser, dan SK inilah dasar SK KGB berikutnya.",
   koreksi: "Tidak ada SK baru; data yang tercatat salah ketik. Dasar SK KGB berikutnya tidak berubah, dan perubahannya tercatat di log aktivitas.",
 };
 

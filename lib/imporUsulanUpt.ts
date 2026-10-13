@@ -19,9 +19,10 @@ import { JENIS_KP, isJenisKp } from "./kenaikanPangkat";
 import { bandingkanUsulan, kekuranganUsulan, type PerubahanUsulan } from "./usulanPegawai";
 import { FORMAT_TANGGAL_DITERIMA, bacaTanggal } from "./dataPegawai";
 import { ESELON, JENIS_JABATAN, JENIS_KELAMIN, PENDIDIKAN_TERAKHIR } from "./pilihanPegawai";
-import { periksaNip } from "./nipPns";
+import { nipTidakCocokDenganIsian, periksaNip } from "./nipPns";
 import { GOLONGAN_PANGKAT, isGolonganDikenal } from "./tabelGaji";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
+import type { NilaiTanggal } from "./waktu";
 
 /** Lembar templat Excel yang dibaca saat berkasnya diunggah; lembar lain hanya untuk dibaca operator. */
 export const LEMBAR_DATA_UPT = "Data Pegawai";
@@ -382,7 +383,7 @@ export const ATURAN_DASAR_BARU: readonly string[] = [
   "Satu baris hanya menyebut satu SK, yaitu SK dengan TMT paling baru. SK itulah yang tercetak sebagai dasar pada SK KGB berikutnya.",
   "Pegawai baru yang melaporkan SK kp atau pmk boleh mengisi golonganAcuan, mkgTahunAcuan, dan mkgBulanAcuan: golongan dan masa kerja pada SK KGB terakhir. Dengan itu sistem menghitung dari SK KGB terakhir seperti pegawai yang sudah tercatat dan mencocokkan masa kerja yang tertulis pada SK kenaikan pangkat. Bagi pegawai yang sudah tercatat, ketiganya diabaikan.",
   "Untuk kp pada pegawai yang sudah tercatat, sistem menghitung sendiri masa kerja golongan, gaji pokok, dan TMT golongan dari data tercatat dan SK-nya; jadwal KGB tidak bergeser.",
-  "Untuk pmk, golongan tetap dan masa kerja golongan mengikuti SK PMK; jadwal KGB dapat maju.",
+  "Untuk pmk, golongan tetap dan masa kerja golongan mengikuti SK PMK; jadwal KGB tidak bergeser.",
   `Isian kosong atau belum lengkap tidak menolak baris; yang kurang, termasuk dasarBaruJenis yang belum dijawab, ditagih saat diajukan di Usul KGB Kolektif. Isian yang salah tulis (misalnya "KP" atau "naik pangkat") menolak barisnya. Tanggal ditulis ${FORMAT_TANGGAL_DITERIMA}.`,
 ];
 
@@ -719,7 +720,7 @@ export function periksaImporUpt(
 
     const tercatat = konteks.pegawaiSatker.get(nip) ?? null;
     if (tercatat && konteks.pegawaiIdUsulan.has(tercatat.id))
-      return tolak("Pegawai ini sedang punya usulan yang belum selesai di Kanwil");
+      return tolak("Pegawai ini sedang punya usulan yang belum selesai (draf, dikembalikan, atau menunggu Kanwil)");
     if (!tercatat && konteks.nipUsulan.has(nip))
       return tolak("NIP ini sudah ada pada usulan pegawai baru yang belum selesai");
 
@@ -750,6 +751,12 @@ export function periksaImporUpt(
     const dasarBaru = bacaDasarBaru((kunci) => teks(seragam.row, kunci));
 
     if (!tercatat) {
+      // Pegawai baru: NIP harus cocok dengan tanggal lahir dan jenis kelamin pada baris yang sama (ADR-111).
+      const nipTidakCocok = nipTidakCocokDenganIsian(nip, {
+        tanggalLahir: dibaca.isian.tanggalLahir as NilaiTanggal | undefined,
+        jenisKelamin: (dibaca.isian.jenisKelamin as string | null | undefined) ?? null,
+      });
+      if (nipTidakCocok) return tolak(nipTidakCocok);
       // Keadaan pada SK KGB terakhir (ADR-078), hanya bersama SK kp atau pmk; golongan yang salah tulis menolak barisnya.
       const golonganAcuan = teks(seragam.row, "golonganAcuan");
       if (golonganAcuan && !isGolonganDikenal(golonganAcuan))

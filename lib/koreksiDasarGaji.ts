@@ -25,6 +25,35 @@ export interface MkgSetelahGanti {
   disesuaikan: boolean;
 }
 
+/**
+ * Rentang masa kerja golongan yang dapat dicatat pada golongan itu, dalam bulan (ADR-106): dari langkah pertama tabel
+ * gaji sampai sebelum satu siklus KGB (24 bulan) sesudah langkah terakhir. Masa kerja di antara dua langkah, termasuk
+ * sisa bulannya, dicatat sesuai SK; gaji pokoknya tetap langkah tabel di bawahnya. Null bila golongannya tidak dikenal.
+ */
+export function rentangMkg(golongan: string): { awal: number; akhir: number } | null {
+  const pilihan = getMKGOptions(golongan);
+  if (pilihan.length === 0) return null;
+  const pertama = pilihan[0];
+  const terakhir = pilihan[pilihan.length - 1];
+  return { awal: pertama.tahun * 12 + pertama.bulan, akhir: terakhir.tahun * 12 + terakhir.bulan + 23 };
+}
+
+/** true bila masa kerja golongan itu berada dalam rentang tabel gaji golongannya (lihat rentangMkg). */
+export function mkgDalamRentang(golongan: string, tahun: number, bulan: number): boolean {
+  const rentang = rentangMkg(golongan);
+  const total = tahun * 12 + bulan;
+  return !!rentang && bulan >= 0 && bulan <= 11 && total >= rentang.awal && total <= rentang.akhir;
+}
+
+/** Pilihan tahun masa kerja golongan pada golongan itu, untuk isian tahun dan bulan yang terpisah. */
+export function pilihanTahunMkg(golongan: string): number[] {
+  const rentang = rentangMkg(golongan);
+  if (!rentang) return [];
+  const hasil: number[] = [];
+  for (let tahun = Math.floor(rentang.awal / 12); tahun <= Math.floor(rentang.akhir / 12); tahun++) hasil.push(tahun);
+  return hasil;
+}
+
 /** Langkah masa kerja golongan terdekat pada golongan itu; null bila golongannya tidak dikenal. */
 export function mkgTerdekat(golongan: string, tahun: number, bulan: number): LangkahMkg | null {
   const pilihan = getMKGOptions(golongan);
@@ -38,22 +67,26 @@ export function mkgTerdekat(golongan: string, tahun: number, bulan: number): Lan
 /**
  * Masa kerja golongan yang dipakai setelah golongan diganti.
  *
- * Langkah yang sedang dipakai dipertahankan bila golongan baru memilikinya; itu keadaan yang paling
- * lazim, sebab tabel gaji PP 5/2024 memakai langkah masa kerja yang sama untuk hampir semua golongan.
- * Bila tidak ada, diambil yang terdekat dan ditandai `disesuaikan` supaya layar dapat mengatakannya,
- * bukan mengubahnya diam-diam. Null hanya bila golongan barunya tidak dikenal tabel gaji.
+ * Masa kerja yang sedang dipakai, termasuk sisa bulannya, dipertahankan bila masih dalam rentang tabel
+ * golongan baru; itu keadaan yang paling lazim. Bila tidak, diambil langkah terdekat dan ditandai
+ * `disesuaikan` supaya layar dapat mengatakannya, bukan mengubahnya diam-diam. Null hanya bila golongan
+ * barunya tidak dikenal tabel gaji.
  */
 export function mkgSetelahGantiGolongan(golonganBaru: string, tahun: number, bulan: number): MkgSetelahGanti | null {
-  const pilihan = getMKGOptions(golonganBaru);
-  if (pilihan.length === 0) return null;
-  if (pilihan.some((m) => m.tahun === tahun && m.bulan === bulan)) return { tahun, bulan, disesuaikan: false };
+  if (!rentangMkg(golonganBaru)) return null;
+  if (mkgDalamRentang(golonganBaru, tahun, bulan)) return { tahun, bulan, disesuaikan: false };
   const dekat = mkgTerdekat(golonganBaru, tahun, bulan)!;
   return { tahun: dekat.tahun, bulan: dekat.bulan, disesuaikan: true };
 }
 
-/** Gaji pokok menurut tabel PP 5/2024; null bila langkah itu tidak ada pada golongan tersebut. */
+/**
+ * Gaji pokok menurut tabel PP 5/2024: langkah tertinggi yang tidak melebihi masa kerja golongan, sehingga
+ * 8 tahun 4 bulan bergaji sama dengan 8 tahun 0 bulan (ADR-106). Null bila masa kerjanya di luar rentang
+ * tabel golongan itu.
+ */
 export function gajiPokokUntuk(golongan: string, tahun: number, bulan: number): number | null {
-  return getMKGOptions(golongan).find((m) => m.tahun === tahun && m.bulan === bulan)?.gaji ?? null;
+  if (!mkgDalamRentang(golongan, tahun, bulan)) return null;
+  return getGajiPokok(golongan, tahun, bulan) || null;
 }
 
 /**

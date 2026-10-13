@@ -11,10 +11,9 @@ import { db } from "./db";
 import { newId } from "./sheets/id";
 import { TIPE_NOTIFIKASI, notifikasiUsulanDisetujui } from "./generateNotifikasi";
 import { bandingkanUsulan, perubahanPegawai, ringkasHukdisUsulan } from "./usulanPegawai";
-import { getGajiPokok, getPangkat } from "./tabelGaji";
-import { SATKER } from "./satker";
 import type { PegawaiRow, RiwayatPangkatRow, RiwayatPmkRow, UsulanPegawaiRow } from "./sheets/tables";
 import { rencanakanPenyesuaianKgb } from "./sesuaikanKgbUsulan";
+import { jadwalDigeserHukdis } from "./terdatakanPegawaiBaru";
 import { catatKenaikanPangkat, catatPmk } from "./catatDasarGaji";
 import { isJenisKp } from "./kenaikanPangkat";
 import { ringkasDasarBaru } from "./dasarBaruUsulan";
@@ -23,7 +22,6 @@ import { ringkasDasarBaru } from "./dasarBaruUsulan";
 import {
   KOLOM_DITENTUKAN_SK,
   cariSkTercatat,
-  hitungSkPegawaiBaru,
   rencanaSkUsulan,
   teksKoreksiDasar,
   usulanMenurutSk,
@@ -33,6 +31,7 @@ import { kodeSatkerPegawai } from "./rekapSatker";
 import { tanggalKalender } from "./waktu";
 import { penetapSesudahUsulan } from "./penetapSk";
 import { jadikanPerbaikan, kolomJadiPerbaikan, nipBaruTercatat, pesanSatkerLainKanwil } from "./usulanBaruTercatat";
+import { isiPembaruanPegawaiBaru, susunPegawaiBaru } from "./pegawaiBaruDariUsulan";
 
 
 export interface HasilSetujui {
@@ -83,8 +82,9 @@ async function terbentukDariUsulan(pegawai: PegawaiRow, usulan: UsulanPegawaiRow
 /**
  * Terapkan satu usulan ke data induk dan tandai usulannya disetujui.
  *
- * Usulan pegawai baru membuat barisnya di sini, bukan saat dikirim UPT: sampai Kanwil menyetujuinya,
- * pegawai itu belum ada di data induk. Usulan perubahan menimpa kolom yang diusulkan saja.
+ * Usulan pegawai baru yang pegawainya belum terdata (usulan lama, atau tautannya terputus) membuat barisnya di sini.
+ * Yang pegawainya sudah terdata langsung dari draf (ADR-112) memperbarui baris itu di tempat dan menandai datanya
+ * sudah ditinjau. Usulan perubahan menimpa kolom yang diusulkan saja.
  *
  * Persetujuan sekaligus menuliskan konfirmasi UPT untuk siklus berjalan, walau tidak ada satu kolom pun
  * yang berubah: mengusulkan data adalah pernyataan yang lebih kuat daripada sekadar menyatakan data
@@ -109,6 +109,8 @@ export async function setujuiUsulan(
     : [];
   let dasarBaru: string | null = null;
   let pegawaiIdHasil = usulan.pegawaiId;
+  /** Pegawai sudah terdata dari drafnya sendiri (ADR-112); persetujuan hanya meninjau datanya. */
+  let sudahTerdata = false;
 
   if (usulan.jenis === "baru") {
     // NIP diperiksa ulang karena bisa saja sudah ditambahkan Kanwil sendiri sejak usulan dikirim.
@@ -116,7 +118,9 @@ export async function setujuiUsulan(
     if (!/^\d{18}$/.test(nip)) return { ok: false, pesan: "Usulan pegawai baru tidak memuat NIP yang sah" };
     const bentrok = (await db.pegawai.findUnique({ nip })) as PegawaiRow | null;
     // Pegawai yang sudah terbentuk dari usulan ini oleh persetujuan yang terputus dilanjutkan, bukan ditolak (ADR-079).
-    const lanjutan = bentrok && (await terbentukDariUsulan(bentrok, usulan)) ? bentrok : null;
+    // Pegawai yang dibuat langsung dari draf ini (ADR-112) dikenali dari tautan eksplisit usulan.pegawaiId.
+    const lanjutan = bentrok && (usulan.pegawaiId === bentrok.id || (await terbentukDariUsulan(bentrok, usulan))) ? bentrok : null;
+    sudahTerdata = !!lanjutan && usulan.pegawaiId === lanjutan.id;
     if (bentrok && !lanjutan) {
       // Pegawai ber-NIP sama di satker yang sama: usulannya diterapkan sebagai perbaikan data pegawai itu (ADR-091).
       // Jenisnya ditulis lebih dulu, supaya usulan yang gagal diterapkan tetap terbaca sebagai perbaikan di kedua papan.
@@ -128,75 +132,20 @@ export async function setujuiUsulan(
         : hasil;
     }
 
-    const golongan = String(nilaiBaru.golonganRuang ?? "");
-    // SK kenaikan pangkat, penyesuaian ijazah, atau PMK sesudah SK KGB terakhir (ADR-065): golongan dan masa kerja
-    // pada usulan disalin dari SK itu, jadi masa kerja pada TMT KGB terakhir, gaji pokok, dan jadwal KGB dihitung
-    // darinya. Usulan yang diajukan sudah lolos hitungan ini; yang gagal di sini berarti datanya diubah sesudahnya.
-    const skBaru = hitungSkPegawaiBaru(usulan);
-    if (skBaru.berlaku && !skBaru.ok)
-      return { ok: false, pesan: `SK sesudah SK KGB terakhir tidak dapat dihitung: periksa ${skBaru.pesan}. Kembalikan usulan ini ke UPT.` };
-    const menurutSk = skBaru.berlaku && skBaru.ok ? skBaru.nilai : null;
-    // Keadaan pada SK KGB terakhir yang ditulis UPT bersama SK-nya (ADR-078); null pada usulan lama.
-    const acuan = skBaru.berlaku && skBaru.ok ? skBaru.acuan : null;
-    const mkgTahun = menurutSk ? menurutSk.mkgTahun : Number(nilaiBaru.mkgTahun ?? 0);
-    const mkgBulan = menurutSk ? menurutSk.mkgBulan : Number(nilaiBaru.mkgBulan ?? 0);
-    const tmtKgbBerikutnya = menurutSk ? menurutSk.tmtKgbBerikutnya : ((nilaiBaru.tmtKgbBerikutnya as Date | null) ?? null);
-    const unitKerja = usulan.unitKerja ?? SATKER.find((s) => s.kode === usulan.satker)?.nama ?? "";
-    const pegawaiBaru: PegawaiRow = {
-      id: lanjutan?.id ?? newId(),
-      nip,
-      nama: String(nilaiBaru.nama ?? ""),
-      tempatLahir: (nilaiBaru.tempatLahir as string | null) ?? null,
-      tanggalLahir: (nilaiBaru.tanggalLahir as Date | null) ?? null,
-      jenisKelamin: (nilaiBaru.jenisKelamin as string | null) ?? null,
-      pendidikanTerakhir: (nilaiBaru.pendidikanTerakhir as string | null) ?? null,
-      jabatan: String(nilaiBaru.jabatan ?? ""),
-      // Pangkat mengikuti golongan bila UPT tidak menuliskannya.
-      pangkat: String(nilaiBaru.pangkat ?? getPangkat(golongan) ?? ""),
-      golonganRuang: golongan,
-      unitKerja,
-      eselon: (nilaiBaru.eselon as string | null) ?? null,
-      jenisJabatan: (nilaiBaru.jenisJabatan as string | null) ?? null,
-      // TMT golongan pada usulan ber-acuan adalah TMT golongan pada SK KGB terakhir; golongan barunya berlaku sejak TMT
-      // kenaikan pangkat, sama dengan Catat KP.
-      tmtGolongan:
-        acuan && skBaru.berlaku && skBaru.ok && skBaru.jenis === "kp" ? skBaru.tmtSk : ((nilaiBaru.tmtGolongan as Date | null) ?? null),
-      mkgTahun,
-      mkgBulan,
-      // Gaji pokok dihitung dari tabel PP 5/2024 bila tidak diisi, sama dengan impor CSV.
-      gajiPokok: menurutSk
-        ? menurutSk.gajiPokok
-        : Number(nilaiBaru.gajiPokok ?? 0) || getGajiPokok(golongan, mkgTahun, mkgBulan) || 0,
-      tmtKgbTerakhir: (nilaiBaru.tmtKgbTerakhir as Date | null) ?? null,
-      tmtKgbBerikutnya,
-      statusHukdis: false,
-      tanggalHukdisBerakhir: null,
-      jenisHukdis: null,
-      keteranganHukdis: null,
-      aktif: true,
-      createdAt: sekarang,
-      updatedAt: sekarang,
-      konfirmasiUptTmt: tmtKgbBerikutnya,
-      konfirmasiUptAt: sekarang,
-      konfirmasiUptOleh: usulan.diajukanOleh,
-      satkerTugas: null,
-      berhentiTmt: null,
-      berhentiAlasan: null,
-      // SK yang diketik UPT pada usulan (SK CPNS, atau SK KGB terakhir di luar SIM-KGB) menjadi SK dasar
-      // Input KGB pertama, jadi Tim SDM tidak mengetiknya ulang (ADR-010).
-      nomorSkDasar: usulan.nomorSkTerakhir?.trim() || null,
-      tanggalSkDasar: usulan.tanggalSkTerakhir ?? null,
-      // Pejabat penetap SK itu: isian UPT, atau saran dari awalan nomornya (ADR-086). Kosong diisi Kanwil saat Input KGB.
-      penetapSkDasar: penetapSesudahUsulan(null, usulan) ?? null,
-    };
+    // Baris pegawai disusun oleh pembentuk yang sama dengan pembuatan langsung begitu data utama draf terisi (ADR-112, ADR-113). SK kenaikan
+    // pangkat, penyesuaian ijazah, atau PMK sesudah SK KGB terakhir (ADR-065) menentukan golongan, masa kerja, gaji pokok,
+    // dan jadwal KGB; usulan yang diajukan sudah lolos hitungan ini, jadi yang gagal di sini berarti datanya diubah sesudahnya.
+    const susun = susunPegawaiBaru(usulan, lanjutan?.id ?? newId(), sekarang);
+    if (!susun.ok) return { ok: false, pesan: `${susun.pesan} Kembalikan usulan ini ke UPT.` };
+    const { pegawai: pegawaiBaru, skBaru, acuan } = susun;
     if (lanjutan) {
-      // Isian usulan (yang mungkin sudah dibetulkan UPT sejak percobaan sebelumnya) ditulis ulang; yang dicatat Kanwil
-      // sesudahnya, seperti hukuman disiplin, mutasi, dan penetap SK dasar, dibiarkan.
-      const {
-        id: _id, createdAt: _dibuat, statusHukdis: _h1, tanggalHukdisBerakhir: _h2, jenisHukdis: _h3, keteranganHukdis: _h4,
-        aktif: _aktif, satkerTugas: _tugas, berhentiTmt: _b1, berhentiAlasan: _b2, penetapSkDasar: _penetap, ...isi
-      } = pegawaiBaru;
-      await db.pegawai.update({ id: lanjutan.id }, isi);
+      // Isian usulan (yang mungkin sudah dibetulkan UPT sejak percobaan sebelumnya, atau sejak pegawainya dibuat langsung
+      // dari draf) ditulis ulang; yang dicatat Kanwil sesudahnya, seperti hukuman disiplin, mutasi, dan penetap SK dasar,
+      // dibiarkan.
+      await db.pegawai.update(
+        { id: lanjutan.id },
+        isiPembaruanPegawaiBaru(pegawaiBaru, { jagaJadwal: await jadwalDigeserHukdis(lanjutan.id) }),
+      );
     } else await db.pegawai.create(pegawaiBaru);
     pegawaiIdHasil = pegawaiBaru.id;
     perubahan = [];
@@ -441,7 +390,9 @@ export async function setujuiUsulan(
     dasarBaru: dasarBaru ?? ringkasDasarBaru(usulan),
     ringkasPerubahan:
       usulan.jenis === "baru"
-        ? "pegawai baru ditambahkan ke data induk"
+        ? sudahTerdata
+          ? "data pegawai baru ditinjau dan disetujui, proses KGB-nya dibuka"
+          : "pegawai baru ditambahkan ke data induk"
         : perubahan.length > 0
           ? perubahan.map((p) => `${p.label} ${p.sekarang} → ${p.diusulkan}`).join("; ")
           : "tanpa perubahan kolom",

@@ -35,3 +35,12 @@ test("dijadikan perbaikan: jenis, pegawai, dan unit kerja berganti; isian lain t
   assert.equal(hasil.nama, "PEGAWAI UJI");
   assert.equal(asal.jenis, "baru", "usulan asalnya tidak diubah");
 });
+
+test("pegawai yang dibuat langsung dari draf itu sendiri (ADR-112) bukan bentrokan NIP", () => {
+  // Usulan tertaut ke pegawai ber-NIP sama: itu pegawai yang terbentuk dari drafnya, jadi usulannya tetap usulan baru.
+  assert.equal(nipBaruTercatat({ ...usulan, pegawaiId: "p1" }, pegawai), null);
+  // Tautan ke pegawai lain tidak menutupi bentrokan sungguhan.
+  assert.equal(nipBaruTercatat({ ...usulan, pegawaiId: "p9" }, pegawai), "satker_sama");
+  // Usulan lama tanpa tautan tetap diperlakukan seperti sebelumnya (ADR-091).
+  assert.equal(nipBaruTercatat({ ...usulan, pegawaiId: null }, pegawai), "satker_sama");
+});

@@ -12,7 +12,9 @@ import { rencanaSiklusBerikutnya, type RencanaSiklusKgb } from "@/lib/jadwalKgb"
 import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
 import { hariIniWita } from "@/lib/waktu";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
-import { BELUM_SELESAI } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, pesanNipSedangDiusulkan } from "@/lib/usulanPegawai";
+import { idPegawaiBelumDitinjau } from "@/lib/terdatakanPegawaiBaru";
+import { SATKER } from "@/lib/satker";
 
 export const runtime = "nodejs";
 
@@ -49,7 +51,10 @@ export async function GET(req: Request) {
     });
 
     // Status KGB terkini (record aktif terbaru per pegawai), pengganti `include`.
-    const allKgb = await db.riwayatKGB.findMany({ where: { isArsip: false } });
+    const [allKgb, belumDitinjau] = await Promise.all([
+      db.riwayatKGB.findMany({ where: { isArsip: false } }),
+      idPegawaiBelumDitinjau(),
+    ]);
     const latestByPegawai = new Map<string, { status: string; t: number }>();
     for (const k of allKgb) {
       const t = k.createdAt?.getTime() ?? 0;
@@ -62,7 +67,8 @@ export async function GET(req: Request) {
     const hariIni = hariIniWita();
     const withKgb = pegawai.map((p) => {
       const kgb = latestByPegawai.get(p.id);
-      return { ...penandaHukdisBerlaku(p, hariIni), statusKGB: kgb?.status ?? null };
+      // Pegawai yang didata UPT dan usulan pegawai barunya belum disetujui (ADR-112).
+      return { ...penandaHukdisBerlaku(p, hariIni), statusKGB: kgb?.status ?? null, dataBelumDitinjau: belumDitinjau.has(p.id) };
     });
 
     const role = session.user.role!;
@@ -105,22 +111,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Tanggal berakhir hukuman disiplin tidak valid." }, { status: 400 });
 
   const existing = await db.pegawai.findUnique({ nip: isian.nip });
-  if (existing)
-    return NextResponse.json({ error: "NIP sudah terdaftar" }, { status: 409 });
+  if (existing) {
+    // Pegawai yang didata UPT dari drafnya (ADR-112) sudah ada di sini walau usulannya belum ditinjau.
+    const belumDitinjau = (await idPegawaiBelumDitinjau()).has(existing.id);
+    return NextResponse.json(
+      {
+        error: belumDitinjau
+          ? "NIP sudah terdaftar: pegawai ini didata UPT dan datanya belum ditinjau Kanwil. Cari di Data Pegawai; usulannya ditinjau di Usulan UPT setelah UPT mengajukannya."
+          : "NIP sudah terdaftar",
+      },
+      { status: 409 },
+    );
+  }
 
   // Usulan pegawai baru dari UPT untuk NIP yang sama ditinjau lebih dulu, supaya orang yang sama tidak masuk
   // dua kali dan papan UPT tidak menampilkannya dua kartu (ADR-026).
   const usulanBerjalan = (await db.usulanPegawai.findMany({
     where: { nip: isian.nip, status: { in: BELUM_SELESAI } },
-  })) as { satker: string; nama: string }[];
+  })) as { satker: string; nama: string | null; status: string }[];
   if (usulanBerjalan.length > 0) {
-    const u = usulanBerjalan[0];
-    return NextResponse.json(
-      {
-        error: `NIP ${isian.nip} sedang diusulkan ${u.satker} atas nama ${u.nama}. Tinjau usulannya di Usulan UPT; menyetujuinya akan menambahkan pegawai ini.`,
-      },
-      { status: 409 },
-    );
+    // Yang menunggu tinjauan didahulukan: hanya itu yang dapat ditindaklanjuti Kanwil sendiri.
+    const u = usulanBerjalan.find((x) => x.status === "menunggu") ?? usulanBerjalan[0];
+    const namaSatker = SATKER.find((s) => s.kode === u.satker)?.nama ?? u.satker;
+    return NextResponse.json({ error: pesanNipSedangDiusulkan(isian.nip, u, namaSatker) }, { status: 409 });
   }
 
   const userLogin = await db.user.findUnique({ nip: session.user.nip! });

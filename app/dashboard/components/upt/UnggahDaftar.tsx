@@ -61,6 +61,8 @@ interface Pratinjau {
 interface HasilSimpan {
   disimpan: number;
   baru: number;
+  /** Pegawai baru yang langsung terdata karena data utamanya terisi (ADR-113). */
+  terdata?: number;
   perubahan: number;
   sama: number;
   ditolak: number;
@@ -75,7 +77,7 @@ const KELOMPOK: { k: HasilImpor; label: string; nada: string; ket: string }[] = 
     k: "baru",
     label: "Pegawai baru",
     nada: "hijau",
-    ket: "NIP belum tercatat. Disimpan sebagai draf pegawai baru.",
+    ket: "NIP belum tercatat. Disimpan sebagai draf pegawai baru; terdata di SIM-KGB begitu data utamanya terisi.",
   },
   {
     k: "perubahan",
@@ -394,7 +396,7 @@ export default function UnggahDaftar() {
             <Catatan>
               Unduh templat Excel di bawah, lalu isi lembar <strong>{LEMBAR_DATA_UPT}</strong>, satu baris untuk satu
               pegawai. Templatnya memuat lembar panduan dan contoh. Isinya masuk sebagai data yang disiapkan, belum
-              terkirim: setelah ini pegawainya tampil di Pegawai Satker sebagai baris bertanda; pilih dan lengkapi di Usul KGB Kolektif, saringan Pegawai baru, lalu
+              terkirim: setelah ini pegawainya tampil di Pegawai Satker sebagai baris bertanda sampai datanya lengkap; pilih dan lengkapi di Usul KGB Kolektif, saringan Pegawai baru, lalu
               ajukan bersama satu surat usulan. Kolom unit kerja pada berkas diabaikan, sebab satkernya mengikuti akun
               ini.
             </Catatan>
@@ -705,6 +707,7 @@ export default function UnggahDaftar() {
                 <p>
                   {hasilSimpan.baru} draf pegawai baru dan {hasilSimpan.perubahan} draf usulan perbaikan dari{" "}
                   {namaBerkas}. Belum ada yang terkirim ke Kanwil.
+                  {hasilSimpan.terdata ? ` ${hasilSimpan.terdata} pegawai baru langsung terdata di SIM-KGB karena data utamanya terisi.` : ""}
                 </p>
               </div>
             </div>
@@ -740,8 +743,9 @@ export default function UnggahDaftar() {
             )}
 
             <p className="kgbm-bantuan">
-              Drafnya terlihat di tiga tempat: tabel <strong>Pegawai Satker</strong> (baris bertanda, sampai Kanwil menyetujui),{" "}
-              <strong>Perlu dikerjakan</strong> pada Dashboard, dan <strong>Usul KGB Kolektif</strong>. Langkah berikutnya: di Usul KGB
+              Drafnya terlihat di tabel <strong>Pegawai Satker</strong> (baris bertanda sampai lengkap; sesudah itu pegawainya terdata, tanpa menunggu Kanwil) dan di{" "}
+              <strong>Usul KGB Kolektif</strong>. Di Dashboard, draf baru tampil di <strong>Perlu dikerjakan</strong> saat
+              jendela kirim KGB-nya dibuka; sebelum itu terlipat di bagian Terkunci. Langkah berikutnya: di Usul KGB
               Kolektif, saringan Pegawai baru, pilih pegawai yang akan dikirim (bisa
               bertahap), lengkapi data dan berkasnya, lalu ajukan bersama satu surat usulan Srikandi. Pegawai baru tidak
               ikut usulan KGB periode berjalan kecuali dipilih.

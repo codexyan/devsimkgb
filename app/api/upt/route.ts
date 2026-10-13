@@ -87,6 +87,8 @@ export async function GET() {
       { nomorSK: r.nomorSK, tanggalSK: r.tanggalSK, tmt: r.tmtPmk },
     ]);
   const jenisUsulanPegawai = new Map<string, string>();
+  /** Pegawai yang didata dari draf pegawai baru dan usulannya belum disetujui (ADR-112). */
+  const dataBelumDitinjau = new Set<string>();
   // SK dasar yang sedang diusulkan UPT: nomor SK terakhir dan pindaiannya pada usulan yang belum selesai. Baru
   // menjadi SK dasar Data Pegawai setelah Kanwil menyetujui usulannya; sampai saat itu ditampilkan terpisah, supaya
   // UPT tahu berkasnya sudah masuk dan sedang menunggu apa (ADR-057).
@@ -94,6 +96,7 @@ export async function GET() {
   for (const u of usulanBerjalan as UsulanPegawaiRow[]) {
     if (!u.pegawaiId) continue;
     jenisUsulanPegawai.set(u.pegawaiId, u.status);
+    if (u.jenis === "baru") dataBelumDitinjau.add(u.pegawaiId);
     const nomorSK = u.nomorSkTerakhir?.trim() || null;
     const berkas = !!(u.pathSkTerakhir || u.pathSkCpns);
     if (nomorSK || berkas)
@@ -173,6 +176,7 @@ export async function GET() {
         konfirmasiAt: p.konfirmasiUptAt ? new Date(p.konfirmasiUptAt).toISOString() : null,
         konfirmasiOleh: p.konfirmasiUptOleh ?? null,
         usulanBerjalan: jenisUsulanPegawai.get(p.id) ?? null,
+        dataBelumDitinjau: dataBelumDitinjau.has(p.id),
         // SK yang menjadi "Atas dasar" SK KGB berikutnya (ADR-030): SK KGB terakhir yang sudah direkam di
         // Gaji Web, atau SK kenaikan pangkat/PMK yang terbit sesudahnya. Tanpa riwayat KGB di SIM-KGB, SK dasar
         // yang tercatat di Data Pegawai (ADR-057).

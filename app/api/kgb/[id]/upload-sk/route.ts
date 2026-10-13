@@ -4,6 +4,7 @@ import { pesanUsulanMenahan, usulanMenahan } from "@/lib/usulanMenahan";
 import { newId } from "@/lib/sheets/id";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/auditLog";
+import { AKSI_UNGGAH_SK, AKSI_UNGGAH_SK_ARSIP } from "@/lib/aksiAudit";
 import { canProcessKGB } from "@/lib/auth";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import {
@@ -56,8 +57,8 @@ export async function POST(
   if (!izin.ok)
     return NextResponse.json({ error: izin.error }, { status: 409 });
   // SK TTE tidak diunggah selama usulan UPT pegawai ini belum ditinjau (ADR-014); arsip lama tidak tertahan.
-  if (izin.jenis === "unggah" && pegawai && (await usulanMenahan(pegawai.id)))
-    return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama) }, { status: 409 });
+  const menahan = izin.jenis === "unggah" && pegawai ? await usulanMenahan(pegawai.id) : null;
+  if (menahan && pegawai) return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama, menahan) }, { status: 409 });
   // SK pegawai UPT baru boleh diunggah TTE-nya setelah disetujui Admin UPT atau dilewati Super Admin (ADR-077). SK yang
   // dibuat sebelum review aktif tidak punya permintaan review, jadi tidak tertahan.
   if (izin.jenis === "unggah" && pegawai && pegawaiPerluReviewSk(pegawai.unitKerja)) {
@@ -181,7 +182,7 @@ export async function POST(
         : "file SK arsip";
   logAudit({
     userId: userLogin.id,
-    aksi: "upload_sk",
+    aksi: izin.jenis === "arsip" ? AKSI_UNGGAH_SK_ARSIP : AKSI_UNGGAH_SK,
     detail:
       `Upload SK TTD untuk ${pegawai?.nama ?? "-"} (${pegawai?.nip ?? "-"}), ${keterangan}; ` +
       `${statusTtd === "tte" ? "TTE utuh" : statusTtd === "basah" ? "tanda tangan basah (tanpa TTE)" : "TTE tidak dapat diperiksa"}, ` +

@@ -9,7 +9,7 @@ import type { KartuPapan, KolomPapan } from "@/app/dashboard/components/PapanAnt
 import type { UsulanMenunggu } from "@/app/dashboard/components/ModalUsulanUpt";
 import { keteranganRingkasan, nadaUmurUsulan, ringkasUsulanPerUpt } from "@/lib/ringkasUsulanUpt";
 import { tandaUsulan } from "@/lib/tandaUsulan";
-import { LABEL_REVIEW_SK, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
+import { BATAS_LEWATI_REVIEW_JAM, LABEL_REVIEW_SK, formatSisaWaktu, kesempatanLewatiReview, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
 import { cetakSk, mintaReviewSkUpt, unduhZipSiapCetak, type VersiCetak } from "@/lib/kgbAksi";
 import TombolCetakSk from "@/app/dashboard/components/kgb/TombolCetakSk";
 
@@ -87,6 +87,8 @@ interface PegawaiJatuhTempo {
   terlambat: boolean;
   isLocked: boolean;
   statusKGB: string | null;
+  /** Didata UPT, tetapi usulan pegawai barunya belum disetujui: proses KGB tertahan (ADR-112). */
+  dataBelumDitinjau?: boolean;
   kgbId: string | null;
   nomorSK: string | null;
   penetapSkDasar: string | null;
@@ -151,6 +153,14 @@ function daysDiff(date: string) {
 /** Umur dalam hari penuh sejak sebuah waktu lampau; 0 bila belum genap sehari. */
 function hariSejak(iso: string) {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+}
+
+/**
+ * Apakah Super Admin boleh melewati review UPT ini sekarang: sesudah UPT menunggu 24 jam, atau begitu batas input Kanwil
+ * lewat (ADR-109). `deadlineSDM` adalah batas input KGB itu, yang juga tampil sebagai "batas 31 Okt" pada kartu.
+ */
+function lewatiReviewSekarang(review: InfoReviewSk | null | undefined, deadlineSDM: string | Date) {
+  return kesempatanLewatiReview(review, new Date(), tanggalKalender(deadlineSDM));
 }
 
 /* -----------------------------------------
@@ -276,7 +286,8 @@ function DashboardMain() {
   // Seluruh usulan UPT yang menunggu tinjauan, termasuk pegawai baru yang belum punya pegawaiId.
   const [usulanMenunggu, setUsulanMenunggu] = useState<UsulanMenunggu[]>([]);
   // Usulan data UPT yang menunggu tinjauan, per pegawai: tampil langsung di papan dan daftar (ADR-011).
-  // Hanya usulan perbaikan yang masuk sini, sebab hanya itu yang menahan proses KGB pegawai tertentu.
+  // Yang masuk sini usulan perbaikan dan usulan pegawai baru yang pegawainya sudah terdata (ADR-112), sebab hanya itu yang
+  // menahan proses KGB pegawai tertentu. Yang belum diajukan atau dikembalikan UPT tidak ada di sini; penandanya dataBelumDitinjau.
   const [usulanPerPegawai, setUsulanPerPegawai] = useState<Map<string, UsulanMenunggu>>(() => new Map());
   const [usulanDibuka, setUsulanDibuka] = useState<UsulanMenunggu | null>(null);
   const [pesanBerhasil, setPesanBerhasil] = useState<string | null>(null);
@@ -634,8 +645,8 @@ function DashboardMain() {
    * Proses KGB tertahan selama usulan UPT pegawai ini menunggu tinjauan dan SK TTE-nya belum diunggah
    * (ADR-014); server menolak langkahnya dengan aturan yang sama (lib/usulanMenahan.ts).
    */
-  function tertahanUsulan(p: { id: string }, pos: PosisiAntrian): boolean {
-    return usulanPerPegawai.has(p.id) && pos !== "keuangan" && pos !== "rekam_upt" && pos !== "selesai";
+  function tertahanUsulan(p: { id: string; dataBelumDitinjau?: boolean }, pos: PosisiAntrian): boolean {
+    return (usulanPerPegawai.has(p.id) || !!p.dataBelumDitinjau) && pos !== "keuangan" && pos !== "rekam_upt" && pos !== "selesai";
   }
 
   /** Tombol tinjauan usulan UPT; tombol utama bila prosesnya sedang tertahan. */
@@ -709,8 +720,8 @@ function DashboardMain() {
     }
     setPesanBerhasil(
       versi === "tte"
-        ? `SK ${p.nama} versi Srikandi diunduh untuk TTE. Setelah ditandatangani, pilih Unggah SK bertanda tangan.`
-        : `SK ${p.nama} diunduh untuk tanda tangan basah. Setelah ditandatangani dan dipindai, pilih Unggah SK bertanda tangan.`,
+        ? `SK ${p.nama} versi Srikandi diunduh untuk TTE. Setelah ditandatangani, pilih Unggah SK TTE Srikandi.`
+        : `SK ${p.nama} diunduh untuk tanda tangan basah. Setelah ditandatangani dan dipindai, unggah pindaiannya lewat Unggah SK TTE Srikandi dan centang pernyataan tanda tangan basah.`,
     );
   }
 
@@ -771,7 +782,7 @@ function DashboardMain() {
       // Sesudah diunggah, SK pegawai UPT ditindaklanjuti keuangan UPT, bukan keuangan Kanwil (ADR-009).
       // SK pegawai UPT yang belum disetujui UPT tidak dapat diseret ke unggah TTE (ADR-077).
       if (!p.skSudahDibuat || skBolehDicetak(p.reviewSk))
-        pindah[dipegangKeuanganKanwil(p.unitKerja) ? "keuangan" : "rekam_upt"] = p.skSudahDibuat ? "Unggah SK bertanda tangan" : "Buat SK dulu";
+        pindah[dipegangKeuanganKanwil(p.unitKerja) ? "keuangan" : "rekam_upt"] = p.skSudahDibuat ? "Unggah SK TTE Srikandi" : "Buat SK dulu";
       pindah.input = "Batalkan proses";
     }
     const tanda: NonNullable<KartuPapan["tanda"]> = [];
@@ -807,13 +818,18 @@ function DashboardMain() {
           teks: `Menunggu review UPT${hari === null ? "" : hari === 0 ? " sejak hari ini" : ` · ${hari} hari`}`,
           nada: "ungu",
         });
+        // Lewati review hanya terbuka sesudah 24 jam (ADR-109); Super Admin diberi tahu kapan tombolnya muncul.
+        const lewati = role === ROLES.SUPER_ADMIN ? lewatiReviewSekarang(review, p.deadlineSDM) : null;
+        if (lewati && !lewati.boleh && lewati.sebab === "belum_24_jam")
+          tanda.push({ teks: `Lewati review terbuka ${formatSisaWaktu(lewati.sisaMs)} lagi`, nada: "kuning" });
       }
     }
     if (dibatalkan) tanda.push({ teks: "Dibatalkan", nada: "merah" });
     // Kartu yang lewat batas sudah menyebutnya di baris TMT; penanda rapelan hanya untuk yang sudah berjalan.
     if (p.flagRapelan && pos !== "selesai" && pos !== "lewat") tanda.push({ teks: "Berpotensi rapelan", nada: "kuning" });
     if (p.statusHukdis) tanda.push({ teks: `Hukdis${p.tanggalHukdisBerakhir ? ` s.d. ${formatTanggalId(p.tanggalHukdisBerakhir, { day: "numeric", month: "short" })}` : ""}`, nada: "merah" });
-    if (tertahan) tanda.push({ teks: "Tertahan usulan UPT", nada: "ungu" });
+    // Usulan yang menunggu bisa ditinjau dari kartu; yang belum diajukan atau dikembalikan UPT hanya ditandai (ADR-112).
+    if (tertahan) tanda.push({ teks: usulanPerPegawai.has(p.id) ? "Tertahan usulan UPT" : "Data belum ditinjau", nada: "ungu" });
     const [catatan, catatanNada]: [string | undefined, Nada | undefined] =
       pos === "terkunci" ? [buka ? `dibuka ${formatTanggalId(buka, { day: "numeric", month: "short" })}` : "belum dibuka", undefined]
       : pos === "keuangan" || pos === "rekam_upt" || pos === "selesai" ? [undefined, undefined]
@@ -916,9 +932,13 @@ function DashboardMain() {
                 className="dsb-tombol dsb-tombol-kecil"
                 data-jenis={p.reviewSk?.status === "perbaikan" ? undefined : "garis"}
                 onClick={() => bukaBuatSk(p)}
-                title="Buat ulang SK: nomor, tanggal, dan isinya dicatat ulang"
+                title={
+                  p.reviewSk
+                    ? "Buat ulang SK: nomor, tanggal, dan isinya dicatat ulang, lalu review diminta ulang ke Admin UPT. SK tidak diunduh."
+                    : "Buat ulang SK: nomor, tanggal, dan isinya dicatat ulang"
+                }
               >
-                Perbaiki SK
+                {p.reviewSk ? "Perbaiki SK dan Minta Review UPT" : "Perbaiki SK"}
               </button>
               {p.reviewSk && p.reviewSk.status === null && (
                 <button
@@ -932,31 +952,46 @@ function DashboardMain() {
                   Minta review UPT
                 </button>
               )}
-              {!skBolehDicetak(p.reviewSk) && role === ROLES.SUPER_ADMIN && (
-                <button
-                  type="button"
-                  className="dsb-tombol dsb-tombol-kecil"
-                  data-jenis="garis"
-                  onClick={() => setModal({ jenis: "lewati_review", kgbId, pegawai: pegawaiModal(p), reviewSk: p.reviewSk ?? null })}
-                  title="Lanjutkan tanpa menunggu UPT, dengan alasan yang tercatat"
-                >
-                  Lewati review
-                </button>
-              )}
+              {/* Semua SK pegawai UPT melalui review UPT lebih dulu; Lewati review baru muncul bila UPT sudah menunggu
+                  lebih dari 24 jam, atau begitu batas input Kanwil lewat (ADR-109). */}
+              {role === ROLES.SUPER_ADMIN && (() => {
+                const lewati = lewatiReviewSekarang(p.reviewSk, p.deadlineSDM);
+                if (!lewati.boleh) return null;
+                return (
+                  <button
+                    type="button"
+                    className="dsb-tombol dsb-tombol-kecil"
+                    data-jenis="garis"
+                    onClick={() => setModal({ jenis: "lewati_review", kgbId, pegawai: pegawaiModal(p), reviewSk: p.reviewSk ?? null })}
+                    title={
+                      lewati.dasar === "batas_input"
+                        ? "Batas input Kanwil sudah lewat. Lanjutkan tanpa menunggu UPT, dengan alasan yang tercatat"
+                        : `UPT sudah menunggu lebih dari ${BATAS_LEWATI_REVIEW_JAM} jam. Lanjutkan tanpa menunggu, dengan alasan yang tercatat`
+                    }
+                  >
+                    Lewati review
+                  </button>
+                );
+              })()}
               {skBolehDicetak(p.reviewSk) && (
                 <>
                   {/* Langkah berikutnya tampil paling depan dan Cetak SK menjadi tombol utama (ADR-089). Klik utama
                       mengunduh versi Srikandi untuk TTE; tanda tangan basah lewat panah di sebelahnya (ADR-095). */}
                   <TombolCetakSk nama={p.nama} urutan={-2} sibuk={sibukSk === kgbId} onCetak={(versi) => void cetakSkPegawai(p, versi)} />
                   <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" style={{ order: -1 }} onClick={() => setModal({ jenis: "unggah_sk", kgbId, status: p.statusKGB ?? "", pegawai: pegawaiModal(p) })}>
-                    Unggah SK bertanda tangan
+                    Unggah SK TTE Srikandi
                   </button>
                 </>
               )}
             </>
           ) : (
-            <button type="button" className="dsb-tombol dsb-tombol-kecil" onClick={() => bukaBuatSk(p)}>
-              Buat SK
+            <button
+              type="button"
+              className="dsb-tombol dsb-tombol-kecil"
+              onClick={() => bukaBuatSk(p)}
+              title={p.reviewSk ? "SK dicatat lalu diminta direview Admin UPT. SK tidak diunduh sampai UPT menyetujuinya." : undefined}
+            >
+              {p.reviewSk ? "Buat SK dan Minta Review UPT" : "Buat SK"}
             </button>
           )}
         </>

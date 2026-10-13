@@ -17,6 +17,7 @@ import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { selaraskanSkDasarPegawai } from "@/lib/selarasSkDasar";
 import { pindahkanKeTerhapus, type BucketPindah } from "@/lib/r2Terhapus";
+import { BELUM_SELESAI } from "@/lib/usulanPegawai";
 
 export const runtime = "nodejs";
 
@@ -290,6 +291,10 @@ export async function DELETE(
     }
     await db.riwayatKGB.deleteMany({ pegawaiId: id });
     await db.riwayatHukdis.deleteMany({ pegawaiId: id });
+    // Usulan pegawai baru yang belum selesai dan tertaut ke pegawai ini (ADR-112) dilepas tautannya: UPT melanjutkan drafnya,
+    // dan pegawainya dibuat lagi bila drafnya disimpan atau diajukan lagi. Usulan yang sudah disetujui atau ditolak tetap
+    // menjadi catatan.
+    await db.usulanPegawai.updateMany({ pegawaiId: id, jenis: "baru", status: { in: [...BELUM_SELESAI] } }, { pegawaiId: null });
     await db.pegawai.delete({ id });
 
     // Berkas dihapus setelah data, agar kegagalan penyimpanan tidak meninggalkan data yang menunjuk berkas hilang.

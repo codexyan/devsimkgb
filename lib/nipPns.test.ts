@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { berakhirNolBeruntun, berbentukNotasiIlmiah, nipSah, periksaNip } from "./nipPns";
+import { berakhirNolBeruntun, berbentukNotasiIlmiah, nipSah, nipTidakCocokDenganIsian, periksaNip } from "./nipPns";
 
 // Tahun acuan dipatok agar hasil ujinya tidak berubah seiring waktu.
 const TAHUN = 2026;
@@ -97,4 +97,36 @@ test("tahun di luar akal ditolak", () => {
 test("NIP yang masih wajar di tepi batas tetap diterima", () => {
   // Diangkat CPNS pada tahun depan (SK sudah terbit lebih awal) masih diterima.
   assert.equal(nipSah("200001012027011001", TAHUN), true);
+});
+
+test("NIP dicocokkan dengan tanggal lahir dan jenis kelamin yang diisi (ADR-111)", () => {
+  const nip = "198911282017121003"; // lahir 28 November 1989, laki-laki
+  // Cocok, atau isiannya memang kosong: tanggal lahir tidak wajib.
+  assert.equal(nipTidakCocokDenganIsian(nip, { tanggalLahir: "1989-11-28", jenisKelamin: "Laki-laki" }), null);
+  assert.equal(nipTidakCocokDenganIsian(nip, {}), null);
+  assert.equal(nipTidakCocokDenganIsian(nip, { tanggalLahir: null, jenisKelamin: null }), null);
+  assert.equal(nipTidakCocokDenganIsian(nip, { tanggalLahir: new Date(1989, 10, 28) }), null);
+  // Singkatan jenis kelamin tetap terbaca.
+  assert.equal(nipTidakCocokDenganIsian(nip, { jenisKelamin: "L" }), null);
+
+  // Kasus nyata 13 Oktober 2026: NIP pegawai lain (lahir 7 April 1993) diketik untuk pegawai yang lahir 28 November 1989.
+  const tertukar = nipTidakCocokDenganIsian("199304072017121006", { tanggalLahir: "1989-11-28", jenisKelamin: "Laki-laki" });
+  assert.match(tertukar ?? "", /menunjukkan lahir 7 April 1993, tetapi tanggal lahir yang diisi 28 November 1989/);
+  assert.match(tertukar ?? "", /Cocokkan dengan NIP pada SK pegawai/);
+
+  // Tanggal lahir yang keliru saja, atau jenis kelamin saja, atau keduanya.
+  assert.match(nipTidakCocokDenganIsian(nip, { tanggalLahir: "1993-11-28" }) ?? "", /menunjukkan lahir 28 November 1989.*diisi 28 November 1993/);
+  const kelamin = nipTidakCocokDenganIsian(nip, { jenisKelamin: "Perempuan" });
+  assert.match(kelamin ?? "", /angka ke-15 NIP \(1\) menunjukkan laki-laki, tetapi jenis kelamin yang dipilih perempuan/);
+  assert.doesNotMatch(kelamin ?? "", /menunjukkan lahir/);
+  const dua = nipTidakCocokDenganIsian(nip, { tanggalLahir: "1990-01-01", jenisKelamin: "Perempuan" }) ?? "";
+  assert.match(dua, /menunjukkan lahir/);
+  assert.match(dua, /angka ke-15/);
+
+  // NIP yang bukan 18 digit bukan urusan pemeriksa ini; bentuknya diperiksa di tempat lain.
+  assert.equal(nipTidakCocokDenganIsian("1989", { tanggalLahir: "1990-01-01" }), null);
+  // Delapan angka pertama yang bukan tanggal nyata disebut apa adanya.
+  assert.match(nipTidakCocokDenganIsian("199013322017121003", { tanggalLahir: "1990-01-01" }) ?? "", /bukan tanggal lahir yang ada/);
+  // Angka jenis kelamin NIP yang mustahil (bukan 1 atau 2) tidak ditebak di sini.
+  assert.equal(nipTidakCocokDenganIsian("198911282017120003", { jenisKelamin: "Laki-laki" }), null);
 });

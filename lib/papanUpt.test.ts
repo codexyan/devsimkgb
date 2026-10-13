@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { gabungKartuUpt, kartuPerKolom, type SumberKartu } from "./papanUpt";
+import { gabungKartuUpt, kartuPerKolom, kelompokKerja, susunKelompokKerja, type KelompokKerja, type SumberKartu } from "./papanUpt";
 
 const s = (k: Partial<SumberKartu> & Pick<SumberKartu, "kunci" | "kolom">): SumberKartu => ({
   pegawaiId: null,
@@ -126,4 +126,19 @@ test("SK KGB yang menunggu review UPT berada di kolom Periksa SK, didahulukan at
   const per = kartuPerKolom([s({ kunci: "proses:p4", kolom: "periksa", pegawaiId: "p4", nip: "4" })]);
   assert.equal(per.periksa.length, 1);
   assert.equal(per.kerja.length, 0, "tidak lagi bercampur dengan draf di Perlu dikerjakan");
+});
+
+test("kelompok Perlu dikerjakan: terlambat, dikembalikan, jendela kirim, lainnya", () => {
+  const k = (bulanTmt: string | null, dikembalikan = false) => kelompokKerja({ bulanTmt, dikembalikan, bulanUsulan: "2027-01" });
+  assert.equal(k("2026-12"), "terlambat");
+  assert.equal(k("2026-12", true), "kembali");
+  assert.equal(k("2027-01"), "jendela");
+  assert.equal(k(null), "lain");
+  assert.equal(k("2027-02"), "lain");
+  const susun = susunKelompokKerja(["a:jendela", "b:terlambat", "c:jendela", "d:kembali"], (s) => s.split(":")[1] as KelompokKerja);
+  assert.deepEqual(susun.map((g) => [g.kelompok, g.isi.map((s) => s[0])]), [
+    ["terlambat", ["b"]],
+    ["kembali", ["d"]],
+    ["jendela", ["a", "c"]],
+  ]);
 });

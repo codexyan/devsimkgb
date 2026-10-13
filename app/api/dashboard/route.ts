@@ -22,6 +22,7 @@ import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { berhakKgb, sudahBerhenti } from "@/lib/mutasiPegawai";
 import { infoReviewSk } from "@/lib/reviewSkUpt";
 import { muatSemuaReviewSk } from "@/lib/reviewSkUptServer";
+import { idPegawaiBelumDitinjau } from "@/lib/terdatakanPegawaiBaru";
 
 export const runtime = "nodejs";
 
@@ -49,7 +50,7 @@ export async function GET() {
     // Pipeline memuat TMT tahun ini dan TMT yang masa inputnya sudah dibuka (sebelum awal bulan ke-3 dari sekarang).
     const batasPipeline = new Date(Math.max(tahunAkhir.getTime(), new Date(tahun, bulan + 3, 1).getTime()));
 
-    const [semuaPegawai, semuaKgb, allSurat, followupRows, reviewSk] = await Promise.all([
+    const [semuaPegawai, semuaKgb, allSurat, followupRows, reviewSk, belumDitinjau] = await Promise.all([
       db.pegawai.findMany(),
       db.riwayatKGB.findMany(),
       db.suratKGB.findMany() as Promise<SuratKgbTersimpan[]>,
@@ -58,6 +59,8 @@ export async function GET() {
         : Promise.resolve([]),
       // Review SK pegawai UPT oleh Admin UPT (ADR-077); kosong dan tidak aktif selama tabelnya belum ada.
       bolehLihatFollowup ? muatSemuaReviewSk() : Promise.resolve({ aktif: false, perKgb: new Map() }),
+      // Pegawai yang didata UPT dan usulan pegawai barunya belum disetujui: proses KGB-nya tertahan (ADR-112).
+      bolehLihatFollowup ? idPegawaiBelumDitinjau() : Promise.resolve(new Set<string>()),
     ]);
 
     // Beranda keuangan Kanwil hanya menghitung pegawai Kanwil; pegawai UPT dipegang keuangan satkernya (ADR-009).
@@ -153,6 +156,7 @@ export async function GET() {
         terlambat,
         isLocked: statusKGB === null && jendela.isLocked,
         statusKGB,
+        dataBelumDitinjau: belumDitinjau.has(p.id),
         kgbId: k?.id || null,
         nomorSK: k?.nomorSK ?? null,
         penetapSkDasar: k?.penetapSkDasar ?? null,

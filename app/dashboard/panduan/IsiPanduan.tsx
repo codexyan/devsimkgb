@@ -237,7 +237,7 @@ export default async function IsiPanduan({
                     <h3 className="pub-step-title">Unggah SK ke SIM-KGB</h3>
                     <p className="pub-step-who">Tim SDM KGB</p>
                     <p>
-                      Berkas PDF SK yang sudah ditandatangani diunggah dengan tombol Unggah SK bertanda tangan. SK pegawai UPT
+                      Berkas PDF SK yang sudah ditandatangani diunggah dengan tombol Unggah SK TTE Srikandi. SK pegawai UPT
                       langsung dapat diunduh UPT-nya.
                     </p>
                     <p className="pg-hasil">
@@ -766,7 +766,7 @@ export default async function IsiPanduan({
 
                 <h3 className="pub-h3">Enam langkah yang berulang tiap periode</h3>
                 <ol>
-                  <li>Buka SIM-KGB dan kenali enam menu Anda.</li>
+                  <li>Buka SIM-KGB dan kenali menu Anda.</li>
                   <li>Tunggu pengingat masa kirim, atau lihat sendiri pita jadwal di dashboard.</li>
                   <li>Pastikan data pegawai sudah sama dengan SK; yang keliru dibetulkan lewat usulan.</li>
                   <li>Siapkan usulan di Usul KGB Kolektif: pilih pegawainya, lengkapi data dan berkasnya.</li>
@@ -776,21 +776,25 @@ export default async function IsiPanduan({
 
                 <h3 className="pub-h3">Membaca pita jadwal di dashboard</h3>
                 <p>
-                  Pita di kepala dashboard tersusun menurut <strong>bulan kirim</strong> surat usulan. Kartu paling lebar
-                  adalah bulan berjalan: garis emas menandai jendela kirim (tanggal 1 sampai batas kirim), titik putih
-                  menandai hari ini, dan hitung mundur menyebut sisa harinya. Di bawahnya tertulis bulan TMT yang
-                  diusulkan, dua bulan kemudian. Batang berwarna membagi pegawai menjadi <strong>Perlu diusulkan</strong>{" "}
-                  (kuning), <strong>Di Kanwil</strong> (biru), <strong>SK terbit</strong> (hijau toska), dan{" "}
-                  <strong>Selesai</strong> (hijau), sama dengan kolom papan Alur KGB. Klik kartu untuk melihat daftar
-                  pegawainya per tahap. Kartu <strong>Terlambat</strong> muncul bila ada TMT yang sudah lewat jadwal kirim
-                  dan KGB-nya belum selesai; yang perlu segera dikejar adalah angka &ldquo;perlu diusulkan&rdquo; di
-                  dalamnya. Kartu KGB tahun ini menunjukkan berapa yang sudah selesai.
+                  Pita di kepala dashboard punya tiga bagian. Bagian kiri adalah <strong>Kirim &lt;bulan&gt;</strong>, masa
+                  kirim yang sedang berjalan: lingkaran hitung mundur menyebut sisa harinya, label <em>Terbuka</em> atau{" "}
+                  <em>Ditutup</em>, bulan TMT yang diusulkan (dua bulan kemudian), jumlah pegawai beserta yang masih perlu
+                  diusulkan, dan empat langkah bertanggal: Surat, Ajukan, Kanwil, dan Rekon. Tombol{" "}
+                  <strong>Rincian</strong> membuka keterangan tiap langkah. Bagian tengah, <strong>KGB per bulan
+                  TMT</strong>, memuat batang Januari sampai Desember yang warnanya mengikuti kolom papan Alur KGB:{" "}
+                  <strong>Perlu diusulkan</strong> (kuning), <strong>Di Kanwil</strong> (biru), <strong>SK terbit</strong>{" "}
+                  (hijau toska), dan <strong>Selesai</strong> (hijau); panah di atasnya berganti tahun, dan klik batang
+                  untuk melihat daftar pegawainya per tahap. Bagian kanan, <strong>KGB &lt;tahun&gt;</strong>, menunjukkan
+                  berapa yang sudah selesai dan berapa KGB yang ditunda karena hukuman disiplin. Tombol{" "}
+                  <strong>N terlambat</strong> muncul bila ada TMT yang sudah lewat jadwal kirim dan KGB-nya belum selesai;
+                  yang perlu segera dikejar adalah angka &ldquo;perlu diusulkan&rdquo; di dalamnya.
                 </p>
 
                 <h3 className="pub-h3">Langkah 1: Kenali menu Anda</h3>
                 <p>
-                  Sesudah masuk, menu di sisi kiri layar hanya berisi enam pilihan. Seluruhnya terbatas pada satker
-                  Anda: pegawai satker lain tidak pernah tampil, dan tidak ada menu Kanwil di sana.
+                  Sesudah masuk, menu di sisi kiri layar berisi enam menu kerja, ditambah Panduan, Cadangkan data, dan
+                  Notifikasi. Seluruhnya terbatas pada satker Anda: pegawai satker lain tidak pernah tampil, dan tidak ada
+                  menu Kanwil di sana.
                 </p>
                 <LayarMenu />
 
@@ -824,6 +828,14 @@ export default async function IsiPanduan({
                   Kanwil, boleh ditinggal dan dilanjutkan kapan saja, dan boleh dihapus bila keliru. NIP yang tercatat
                   salah juga dibetulkan lewat <strong>Perbarui data</strong>: ketik NIP yang benar, lalu Kanwil
                   mencocokkannya dengan SK CPNS sebelum menyetujui.
+                </p>
+                <p>
+                  Untuk <strong>pegawai baru</strong>, NIP dicocokkan dengan isian lain sebelum tersimpan: delapan angka
+                  pertama NIP adalah tanggal lahir, dan angka ke-15 adalah jenis kelamin (1 laki-laki, 2 perempuan).
+                  Bila tanggal lahir atau jenis kelamin yang Anda isi tidak sama dengan yang tertulis di NIP, isian
+                  ditolak dengan keterangan bagian mana yang berbeda. Yang keliru bisa NIP-nya, bisa juga isian tanggal
+                  lahir atau jenis kelaminnya; cocokkan dengan SK pegawai itu. Tanggal lahir yang dikosongkan tidak
+                  diperiksa.
                 </p>
 
                 <h4 className="pub-h3">Mengisi banyak pegawai sekaligus dengan Unggah daftar</h4>
@@ -967,9 +979,10 @@ export default async function IsiPanduan({
                 <p>
                   Inilah tempat kerja utama Anda tiap periode. <strong>Usul KGB Kolektif</strong> menyiapkan usul KGB
                   beberapa pegawai untuk satu surat, dalam tiga langkah. Halamannya dibuka pada pegawai yang jatuh tempo
-                  periode ini. Draf pegawai baru hasil Unggah daftar tidak ikut kecuali dipilih di saringan{" "}
+                  periode ini. Draf pegawai baru yang belum lengkap tidak ikut kecuali dipilih di saringan{" "}
                   <em>Pegawai baru</em>, sehingga pendataan ratusan pegawai dapat dikirim bertahap dan tidak tercampur
-                  dengan usul KGB periode berjalan.
+                  dengan usul KGB periode berjalan. Draf yang data utamanya sudah terisi sudah terdata sebagai pegawai biasa, jadi
+                  ikut daftar periode bila TMT KGB-nya jatuh pada periode ini.
                 </p>
                 <LayarKolektif1 namaBulan={bulanTahun(TMT_KGB)} />
                 <p>
@@ -1052,8 +1065,12 @@ export default async function IsiPanduan({
                 </p>
                 <p>
                   Berkas wajib ditagih saat diajukan: bagi pegawai baru selalu, bagi usulan perbaikan hanya bila
-                  golongan, TMT golongan, masa kerja golongan, atau TMT KGB terakhirnya ikut diubah. Draf pegawai baru
-                  yang NIP-nya ternyata sudah tercatat di satker Anda ditandai di papan dan diajukan sebagai perbaikan
+                  golongan, TMT golongan, masa kerja golongan, atau TMT KGB terakhirnya ikut diubah. <strong>Pegawai baru
+                  langsung terdata</strong> begitu data utama drafnya terisi (identitas, golongan, masa kerja golongan, dan TMT KGB terakhir), tanpa surat, tanpa berkas, dan tanpa menunggu Kanwil: ia tampil di
+                  Pegawai Satker sebagai pegawai biasa. Surat Srikandi dan tinjauan Kanwil baru diperlukan saat KGB-nya
+                  diusulkan, dan selama usulan pertamanya belum disetujui, Kanwil belum dapat memproses KGB-nya. Hapus
+                  pada draf yang sudah terdata menghapus drafnya dan menonaktifkan pegawainya; Kanwil dapat mengaktifkannya
+                  kembali. Draf pegawai baru yang NIP-nya ternyata sudah tercatat di satker Anda ditandai di papan dan diajukan sebagai perbaikan
                   data pegawai itu; yang tercatat di satker lain tidak dapat diajukan dan harus dihapus. Pada usulan
                   perbaikan berikutnya, nomor, tanggal, dan pejabat penetap SK dasar serta berkas terakhir yang sudah
                   disetujui Kanwil <strong>terisi sendiri</strong> dan bertanda <em>disetujui</em>; pilih PDF baru hanya
@@ -1108,13 +1125,13 @@ export default async function IsiPanduan({
                 </p>
                 <p>
                   Usulan tidak langsung mengubah data. Super Admin atau Tim SDM KGB meninjaunya lebih dulu, lalu memilih{" "}
-                  <strong>Setujui</strong> atau <strong>Kembalikan</strong> untuk revisi dengan catatan. Usulan yang
+                  <strong>Setujui dan terapkan</strong> atau <strong>Kembalikan ke UPT</strong> dengan catatan. Usulan yang
                   dikembalikan muncul lagi di Perlu dikerjakan beserta catatannya: perbaiki, lalu ajukan ulang; nomor
                   surat yang lama sudah terisi di jendela Ajukan ke Kanwil. Kanwil juga dapat mengembalikan usulan yang
                   <em>sudah disetujui</em>, misalnya bila belakangan ketahuan datanya keliru. Data pegawai tidak berubah:
                   yang tampil di Perlu dikerjakan adalah usulan perbaikan baru yang sudah terisi sesuai data pegawai saat
                   ini beserta catatan Kanwil; perbaiki yang keliru lalu ajukan ulang seperti biasa. Selama usulan menunggu tinjauan, proses KGB
-                  pegawainya (Input KGB, Buat SK, Unggah SK bertanda tangan) tertahan agar SK dibuat dari data yang sudah
+                  pegawainya (Input KGB, Buat SK, Unggah SK TTE Srikandi) tertahan agar SK dibuat dari data yang sudah
                   diperbarui. Hasil tinjauan tercatat di <strong>Riwayat → Usulan dan laporan</strong>. Satu pegawai
                   hanya boleh punya satu usulan yang belum selesai, agar antrian tinjauan tidak berisi dua versi yang
                   saling menimpa.
@@ -1122,7 +1139,7 @@ export default async function IsiPanduan({
 
                 <h4 className="pub-h3">Memantau semuanya dari papan Alur KGB</h4>
                 <p>
-                  Dashboard Anda memuat satu papan berisi empat kolom. Tiap pegawai berada di kolom tahapnya, jadi
+                  Dashboard Anda memuat satu papan berisi lima kolom. Tiap pegawai berada di kolom tahapnya, jadi
                   cukup melihat papan ini untuk tahu apa yang masih menunggu Anda dan apa yang sedang di Kanwil.
                 </p>
                 <LayarPapan />
@@ -1145,8 +1162,8 @@ export default async function IsiPanduan({
                   disetujui, jendelanya menyebut apa saja yang berbeda. Tekan{" "}
                   <strong>Periksa SK</strong>: pratinjaunya bertanda air DRAF, dan isinya
                   sama dengan yang kelak dicetak. Periksa nama, NIP, pangkat dan golongan, gaji pokok, masa kerja, serta TMT.
-                  Bila semuanya benar, centang pernyataan lalu tekan <strong>SK sudah benar</strong>; Kanwil baru mencetaknya
-                  untuk ditandatangani basah, mengirimnya lewat Srikandi, dan mengunggah TTE-nya. Bila ada yang keliru, tekan{" "}
+                  Bila semuanya benar, centang pernyataan lalu tekan <strong>SK sudah benar</strong>; Kanwil baru mengunduhnya
+                  untuk ditandatangani dengan TTE, mengirimnya lewat Srikandi, dan mengunggah SK TTE-nya. Bila ada yang keliru, tekan{" "}
                   <strong>Minta perbaikan</strong> dan tulis apa yang harus dibetulkan; setelah Kanwil memperbaikinya,
                   permintaan review muncul lagi.
                 </p>
@@ -1264,8 +1281,9 @@ export default async function IsiPanduan({
                     pengingat <em>Perlu diperiksa</em>, lengkap dengan batas input Kanwil. Draf perbaikan data milik pegawai
                     yang masa usul KGB-nya belum dibuka disimpan terlipat di bagian <em>Terkunci sampai masa usul KGB</em>,
                     tanpa kotak centang, dan terbuka sendiri pada bulan kirimnya, 2 bulan sebelum TMT. Draf pegawai baru
-                    dan usulan yang dikembalikan Kanwil tidak pernah dikunci. Perbaikan yang mendesak tetap dapat
-                    diajukan lebih awal lewat <strong>Usul KGB Kolektif</strong>. Bila ada yang keliru, pilih{" "}
+                    ikut terlipat menurut TMT KGB pada isiannya; yang TMT-nya belum diisi juga terlipat. Usulan yang
+                    dikembalikan Kanwil tidak pernah dikunci. Perbaikan yang mendesak dan pendataan pegawai baru tetap
+                    dapat diajukan lebih awal lewat <strong>Usul KGB Kolektif</strong>. Bila ada yang keliru, pilih{" "}
                     <strong>Perbarui data</strong> sebelum batas itu. Hukuman disiplin yang belum dilaporkan
                     disampaikan lewat menu <strong>Lapor Hukdis</strong>; pegawai yang pindah, BKO, atau berhenti
                     dilaporkan dengan <strong>Laporkan mutasi</strong> pada barisnya. Pegawai yang sedang{" "}
@@ -1283,9 +1301,9 @@ export default async function IsiPanduan({
                     golongan baru (kenaikan pangkat), masa kerja golongan menurut SK, nomor, tanggal, TMT, pejabat
                     penetapnya, dan unggah <strong>pindaian SK-nya</strong>. Kotak <em>Dihitung sistem</em> langsung
                     menunjukkan akibatnya seperti Kanwil saat menyetujui: naik dari golongan II ke III tetap memotong
-                    masa kerja 5 tahun, dan masa kerja yang Anda salin dari SK dicocokkan dengan hitungan itu. Bila
-                    KGB pegawai itu sedang diproses Kanwil, atau SK KGB-nya sudah ditandatangani, langkah ini memberi
-                    tahu dampaknya sebelum Anda mengirim.
+                    masa kerja 5 tahun, dan masa kerja yang Anda salin dari SK dicocokkan dengan hitungan itu. Di Usul KGB
+                    Kolektif, bila KGB pegawai itu sedang diproses Kanwil atau SK KGB-nya sudah ditandatangani, langkah
+                    ini memberi tahu dampaknya sebelum Anda mengirim.
                   </p>
                   <p>
                     Laporan SK <strong>tidak menumpang surat usulan Srikandi</strong>: bila semua yang Anda ajukan
@@ -1593,7 +1611,7 @@ export default async function IsiPanduan({
                     <p>
                       Daftar berisi satu nama per pegawai, dikelompokkan per UPT dan dapat disaring per UPT; usulan lain
                       pegawai yang sama ada di Riwayat usulan pada detailnya. Periksa perbedaan isian dengan data yang tercatat, berkas SK dasar,
-                      dan dampaknya pada KGB yang sedang berjalan, lalu pilih Setujui atau Kembalikan. Kembalikan wajib
+                      dan dampaknya pada KGB yang sedang berjalan, lalu pilih Setujui dan terapkan atau Kembalikan ke UPT. Kembalikan wajib
                       disertai catatan; UPT memperbaikinya lalu mengajukan ulang dengan surat yang sama.
                     </p>
                     <p>
@@ -1618,10 +1636,13 @@ export default async function IsiPanduan({
                       dipakai apa adanya dan dasar KGB berikutnya tidak berpindah.
                     </p>
                     <p>
-                      Usulan pegawai baru yang disetujui langsung menambahkan pegawai beserta jadwal KGB-nya, dan SK yang
-                      diketik UPT (misalnya SK CPNS) menjadi SK dasar Input KGB pertama. Bila KGB pegawai sedang berjalan
-                      dan SK-nya belum diunggah, perhitungannya disesuaikan otomatis saat usulan disetujui. Selama usulan
-                      menunggu, baris pegawai bertanda Tertahan usulan UPT dan langkah prosesnya ditolak.
+                      Pegawai baru sudah terdata sejak Admin UPT melengkapi drafnya, dengan jadwal KGB-nya, dan SK yang
+                      diketik UPT (misalnya SK CPNS) menjadi SK dasar Input KGB pertama. Menyetujui usulannya menandai
+                      datanya sudah ditinjau dan membuka proses KGB-nya. Bila KGB pegawai sedang berjalan dan SK-nya belum
+                      diunggah, perhitungannya disesuaikan otomatis saat usulan disetujui. Selama usulan menunggu, baris
+                      pegawai bertanda Tertahan usulan UPT dan langkah prosesnya ditolak; selama UPT belum mengajukannya
+                      atau usulannya dikembalikan, kartunya bertanda Data belum ditinjau dan Data Pegawai memberi label
+                      yang sama.
                     </p>
                     <p>
                       Usulan pegawai baru yang NIP-nya ternyata sudah tercatat di satker yang sama bertanda{" "}
@@ -1637,8 +1658,8 @@ export default async function IsiPanduan({
                     <h3 className="pub-step-title">Periksa data pegawai</h3>
                     <p className="pub-step-who">Tim SDM, menu Data Pegawai</p>
                     <p>
-                      Cari setiap pegawai pada surat menurut NIP. Pegawai UPT yang belum terdaftar masuk lewat usulan
-                      pegawai baru dari UPT; pegawai Kanwil ditambahkan dengan tombol Tambah Pegawai, atau Impor CSV
+                      Cari setiap pegawai pada surat menurut NIP. Pegawai UPT terdata begitu Admin UPT melengkapi draf
+                      pegawai barunya (berlabel Data belum ditinjau sampai usulannya disetujui); pegawai Kanwil ditambahkan dengan tombol Tambah Pegawai, atau Impor CSV
                       untuk banyak pegawai sekaligus. Golongan, masa kerja golongan, dan TMT KGB
                       terakhir harus sama dengan SK yang dilampirkan UPT; gaji pokok dan TMT KGB berikutnya terisi
                       sendiri dari ketiganya menurut tabel PP 5/2024, sehingga tidak perlu diketik. Isi TMT KGB
@@ -1768,18 +1789,24 @@ export default async function IsiPanduan({
                     </p>
                     <p>
                       <strong>SK pegawai UPT direview Admin UPT lebih dulu.</strong> Untuk pegawai UPT, tombolnya menjadi{" "}
-                      <strong>Buat SK dan minta review UPT</strong>: SK tercatat, tetapi tidak diunduh, dan Admin UPT satker
+                      <strong>Buat SK dan Minta Review UPT</strong> (di kartu Sedang diproses: <strong>Perbaiki SK dan Minta Review UPT</strong>
+                      bila SK sudah pernah dibuat): SK tercatat, tetapi tidak diunduh, dan Admin UPT satker
                       itu menerima permintaan review di lonceng dan di kolom Periksa SK, termasuk SK yang sama dengan usulan
                       UPT yang disetujui. Selama belum disetujui, kartu
-                      pegawai bertanda <em>Menunggu review UPT</em>, setiap unduhan SK bertanda air DRAF, dan Unggah SK bertanda tangan
+                      pegawai bertanda <em>Menunggu review UPT</em>, setiap unduhan SK bertanda air DRAF, dan Unggah SK TTE Srikandi
                       ditolak. Bila UPT meminta perbaikan, kartu bertanda merah beserta catatannya; pilih Perbaiki SK, dan
                       review diminta ulang otomatis. Setelah UPT menyatakan SK sudah benar, tekan <strong>Unduh untuk TTE</strong>{" "}
                       untuk mengunduh versi Srikandi tanpa tanda air (panah di sebelahnya untuk SK tanda tangan basah),
-                      kirim lewat Srikandi, lalu Unggah SK bertanda tangan. Bila banyak SK siap cetak, tombol{" "}
+                      kirim lewat Srikandi, lalu Unggah SK TTE Srikandi. Bila banyak SK siap cetak, tombol{" "}
                       <strong>ZIP N SK untuk TTE</strong> di kolom Sedang diproses mengunduh semuanya dalam satu ZIP;
                       panah di sebelahnya mengunduh ZIP untuk tanda tangan basah. Nama berkas SK berbentuk nomor urut surat,
-                      TTE atau TTD, KGB, lalu nama pegawai, mis. <code>1758 TTE KGB Abdul Hayat.pdf</code>. Untuk keadaan mendesak, Super Admin dapat memilih{" "}
-                      <strong>Lewati review</strong> dengan alasan yang tercatat di Log Aktivitas. SK pegawai Kanwil tidak
+                      TTE atau TTD, KGB, lalu nama pegawai, mis. <code>1758 TTE KGB Abdul Hayat.pdf</code>. Semua SK pegawai UPT melalui review UPT lebih dulu. Untuk keadaan mendesak, Super Admin dapat memilih{" "}
+                      <strong>Lewati review</strong> dengan alasan yang tercatat di Log Aktivitas, tetapi tombolnya baru muncul
+                      bila permintaan review sudah menunggu UPT <strong>lebih dari 24 jam</strong>; kartu menunjukkan sisa
+                      waktunya. Jam 24 dihitung dari permintaan terakhir, jadi Perbaiki SK memulainya lagi. Penantian itu hanya
+                      berlaku sampai batas input Kanwil (akhir bulan, dua bulan sebelum TMT): begitu batas input lewat dan
+                      masa input Kanwil habis, Lewati review langsung muncul tanpa menunggu 24 jam. Saat UPT meminta
+                      perbaikan tidak ada Lewati review: jalurnya Perbaiki SK. SK pegawai Kanwil tidak
                       melalui review ini. SK pegawai UPT yang dibuat sebelum review aktif juga tertahan sampai direview:
                       pilih <strong>Minta review UPT</strong>.
                     </p>
@@ -1787,7 +1814,7 @@ export default async function IsiPanduan({
                       Di papan antrian Dashboard, kolom <strong>Sedang diproses</strong> diurutkan menurut tindakan Kanwil.
                       Yang paling atas adalah SK yang diminta diperbaiki UPT (garis merah, label <em>Perbaiki SK</em>).
                       Sesudahnya SK yang <strong>siap cetak</strong> (garis hijau, tombol <strong>Unduh untuk TTE</strong> hijau
-                      di depan, lalu Unggah SK bertanda tangan), kemudian KGB yang perlu dibuat SK-nya. Paling bawah, dalam bingkai
+                      di depan, lalu Unggah SK TTE Srikandi), kemudian KGB yang perlu dibuat SK-nya. Paling bawah, dalam bingkai
                       putus-putus yang diredupkan, SK yang masih menunggu review UPT beserta lama menunggunya. Dalam
                       tiap kelompok, batas input terdekat di atas.
                     </p>
@@ -1815,8 +1842,8 @@ export default async function IsiPanduan({
                     <h3 className="pub-step-title">Unggah SK yang sudah ditandatangani</h3>
                     <p className="pub-step-who">Tim SDM, kartu atau baris berstatus Sedang Diproses</p>
                     <p>
-                      Tombol Unggah SK bertanda tangan muncul setelah SK dibuat dengan Buat SK. Unduh naskah yang sudah ditandatangani
-                      dari Srikandi, pilih Unggah SK bertanda tangan, pilih berkas PDF <strong>asli</strong> (paling besar 5 MB)
+                      Tombol Unggah SK TTE Srikandi muncul setelah SK dibuat dengan Buat SK. Unduh naskah yang sudah ditandatangani
+                      dari Srikandi, pilih Unggah SK TTE Srikandi, pilih berkas PDF <strong>asli</strong> (paling besar 5 MB)
                       pada jendela Unggah SK yang Sudah Ditandatangani, lalu pilih Unggah SK. Status berubah menjadi{" "}
                       <Status status="menunggu_keuangan" />. KGB pegawai Kanwil muncul di menu Keuangan; SK pegawai UPT
                       langsung dapat diunduh UPT-nya dan menunggu keuangan satker merekamnya di Gaji Web (ubin Di
@@ -1851,7 +1878,7 @@ export default async function IsiPanduan({
                       kembali ke <Status status="sedang_diproses" />, kartunya kembali ke kolom Sedang Diproses, dan
                       alasannya muncul di panel tindakan dasbor Tim SDM. Data pegawai belum berubah sama sekali, sebab
                       gaji pokok dan jadwal KGB berikutnya baru ditulis saat konfirmasi. Dari kolom itu, SK-nya dapat
-                      diganti dengan Unggah SK bertanda tangan, atau prosesnya dibatalkan sekalian bila yang keliru justru angkanya.
+                      diganti dengan Unggah SK TTE Srikandi, atau prosesnya dibatalkan sekalian bila yang keliru justru angkanya.
                     </p>
                     <p>
                       Bila selama KGB berjalan tercatat hukuman disiplin yang menunda KGB berikutnya, pembatalan ditolak.
@@ -1881,7 +1908,7 @@ export default async function IsiPanduan({
                     SK, Tanggal SK, TMT SK, dan Oleh bila diketahui, pilih Berkas SK (PDF) asli paling besar 5 MB,
                     lalu pilih Simpan Arsip. KGB langsung berstatus <Status status="selesai" /> tanpa konfirmasi keuangan, data gaji pegawai
                     diperbarui, dan jadwal KGB berikutnya dibuat. Arsip KGB mengikuti jendela proses yang sama dengan
-                    Input KGB. Bila berkas SK gagal terunggah, unggah dari Detail KGB dengan Unggah SK bertanda tangan.
+                    Input KGB. Bila berkas SK gagal terunggah, unggah dari Detail KGB dengan Unggah berkas SK.
                   </li>
                   <li>
                     <strong>Angka pada SK dicocokkan lebih dulu.</strong> Jendela Arsip KGB meminta{" "}
@@ -1978,8 +2005,9 @@ export default async function IsiPanduan({
                 </ol>
                 <p>
                   Laporan belum mengubah data pegawai maupun jadwal KGB. Satu pegawai hanya boleh punya satu laporan yang
-                  belum selesai. Selama masih Menunggu tinjauan, laporan dapat dibatalkan. Laporan yang Dikembalikan untuk
-                  diperbaiki membawa catatan Kanwil; pilih <strong>Kirim ulang</strong>, betulkan isiannya, lalu kirim.
+                  belum selesai. Selama masih Menunggu tinjauan atau Dikembalikan, laporan dapat dibatalkan. Laporan yang
+                  Dikembalikan membawa catatan Kanwil; pilih <strong>Perbaiki dan kirim ulang</strong>, betulkan isiannya,
+                  lalu pilih <strong>Kirim ulang</strong>.
                 </p>
 
                 <h3 className="pub-h3">Di Kanwil: mencatat atau mengembalikan</h3>
@@ -2375,7 +2403,7 @@ export default async function IsiPanduan({
                         </th>
                         <td>
                           Keterangan di dashboard Kanwil, bukan status. UPT mengusulkan perbaikan data pegawai ini, dan
-                          Input KGB, Buat SK, serta Unggah SK bertanda tangan menunggu usulan itu ditinjau. Status KGB tidak berubah
+                          Input KGB, Buat SK, serta Unggah SK TTE Srikandi menunggu usulan itu ditinjau. Status KGB tidak berubah
                           sampai usulannya disetujui atau dikembalikan.
                         </td>
                       </tr>
@@ -2420,8 +2448,8 @@ export default async function IsiPanduan({
                   <details name="faq-panduan">
                     <summary>NIP pegawai tidak ditemukan di SIM-KGB</summary>
                     <p>
-                      Pegawai UPT yang belum tercatat ditambahkan Admin UPT dengan Tambah pegawai atau Unggah daftar, lalu
-                      diajukan ke Kanwil. NIP yang tercatat keliru dibetulkan lewat Perbarui data; Kanwil
+                      Pegawai UPT yang belum tercatat ditambahkan Admin UPT dengan Tambah pegawai atau Unggah daftar; ia
+                      terdata begitu data utama drafnya terisi, lalu diajukan ke Kanwil saat KGB-nya diusulkan. NIP yang tercatat keliru dibetulkan lewat Perbarui data; Kanwil
                       mencocokkannya dengan SK CPNS sebelum menyetujui.
                     </p>
                   </details>
@@ -2444,9 +2472,9 @@ export default async function IsiPanduan({
                     </p>
                   </details>
                   <details name="faq-panduan">
-                    <summary>Mengapa tombol Buat SK atau Unggah SK bertanda tangan tidak muncul?</summary>
+                    <summary>Mengapa tombol Buat SK atau Unggah SK TTE Srikandi tidak muncul?</summary>
                     <p>
-                      Buat SK baru tersedia setelah Input KGB disimpan dan status menjadi Sedang Diproses. Unggah SK bertanda tangan
+                      Buat SK baru tersedia setelah Input KGB disimpan dan status menjadi Sedang Diproses. Unggah SK TTE Srikandi
                       baru muncul setelah SK dibuat dengan Buat SK. KGB yang jendela prosesnya belum dibuka tidak tampil di
                       Dashboard dan bertuliskan Terkunci di menu Proses KGB, disertai tanggal jendela proses dibuka. Baris
                       bertanda Tertahan usulan UPT hanya menampilkan Tinjau usulan UPT sampai usulannya ditinjau.
