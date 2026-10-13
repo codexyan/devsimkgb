@@ -13,6 +13,7 @@ import { TIPE_NOTIFIKASI, notifikasiUsulanDisetujui } from "./generateNotifikasi
 import { bandingkanUsulan, perubahanPegawai, ringkasHukdisUsulan } from "./usulanPegawai";
 import type { PegawaiRow, RiwayatPangkatRow, RiwayatPmkRow, UsulanPegawaiRow } from "./sheets/tables";
 import { rencanakanPenyesuaianKgb } from "./sesuaikanKgbUsulan";
+import { jadwalDigeserHukdis } from "./terdatakanPegawaiBaru";
 import { catatKenaikanPangkat, catatPmk } from "./catatDasarGaji";
 import { isJenisKp } from "./kenaikanPangkat";
 import { ringkasDasarBaru } from "./dasarBaruUsulan";
@@ -131,7 +132,7 @@ export async function setujuiUsulan(
         : hasil;
     }
 
-    // Baris pegawai disusun oleh pembentuk yang sama dengan pembuatan langsung begitu draf lengkap (ADR-112). SK kenaikan
+    // Baris pegawai disusun oleh pembentuk yang sama dengan pembuatan langsung begitu data utama draf terisi (ADR-112, ADR-113). SK kenaikan
     // pangkat, penyesuaian ijazah, atau PMK sesudah SK KGB terakhir (ADR-065) menentukan golongan, masa kerja, gaji pokok,
     // dan jadwal KGB; usulan yang diajukan sudah lolos hitungan ini, jadi yang gagal di sini berarti datanya diubah sesudahnya.
     const susun = susunPegawaiBaru(usulan, lanjutan?.id ?? newId(), sekarang);
@@ -141,7 +142,10 @@ export async function setujuiUsulan(
       // Isian usulan (yang mungkin sudah dibetulkan UPT sejak percobaan sebelumnya, atau sejak pegawainya dibuat langsung
       // dari draf) ditulis ulang; yang dicatat Kanwil sesudahnya, seperti hukuman disiplin, mutasi, dan penetap SK dasar,
       // dibiarkan.
-      await db.pegawai.update({ id: lanjutan.id }, isiPembaruanPegawaiBaru(pegawaiBaru));
+      await db.pegawai.update(
+        { id: lanjutan.id },
+        isiPembaruanPegawaiBaru(pegawaiBaru, { jagaJadwal: await jadwalDigeserHukdis(lanjutan.id) }),
+      );
     } else await db.pegawai.create(pegawaiBaru);
     pegawaiIdHasil = pegawaiBaru.id;
     perubahan = [];

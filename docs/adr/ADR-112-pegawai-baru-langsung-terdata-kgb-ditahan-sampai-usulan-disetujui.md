@@ -1,7 +1,7 @@
 # ADR-112: Pegawai baru dari UPT langsung terdata; yang ditinjau Kanwil adalah usulan KGB-nya
 
 Tanggal: 13 Oktober 2026
-Status: berlaku. Mengubah prinsip "UPT hanya mengusulkan, pegawai baru masuk data induk setelah Kanwil menyetujui"
+Status: berlaku; butir 1 (kapan terdata) diganti ADR-113: cukup data utama, tanpa menunggu berkas. Mengubah prinsip "UPT hanya mengusulkan, pegawai baru masuk data induk setelah Kanwil menyetujui"
 (ADR-004, ADR-007, ADR-072, ADR-091) pada satu hal saja: kapan baris pegawai dibuat. Tinjauan Kanwil, surat usulan, dan gerbang
 Input KGB (ADR-014) tetap.
 

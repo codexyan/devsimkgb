@@ -405,7 +405,7 @@ export async function POST(req: Request) {
 
   await tulisDenganAcuan(baris, (isi) => db.usulanPegawai.create(isi));
 
-  // Pegawai baru langsung terdata begitu drafnya lengkap, tanpa surat dan tanpa tinjauan (ADR-112). Kegagalannya tidak boleh
+  // Pegawai baru langsung terdata begitu data utama drafnya terisi, tanpa surat dan tanpa tinjauan (ADR-112). Kegagalannya tidak boleh
   // membatalkan draf yang sudah tersimpan: pegawainya dibuat lagi saat diajukan, paling lambat saat disetujui.
   const terdata = jenis === "baru" ? await terdatakanDariDraf(baris.id, pengguna.id, namaUntukCatatan, nipUntukCatatan, satker.nama) : false;
 

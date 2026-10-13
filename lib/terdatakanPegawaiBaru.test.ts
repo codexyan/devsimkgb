@@ -219,3 +219,81 @@ test("usulan perbaikan yang menunggu tetap menahan seperti sebelumnya, dan yang 
     assert.equal(await usulanMenahan("p1"), null, "baris ditolak lama tidak menahan selamanya");
   });
 });
+
+test("data utama yang terisi sudah cukup untuk terdata, tanpa berkas, pejabat penetap, atau jawaban SK baru (ADR-113)", async () => {
+  await denganDataLokal(async () => {
+    const { db } = await import("./db");
+    const { terdatakanPegawaiBaru } = await import("./terdatakanPegawaiBaru");
+    const { kekuranganUsulan, kekuranganPendataanBaru } = await import("./usulanPegawai");
+
+    const tanpaBerkas = drafLengkap({
+      pathSkTerakhir: null, pathSyaratCpns: null, pathSkCpns: null, penetapSkTerakhir: null, nomorSkTerakhir: null,
+      tanggalSkTerakhir: null, dasarBaruJenis: null, keadaanKgb: null,
+    });
+    assert.ok(kekuranganUsulan(tanpaBerkas as never, "baru", null).length > 0, "untuk diajukan, masih banyak yang kurang");
+    assert.deepEqual(kekuranganPendataanBaru(tanpaBerkas as never), [], "untuk terdata, data utamanya sudah cukup");
+
+    const { draf } = await simpanDraf(tanpaBerkas);
+    const hasil = await terdatakanPegawaiBaru(draf as never);
+    assert.equal(hasil.hasil, "dibuat");
+    assert.equal((await db.pegawai.findUnique({ nip: NIP }))?.nama, "PEGAWAI BARU UJI");
+
+    // Golongan, masa kerja yang cocok dengan tabel gaji, dan TMT KGB terakhir tetap wajib.
+    for (const [kurangnya, ubah] of [
+      ["golongan/ruang", { golonganRuang: null }],
+      ["TMT KGB terakhir", { tmtKgbTerakhir: null }],
+      ["nama lengkap", { nama: "" }],
+      ["jabatan", { jabatan: "" }],
+    ] as const) {
+      const kurang = kekuranganPendataanBaru(drafLengkap(ubah as never) as never);
+      assert.ok(kurang.includes(kurangnya), `${kurangnya}: ${kurang.join(", ")}`);
+    }
+    assert.ok(kekuranganPendataanBaru(drafLengkap({ mkgTahun: 1 }) as never).some((k) => /masa kerja golongan yang cocok/.test(k)));
+  });
+});
+
+test("jadwal yang digeser hukuman disiplin penunda KGB tidak ditimpa saat draf disimpan ulang atau disetujui (ADR-113)", async () => {
+  await denganDataLokal(async () => {
+    const { db, draf } = await simpanDraf();
+    const { terdatakanPegawaiBaru, jadwalDigeserHukdis } = await import("./terdatakanPegawaiBaru");
+    const { catatHukdis } = await import("./catatHukdis");
+    const { setujuiUsulan } = await import("./setujuiUsulan");
+
+    const dibuat = await terdatakanPegawaiBaru(draf as never);
+    assert.equal(dibuat.hasil, "dibuat");
+    if (dibuat.hasil !== "dibuat") return;
+    const id = dibuat.pegawaiId;
+    const awal = await db.pegawai.findUnique({ id });
+    assert.equal(await jadwalDigeserHukdis(id), false);
+
+    // SDM Hukdis Kanwil mencatat penundaan KGB 12 bulan pada pegawai yang datanya belum ditinjau.
+    const catat = await catatHukdis(
+      id,
+      { jenisHukdis: "penundaan_kgb", nomorSK: "HD-1", tanggalSK: "2025-12-15", tmtMulai: "2025-12-01", tmtBerakhir: "2026-11-30", berdampakKGB: true, durasiTunda: 12 },
+      "u-hukdis",
+    );
+    assert.equal(catat.ok, true, JSON.stringify(catat));
+    const digeser = await db.pegawai.findUnique({ id });
+    assert.notEqual(new Date(digeser!.tmtKgbBerikutnya!).getTime(), new Date(awal!.tmtKgbBerikutnya!).getTime(), "jadwalnya bergeser");
+    assert.equal(await jadwalDigeserHukdis(id), true);
+
+    // UPT membetulkan jabatan pada drafnya: kolom itu ikut berubah, jadwalnya tidak kembali ke hitungan draf.
+    await db.usulanPegawai.update({ id: "u1" }, { jabatan: "Pengamanan Tahanan" });
+    const kedua = await terdatakanPegawaiBaru((await db.usulanPegawai.findUnique({ id: "u1" })) as never);
+    assert.equal(kedua.hasil, "diperbarui");
+    const sesudahSimpan = await db.pegawai.findUnique({ id });
+    assert.equal(sesudahSimpan?.jabatan, "Pengamanan Tahanan");
+    assert.equal(new Date(sesudahSimpan!.tmtKgbBerikutnya!).getTime(), new Date(digeser!.tmtKgbBerikutnya!).getTime());
+    assert.equal(new Date(sesudahSimpan!.tmtKgbTerakhir!).getTime(), new Date(digeser!.tmtKgbTerakhir!).getTime());
+    assert.equal(sesudahSimpan?.statusHukdis, digeser?.statusHukdis, "penanda hukdis tidak tersentuh");
+
+    // Persetujuan Kanwil melanjutkan pegawai yang sama dengan jaminan yang sama.
+    await db.usulanPegawai.update({ id: "u1" }, { status: "menunggu", nomorSurat: "W.1", tanggalSurat: tgl(2026, 10, 1), diajukanAt: new Date() });
+    const menunggu = await db.usulanPegawai.findUnique({ id: "u1" });
+    const hasil = await setujuiUsulan(menunggu as never, null, "Peninjau", new Date(), "u1");
+    assert.equal(hasil.ok, true, JSON.stringify(hasil));
+    const disetujui = await db.pegawai.findUnique({ id });
+    assert.equal(new Date(disetujui!.tmtKgbBerikutnya!).getTime(), new Date(digeser!.tmtKgbBerikutnya!).getTime(), "jadwal tetap bergeser");
+    assert.equal((await db.pegawai.findMany({ where: { nip: NIP } })).length, 1);
+  });
+});

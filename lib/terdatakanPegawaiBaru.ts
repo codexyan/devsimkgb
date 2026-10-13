@@ -1,4 +1,4 @@
-// Pegawai baru dari UPT langsung terdata begitu drafnya lengkap (ADR-112).
+// Pegawai baru dari UPT langsung terdata begitu data utama drafnya terisi (ADR-112, ADR-113).
 //
 // Dulu pegawai baru dari UPT baru masuk data induk setelah Kanwil menyetujui usulannya. Kini mendata dan mengusulkan KGB
 // dipisah: begitu draf pegawai baru lengkap disimpan, barisnya di tabel pegawai dibuat saat itu juga, tanpa surat dan tanpa
@@ -10,7 +10,7 @@
 // disetujui (`usulanBaruBelumDitinjau`), sehingga tidak ada migrasi.
 
 import { db } from "./db";
-import { BELUM_SELESAI, kekuranganUsulan } from "./usulanPegawai";
+import { BELUM_SELESAI, kekuranganPendataanBaru } from "./usulanPegawai";
 import { isiPembaruanPegawaiBaru, susunPegawaiBaru } from "./pegawaiBaruDariUsulan";
 import { newId } from "./sheets/id";
 import type { PegawaiRow, UsulanPegawaiRow } from "./sheets/tables";
@@ -34,7 +34,8 @@ export async function terdatakanPegawaiBaru(usulan: UsulanPegawaiRow, sekarang: 
   // Yang sudah disetujui atau ditolak sudah selesai: datanya tidak disentuh lagi dari sini.
   if (!BELUM_SELESAI.includes(usulan.status)) return { hasil: "belum", alasan: "bukan_di_tangan_upt" };
 
-  const kurang = kekuranganUsulan(usulan, "baru", null);
+  // Cukup data utamanya (ADR-113); berkas dan pejabat penetap baru ditagih saat usulannya diajukan.
+  const kurang = kekuranganPendataanBaru(usulan);
   if (kurang.length > 0) return { hasil: "belum", alasan: "belum_lengkap", kurang };
 
   // Sudah tertaut: pegawainya diperbarui di tempat selama datanya belum ditinjau. Tautan yang menggantung (pegawainya sudah
@@ -44,7 +45,7 @@ export async function terdatakanPegawaiBaru(usulan: UsulanPegawaiRow, sekarang: 
     if (ada) {
       const susun = susunPegawaiBaru(usulan, ada.id, sekarang);
       if (!susun.ok) return { hasil: "belum", alasan: "tidak_dapat_disusun", kurang: [susun.pesan] };
-      await db.pegawai.update({ id: ada.id }, isiPembaruanPegawaiBaru(susun.pegawai));
+      await db.pegawai.update({ id: ada.id }, isiPembaruanPegawaiBaru(susun.pegawai, { jagaJadwal: await jadwalDigeserHukdis(ada.id) }));
       return { hasil: "diperbarui", pegawaiId: ada.id };
     }
   }
@@ -84,4 +85,13 @@ export function usulanBaruBelumDitinjau<T extends Pick<UsulanPegawaiRow, "jenis"
 export async function idPegawaiBelumDitinjau(): Promise<Set<string>> {
   const baris = await db.usulanPegawai.findKolom(["pegawaiId"], { where: { jenis: "baru", status: { in: [...BELUM_SELESAI] } } });
   return new Set(baris.map((b) => b.pegawaiId).filter((id): id is string => !!id));
+}
+
+/**
+ * Jadwal KGB pegawai ini sudah digeser hukuman disiplin yang menunda KGB (dicatat Kanwil sesudah pegawainya terdata,
+ * ADR-113). Simpan ulang draf dan persetujuan tidak boleh menimpa jadwal itu dengan hitungan dari isian draf.
+ */
+export async function jadwalDigeserHukdis(pegawaiId: string): Promise<boolean> {
+  const hukdis = (await db.riwayatHukdis.findMany({ where: { pegawaiId } })) as { berdampakKGB: boolean | null }[];
+  return hukdis.some((h) => !!h.berdampakKGB);
 }

@@ -61,6 +61,8 @@ interface Pratinjau {
 interface HasilSimpan {
   disimpan: number;
   baru: number;
+  /** Pegawai baru yang langsung terdata karena data utamanya terisi (ADR-113). */
+  terdata?: number;
   perubahan: number;
   sama: number;
   ditolak: number;
@@ -75,7 +77,7 @@ const KELOMPOK: { k: HasilImpor; label: string; nada: string; ket: string }[] = 
     k: "baru",
     label: "Pegawai baru",
     nada: "hijau",
-    ket: "NIP belum tercatat. Disimpan sebagai draf pegawai baru; terdata di SIM-KGB begitu drafnya lengkap.",
+    ket: "NIP belum tercatat. Disimpan sebagai draf pegawai baru; terdata di SIM-KGB begitu data utamanya terisi.",
   },
   {
     k: "perubahan",
@@ -705,6 +707,7 @@ export default function UnggahDaftar() {
                 <p>
                   {hasilSimpan.baru} draf pegawai baru dan {hasilSimpan.perubahan} draf usulan perbaikan dari{" "}
                   {namaBerkas}. Belum ada yang terkirim ke Kanwil.
+                  {hasilSimpan.terdata ? ` ${hasilSimpan.terdata} pegawai baru langsung terdata di SIM-KGB karena data utamanya terisi.` : ""}
                 </p>
               </div>
             </div>

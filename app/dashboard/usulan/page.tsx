@@ -431,7 +431,7 @@ export default function UsulanPage() {
           <h1 className="dsb-halaman-judul">Usulan UPT</h1>
           <p className="dsb-sub">
             Perubahan data dari UPT baru masuk ke data induk setelah disetujui di sini. Pegawai baru sudah terdata sejak
-            drafnya lengkap, dan datanya ditinjau di sini. Selama menunggu, proses KGB pegawainya tertahan.
+            data utama drafnya terisi, dan datanya ditinjau di sini. Selama menunggu, proses KGB pegawainya tertahan.
           </p>
         </div>
         <button type="button" className="dsb-ikon-tombol" onClick={() => void muat()} title="Muat ulang" aria-label="Muat ulang usulan">
