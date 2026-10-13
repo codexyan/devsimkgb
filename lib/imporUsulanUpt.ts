@@ -720,7 +720,7 @@ export function periksaImporUpt(
 
     const tercatat = konteks.pegawaiSatker.get(nip) ?? null;
     if (tercatat && konteks.pegawaiIdUsulan.has(tercatat.id))
-      return tolak("Pegawai ini sedang punya usulan yang belum selesai di Kanwil");
+      return tolak("Pegawai ini sedang punya usulan yang belum selesai (draf, dikembalikan, atau menunggu Kanwil)");
     if (!tercatat && konteks.nipUsulan.has(nip))
       return tolak("NIP ini sudah ada pada usulan pegawai baru yang belum selesai");
 

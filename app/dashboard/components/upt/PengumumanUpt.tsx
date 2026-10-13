@@ -43,7 +43,7 @@ const ADEGAN: readonly { pengumuman: IdPengumumanUpt; gambar: Gambar; judul: str
     pengumuman: "nama-menu-2026-10",
     gambar: "tabel",
     judul: "Pegawai baru hasil unggahan terlihat di tabel",
-    teks: "Pegawai yang masih draf, dikembalikan, atau menunggu Kanwil tampil di Pegawai Satker sebagai baris bertanda, dengan saringan Belum tercatat. Barisnya berpindah sendiri setelah Kanwil menyetujui.",
+    teks: "Pegawai yang masih draf belum lengkap, dikembalikan, atau menunggu Kanwil tampil di Pegawai Satker sebagai baris bertanda, dengan saringan Belum tercatat. Begitu draf lengkap, pegawainya terdata sebagai baris pegawai biasa; usulan KGB-nya tetap ditinjau Kanwil.",
   },
   {
     pengumuman: "nama-menu-2026-10",

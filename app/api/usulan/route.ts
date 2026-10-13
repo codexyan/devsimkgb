@@ -109,8 +109,11 @@ export async function GET(req: Request) {
       // Baris lengkap hanya untuk usulan yang menunggu; nama dan NIP untuk semuanya.
       const p = u.pegawaiId ? pegawaiById.get(u.pegawaiId) : null;
       const n = u.pegawaiId ? namaById.get(u.pegawaiId) : null;
+      // Usulan pegawai baru, termasuk yang pegawainya sudah terdata langsung (ADR-112), tidak dibandingkan dengan data induk:
+      // datanya ditinjau penuh, sebagaimana hasil ketikan UPT.
+      const dibandingkan = !!p && u.status === "menunggu" && u.jenis !== "baru";
       const tercatat =
-        p && u.status === "menunggu"
+        p && dibandingkan
           ? cariSkTercatat(u, { pangkat: pangkatPerPegawai.get(p.id), pmk: pmkPerPegawai.get(p.id) })
           : null;
       const sk = u.jenis === "baru" || u.status === "menunggu" ? periksaSkDilaporkan(u, p, tercatat) : null;
@@ -132,8 +135,8 @@ export async function GET(req: Request) {
         // Usulan pegawai baru belum punya pembanding, jadi selalu menampilkan nilai yang diusulkan.
         // Kolom dasar gaji pada laporan SK kenaikan pangkat atau PMK ditampilkan menurut hitungan SK-nya,
         // yang sama dengan yang diterapkan saat disetujui, bukan angka mentah usulan (ADR-052).
-        perubahan: u.status === "menunggu" && p ? bandingkanUsulan(p, usulanMenurutSk(p, u, perubahanPegawai(u), tercatat)) : [],
-        nilaiDiusulkan: u.status === "menunggu" && p ? [] : nilaiUsulan(u.jenis === "baru" ? usulanBaruMenurutSk(u) : u),
+        perubahan: dibandingkan && p ? bandingkanUsulan(p, usulanMenurutSk(p, u, perubahanPegawai(u), tercatat)) : [],
+        nilaiDiusulkan: dibandingkan ? [] : nilaiUsulan(u.jenis === "baru" ? usulanBaruMenurutSk(u) : u),
         hukdis: ringkasHukdisUsulan(u),
         // SK kenaikan pangkat atau PMK yang disebut UPT sebagai sebab perubahan dasar gaji (ADR-030).
         dasarBaru: ringkasDasarBaru(u),

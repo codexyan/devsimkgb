@@ -95,8 +95,8 @@ export async function POST(
     if (basi) return NextResponse.json({ error: basi }, { status: 409 });
   }
   // SK tidak dibuat selama usulan UPT pegawai ini belum ditinjau; pratinjau tetap boleh (ADR-014).
-  if (!isPreview && (await usulanMenahan(pegawai.id)))
-    return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama) }, { status: 409 });
+  const menahan = isPreview ? null : await usulanMenahan(pegawai.id);
+  if (menahan) return NextResponse.json({ error: pesanUsulanMenahan(pegawai.nama, menahan) }, { status: 409 });
 
   // Keadaan pegawai diperiksa ulang di sini, bukan hanya saat Input KGB: jarak input ke TMT sekitar dua
   // bulan, dan hukuman disiplin yang terbit di sela itu membuat SK ini tidak boleh terbit.

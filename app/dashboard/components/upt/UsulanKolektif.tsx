@@ -143,7 +143,10 @@ const KOLOM_TABEL = [
   "golonganRuang", "mkgTahun", "mkgBulan", "tmtKgbTerakhir", "nomorSkTerakhir", "tanggalSkTerakhir", "penetapSkTerakhir",
 ] as const;
 
-function barisDari(p: PegawaiUpt | null, d: DrafUpt | null): Baris {
+function barisDari(pegawaiAsal: PegawaiUpt | null, d: DrafUpt | null): Baris {
+  // Draf pegawai baru yang pegawainya sudah terdata dari draf itu (ADR-112) tetap diperlakukan sebagai pegawai baru: baris
+  // pegawainya bukan data tercatat, dan belum punya SK dasar, berkas bawaan, atau KGB yang sedang berjalan.
+  const p = d?.jenis === "baru" ? null : pegawaiAsal;
   const dataTercatat = d?.jenis === "baru" ? null : (p?.dataSekarang ?? null);
   // Keadaan pada SK acuan di tabel, golongan dan masa kerja menurut SK yang dilaporkan di bagian SK (ADR-078).
   const terpisah = pisahkanIsianSk({ nilai: d?.nilai ?? p?.dataSekarang ?? {}, jenisSk: d?.dasarBaru?.jenis, acuan: d?.acuan, tercatat: dataTercatat });
@@ -161,12 +164,12 @@ function barisDari(p: PegawaiUpt | null, d: DrafUpt | null): Baris {
       (skDraf ? skDraf.penetapSkTerakhir : p?.bawaan?.penetapSkTerakhir) || penetapSesudahNomor("", "", nomorSk),
   };
   return {
-    kunci: d ? `draf:${d.id}` : `pegawai:${p!.id}`,
-    pegawaiId: p?.id ?? d?.pegawaiId ?? null,
+    kunci: d ? `draf:${d.id}` : `pegawai:${pegawaiAsal!.id}`,
+    pegawaiId: pegawaiAsal?.id ?? d?.pegawaiId ?? null,
     drafId: d?.id ?? null,
     jenis: d?.jenis === "baru" ? "baru" : "perubahan",
-    nama: p?.nama ?? d?.nama ?? "-",
-    nip: p?.nip ?? d?.nip ?? "-",
+    nama: d?.jenis === "baru" ? (d.nama ?? pegawaiAsal?.nama ?? "-") : (p?.nama ?? d?.nama ?? "-"),
+    nip: d?.jenis === "baru" ? (d.nip ?? pegawaiAsal?.nip ?? "-") : (p?.nip ?? d?.nip ?? "-"),
     awal,
     isian: { ...awal },
     // Pilihan yang tersimpan, atau tebakan dari riwayat dan masa kerja golongan (ADR-080).
@@ -445,7 +448,14 @@ export default function UsulanKolektif() {
     () => new Map(draf.filter((d) => d.pegawaiId && (d.status === "draf" || d.status === "revisi")).map((d) => [d.pegawaiId as string, d])),
     [draf],
   );
-  const drafBaru = draf.filter((d) => d.jenis === "baru" && (d.status === "draf" || d.status === "revisi"));
+  // Draf pegawai baru yang pegawainya sudah ada di daftar pegawai (ADR-112) dipilih lewat baris pegawainya, supaya orang yang
+  // sama tidak tampil dan terhitung dua kali.
+  const drafBaru = draf.filter(
+    (d) =>
+      d.jenis === "baru" &&
+      (d.status === "draf" || d.status === "revisi") &&
+      !(d.pegawaiId && pegawai.some((p) => p.id === d.pegawaiId)),
+  );
   const dapatDipilih = (p: PegawaiUpt) => p.usulanBerjalan !== "menunggu";
 
   const q = cari.trim().toLowerCase();

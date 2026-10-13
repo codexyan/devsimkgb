@@ -470,14 +470,17 @@ export default function FormulirUsulan({
       const res = draf
         ? await fetch(`/api/upt/usulan/${draf.id}`, { method: "PATCH", body: form })
         : await fetch("/api/upt/usulan", { method: "POST", body: form });
-      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      const d = (await res.json().catch(() => ({}))) as { error?: string; terdata?: boolean };
       if (!res.ok) {
         setGalat(d.error ?? "Data gagal disimpan");
         return;
       }
       const nama = isian.nama || pegawai?.nama || "pegawai";
       onSelesai(
-        dikembalikan
+        // Draf pegawai baru yang lengkap langsung terdata tanpa menunggu Kanwil (ADR-112).
+        jenis === "baru" && d.terdata && !dikembalikan
+          ? `Data ${nama} tersimpan dan pegawainya sudah terdata di SIM-KGB. Ajukan ke Kanwil dengan surat usulan saat KGB-nya akan diusulkan; proses KGB-nya menunggu usulan itu disetujui.`
+          : dikembalikan
           ? `Perbaikan data ${nama} tersimpan. Kirim ulang lewat Ajukan ke Kanwil di daftar Perlu dikerjakan.`
           : draf
             ? `Draf data ${nama} diperbarui. Ajukan ke Kanwil bila sudah lengkap.`
@@ -554,7 +557,7 @@ export default function FormulirUsulan({
       {langkah === 1 && (
       <Catatan>
         {jenis === "baru"
-          ? "Data disimpan dulu sebagai draf usulan milik satker: belum dikirim ke Kanwil dan belum tercatat di SIM-KGB. Setelah semua pegawai yang akan diusulkan lengkap, ajukan sekaligus dengan satu surat usulan; pegawai ini tercatat di SIM-KGB setelah Kanwil menyetujuinya. Selama itu ia tampil di Pegawai Satker sebagai baris bertanda."
+          ? "Data disimpan sebagai draf usulan milik satker. Begitu semua isian wajib lengkap, pegawai ini langsung terdata di SIM-KGB dan tampil di Pegawai Satker, tanpa surat dan tanpa menunggu Kanwil. Surat usulan dan tinjauan Kanwil baru diperlukan saat KGB-nya diusulkan: ajukan drafnya bersama pegawai lain dalam satu surat. Proses KGB pegawai ini ditahan sampai usulannya disetujui. Selama belum lengkap, ia tampil sebagai baris bertanda."
           : "Isian sudah diisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; yang dikosongkan berarti tidak diusulkan berubah. Yang disimpan di sini draf usulan: data pegawai di SIM-KGB baru berubah setelah usulannya diajukan dan disetujui Kanwil."}
       </Catatan>
       )}

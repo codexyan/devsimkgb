@@ -87,6 +87,8 @@ interface PegawaiJatuhTempo {
   terlambat: boolean;
   isLocked: boolean;
   statusKGB: string | null;
+  /** Didata UPT, tetapi usulan pegawai barunya belum disetujui: proses KGB tertahan (ADR-112). */
+  dataBelumDitinjau?: boolean;
   kgbId: string | null;
   nomorSK: string | null;
   penetapSkDasar: string | null;
@@ -284,7 +286,8 @@ function DashboardMain() {
   // Seluruh usulan UPT yang menunggu tinjauan, termasuk pegawai baru yang belum punya pegawaiId.
   const [usulanMenunggu, setUsulanMenunggu] = useState<UsulanMenunggu[]>([]);
   // Usulan data UPT yang menunggu tinjauan, per pegawai: tampil langsung di papan dan daftar (ADR-011).
-  // Hanya usulan perbaikan yang masuk sini, sebab hanya itu yang menahan proses KGB pegawai tertentu.
+  // Yang masuk sini usulan perbaikan dan usulan pegawai baru yang pegawainya sudah terdata (ADR-112), sebab hanya itu yang
+  // menahan proses KGB pegawai tertentu. Yang belum diajukan atau dikembalikan UPT tidak ada di sini; penandanya dataBelumDitinjau.
   const [usulanPerPegawai, setUsulanPerPegawai] = useState<Map<string, UsulanMenunggu>>(() => new Map());
   const [usulanDibuka, setUsulanDibuka] = useState<UsulanMenunggu | null>(null);
   const [pesanBerhasil, setPesanBerhasil] = useState<string | null>(null);
@@ -642,8 +645,8 @@ function DashboardMain() {
    * Proses KGB tertahan selama usulan UPT pegawai ini menunggu tinjauan dan SK TTE-nya belum diunggah
    * (ADR-014); server menolak langkahnya dengan aturan yang sama (lib/usulanMenahan.ts).
    */
-  function tertahanUsulan(p: { id: string }, pos: PosisiAntrian): boolean {
-    return usulanPerPegawai.has(p.id) && pos !== "keuangan" && pos !== "rekam_upt" && pos !== "selesai";
+  function tertahanUsulan(p: { id: string; dataBelumDitinjau?: boolean }, pos: PosisiAntrian): boolean {
+    return (usulanPerPegawai.has(p.id) || !!p.dataBelumDitinjau) && pos !== "keuangan" && pos !== "rekam_upt" && pos !== "selesai";
   }
 
   /** Tombol tinjauan usulan UPT; tombol utama bila prosesnya sedang tertahan. */
@@ -825,7 +828,8 @@ function DashboardMain() {
     // Kartu yang lewat batas sudah menyebutnya di baris TMT; penanda rapelan hanya untuk yang sudah berjalan.
     if (p.flagRapelan && pos !== "selesai" && pos !== "lewat") tanda.push({ teks: "Berpotensi rapelan", nada: "kuning" });
     if (p.statusHukdis) tanda.push({ teks: `Hukdis${p.tanggalHukdisBerakhir ? ` s.d. ${formatTanggalId(p.tanggalHukdisBerakhir, { day: "numeric", month: "short" })}` : ""}`, nada: "merah" });
-    if (tertahan) tanda.push({ teks: "Tertahan usulan UPT", nada: "ungu" });
+    // Usulan yang menunggu bisa ditinjau dari kartu; yang belum diajukan atau dikembalikan UPT hanya ditandai (ADR-112).
+    if (tertahan) tanda.push({ teks: usulanPerPegawai.has(p.id) ? "Tertahan usulan UPT" : "Data belum ditinjau", nada: "ungu" });
     const [catatan, catatanNada]: [string | undefined, Nada | undefined] =
       pos === "terkunci" ? [buka ? `dibuka ${formatTanggalId(buka, { day: "numeric", month: "short" })}` : "belum dibuka", undefined]
       : pos === "keuangan" || pos === "rekam_upt" || pos === "selesai" ? [undefined, undefined]

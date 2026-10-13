@@ -169,7 +169,11 @@ export default function UsulanPage() {
       if (!res.ok) { setGalat(d.error ?? "Tinjauan gagal disimpan"); return; }
       beriKabar(
         aksi === "setujui"
-          ? `Usulan ${u.nama} disetujui, ${d.jumlahPerubahan ?? 0} kolom diperbarui.${d.penyesuaianKgb ? ` KGB: ${d.penyesuaianKgb}.` : ""}${d.perluCatatHukdis ? " Laporan hukuman disiplinnya masih perlu dicatat di modul Hukuman Disiplin." : ""}`
+          ? u.jenis === "baru"
+            ? u.pegawaiId
+              ? `Usulan ${u.nama} disetujui. Datanya sudah ditinjau dan proses KGB-nya dibuka.${d.penyesuaianKgb ? ` KGB: ${d.penyesuaianKgb}.` : ""}`
+              : `Usulan ${u.nama} disetujui, pegawai ditambahkan ke data induk.${d.penyesuaianKgb ? ` KGB: ${d.penyesuaianKgb}.` : ""}`
+            : `Usulan ${u.nama} disetujui, ${d.jumlahPerubahan ?? 0} kolom diperbarui.${d.penyesuaianKgb ? ` KGB: ${d.penyesuaianKgb}.` : ""}${d.perluCatatHukdis ? " Laporan hukuman disiplinnya masih perlu dicatat di modul Hukuman Disiplin." : ""}`
           : sudahDisetujui
             ? `Usulan ${u.nama} yang sudah disetujui dikembalikan ke ${ringkas(u.unitKerja)}. Data pegawai tidak berubah; UPT menerima usulan perbaikan beserta catatan Anda.`
             : `Usulan ${u.nama} dikembalikan ke ${ringkas(u.unitKerja)} dengan catatan perbaikan.`,
@@ -426,8 +430,8 @@ export default function UsulanPage() {
           <p className="dsb-label">Data</p>
           <h1 className="dsb-halaman-judul">Usulan UPT</h1>
           <p className="dsb-sub">
-            Perubahan data dari UPT baru masuk ke data induk setelah disetujui di sini. Selama menunggu, proses KGB
-            pegawainya tertahan.
+            Perubahan data dari UPT baru masuk ke data induk setelah disetujui di sini. Pegawai baru sudah terdata sejak
+            drafnya lengkap, dan datanya ditinjau di sini. Selama menunggu, proses KGB pegawainya tertahan.
           </p>
         </div>
         <button type="button" className="dsb-ikon-tombol" onClick={() => void muat()} title="Muat ulang" aria-label="Muat ulang usulan">
@@ -925,8 +929,9 @@ export default function UsulanPage() {
             </Catatan>
           ) : (
             <Catatan>
-              Usulan ini kembali ke daftar kerja UPT dengan isian dan berkas yang utuh. Proses KGB pegawainya dapat
-              dilanjutkan dengan data yang ada; bila UPT mengirim ulang, prosesnya tertahan lagi sampai ditinjau.
+              {dialogKembali.jenis === "baru" && dialogKembali.pegawaiId
+                ? "Usulan ini kembali ke daftar kerja UPT dengan isian dan berkas yang utuh. Pegawainya tetap terdata, tetapi proses KGB-nya tetap tertahan sampai UPT mengirim ulang dan usulannya Anda setujui."
+                : "Usulan ini kembali ke daftar kerja UPT dengan isian dan berkas yang utuh. Proses KGB pegawainya dapat dilanjutkan dengan data yang ada; bila UPT mengirim ulang, prosesnya tertahan lagi sampai ditinjau."}
             </Catatan>
           )}
         </KerangkaModal>

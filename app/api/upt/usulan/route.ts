@@ -9,6 +9,7 @@ import { notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
 import { pegawaiSatker } from "@/lib/aksesUpt";
 import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, hitungUsulan, kekuranganUsulan, pernahKgbUsulan, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
 import { nipTidakCocokDenganIsian } from "@/lib/nipPns";
+import { terdatakanPegawaiBaru } from "@/lib/terdatakanPegawaiBaru";
 import type { NilaiTanggal } from "@/lib/waktu";
 import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan } from "@/lib/bawaanUsulan";
 import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, bacaKeadaanKgb, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
@@ -99,8 +100,10 @@ export async function GET(req: Request) {
          * sama dengan rute lain yang tidak membuka data satker lain kepada UPT.
          */
         nipTercatat: !keadaanNip || !tercatat ? null : keadaanNip === "satker_sama" ? { nama: tercatat.nama, satkerSama: true } : { satkerSama: false },
-        nama: p?.nama ?? u.nama ?? "-",
-        nip: p?.nip ?? u.nip ?? "-",
+        // Usulan pegawai baru menampilkan isiannya sendiri, juga bila pegawainya sudah terdata dari draf itu (ADR-112): sunting
+        // yang belum lengkap belum memperbarui baris pegawainya.
+        nama: u.jenis === "baru" ? (u.nama ?? p?.nama ?? "-") : (p?.nama ?? u.nama ?? "-"),
+        nip: u.jenis === "baru" ? (u.nip ?? p?.nip ?? "-") : (p?.nip ?? u.nip ?? "-"),
         status: u.status,
         nomorSurat: u.nomorSurat,
         tanggalSurat: u.tanggalSurat ? new Date(u.tanggalSurat).toISOString() : null,
@@ -117,7 +120,7 @@ export async function GET(req: Request) {
           ? []
           : keadaanNip === "satker_lain"
             ? [pesanSatkerLainUpt(u.nip ?? "")]
-            : kekuranganUsulan(lengkapiBawaan, u.jenis, p),
+            : kekuranganUsulan(lengkapiBawaan, u.jenis, u.jenis === "baru" ? null : p),
         // Isi dikirim utuh agar formulirnya dapat dilanjutkan, baik draf maupun usulan yang
         // dikembalikan Kanwil; usulan yang sedang ditinjau atau sudah selesai tidak perlu.
         nilai: DIPEGANG_UPT.includes(u.status) ? nilaiFormulir(u) : null,
@@ -172,6 +175,29 @@ export async function GET(req: Request) {
     .sort((a, b) => (b.diajukanAt ?? "").localeCompare(a.diajukanAt ?? ""));
 
   return NextResponse.json(daftar);
+}
+
+/**
+ * Buat atau perbarui baris pegawai dari draf pegawai baru yang lengkap (ADR-112). true bila pegawainya terdata. Kegagalan
+ * hanya dicatat: drafnya tetap tersimpan dan pegawainya dibuat lagi saat diajukan.
+ */
+async function terdatakanDariDraf(usulanId: string, userId: string, nama: string, nip: string, namaSatker: string): Promise<boolean> {
+  try {
+    const tersimpan = (await db.usulanPegawai.findUnique({ id: usulanId })) as UsulanPegawaiRow | null;
+    if (!tersimpan) return false;
+    const hasil = await terdatakanPegawaiBaru(tersimpan);
+    if (hasil.hasil === "dibuat")
+      logAudit({
+        userId,
+        aksi: "terdata_pegawai_baru",
+        detail: `Pegawai baru ${nama} (${nip}) langsung terdata dari draf ${namaSatker}; datanya belum ditinjau Kanwil`,
+        targetNama: nama,
+      });
+    return hasil.hasil === "dibuat" || hasil.hasil === "diperbarui";
+  } catch (e) {
+    console.error("[terdatakanPegawaiBaru] gagal:", e);
+    return false;
+  }
 }
 
 /**
@@ -235,14 +261,23 @@ export async function POST(req: Request) {
       jenisKelamin: (dibaca.isian.jenisKelamin as string | null | undefined) ?? null,
     });
     if (nipTidakCocok) return NextResponse.json({ error: nipTidakCocok }, { status: 400 });
-    const bentrokPegawai = await db.pegawai.findUnique({ nip: nipBaru });
-    if (bentrokPegawai)
-      return NextResponse.json({ error: `NIP ${nipBaru} sudah tercatat atas nama ${bentrokPegawai.nama}` }, { status: 409 });
+    // Draf yang masih berjalan dicek lebih dulu: pegawai yang dibuat dari draf itu sendiri (ADR-112) juga bernama NIP ini, dan
+    // petunjuknya adalah melanjutkan drafnya, bukan "sudah tercatat".
     const sudahAda = (await db.usulanPegawai.findMany({
       where: { nip: nipBaru, status: { in: BELUM_SELESAI } },
     })) as UsulanPegawaiRow[];
     if (sudahAda.length > 0)
       return NextResponse.json({ error: pesanMasihBerjalan(sudahAda[0].status, `NIP ${nipBaru}`) }, { status: 409 });
+    const bentrokPegawai = await db.pegawai.findUnique({ nip: nipBaru });
+    if (bentrokPegawai)
+      return NextResponse.json(
+        {
+          error:
+            `NIP ${nipBaru} sudah tercatat atas nama ${bentrokPegawai.nama}` +
+            (bentrokPegawai.aktif === false ? " dan berstatus nonaktif; minta Kanwil mengaktifkannya kembali di Data Pegawai" : ""),
+        },
+        { status: 409 },
+      );
     namaUntukCatatan = String(dibaca.isian.nama ?? nipBaru);
     nipUntukCatatan = nipBaru;
   } else {
@@ -370,6 +405,10 @@ export async function POST(req: Request) {
 
   await tulisDenganAcuan(baris, (isi) => db.usulanPegawai.create(isi));
 
+  // Pegawai baru langsung terdata begitu drafnya lengkap, tanpa surat dan tanpa tinjauan (ADR-112). Kegagalannya tidak boleh
+  // membatalkan draf yang sudah tersimpan: pegawainya dibuat lagi saat diajukan, paling lambat saat disetujui.
+  const terdata = jenis === "baru" ? await terdatakanDariDraf(baris.id, pengguna.id, namaUntukCatatan, nipUntukCatatan, satker.nama) : false;
+
   if (!draf) {
     // Notifikasi dibuat di sini, bukan menunggu pemeriksaan berkala, supaya Tim SDM Kanwil melihat usulan
     // pada saat UPT mengirimnya. Kegagalannya tidak boleh membatalkan usulan yang sudah tersimpan:
@@ -397,5 +436,5 @@ export async function POST(req: Request) {
     targetNama: namaUntukCatatan,
   });
 
-  return NextResponse.json({ ok: true, id: baris.id, jenis, status: baris.status }, { status: 201 });
+  return NextResponse.json({ ok: true, id: baris.id, jenis, status: baris.status, terdata }, { status: 201 });
 }

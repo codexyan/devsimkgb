@@ -96,6 +96,8 @@ interface PegawaiUpt {
   perluDiperiksa: boolean;
   /** "draf", "menunggu", atau "revisi" bila ada usulan berjalan. */
   usulanBerjalan?: string | null;
+  /** Pegawai ini didata dari draf pegawai baru dan datanya belum disetujui Kanwil; proses KGB-nya tertahan (ADR-112). */
+  dataBelumDitinjau?: boolean;
   /** SK yang menjadi dasar KGB berikutnya (ADR-030); null bila belum ada SK yang tercatat. */
   dasarKgb?: DasarKgbBerikutnya | null;
   /** SK dasar pada usulan UPT yang belum selesai; menjadi dasar setelah disetujui Kanwil (ADR-057). */
@@ -118,7 +120,16 @@ const dipegangUpt = (status: string) => status === "draf" || status === "revisi"
  * akibatnya berbeda di mata UPT: draf belum pernah dilihat siapa pun, usulan terkirim sedang ditunggu
  * Kanwil, dan yang dikembalikan justru sedang ditunggu perbaikannya.
  */
-function salinanHapusUsulan(status: string) {
+function salinanHapusUsulan(status: string, pegawaiTerdata = false) {
+  // Draf pegawai baru yang sudah terdata (ADR-112): menghapusnya juga menonaktifkan pegawainya, dan Kanwil sudah dapat
+  // melihat pegawai itu di Data Pegawai.
+  if (pegawaiTerdata && status !== "menunggu")
+    return {
+      judul: status === "revisi" ? "Hapus usulan yang dikembalikan" : "Hapus data yang disiapkan",
+      tombol: status === "revisi" ? "Hapus usulan" : "Hapus data",
+      peringatan:
+        "Pegawai ini sudah terdata di SIM-KGB. Menghapusnya menghapus draf beserta berkas yang diunggah, dan pegawainya dinonaktifkan: ia hilang dari Pegawai Satker. Kanwil dapat mengaktifkannya kembali bila terhapus karena keliru.",
+    };
   if (status === "draf")
     return {
       judul: "Hapus data yang disiapkan",
@@ -250,6 +261,12 @@ function keadaan(p: PegawaiUpt): { teks: string; nada?: Nada } {
     return { teks: "Sedang diproses Kanwil", nada: "navy" };
   }
   if (p.terkunci) return { teks: "Belum masuk jadwal" };
+  // Pegawai yang didata UPT belum dapat diproses Kanwil sampai usulan pegawai barunya disetujui (ADR-112).
+  if (p.dataBelumDitinjau) {
+    if (p.usulanBerjalan === "revisi") return { teks: "Dikembalikan Kanwil, perbaiki", nada: "merah" };
+    if (p.usulanBerjalan === "draf") return { teks: "Data baru, belum diajukan ke Kanwil", nada: "kuning" };
+    return { teks: "Data baru ditinjau Kanwil", nada: "navy" };
+  }
   if (p.terlambat) return { teks: "Lewat batas input Kanwil", nada: "merah" };
   return { teks: "Menunggu diproses Kanwil", nada: "kuning" };
 }
@@ -555,10 +572,16 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   }
 
   function bukaUsulan(p: PegawaiUpt) {
+    const d = drafPegawai(p.id);
+    // Pegawai yang didata dari draf pegawai baru (ADR-112) membuka formulir pegawai barunya, bukan formulir perbaikan.
+    if (d?.jenis === "baru") {
+      setFormulir({ jenis: "baru", pegawai: null, draf: d });
+      return;
+    }
     setFormulir({
       jenis: "perubahan",
       pegawai: { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan, dasarKgb: p.dasarKgb },
-      draf: drafPegawai(p.id),
+      draf: d,
     });
   }
 
@@ -567,7 +590,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   }
 
   function lanjutkanDraf(u: UsulanTerkirim) {
-    const p = (data?.pegawai ?? []).find((x) => x.id === u.pegawaiId) ?? null;
+    // Draf pegawai baru tidak memakai baris pegawainya sebagai dasar, juga yang sudah terdata dari draf itu (ADR-112).
+    const p = u.jenis === "baru" ? null : ((data?.pegawai ?? []).find((x) => x.id === u.pegawaiId) ?? null);
     setFormulir({
       jenis: u.jenis === "baru" ? "baru" : "perubahan",
       pegawai: p ? { id: p.id, nama: p.nama, nip: p.nip, dataSekarang: p.dataSekarang, bawaan: p.bawaan, dasarKgb: p.dasarKgb } : null,
@@ -662,13 +686,17 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     setMembatalkan(true);
     try {
       const res = await fetch(`/api/upt/usulan/${dialogBatal.id}`, { method: "DELETE" });
-      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      const d = (await res.json().catch(() => ({}))) as { error?: string; pegawaiDinonaktifkan?: boolean };
       if (!res.ok) {
         setGalat(d.error ?? "Usulan gagal dibatalkan");
         return;
       }
+      // Pegawai yang didata dari draf ini ikut dinonaktifkan (ADR-112); tabel dimuat ulang supaya barisnya hilang.
+      if (d.pegawaiDinonaktifkan) muat();
       setKabar(
-        dialogBatal.status === "draf"
+        d.pegawaiDinonaktifkan
+          ? `Data ${dialogBatal.nama} yang disiapkan sudah dihapus dan pegawainya dinonaktifkan. Kanwil dapat mengaktifkannya kembali.`
+          : dialogBatal.status === "draf"
           ? `Data ${dialogBatal.nama} yang disiapkan sudah dihapus.`
           : dialogBatal.status === "revisi"
             ? `Usulan ${dialogBatal.nama} yang dikembalikan Kanwil sudah dihapus.`
@@ -785,16 +813,23 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
   const q = cari.trim().toLowerCase();
   /**
    * Pegawai baru yang belum tercatat di SIM-KGB tampil di tabel sebagai baris bertanda, supaya tabel memuat semua orang
-   * satker, termasuk hasil Unggah daftar. Barisnya hilang sendiri setelah Kanwil menyetujui dan pegawainya tercatat
-   * (ADR-072). Yang dikembalikan Kanwil didahulukan, lalu draf, lalu yang menunggu tinjauan.
+   * satker, termasuk hasil Unggah daftar. Draf yang lengkap langsung terdata dan tampil sebagai baris pegawainya sendiri
+   * (ADR-112), jadi barisnya di sini hilang begitu pegawainya ada di tabel. Yang dikembalikan Kanwil didahulukan, lalu
+   * draf, lalu yang menunggu tinjauan.
    */
   const barisBaru = useMemo(() => {
     const urut: Record<string, number> = { revisi: 0, draf: 1, menunggu: 2 };
     return usulan
       // Yang NIP-nya sudah tercatat di satker ini sudah punya baris pegawainya sendiri (ADR-091).
-      .filter((u) => u.jenis === "baru" && u.status in urut && !u.nipTercatat?.satkerSama)
+      .filter(
+        (u) =>
+          u.jenis === "baru" &&
+          u.status in urut &&
+          !u.nipTercatat?.satkerSama &&
+          !(u.pegawaiId && pegawai.some((p) => p.id === u.pegawaiId)),
+      )
       .sort((a, b) => urut[a.status] - urut[b.status] || a.nama.localeCompare(b.nama, "id"));
-  }, [usulan]);
+  }, [usulan, pegawai]);
   // Saringan Belum tercatat hilang bersama barisnya; tanpa ini tabel kosong tanpa tombol untuk kembali.
   const saringAktif: Saring = saring === "baru" && barisBaru.length === 0 ? "semua" : saring;
   const tampil = useMemo(
@@ -1638,8 +1673,8 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             <h1 className="dsb-halaman-judul">{data ? namaTampilSatker(data.satker) : "Satker Anda"}</h1>
             <p className="dsb-sub">
               Status KGB setiap pegawai di Kanwil. Dari sini pegawai baru ditambahkan, daftar pegawai diunggah
-              sekaligus, perbaikan data diusulkan, dan mutasi atau pemberhentian dilaporkan. Pegawai baru yang belum
-              disetujui Kanwil tampil sebagai baris bertanda; memilih dan mengajukannya lewat Usul KGB Kolektif.
+              sekaligus, perbaikan data diusulkan, dan mutasi atau pemberhentian dilaporkan. Pegawai baru terdata begitu
+              drafnya lengkap; yang belum lengkap tampil sebagai baris bertanda. KGB-nya diusulkan lewat Usul KGB Kolektif.
             </p>
           </div>
           <button
@@ -1970,7 +2005,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
 
       {dialogBatal && (
         <KerangkaModal
-          judul={salinanHapusUsulan(dialogBatal.status).judul}
+          judul={salinanHapusUsulan(dialogBatal.status, !!dialogBatal.pegawaiId && dialogBatal.jenis === "baru").judul}
           subjudul={
             dialogBatal.status === "draf"
               ? `${dialogBatal.nama} · belum diajukan ke Kanwil`
@@ -1987,12 +2022,12 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
                 Tidak jadi
               </button>
               <button type="submit" className="kgbm-tombol kgbm-utama" disabled={membatalkan}>
-                {membatalkan ? "Menghapus…" : salinanHapusUsulan(dialogBatal.status).tombol}
+                {membatalkan ? "Menghapus…" : salinanHapusUsulan(dialogBatal.status, !!dialogBatal.pegawaiId && dialogBatal.jenis === "baru").tombol}
               </button>
             </>
           }
         >
-          <Catatan nada="amber">{salinanHapusUsulan(dialogBatal.status).peringatan}</Catatan>
+          <Catatan nada="amber">{salinanHapusUsulan(dialogBatal.status, !!dialogBatal.pegawaiId && dialogBatal.jenis === "baru").peringatan}</Catatan>
         </KerangkaModal>
       )}
 

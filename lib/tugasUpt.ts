@@ -157,7 +157,13 @@ export function daftarTugasUpt(
       continue;
     }
     if (u.status !== "draf") continue;
-    const terkunci = drafTerkunci(u, u.pegawaiId ? bulanPegawai.get(u.pegawaiId) : u.bulanTmt, bulanUsulan);
+    // Draf pegawai baru memakai bulan TMT dari isiannya sendiri, juga bila pegawainya sudah terdata dari draf itu (ADR-112):
+    // baris pegawai yang belum lengkap diperbarui tidak ikut menentukan kunci.
+    const terkunci = drafTerkunci(
+      u,
+      u.jenis === "baru" ? u.bulanTmt : u.pegawaiId ? bulanPegawai.get(u.pegawaiId) : u.bulanTmt,
+      bulanUsulan,
+    );
     tugas.push(
       u.kekurangan.length > 0
         ? {

@@ -14,6 +14,7 @@ import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkas
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { SATKER } from "@/lib/satker";
+import { terdatakanPegawaiBaru } from "@/lib/terdatakanPegawaiBaru";
 import type { PegawaiRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
@@ -235,6 +236,17 @@ export async function POST(req: Request) {
       },
     );
     terkirim.push(tercatat ? `${nama} (NIP sudah tercatat, diajukan sebagai perbaikan data)` : nama);
+
+    // Draf pegawai baru yang belum sempat terdata (dibuat sebelum aturan ADR-112, atau gagal saat disimpan) terdata paling
+    // lambat saat diajukan. Kegagalannya tidak membatalkan pengajuan: persetujuan membuatnya bila belum ada.
+    if (u.jenis === "baru" && !tercatat) {
+      try {
+        const diajukan = (await db.usulanPegawai.findUnique({ id: u.id })) as UsulanPegawaiRow | null;
+        if (diajukan) await terdatakanPegawaiBaru(diajukan, sekarang);
+      } catch (e) {
+        console.error("[terdatakanPegawaiBaru] gagal:", e);
+      }
+    }
 
     // Usulan yang dikembalikan sudah diperbaiki dan berangkat lagi; tagihan perbaikannya ditutup.
     if (u.status === "revisi")
