@@ -8,6 +8,8 @@ import { logAudit } from "@/lib/auditLog";
 import { notifikasiUsulanUpt } from "@/lib/generateNotifikasi";
 import { pegawaiSatker } from "@/lib/aksesUpt";
 import { BELUM_SELESAI, BERKAS_USULAN, BIDANG_USULAN, DIPEGANG_UPT, bandingkanUsulan, hitungUsulan, kekuranganUsulan, pernahKgbUsulan, usulanKosong, namaAsliBerkas } from "@/lib/usulanPegawai";
+import { nipTidakCocokDenganIsian } from "@/lib/nipPns";
+import type { NilaiTanggal } from "@/lib/waktu";
 import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan } from "@/lib/bawaanUsulan";
 import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, bacaKeadaanKgb, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
 import { tulisDenganAcuan } from "@/lib/acuanUsulanServer";
@@ -227,6 +229,12 @@ export async function POST(req: Request) {
     // NIP menjadi penanda draf pegawai baru, jadi wajib sejak draf pertama disimpan.
     nipBaru = teks("nip");
     if (!/^\d{18}$/.test(nipBaru)) return NextResponse.json({ error: "NIP harus tepat 18 digit angka" }, { status: 400 });
+    // NIP harus cocok dengan tanggal lahir dan jenis kelamin yang diisi (ADR-111).
+    const nipTidakCocok = nipTidakCocokDenganIsian(nipBaru, {
+      tanggalLahir: dibaca.isian.tanggalLahir as NilaiTanggal,
+      jenisKelamin: (dibaca.isian.jenisKelamin as string | null | undefined) ?? null,
+    });
+    if (nipTidakCocok) return NextResponse.json({ error: nipTidakCocok }, { status: 400 });
     const bentrokPegawai = await db.pegawai.findUnique({ nip: nipBaru });
     if (bentrokPegawai)
       return NextResponse.json({ error: `NIP ${nipBaru} sudah tercatat atas nama ${bentrokPegawai.nama}` }, { status: 409 });

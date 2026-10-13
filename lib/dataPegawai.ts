@@ -5,6 +5,7 @@
 import { cariSatker, SATKER_KANWIL, type Satker } from "./satker";
 import { bulanKeKgbBerikutnya, getGajiPokok, getPangkat, isGolonganDikenal, tambahBulan } from "./tabelGaji";
 import { tanggalKalender, type NilaiTanggal } from "./waktu";
+import { nipTidakCocokDenganIsian } from "./nipPns";
 
 export const FORMAT_TANGGAL_DITERIMA = "dd/mm/yyyy atau yyyy-mm-dd";
 
@@ -199,6 +200,13 @@ export function bacaIsianPegawai(
     tanggal[kolom] = hasil.status === "valid" ? hasil.tanggal : null;
   }
   if (!tanggal.tmtGolongan) return { galat: "TMT Golongan wajib diisi." };
+
+  // Pegawai baru: NIP harus cocok dengan tanggal lahir dan jenis kelamin yang diisi (ADR-111). Perbaikan data lama
+  // (denganNip false) tidak diperiksa ulang.
+  if (opsi.denganNip) {
+    const tidakCocok = nipTidakCocokDenganIsian(nip, { tanggalLahir: tanggal.tanggalLahir ?? null, jenisKelamin: teksAtauNull(isian.jenisKelamin) });
+    if (tidakCocok) return { galat: tidakCocok };
+  }
 
   const mkg = bacaMkg(isian.mkgTahun, isian.mkgBulan);
   if (mkg.galat !== undefined) return { galat: mkg.galat };

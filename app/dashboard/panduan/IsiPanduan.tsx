@@ -829,6 +829,14 @@ export default async function IsiPanduan({
                   salah juga dibetulkan lewat <strong>Perbarui data</strong>: ketik NIP yang benar, lalu Kanwil
                   mencocokkannya dengan SK CPNS sebelum menyetujui.
                 </p>
+                <p>
+                  Untuk <strong>pegawai baru</strong>, NIP dicocokkan dengan isian lain sebelum tersimpan: delapan angka
+                  pertama NIP adalah tanggal lahir, dan angka ke-15 adalah jenis kelamin (1 laki-laki, 2 perempuan).
+                  Bila tanggal lahir atau jenis kelamin yang Anda isi tidak sama dengan yang tertulis di NIP, isian
+                  ditolak dengan keterangan bagian mana yang berbeda. Yang keliru bisa NIP-nya, bisa juga isian tanggal
+                  lahir atau jenis kelaminnya; cocokkan dengan SK pegawai itu. Tanggal lahir yang dikosongkan tidak
+                  diperiksa.
+                </p>
 
                 <h4 className="pub-h3">Mengisi banyak pegawai sekaligus dengan Unggah daftar</h4>
                 <p>

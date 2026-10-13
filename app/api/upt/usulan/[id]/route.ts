@@ -12,6 +12,8 @@ import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { TIPE_NOTIFIKASI } from "@/lib/generateNotifikasi";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { bentrokNipUsulan } from "@/lib/nipUsulan";
+import { nipTidakCocokDenganIsian } from "@/lib/nipPns";
+import type { NilaiTanggal } from "@/lib/waktu";
 import type { PegawaiRow, UsulanPegawaiRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
@@ -87,6 +89,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // tidak boleh kosong; pada usulan perbaikan, kosong berarti NIP tidak diusulkan berubah.
   if (usulan.jenis === "baru" && !isian.nip)
     return NextResponse.json({ error: "NIP harus tepat 18 digit angka" }, { status: 400 });
+  // Pegawai baru: NIP harus cocok dengan tanggal lahir dan jenis kelamin pada draf (ADR-111). Usulan perbaikan tidak
+  // diperiksa, sebab data lama yang polanya tidak baku justru dibetulkan lewat jalur itu.
+  if (usulan.jenis === "baru" && isian.nip) {
+    // Isian yang dikirim formulir yang dipakai, termasuk yang sengaja dikosongkan; hanya formulir yang tidak memuat
+    // kolomnya (mis. perbaikan berkas saja) memakai nilai tersimpan pada draf.
+    const nipTidakCocok = nipTidakCocokDenganIsian(isian.nip, {
+      tanggalLahir: form.has("tanggalLahir") ? (isian.tanggalLahir as NilaiTanggal | null | undefined) : usulan.tanggalLahir,
+      jenisKelamin: form.has("jenisKelamin") ? ((isian.jenisKelamin as string | null | undefined) ?? null) : usulan.jenisKelamin,
+    });
+    if (nipTidakCocok) return NextResponse.json({ error: nipTidakCocok }, { status: 400 });
+  }
   if (isian.nip && isian.nip !== usulan.nip && isian.nip !== pegawai?.nip) {
     const bentrok = await bentrokNipUsulan(isian.nip, { usulanId: id, pegawaiId: usulan.pegawaiId });
     if (bentrok) return NextResponse.json({ error: bentrok }, { status: 409 });
