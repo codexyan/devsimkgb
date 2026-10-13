@@ -620,6 +620,10 @@ button.dsb-stat[data-nada]:hover { background: color-mix(in srgb, var(--stat-war
 .dsb-tindakan-daftar p { margin: 0; }
 .dsb-tindakan-daftar strong { font-weight: 600; color: var(--dtn); }
 .dsb-tindakan-daftar .dsb-tautan { grid-column: 2; justify-self: start; }
+/* Isi satu butir yang terdiri dari beberapa baris dan tombol (mis. Permintaan perubahan profil): satu kotak di kolom isi,
+   baris bertumpuk rapat, teks panjang (nama bergelar, email) dipatahkan, tombol berderet dari kiri. */
+.dsb-tindakan-daftar .dsb-tindakan-isi { grid-column: 2; display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.dsb-tindakan-daftar .dsb-tindakan-isi .dsb-aksi { justify-content: flex-start; flex-wrap: wrap; margin-top: 5px; }
 
 
 /* ── Segmen (tab saringan) ─────────────────────────────────────────────── */

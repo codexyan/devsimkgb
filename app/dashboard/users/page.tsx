@@ -466,27 +466,34 @@ export default function UsersPage() {
                 <ul className="dsb-tindakan-daftar">
                   {requests.map((r) => (
                     <li key={r.id}>
-                      <p>
-                        <strong>{r.user.nama}</strong> <span className="dsb-kecil">{r.user.nip}</span>
-                      </p>
-                      <p className="dsb-kecil">
-                        {[
-                          r.nama && r.nama !== r.user.nama && `Nama → ${r.nama}`,
-                          r.jabatan && r.jabatan !== r.user.jabatan && `Jabatan → ${r.jabatan}`,
-                          r.email && r.email !== r.user.email && `Email → ${r.email}`,
-                        ].filter(Boolean).join(" · ") || "Tidak ada perubahan nilai"}
-                      </p>
-                      <p className="dsb-kecil">
-                        Diajukan {formatTanggalId(new Date(r.createdAt), { day: "numeric", month: "short", year: "numeric" })}
-                      </p>
-                      <span className="flex items-center gap-2" style={{ marginTop: 6 }}>
-                        <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" disabled={sibuk} onClick={() => void setujuiProfil(r)}>
-                          Setujui
-                        </button>
-                        <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" disabled={sibuk} onClick={() => { setDialogTolak(r); setAlasanTolak(""); }}>
-                          Tolak
-                        </button>
-                      </span>
+                      {/* Daftar ini grid dua kolom (titik + isi), jadi isi dibungkus satu kotak di kolom kedua. */}
+                      <span className="dsb-titik" data-nada="kuning" aria-hidden="true" />
+                      <div className="dsb-tindakan-isi">
+                        <p>
+                          <strong>{r.user.nama}</strong>
+                        </p>
+                        <p className="dsb-kecil">
+                          {r.user.nip} · Diajukan{" "}
+                          {formatTanggalId(new Date(r.createdAt), { day: "numeric", month: "short", year: "numeric" })}
+                        </p>
+                        {(() => {
+                          // Satu baris per perubahan, supaya "Nama →" tidak terpisah dari nilainya saat panel sempit.
+                          const perubahan = [
+                            r.nama && r.nama !== r.user.nama && `Nama → ${r.nama}`,
+                            r.jabatan && r.jabatan !== r.user.jabatan && `Jabatan → ${r.jabatan}`,
+                            r.email && r.email !== r.user.email && `Email → ${r.email}`,
+                          ].filter((x): x is string => !!x);
+                          return perubahan.length > 0 ? perubahan.map((u) => <p key={u}>{u}</p>) : <p>Tidak ada perubahan nilai</p>;
+                        })()}
+                        <div className="dsb-aksi">
+                          <button type="button" className="dsb-tombol dsb-tombol-kecil" data-nada="hijau" disabled={sibuk} onClick={() => void setujuiProfil(r)}>
+                            Setujui
+                          </button>
+                          <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" disabled={sibuk} onClick={() => { setDialogTolak(r); setAlasanTolak(""); }}>
+                            Tolak
+                          </button>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
