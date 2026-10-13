@@ -193,6 +193,12 @@ export default function ModalLaporHukdis({
               </option>
             ))}
           </select>
+          {!dipilih && pilihanPegawai.length === 0 && (
+            <span className="kgbm-bantuan">
+              Yang tampil hanya pegawai yang sudah terdata. Pegawai baru yang drafnya belum lengkap belum bisa dipilih:
+              lengkapi dulu drafnya di Usul KGB Kolektif; begitu lengkap, pegawainya terdata dan muncul di sini.
+            </span>
+          )}
         </div>
       )}
 
