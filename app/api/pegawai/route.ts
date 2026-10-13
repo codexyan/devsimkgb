@@ -12,7 +12,8 @@ import { rencanaSiklusBerikutnya, type RencanaSiklusKgb } from "@/lib/jadwalKgb"
 import { bulanKeKgbBerikutnya, tambahBulan } from "@/lib/tabelGaji";
 import { hariIniWita } from "@/lib/waktu";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
-import { BELUM_SELESAI } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, pesanNipSedangDiusulkan } from "@/lib/usulanPegawai";
+import { SATKER } from "@/lib/satker";
 
 export const runtime = "nodejs";
 
@@ -112,15 +113,12 @@ export async function POST(req: Request) {
   // dua kali dan papan UPT tidak menampilkannya dua kartu (ADR-026).
   const usulanBerjalan = (await db.usulanPegawai.findMany({
     where: { nip: isian.nip, status: { in: BELUM_SELESAI } },
-  })) as { satker: string; nama: string }[];
+  })) as { satker: string; nama: string | null; status: string }[];
   if (usulanBerjalan.length > 0) {
-    const u = usulanBerjalan[0];
-    return NextResponse.json(
-      {
-        error: `NIP ${isian.nip} sedang diusulkan ${u.satker} atas nama ${u.nama}. Tinjau usulannya di Usulan UPT; menyetujuinya akan menambahkan pegawai ini.`,
-      },
-      { status: 409 },
-    );
+    // Yang menunggu tinjauan didahulukan: hanya itu yang dapat ditindaklanjuti Kanwil sendiri.
+    const u = usulanBerjalan.find((x) => x.status === "menunggu") ?? usulanBerjalan[0];
+    const namaSatker = SATKER.find((s) => s.kode === u.satker)?.nama ?? u.satker;
+    return NextResponse.json({ error: pesanNipSedangDiusulkan(isian.nip, u, namaSatker) }, { status: 409 });
   }
 
   const userLogin = await db.user.findUnique({ nip: session.user.nip! });

@@ -17,6 +17,7 @@ import {
   STATUS_USULAN,
   berkasDasarBaru,
   berkasUntukKeadaan,
+  pesanNipSedangDiusulkan,
 } from "./usulanPegawai";
 import { KURANG_JAWABAN_SK_BARU } from "./dasarBaruUsulan";
 
@@ -337,4 +338,28 @@ test("kekuranganUsulan ber-acuan (ADR-078): masa kerja menurut SK kenaikan pangk
   };
   assert.deepEqual(kekuranganUsulan({ ...baru, ...acuan }, "baru"), []);
   assert.ok(kekuranganUsulan({ ...baru, ...acuan, mkgTahunAcuan: null }, "baru").some((k) => /pada SK KGB terakhir/.test(k)));
+});
+
+test("pesan NIP yang sedang diusulkan menyebut siapa yang memegang usulannya (ADR-110)", () => {
+  const nip = "198911282017121003";
+  const satker = "Lembaga Pemasyarakatan Kelas IIA Kotabaru";
+  // Hanya usulan yang menunggu yang ada di Usulan UPT dan dapat ditinjau Kanwil.
+  const menunggu = pesanNipSedangDiusulkan(nip, { status: "menunggu", nama: "AHMAD RIJANI" }, satker);
+  assert.match(menunggu, /Tinjau usulannya di Usulan UPT/);
+  assert.match(menunggu, new RegExp(`${nip} sedang diusulkan ${satker} atas nama AHMAD RIJANI`));
+  // Draf hanya ada di tangan UPT: tidak boleh menyuruh meninjau di Usulan UPT, harus menyebut tombol Hapus.
+  const draf = pesanNipSedangDiusulkan(nip, { status: "draf", nama: "AHMAD RIJANI" }, satker);
+  assert.doesNotMatch(draf, /Tinjau usulannya/);
+  assert.match(draf, /draf pegawai baru atas nama AHMAD RIJANI dan belum diajukan/);
+  assert.match(draf, /menghapus drafnya.*Hapus.*Pegawai Satker/);
+  assert.match(draf, /Usul KGB Kolektif/);
+  // Usulan yang dikembalikan juga di tangan UPT.
+  const revisi = pesanNipSedangDiusulkan(nip, { status: "revisi", nama: "AHMAD RIJANI" }, satker);
+  assert.doesNotMatch(revisi, /Tinjau usulannya/);
+  assert.match(revisi, /dikembalikan ke UPT untuk diperbaiki/);
+  // Nama kosong tidak merusak kalimat.
+  assert.match(pesanNipSedangDiusulkan(nip, { status: "draf", nama: null }, satker), /atas nama - dan belum diajukan/);
+  // Setiap status yang membuat NIP tertahan mendapat pesan yang jelas, tanpa cabang yang terlewat.
+  for (const status of BELUM_SELESAI)
+    assert.ok(pesanNipSedangDiusulkan(nip, { status, nama: "X" }, satker).includes(nip), status);
 });
