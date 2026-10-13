@@ -410,11 +410,12 @@ export function hitungUsulan(isian: {
 }
 
 /**
- * Apa yang masih kurang sebelum sebuah draf boleh diajukan ke Kanwil. Draf sengaja boleh disimpan
- * setengah jadi (itu gunanya draf), sehingga pemeriksaan kelengkapan dilakukan di sini, sekali, pada
- * saat pengajuan. Daftar yang kosong berarti siap diajukan.
+ * Data utama yang masih kurang agar seorang pegawai dapat dibentuk dari usulan: identitas (nama, NIP, jabatan), golongan,
+ * TMT KGB terakhir, dan masa kerja golongan yang cocok dengan tabel gaji, sehingga gaji pokok dan jadwal KGB-nya dapat
+ * dihitung. Berkas, pejabat penetap, dan jawaban SK baru tidak termasuk: itu syarat mengajukan usulan, bukan syarat didata
+ * (ADR-113). Daftar kosong berarti pegawainya dapat terdata.
  */
-export function kekuranganUsulan(
+export function kekuranganDataUsulan(
   usulan: Partial<UsulanPegawaiRow>,
   jenis: string,
   pegawai?: Partial<PegawaiRow> | null,
@@ -447,6 +448,25 @@ export function kekuranganUsulan(
   if (golongan && hitung.gajiPokok === 0) {
     kurang.push(`masa kerja golongan yang cocok dengan tabel PP 5/2024 untuk golongan ${golongan}`);
   }
+  return kurang;
+}
+
+/** Syarat pegawai baru terdata dari drafnya, tanpa menunggu berkas dilengkapi (ADR-113). */
+export function kekuranganPendataanBaru(usulan: Partial<UsulanPegawaiRow>): string[] {
+  return kekuranganDataUsulan(usulan, "baru", null);
+}
+
+/**
+ * Apa yang masih kurang sebelum sebuah draf boleh diajukan ke Kanwil. Draf sengaja boleh disimpan
+ * setengah jadi (itu gunanya draf), sehingga pemeriksaan kelengkapan dilakukan di sini, sekali, pada
+ * saat pengajuan. Daftar yang kosong berarti siap diajukan.
+ */
+export function kekuranganUsulan(
+  usulan: Partial<UsulanPegawaiRow>,
+  jenis: string,
+  pegawai?: Partial<PegawaiRow> | null,
+): string[] {
+  const kurang: string[] = kekuranganDataUsulan(usulan, jenis, pegawai);
 
   const perubahan = pegawai ? bandingkanUsulan(pegawai, usulan) : [];
   const perluBerkas = jenis === "baru" || perubahan.some((p) => KOLOM_DASAR_GAJI.includes(p.kunci));

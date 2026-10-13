@@ -557,7 +557,7 @@ export default function FormulirUsulan({
       {langkah === 1 && (
       <Catatan>
         {jenis === "baru"
-          ? "Data disimpan sebagai draf usulan milik satker. Begitu semua isian wajib lengkap, pegawai ini langsung terdata di SIM-KGB dan tampil di Pegawai Satker, tanpa surat dan tanpa menunggu Kanwil. Surat usulan dan tinjauan Kanwil baru diperlukan saat KGB-nya diusulkan: ajukan drafnya bersama pegawai lain dalam satu surat. Proses KGB pegawai ini ditahan sampai usulannya disetujui. Selama belum lengkap, ia tampil sebagai baris bertanda."
+          ? "Data disimpan sebagai draf usulan milik satker. Begitu identitas, golongan, masa kerja golongan, dan TMT KGB terakhir terisi, pegawai ini langsung terdata di SIM-KGB dan tampil di Pegawai Satker, tanpa surat, tanpa berkas, dan tanpa menunggu Kanwil. Berkas, surat usulan, dan tinjauan Kanwil baru diperlukan saat KGB-nya diusulkan: ajukan drafnya bersama pegawai lain dalam satu surat. Proses KGB pegawai ini ditahan sampai usulannya disetujui. Selama belum lengkap, ia tampil sebagai baris bertanda."
           : "Isian sudah diisi dengan data yang tercatat di Kanwil. Ubah yang perlu diperbaiki saja; yang dikosongkan berarti tidak diusulkan berubah. Yang disimpan di sini draf usulan: data pegawai di SIM-KGB baru berubah setelah usulannya diajukan dan disetujui Kanwil."}
       </Catatan>
       )}

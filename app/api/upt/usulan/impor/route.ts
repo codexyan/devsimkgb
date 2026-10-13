@@ -4,7 +4,9 @@ import { auth } from "@/auth";
 import { newId } from "@/lib/sheets/id";
 import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
-import { BELUM_SELESAI, nilaiUsulan } from "@/lib/usulanPegawai";
+import { BELUM_SELESAI, kekuranganPendataanBaru, nilaiUsulan } from "@/lib/usulanPegawai";
+import { susunPegawaiBaru } from "@/lib/pegawaiBaruDariUsulan";
+import { cariDalam } from "@/lib/dataSatker";
 import { ringkasDasarBaru } from "@/lib/dasarBaruUsulan";
 import { KOSONG_ACUAN, isiHitungan } from "@/lib/usulanFormulir";
 import { tulisBanyakDenganAcuan } from "@/lib/acuanUsulanServer";
@@ -188,6 +190,31 @@ export async function POST(req: Request) {
   };
 
   const rows = disimpan.map(barisUsulan);
+
+  // Pegawai baru yang data utamanya sudah terisi langsung terdata, dan drafnya ditautkan (ADR-113); berkas dan pejabat
+  // penetap baru ditagih saat usulannya diajukan. Dibuat sekaligus, sebab ratusan baris tidak boleh dikerjakan satu per satu.
+  const pegawaiBaru: PegawaiRow[] = [];
+  for (const r of rows) {
+    if (r.jenis !== "baru" || r.pegawaiId || kekuranganPendataanBaru(r).length > 0) continue;
+    const susun = susunPegawaiBaru(r, newId(), sekarang);
+    if (!susun.ok) continue;
+    pegawaiBaru.push(susun.pegawai);
+    r.pegawaiId = susun.pegawai.id;
+  }
+  if (pegawaiBaru.length > 0) {
+    try {
+      await db.pegawai.createMany(pegawaiBaru);
+    } catch (e) {
+      // Mis. NIP yang sama dibuat serentak oleh permintaan lain. Drafnya tetap tersimpan, tanpa tautan pada yang gagal; ia
+      // terdata saat disimpan atau diajukan.
+      console.error("[impor] sebagian pegawai baru gagal dibuat, draf disimpan tanpa tautan:", e);
+      const sudahAda = new Set(
+        (await cariDalam((where) => db.pegawai.findMany({ where }) as Promise<PegawaiRow[]>, "nip", pegawaiBaru.map((p) => p.nip))).map((p) => p.id),
+      );
+      for (const r of rows) if (r.pegawaiId && !sudahAda.has(r.pegawaiId)) r.pegawaiId = null;
+    }
+  }
+  const jumlahTerdata = rows.filter((r) => r.jenis === "baru" && r.pegawaiId).length;
   if (rows.length > 0) await tulisBanyakDenganAcuan(rows, (isi) => db.usulanPegawai.createMany(isi));
 
   const jumlahBaru = disimpan.filter((h) => h.hasil === "baru").length;
@@ -198,7 +225,7 @@ export async function POST(req: Request) {
     userId: pengguna.id,
     aksi: "impor_draf_pegawai",
     detail:
-      `Unggah massal ${satker.nama}: ${jumlahBaru} pegawai baru dan ${jumlahPerubahan} usulan perbaikan ` +
+      `Unggah massal ${satker.nama}: ${jumlahBaru} pegawai baru${jumlahTerdata > 0 ? ` (${jumlahTerdata} langsung terdata)` : ""} dan ${jumlahPerubahan} usulan perbaikan ` +
       `disiapkan dari ${baris.length} baris berkas` +
       (ringkas.sama > 0 ? `, ${ringkas.sama} baris sama dengan data tercatat` : "") +
       (ringkas.ditolak > 0 ? `, ${ringkas.ditolak} baris ditolak` : "") +
@@ -212,6 +239,7 @@ export async function POST(req: Request) {
     {
       disimpan: disimpan.length,
       baru: jumlahBaru,
+      terdata: jumlahTerdata,
       perubahan: jumlahPerubahan,
       sama: ringkas.sama,
       ditolak: ringkas.ditolak,

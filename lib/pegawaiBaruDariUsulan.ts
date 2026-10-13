@@ -98,24 +98,35 @@ export function susunPegawaiBaru(usulan: UsulanPegawaiRow, id: string, sekarang:
  * Kolom yang ditulis ulang pada pegawai yang sudah terbentuk dari usulan yang sama, baik saat persetujuan melanjutkan
  * pegawai yang terbentuk lebih dulu (ADR-079) maupun saat draf disunting sebelum ditinjau (ADR-112). Yang dicatat Kanwil
  * sesudahnya dibiarkan: hukuman disiplin, mutasi dan pemberhentian, penanda aktif, dan penetap SK dasar.
+ *
+ * `jagaJadwal`: jadwal KGB pegawai sudah digeser hukuman disiplin yang menunda KGB (dicatat Kanwil sesudah pegawainya
+ * terdata, ADR-113), jadi TMT KGB terakhir, TMT KGB berikutnya, dan konfirmasi TMT-nya tidak ditimpa hitungan dari isian
+ * draf; kolom lainnya tetap diperbarui.
  */
-export function isiPembaruanPegawaiBaru(pegawai: PegawaiRow): Omit<
-  PegawaiRow,
-  | "id"
-  | "createdAt"
-  | "statusHukdis"
-  | "tanggalHukdisBerakhir"
-  | "jenisHukdis"
-  | "keteranganHukdis"
-  | "aktif"
-  | "satkerTugas"
-  | "berhentiTmt"
-  | "berhentiAlasan"
-  | "penetapSkDasar"
+export function isiPembaruanPegawaiBaru(
+  pegawai: PegawaiRow,
+  opsi: { jagaJadwal?: boolean } = {},
+): Partial<
+  Omit<
+    PegawaiRow,
+    | "id"
+    | "createdAt"
+    | "statusHukdis"
+    | "tanggalHukdisBerakhir"
+    | "jenisHukdis"
+    | "keteranganHukdis"
+    | "aktif"
+    | "satkerTugas"
+    | "berhentiTmt"
+    | "berhentiAlasan"
+    | "penetapSkDasar"
+  >
 > {
   const {
     id: _id, createdAt: _dibuat, statusHukdis: _h1, tanggalHukdisBerakhir: _h2, jenisHukdis: _h3, keteranganHukdis: _h4,
     aktif: _aktif, satkerTugas: _tugas, berhentiTmt: _b1, berhentiAlasan: _b2, penetapSkDasar: _penetap, ...isi
   } = pegawai;
-  return isi;
+  if (!opsi.jagaJadwal) return isi;
+  const { tmtKgbTerakhir: _t1, tmtKgbBerikutnya: _t2, konfirmasiUptTmt: _t3, ...tanpaJadwal } = isi;
+  return tanpaJadwal;
 }

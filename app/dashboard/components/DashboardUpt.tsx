@@ -1674,7 +1674,7 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
             <p className="dsb-sub">
               Status KGB setiap pegawai di Kanwil. Dari sini pegawai baru ditambahkan, daftar pegawai diunggah
               sekaligus, perbaikan data diusulkan, dan mutasi atau pemberhentian dilaporkan. Pegawai baru terdata begitu
-              drafnya lengkap; yang belum lengkap tampil sebagai baris bertanda. KGB-nya diusulkan lewat Usul KGB Kolektif.
+              data utama drafnya terisi; yang belum cukup tampil sebagai baris bertanda. KGB-nya diusulkan lewat Usul KGB Kolektif.
             </p>
           </div>
           <button

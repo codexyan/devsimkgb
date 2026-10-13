@@ -981,7 +981,7 @@ export default async function IsiPanduan({
                   beberapa pegawai untuk satu surat, dalam tiga langkah. Halamannya dibuka pada pegawai yang jatuh tempo
                   periode ini. Draf pegawai baru yang belum lengkap tidak ikut kecuali dipilih di saringan{" "}
                   <em>Pegawai baru</em>, sehingga pendataan ratusan pegawai dapat dikirim bertahap dan tidak tercampur
-                  dengan usul KGB periode berjalan. Draf yang sudah lengkap sudah terdata sebagai pegawai biasa, jadi
+                  dengan usul KGB periode berjalan. Draf yang data utamanya sudah terisi sudah terdata sebagai pegawai biasa, jadi
                   ikut daftar periode bila TMT KGB-nya jatuh pada periode ini.
                 </p>
                 <LayarKolektif1 namaBulan={bulanTahun(TMT_KGB)} />
@@ -1066,7 +1066,7 @@ export default async function IsiPanduan({
                 <p>
                   Berkas wajib ditagih saat diajukan: bagi pegawai baru selalu, bagi usulan perbaikan hanya bila
                   golongan, TMT golongan, masa kerja golongan, atau TMT KGB terakhirnya ikut diubah. <strong>Pegawai baru
-                  langsung terdata</strong> begitu drafnya lengkap, tanpa surat dan tanpa menunggu Kanwil: ia tampil di
+                  langsung terdata</strong> begitu data utama drafnya terisi (identitas, golongan, masa kerja golongan, dan TMT KGB terakhir), tanpa surat, tanpa berkas, dan tanpa menunggu Kanwil: ia tampil di
                   Pegawai Satker sebagai pegawai biasa. Surat Srikandi dan tinjauan Kanwil baru diperlukan saat KGB-nya
                   diusulkan, dan selama usulan pertamanya belum disetujui, Kanwil belum dapat memproses KGB-nya. Hapus
                   pada draf yang sudah terdata menghapus drafnya dan menonaktifkan pegawainya; Kanwil dapat mengaktifkannya
@@ -2449,7 +2449,7 @@ export default async function IsiPanduan({
                     <summary>NIP pegawai tidak ditemukan di SIM-KGB</summary>
                     <p>
                       Pegawai UPT yang belum tercatat ditambahkan Admin UPT dengan Tambah pegawai atau Unggah daftar; ia
-                      terdata begitu drafnya lengkap, lalu diajukan ke Kanwil saat KGB-nya diusulkan. NIP yang tercatat keliru dibetulkan lewat Perbarui data; Kanwil
+                      terdata begitu data utama drafnya terisi, lalu diajukan ke Kanwil saat KGB-nya diusulkan. NIP yang tercatat keliru dibetulkan lewat Perbarui data; Kanwil
                       mencocokkannya dengan SK CPNS sebelum menyetujui.
                     </p>
                   </details>

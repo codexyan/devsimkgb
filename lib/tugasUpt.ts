@@ -157,13 +157,10 @@ export function daftarTugasUpt(
       continue;
     }
     if (u.status !== "draf") continue;
-    // Draf pegawai baru memakai bulan TMT dari isiannya sendiri, juga bila pegawainya sudah terdata dari draf itu (ADR-112):
-    // baris pegawai yang belum lengkap diperbarui tidak ikut menentukan kunci.
-    const terkunci = drafTerkunci(
-      u,
-      u.jenis === "baru" ? u.bulanTmt : u.pegawaiId ? bulanPegawai.get(u.pegawaiId) : u.bulanTmt,
-      bulanUsulan,
-    );
+    // Pegawai yang sudah terdata (termasuk dari draf pegawai baru, ADR-112) memakai bulan TMT pada data pegawainya, yang ikut
+    // bergeser bila Kanwil mencatat hukuman disiplin yang menunda KGB (ADR-113). Draf yang pegawainya belum ada memakai
+    // bulan TMT dari isiannya sendiri (ADR-104).
+    const terkunci = drafTerkunci(u, (u.pegawaiId ? bulanPegawai.get(u.pegawaiId) : undefined) ?? u.bulanTmt, bulanUsulan);
     tugas.push(
       u.kekurangan.length > 0
         ? {
