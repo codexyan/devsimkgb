@@ -1,7 +1,7 @@
 # ADR-114: Proyeksi sementara jadwal KGB dari laporan hukdis yang menunggu Kanwil
 
 Tanggal: 13 Oktober 2026
-Status: berlaku. Melengkapi ADR-016 (laporan hukdis UPT) dan ADR-113 (pegawai terdata lebih awal).
+Status: berlaku. Melengkapi ADR-016 (laporan hukdis UPT) dan ADR-113 (pegawai terdata lebih awal). Sisi peninjau Kanwil: ADR-116.
 
 ## Konteks
 

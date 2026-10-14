@@ -41,8 +41,9 @@ export default function DashboardHukdis() {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [hanyaTunda, setHanyaTunda] = useState(false);
-  // Laporan hukdis dari UPT yang menunggu dicatat (ADR-016); cukup jumlahnya, rinciannya di modul Hukdis.
-  const [laporanUpt, setLaporanUpt] = useState(0);
+  // Laporan hukdis dari UPT yang menunggu dicatat (ADR-016); cukup jumlahnya, rinciannya di modul Hukdis. `menunda` dan
+  // `tertahan` dari perkiraan jadwal tiap laporan (ADR-116): yang menggeser KGB bila dicatat, dan yang belum dapat dicatat.
+  const [laporanUpt, setLaporanUpt] = useState({ jumlah: 0, menunda: 0, tertahan: 0 });
 
   function fetchData() {
     setLoading(true);
@@ -56,8 +57,15 @@ export default function DashboardHukdis() {
       .catch(() => {})
       .finally(() => setLoading(false));
     fetch("/api/hukdis/laporan")
-      .then((r) => r.json() as Promise<{ laporan?: { status: string }[] }>)
-      .then((d) => setLaporanUpt(Array.isArray(d.laporan) ? d.laporan.filter((l) => l.status === "menunggu").length : 0))
+      .then((r) => r.json() as Promise<{ laporan?: { status: string; proyeksi?: { aksi: string } | null }[] }>)
+      .then((d) => {
+        const menunggu = Array.isArray(d.laporan) ? d.laporan.filter((l) => l.status === "menunggu") : [];
+        setLaporanUpt({
+          jumlah: menunggu.length,
+          menunda: menunggu.filter((l) => l.proyeksi?.aksi === "geser").length,
+          tertahan: menunggu.filter((l) => l.proyeksi?.aksi === "tolak").length,
+        });
+      })
       .catch(() => {});
   }
 
@@ -106,11 +114,21 @@ export default function DashboardHukdis() {
     document.getElementById("daftar-hukdis")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   const tindakan: Tindakan[] = [];
-  if (laporanUpt > 0)
+  if (laporanUpt.jumlah > 0)
     tindakan.push({
       id: "laporan-upt",
       nada: "kuning",
-      isi: <><strong>{laporanUpt} laporan hukdis dari UPT</strong> menunggu dicatat. Hukuman yang menunda KGB baru menggeser jadwal setelah dicatat.</>,
+      isi: (
+        <>
+          <strong>{laporanUpt.jumlah} laporan hukdis dari UPT</strong> menunggu dicatat.{" "}
+          {laporanUpt.menunda === 0 && laporanUpt.tertahan === 0
+            ? "Hukuman yang menunda KGB baru menggeser jadwal setelah dicatat."
+            : [
+                laporanUpt.menunda > 0 ? `${laporanUpt.menunda} akan menggeser jadwal KGB bila dicatat` : null,
+                laporanUpt.tertahan > 0 ? `${laporanUpt.tertahan} belum dapat dicatat (alasannya tertera pada laporan)` : null,
+              ].filter(Boolean).join("; ") + "."}
+        </>
+      ),
       aksi: { label: "Tinjau laporan", href: "/dashboard/hukdis#laporan-upt" },
     });
   if (segeraTunda.length > 0)
