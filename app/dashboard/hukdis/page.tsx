@@ -9,6 +9,8 @@ import { formatTanggalId, hariIniWita, isoTanggalLokal, tanggalKalender } from "
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 import { tmtBerakhirOtomatis } from "@/lib/hukdisJenis";
 import type { ProyeksiHukdisJson } from "@/lib/proyeksiHukdis";
+import type { LinimasaHukdisJson } from "@/lib/linimasaHukdis";
+import LinimasaHukdis from "./LinimasaHukdis";
 import { SATKER } from "@/lib/satker";
 import { KODE_SATKER_LAIN, kodeSatkerPegawai } from "@/lib/rekapSatker";
 import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
@@ -147,7 +149,7 @@ export default function HukdisPage() {
   const [pratinjauLaporan, setPratinjauLaporan] = useState<LaporanUpt | null>(null);
   // Perkiraan jadwal KGB dari isian formulir yang sedang diketik (ADR-116). `kunci` mengikat hasilnya ke isian yang
   // menghasilkannya, sehingga hasil usang tidak tampil sementara isian sudah berubah.
-  const [perkiraanForm, setPerkiraanForm] = useState<{ kunci: string; data: ProyeksiHukdisJson | null } | null>(null);
+  const [perkiraanForm, setPerkiraanForm] = useState<{ kunci: string; data: ProyeksiHukdisJson | null; linimasa: LinimasaHukdisJson | null } | null>(null);
 
   // Delete modal
   const [delTarget, setDelTarget] = useState<Hukdis | null>(null);
@@ -222,19 +224,19 @@ export default function HukdisPage() {
   }
 
   const kunciPerkiraan = showInput && selPeg && form.jenisHukdis && form.tmtMulai && form.berdampakKGB
-    ? [selPeg.id, form.jenisHukdis, form.tmtMulai, form.durasiTunda].join("|")
+    ? [selPeg.id, form.jenisHukdis, form.tmtMulai, form.tmtBerakhir, form.durasiTunda].join("|")
     : null;
   useEffect(() => {
     if (!kunciPerkiraan || !selPeg) return;
     const ctl = new AbortController();
     const t = setTimeout(() => {
       const q = new URLSearchParams({
-        pegawaiId: selPeg.id, jenis: form.jenisHukdis, tmtMulai: form.tmtMulai, berdampak: "1", tunda: String(form.durasiTunda),
+        pegawaiId: selPeg.id, jenis: form.jenisHukdis, tmtMulai: form.tmtMulai, tmtBerakhir: form.tmtBerakhir, berdampak: "1", tunda: String(form.durasiTunda),
       });
       fetch(`/api/hukdis/proyeksi?${q}`, { signal: ctl.signal })
-        .then((r) => r.json() as Promise<{ proyeksi?: ProyeksiHukdisJson | null }>)
-        .then((d) => setPerkiraanForm({ kunci: kunciPerkiraan, data: d.proyeksi ?? null }))
-        .catch(() => { if (!ctl.signal.aborted) setPerkiraanForm({ kunci: kunciPerkiraan, data: null }); });
+        .then((r) => r.json() as Promise<{ proyeksi?: ProyeksiHukdisJson | null; linimasa?: LinimasaHukdisJson | null }>)
+        .then((d) => setPerkiraanForm({ kunci: kunciPerkiraan, data: d.proyeksi ?? null, linimasa: d.linimasa ?? null }))
+        .catch(() => { if (!ctl.signal.aborted) setPerkiraanForm({ kunci: kunciPerkiraan, data: null, linimasa: null }); });
     }, 300);
     return () => { clearTimeout(t); ctl.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -734,6 +736,9 @@ export default function HukdisPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Linimasa perhitungan: jalur semula dan jalur sesudah dicatat, untuk memeriksa sebelum menyimpan (ADR-116). */}
+                  {perkiraanSiap && perkiraanForm?.linimasa && <LinimasaHukdis data={perkiraanForm.linimasa} />}
 
                   <div>
                     <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>Keterangan <span style={{ color: "var(--dt5)" }}>(opsional)</span></label>

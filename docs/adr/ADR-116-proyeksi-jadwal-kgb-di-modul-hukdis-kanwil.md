@@ -30,13 +30,24 @@ Pemilik meminta modul Hukdis Super Admin dan SDM Hukdis menampilkan proyeksi unt
    hasil saat disimpan, termasuk penolakannya. Perkiraan tampil di blok "Berdampak pada KGB?" saat dampak menyala, dan berlaku
    juga untuk input hukdis langsung tanpa laporan. Tombol simpan tidak dikunci oleh perkiraan "belum dapat dicatat": peninjau
    tetap dapat mematikan dampak KGB, atau menunggu KGB pegawainya selesai.
-3. **Satu aturan dampak untuk pencatatan dan perkiraan.** `tentukanDampakIsian` (`lib/proyeksiHukdis.ts`) memutuskan dampak
+3. **Linimasa visual perhitungan di formulir Catat.** Pemilik meminta tampilan yang lebih visual dan mencolok untuk memverifikasi
+   sebelum mencatat, bukan hanya baris teks. Bila hukumannya menggeser jadwal, formulir menampilkan dua jalur KGB di atas satu
+   sumbu waktu berskala (`app/dashboard/hukdis/LinimasaHukdis.tsx`): **Semula** (tanpa hukuman) dan **Sesudah dicatat**. Pita
+   kuning di tengah adalah masa hukuman, batang kuning pada jalur bawah adalah penundaannya (+N bulan), dan tiap titik KGB memuat
+   bulan TMT, masa kerja golongan (MKG), dan gaji pokok hasil `kalkulasiKGB`, rumus yang sama dengan Input KGB. Titik KGB berikutnya
+   dan titik semulanya diberi warna hijau bila jatuh pada TMT dan MKG yang sama (jadwal kembali ke jalur semula, tidak mundur dua
+   tahun dari TMT yang baru; ADR-080 dan ADR-115), kuning bila tidak sama. Tiga baris ringkasan di bawahnya memuat angka yang sama
+   dalam teks. Pada layar ponsel baris gaji di sumbu disembunyikan agar label tidak bertabrakan; gajinya tetap ada pada ringkasan.
+   Perhitungannya di `lib/linimasaHukdis.ts` (murni): dasar hitungnya KGB yang sedang berjalan bila ada, selain itu pegawai dengan
+   TMT KGB terakhir yang akan tersimpan. Bila hitungannya tidak mungkin (golongan tidak dikenal, tanggal tidak valid), linimasa
+   tidak tampil dan perkiraan teksnya tetap ada.
+4. **Satu aturan dampak untuk pencatatan dan perkiraan.** `tentukanDampakIsian` (`lib/proyeksiHukdis.ts`) memutuskan dampak
    final dari isian (yang diketik menang, yang kosong mengikuti katalog, lama tunda 1 sampai 60 bulan). `catatHukdis` memakainya,
    sehingga perkiraan formulir dan hasil pencatatan tidak dapat berbeda. Uji membuktikannya: alasan penolakan perkiraan sama
    dengan galat pencatatan.
-4. **Dasbor SDM Hukdis** menambahkan hitungan dari proyeksi pada kartu Perlu tindakan: berapa laporan yang akan menggeser
+5. **Dasbor SDM Hukdis** menambahkan hitungan dari proyeksi pada kartu Perlu tindakan: berapa laporan yang akan menggeser
    jadwal KGB bila dicatat dan berapa yang belum dapat dicatat.
-5. **Bentuk JSON proyeksi dipakai bersama** (`jsonProyeksiHukdis`): UPT dan Kanwil membaca bentuk yang sama; `geser`
+6. **Bentuk JSON proyeksi dipakai bersama** (`jsonProyeksiHukdis`): UPT dan Kanwil membaca bentuk yang sama; `geser`
    membawa `sesudahKgbBerjalan`.
 
 ## Akibat dan batasan yang disengaja
@@ -46,14 +57,17 @@ Pemilik meminta modul Hukdis Super Admin dan SDM Hukdis menampilkan proyeksi unt
   yang berlaku adalah perkiraan formulir dan hasil pencatatan.
 - Perkiraan dihitung terhadap keadaan sekarang. Bila KGB pegawai berubah sebelum laporan dicatat (diinput, dibatalkan), daftar
   menampilkan perkiraan baru pada muat ulang berikutnya, dan pencatatan tetap menjadi penentu.
-- Tidak ada komponen, tata letak, atau warna baru: baris teks memakai kelas dan warna yang sudah ada.
+- Satu komponen baru, linimasa, atas permintaan pemilik. Ia memakai token warna yang sudah ada (terang dan gelap) dan kelas
+  `hkd-lm-*` di `dasbor.css`; panel daftar hanya mendapat baris teks.
 
 ## Uji
 
+`lib/linimasaHukdis.test.ts`: skenario pemilik (jalur semula 2026 dan 2028, jalur sesudah dicatat 2027 dan 2028, MKG sejajar masa kerja
+nyata), penundaan 6 bulan, CPNS II/a, dasar KGB berjalan, masukan tidak valid tanpa melempar, bentuk JSON.
 `lib/proyeksiHukdis.test.ts`: aturan dampak isian (menimpa katalog, bawaan, batas 1 sampai 60 bulan, lama tunda diabaikan bila
 tidak menunda); bentuk JSON (tanggal, penanda KGB berjalan, alasan utuh); sisi Kanwil dengan data lokal (laporan menunggu lintas
 UPT diproyeksikan dan yang sudah dicatat tidak ikut, perkiraan formulir untuk bawaan, 6 bulan, dampak mati, lama tunda
 tak valid, TMT mulai sesudah TMT KGB, tanggal kosong, pegawai tidak ada; hasil `catatHukdis` dengan isian yang sama sama dengan
 perkiraan, dan penolakannya bersuara sama). Uji gagal bila lama tunda yang diketik diabaikan. Alur nyata diperiksa di peramban
 sebagai SDM Hukdis dan Super Admin: panel (geser, tidak menunda, belum dapat dicatat, lintas UPT), perkiraan hidup di formulir,
-dan hasil pencatatan sama dengan perkiraan.
+dan hasil pencatatan sama dengan perkiraan. Linimasa diperiksa di peramban pada tema terang, tema gelap, dan lebar ponsel.

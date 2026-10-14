@@ -197,7 +197,8 @@ test("sisi Kanwil: semua laporan menunggu dari seluruh UPT diproyeksikan, dan pe
   await denganDataLokal(async () => {
     const { db } = await import("./db");
     const { catatHukdis } = await import("./catatHukdis");
-    const { proyeksiIsianHukdis, proyeksiSemuaLaporanMenunggu } = await import("./proyeksiHukdisServer");
+    const { proyeksiIsianHukdis: perkiraanIsian, proyeksiSemuaLaporanMenunggu } = await import("./proyeksiHukdisServer");
+    const proyeksiIsianHukdis = async (i: Parameters<typeof perkiraanIsian>[0]) => (await perkiraanIsian(i))?.proyeksi ?? null;
 
     const buatPegawai = (id: string, nip: string, tmtKgbBerikutnya: Date) =>
       db.pegawai.create({
@@ -244,6 +245,16 @@ test("sisi Kanwil: semua laporan menunggu dari seluruh UPT diproyeksikan, dan pe
     // Belum cukup bahan: tanggal belum diisi atau pegawai tidak ada.
     assert.equal(await proyeksiIsianHukdis({ pegawaiId: "pa", jenisHukdis: "penundaan_kgb", tmtMulai: "", hariIni }), null);
     assert.equal(await proyeksiIsianHukdis({ pegawaiId: "tidak-ada", jenisHukdis: "penundaan_kgb", tmtMulai: "2027-01-01", hariIni }), null);
+
+    // Linimasa menyertai hukuman yang menggeser jadwal; tidak ada untuk yang tidak menggeser atau ditolak.
+    const dgLinimasa = await perkiraanIsian({ pegawaiId: "pa", jenisHukdis: "penundaan_kgb", tmtMulai: "2027-01-01", tmtBerakhir: "2027-12-31", hariIni });
+    assert.ok(dgLinimasa?.linimasa, "ada linimasa");
+    assert.equal(bulanIso(dgLinimasa.linimasa.sesudah[0].tmt), "2028-06", "KGB tertunda jatuh pada TMT baru");
+    assert.equal(bulanIso(dgLinimasa.linimasa.semula[0].tmt), "2027-06", "jalur semula memakai TMT sebelum digeser");
+    assert.equal(bulanIso(dgLinimasa.linimasa.hukuman.berakhir!), "2027-12");
+    assert.equal(dgLinimasa.linimasa.sejajar, true, "jadwal kembali ke jalur semula");
+    assert.equal((await perkiraanIsian({ pegawaiId: "pa", jenisHukdis: "penundaan_kgb", tmtMulai: "2027-01-01", berdampakKGB: false, hariIni }))?.linimasa, null);
+    assert.equal((await perkiraanIsian({ pegawaiId: "pc", jenisHukdis: "penundaan_kgb", tmtMulai: "2027-08-01", hariIni }))?.linimasa, null);
 
     // Perkiraan 6 bulan sama dengan hasil pencatatan dengan isian yang sama.
     const catat = await catatHukdis(

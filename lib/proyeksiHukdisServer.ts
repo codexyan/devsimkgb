@@ -4,8 +4,10 @@
 import { db } from "./db";
 import { cariDalam, pegawaiMenurutId } from "./dataSatker";
 import { bacaTanggal, kgbBerjalanTerbaru } from "./dataPegawai";
+import { susunLinimasaHukdis, type LinimasaHukdis } from "./linimasaHukdis";
 import { proyeksiLaporanHukdis, tentukanDampakIsian, type JenisDampak, type ProyeksiHukdis } from "./proyeksiHukdis";
 import { tabelBelumAda } from "./db/tabelBelumAda";
+import { tanggalKalender } from "./waktu";
 import type { LaporanHukdisRow, PegawaiRow, RiwayatKGBRow } from "./sheets/tables";
 
 export interface ProyeksiLaporan {
@@ -77,19 +79,27 @@ export async function proyeksiLaporanMenunggu(satker: string, hariIni: Date): Pr
   return hasil;
 }
 
+export interface PerkiraanIsian {
+  proyeksi: ProyeksiHukdis;
+  /** Linimasa perhitungan dua jalur; null bila hukumannya tidak menggeser jadwal, atau hitungannya tidak mungkin. */
+  linimasa: LinimasaHukdis | null;
+}
+
 /**
  * Perkiraan jadwal KGB dari isian formulir hukdis Kanwil sebelum disimpan: jenis, TMT mulai, serta dampak dan lama
  * penundaan yang sedang diketik peninjau (kosong berarti mengikuti katalog jenisnya). Aturannya persis `catatHukdis`.
+ * Bila hukumannya menggeser jadwal, ikut linimasa perhitungannya (ADR-116).
  * null bila pegawainya tidak ada, atau TMT mulainya belum terisi dengan tanggal yang valid.
  */
 export async function proyeksiIsianHukdis(input: {
   pegawaiId: string;
   jenisHukdis: string;
   tmtMulai: unknown;
+  tmtBerakhir?: unknown;
   berdampakKGB?: boolean;
   durasiTunda?: unknown;
   hariIni: Date;
-}): Promise<ProyeksiHukdis | null> {
+}): Promise<PerkiraanIsian | null> {
   const tmtMulai = bacaTanggal(input.tmtMulai);
   if (tmtMulai.status !== "valid") return null;
   const pegawai = (await db.pegawai.findUnique({ id: input.pegawaiId })) as PegawaiRow | null;
@@ -97,16 +107,50 @@ export async function proyeksiIsianHukdis(input: {
 
   const jenis = (await db.hukdisJenis.findUnique({ kode: input.jenisHukdis })) as unknown as JenisDampak | null;
   const dampak = tentukanDampakIsian(input.jenisHukdis, jenis, { berdampakKGB: input.berdampakKGB, durasiTunda: input.durasiTunda });
-  if (!dampak.ok) return { aksi: "tolak", alasan: dampak.alasan };
-  if (!dampak.berdampakKGB) return { aksi: "tidak_menunda" };
+  if (!dampak.ok) return { proyeksi: { aksi: "tolak", alasan: dampak.alasan }, linimasa: null };
+  if (!dampak.berdampakKGB) return { proyeksi: { aksi: "tidak_menunda" }, linimasa: null };
 
   const riwayatKgb = (await db.riwayatKGB.findMany({ where: { pegawaiId: pegawai.id } })) as RiwayatKGBRow[];
-  return proyeksiLaporanHukdis({
+  const kgbAktif = kgbBerjalanTerbaru(riwayatKgb);
+  const proyeksi = proyeksiLaporanHukdis({
     pegawai,
-    kgbAktif: kgbBerjalanTerbaru(riwayatKgb),
+    kgbAktif,
     laporan: { jenisHukdis: input.jenisHukdis, tmtMulai: tmtMulai.tanggal },
     // Dampak final sudah diputuskan di atas; jenis hanya meneruskannya.
     jenis: { berdampakKGB: true, durasiTunda: dampak.durasiTunda },
     hariIni: input.hariIni,
   });
+  if (proyeksi.aksi !== "geser") return { proyeksi, linimasa: null };
+
+  // Dasar hitung linimasa: KGB yang sedang berjalan bila ada (yang digeser siklus sesudahnya), selain itu pegawai dengan
+  // TMT KGB terakhir yang akan tersimpan.
+  const tmtAktif = kgbAktif ? tanggalKalender(kgbAktif.tmtKgbBaru) : null;
+  const dasar =
+    kgbAktif && tmtAktif
+      ? {
+          golonganRuang: kgbAktif.golonganBaru,
+          mkgTahun: kgbAktif.mkgTahunBaru,
+          mkgBulan: kgbAktif.mkgBulanBaru,
+          gajiPokok: kgbAktif.gajiPokokBaru,
+          tmtKgbTerakhir: tmtAktif,
+        }
+      : {
+          golonganRuang: pegawai.golonganRuang,
+          mkgTahun: pegawai.mkgTahun,
+          mkgBulan: pegawai.mkgBulan,
+          gajiPokok: pegawai.gajiPokok,
+          tmtKgbTerakhir: proyeksi.tmtKgbTerakhir,
+        };
+  const tmtBerakhir = bacaTanggal(input.tmtBerakhir);
+  return {
+    proyeksi,
+    linimasa: susunLinimasaHukdis({
+      dasar,
+      acuanBerjalan: !!(kgbAktif && tmtAktif),
+      tmtSebelum: proyeksi.tmtSebelum,
+      tmtBaru: proyeksi.tmtBaru,
+      bulan: proyeksi.bulan,
+      hukuman: { mulai: tmtMulai.tanggal, berakhir: tmtBerakhir.status === "valid" ? tmtBerakhir.tanggal : null },
+    }),
+  };
 }

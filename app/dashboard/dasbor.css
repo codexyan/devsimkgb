@@ -2715,6 +2715,47 @@ html[data-gerak="kurangi"] .dsb-putar {
   font-size: 11px;
   font-weight: 700;
 }
+/* Linimasa perhitungan hukdis di formulir Catat Kanwil (ADR-116): dua jalur KGB pada sumbu waktu berskala. */
+.hkd-lm { border: 1px solid var(--ln1); border-radius: 12px; background: var(--sub); padding: 10px 12px 12px; }
+.hkd-lm-kepala { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.hkd-lm-kepala p { margin: 0; font-size: 11px; font-weight: 700; color: var(--dtn); }
+.hkd-lm-kepala span { font-size: 10px; color: var(--dt5); }
+.hkd-lm-kanvas { position: relative; height: 250px; overflow: hidden; }
+.hkd-lm-tahun { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--ln2); }
+.hkd-lm-tahun span { position: absolute; top: 0; left: 3px; font-size: 9px; color: var(--dt5); }
+.hkd-lm-jalur { position: absolute; left: 0; margin: 0; font-size: 9.5px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--dt4); }
+.hkd-lm-garis { position: absolute; height: 3px; margin-top: -1.5px; border-radius: 2px; background: var(--ln1); }
+.hkd-lm-garis[data-jalur="semula"] { background: var(--dt5); opacity: 0.55; }
+.hkd-lm-garis[data-jalur="sesudah"] { background: var(--accent); }
+.hkd-lm-titik { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; box-sizing: border-box; border: 2px solid var(--sub); box-shadow: 0 0 0 1px var(--ln1); background: var(--dt5); }
+.hkd-lm-titik[data-jenis="acuan"] { background: var(--navy-solid); }
+.hkd-lm-titik[data-jenis="semula"] { background: transparent; border-color: var(--dt4); box-shadow: none; }
+.hkd-lm-titik[data-jenis="sesudah"] { background: var(--accent); }
+.hkd-lm-titik[data-nada="hijau"] { background: var(--st-green); }
+.hkd-lm-titik[data-nada="kuning"] { background: var(--st-amber); }
+.hkd-lm-hubung { position: absolute; top: 98px; height: 78px; border-left: 1.5px dashed var(--dt5); opacity: 0.6; }
+.hkd-lm-baris { position: absolute; left: 0; right: 0; height: 52px; }
+.hkd-lm-baris[data-atas] { height: 50px; }
+.hkd-lm-label[data-atas] { bottom: 0; }
+.hkd-lm-label { position: absolute; display: flex; flex-direction: column; gap: 1px; width: max-content; max-width: 112px; font-size: 9.5px; line-height: 1.25; color: var(--dt4); white-space: nowrap; }
+.hkd-lm-label strong { font-size: 10.5px; color: var(--dtn); }
+.hkd-lm-label[data-sisi="tengah"] { transform: translateX(-50%); align-items: center; text-align: center; }
+.hkd-lm-label[data-sisi="kiri"] { align-items: flex-start; }
+.hkd-lm-label[data-sisi="kanan"] { align-items: flex-end; text-align: right; }
+.hkd-lm-tag { font-size: 8.5px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--accent); }
+.hkd-lm-pita { position: absolute; height: 18px; border-radius: 9px; background: var(--tint-amber-bg2); border: 1px solid var(--tint-amber-ln); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.hkd-lm-pita span { font-size: 9.5px; font-weight: 700; color: var(--st-amber2); }
+.hkd-lm-tunda { position: absolute; height: 18px; border-radius: 9px; background: var(--st-amber); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.hkd-lm-tunda span { font-size: 9.5px; font-weight: 700; color: #1f1500; white-space: nowrap; }
+@media (max-width: 520px) {
+  .hkd-lm-gaji, .hkd-lm-panjang { display: none; }
+}
+.hkd-lm-ringkas { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.hkd-lm-ringkas li { position: relative; padding-left: 12px; font-size: 10.5px; line-height: 1.5; color: var(--dt3); }
+.hkd-lm-ringkas li::before { content: ""; position: absolute; left: 1px; top: 0.6em; width: 6px; height: 6px; border-radius: 50%; background: var(--dt5); }
+.hkd-lm-ringkas li[data-nada="kuning"]::before { background: var(--st-amber); }
+.hkd-lm-ringkas li[data-nada="hijau"]::before { background: var(--st-green); }
+.hkd-lm-ringkas li[data-nada="hijau"] { color: var(--st-green); font-weight: 600; }
 @media (max-width: 760px) {
   .hkd-laporan-baris { grid-template-columns: minmax(0, 1fr); }
   .hkd-aksi { justify-content: flex-start; }

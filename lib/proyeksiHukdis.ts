@@ -61,8 +61,9 @@ export type ProyeksiHukdis =
   /**
    * Bila dicatat, TMT KGB berikutnya bergeser dari `tmtSebelum` ke `tmtBaru`. `sesudahKgbBerjalan` true bila pegawai punya
    * KGB yang sedang diproses atau menunggu keuangan: KGB itu tidak berubah, yang bergeser siklus sesudahnya.
+   * `tmtKgbTerakhir` adalah TMT acuan masa kerja yang akan tersimpan pada pegawai (TMT KGB berjalan bila ada).
    */
-  | { aksi: "geser"; tmtSebelum: Date; tmtBaru: Date; bulan: number; sesudahKgbBerjalan: boolean }
+  | { aksi: "geser"; tmtSebelum: Date; tmtBaru: Date; bulan: number; sesudahKgbBerjalan: boolean; tmtKgbTerakhir: Date }
   /** Kanwil akan menolak mencatatnya pada keadaan sekarang; `alasan` apa adanya dari perencana. */
   | { aksi: "tolak"; alasan: string };
 
@@ -100,6 +101,7 @@ export function proyeksiLaporanHukdis(input: {
     tmtBaru: rencana.tmtKgbBerikutnya,
     bulan,
     sesudahKgbBerjalan: rencana.geserKgbAktif,
+    tmtKgbTerakhir: rencana.tmtKgbTerakhir,
   };
 }
 
