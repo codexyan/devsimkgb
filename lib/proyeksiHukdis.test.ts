@@ -92,10 +92,18 @@ async function denganDataLokal(kerja: () => Promise<void>) {
     await sinkronkanHeader(ALL_DEFS, true);
     await kerja();
   } finally {
-    process.env.DATA_BACKEND = simpan.backend;
-    process.env.DATA_LOKAL_BERKAS = simpan.berkas;
+    // Tunggu penulisan terakhir (catatan audit) selesai sebelum berkas ujinya dilepas; menyetel variabel ke undefined
+    // menyimpannya sebagai teks "undefined", sehingga penulisan yang tertinggal membuat berkas bernama itu di repo.
+    await (globalThis as { __antrianDataLokal?: Promise<unknown> }).__antrianDataLokal;
+    pulihkanEnv("DATA_BACKEND", simpan.backend);
+    pulihkanEnv("DATA_LOKAL_BERKAS", simpan.berkas);
     await rm(folder, { recursive: true, force: true });
   }
+}
+
+function pulihkanEnv(nama: string, nilai: string | undefined) {
+  if (nilai === undefined) delete process.env[nama];
+  else process.env[nama] = nilai;
 }
 
 test("perkiraan dari laporan menunggu sama dengan hasil pencatatan Kanwil, dan laporan lain tidak ikut", async () => {
