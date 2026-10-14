@@ -102,6 +102,51 @@ test("masa penundaan dihitung penuh sebagai masa kerja", () => {
   sama(hasil.tmtKgbBerikutnya, tanggal(2028, 1));
 });
 
+test("KGB penyusul sesudah penundaan 12 bulan menambah 12 bulan, bukan 24 (ADR-115)", () => {
+  // KGB 1 Apr 2024 MKG 10, tertunda ke 1 Apr 2027 (MKG 13 th, masa kerja nyata). Jalur asalnya 2026, 2028, 2030, jadi
+  // KGB berikutnya 1 Apr 2028, dan MKG-nya 14 th seperti masa kerja nyata (bukan 15 th).
+  const hasil = kalkulasiKGB({ golonganRuang: "III/b", mkgTahun: 13, mkgBulan: 0, tmtKgbBerikutnya: tanggal(2028, 4), tmtKgbTerakhir: tanggal(2027, 4) });
+  assert.deepEqual([hasil.mkgTahunBaru, hasil.mkgBulanBaru], [14, 0]);
+  assert.equal(hasil.gajiPokokBaru, getGajiPokok("III/b", 14, 0));
+  sama(hasil.tmtKgbBerikutnya, tanggal(2030, 4));
+});
+
+test("KGB penyusul sesudah penundaan 6 bulan menambah 18 bulan dan kembali ke jalur asal", () => {
+  // KGB 1 Jan 2024 MKG 4, tertunda 6 bulan ke 1 Jul 2026 (MKG 6 th 6 bln); jalur asalnya 2026-01, 2028-01.
+  const tertunda = kalkulasiKGB({ golonganRuang: "III/a", mkgTahun: 4, mkgBulan: 0, tmtKgbBerikutnya: tanggal(2026, 7), tmtKgbTerakhir: tanggal(2024, 1) });
+  sama(tertunda.tmtKgbBerikutnya, tanggal(2028, 1));
+  const penyusul = kalkulasiKGB({ golonganRuang: "III/a", mkgTahun: tertunda.mkgTahunBaru, mkgBulan: tertunda.mkgBulanBaru, tmtKgbBerikutnya: tanggal(2028, 1), tmtKgbTerakhir: tanggal(2026, 7) });
+  assert.deepEqual([penyusul.mkgTahunBaru, penyusul.mkgBulanBaru], [8, 0], "masa kerja nyata: 4 th pada Jan 2024, 8 th pada Jan 2028");
+  sama(penyusul.tmtKgbBerikutnya, tanggal(2030, 1));
+});
+
+test("KGB pertama sejak SK CPNS yang tertunda juga kembali ke jalurnya, bukan mundur setahun (ADR-115)", () => {
+  // CPNS II/a TMT 1 Jun 2025 (MKG 0): jalurnya 2026-06 (MKG 1), 2028-06 (MKG 3), 2030-06. KGB pertama tertunda 12 bulan ke
+  // 1 Jun 2027 dengan MKG 2 th; KGB berikutnya tetap 1 Jun 2028, bukan 2029.
+  const tertunda = kalkulasiKGB({ golonganRuang: "II/a", mkgTahun: 0, mkgBulan: 0, tmtKgbBerikutnya: tanggal(2027, 6), tmtKgbTerakhir: tanggal(2025, 6) });
+  assert.deepEqual([tertunda.mkgTahunBaru, tertunda.mkgBulanBaru], [2, 0]);
+  sama(tertunda.tmtKgbBerikutnya, tanggal(2028, 6));
+  const penyusul = kalkulasiKGB({ golonganRuang: "II/a", mkgTahun: 2, mkgBulan: 0, tmtKgbBerikutnya: tanggal(2028, 6), tmtKgbTerakhir: tanggal(2027, 6) });
+  assert.deepEqual([penyusul.mkgTahunBaru, penyusul.mkgBulanBaru], [3, 0]);
+  sama(penyusul.tmtKgbBerikutnya, tanggal(2030, 6));
+  // Tertunda 6 bulan: 18 bulan sejak SK CPNS, lalu 12 bulan ke jalur asalnya (2028-06).
+  const enamBulan = kalkulasiKGB({ golonganRuang: "II/a", mkgTahun: 0, mkgBulan: 0, tmtKgbBerikutnya: tanggal(2026, 12), tmtKgbTerakhir: tanggal(2025, 6) });
+  assert.deepEqual([enamBulan.mkgTahunBaru, enamBulan.mkgBulanBaru], [1, 6]);
+  sama(enamBulan.tmtKgbBerikutnya, tanggal(2028, 6));
+});
+
+test("tanpa penundaan hasilnya tidak berubah: KGB pertama CPNS tepat waktu dan TMT terakhir yang tidak terbaca", () => {
+  const tepat = kalkulasiKGB({ golonganRuang: "II/a", mkgTahun: 0, mkgBulan: 0, tmtKgbBerikutnya: tanggal(2026, 6), tmtKgbTerakhir: tanggal(2025, 6) });
+  assert.deepEqual([tepat.mkgTahunBaru, tepat.mkgBulanBaru], [1, 0]);
+  sama(tepat.tmtKgbBerikutnya, tanggal(2028, 6));
+  // TMT terakhir sama dengan atau sesudah TMT KGB tidak bermakna sebagai jarak: langkah tabel dipakai.
+  for (const tmtKgbTerakhir of [tanggal(2026, 4), tanggal(2027, 4)]) {
+    const hasil = kalkulasiKGB({ golonganRuang: "III/a", mkgTahun: 4, mkgBulan: 0, tmtKgbBerikutnya: tanggal(2026, 4), tmtKgbTerakhir });
+    assert.deepEqual([hasil.mkgTahunBaru, hasil.mkgBulanBaru], [6, 0]);
+    sama(hasil.tmtKgbBerikutnya, tanggal(2028, 4));
+  }
+});
+
 test("siklus berikutnya untuk II/a setelah MKG 1", () => {
   const hasil = kalkulasiKGB({ golonganRuang: "II/a", mkgTahun: 1, mkgBulan: 0, tmtKgbBerikutnya: tanggal(2028, 6) });
   assert.equal(hasil.mkgTahunBaru, 3);

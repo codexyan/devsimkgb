@@ -12,6 +12,7 @@ import {
   rencanaSiklusBerikutnya,
   tanggalPalingAkhir,
 } from "./jadwalKgb";
+import { getGajiPokok } from "./tabelGaji";
 import { hariIniWita } from "./waktu";
 
 const tanggal = (tahun: number, bulan: number, hari = 1) => new Date(tahun, bulan - 1, hari);
@@ -430,6 +431,46 @@ test("flagRapelan placeholder mengikuti hari ini WITA yang disuntikkan", () => {
   assert.equal(sebelumBatas.flagRapelan, false);
   assert.equal(sesudahBatas.flagRapelan, true);
   assert.equal(sesudahBatas.mkgTahunBaru, 6);
+});
+
+test("rantai penundaan hukdis: jadwal kembali ke jalur asal dan MKG selalu sama dengan masa kerja nyata (ADR-115)", () => {
+  // Siklus 1 April tahun genap. KGB 1 Apr 2024 MKG 10 th; hukdis Sedang pertengahan 2025 menunda KGB 2026 ke 2027.
+  type Pegawai = { golonganRuang: string; mkgTahun: number; mkgBulan: number; gajiPokok: number; tmtKgbTerakhir: Date; tmtKgbBerikutnya: Date };
+  let pegawai: Pegawai = { golonganRuang: "III/b", mkgTahun: 10, mkgBulan: 0, gajiPokok: getGajiPokok("III/b", 10, 0), tmtKgbTerakhir: tanggal(2024, 4), tmtKgbBerikutnya: tanggal(2026, 4) };
+  const bulanNyata = (tmt: Date) => 10 * 12 + (tmt.getFullYear() - 2024) * 12 + (tmt.getMonth() - 3);
+  const tunda = (mulai: Date) => {
+    const rencana = rencanaPenundaanHukdis({ pegawai, tmtMulaiHukdis: mulai, durasiTunda: 12, hariIni: mulai });
+    assert.equal(rencana.aksi, "geser");
+    if (rencana.aksi !== "geser") return;
+    pegawai = { ...pegawai, tmtKgbBerikutnya: rencana.tmtKgbBerikutnya, tmtKgbTerakhir: rencana.tmtKgbTerakhir };
+  };
+  const kgbBerikutnya = () => {
+    const kgb = rencanaSiklusBerikutnya({ ...pegawai, hariIni: new Date(pegawai.tmtKgbBerikutnya.getTime() - 40 * 86400000) });
+    const lanjut = rencanaSetelahKgbSelesai({ kgb, tmtKgbBerikutnyaPegawai: kgb.tmtKgbBerikutnya, hariIni: kgb.tmtKgbBaru });
+    pegawai = { ...pegawai, ...lanjut.pegawai };
+    return kgb;
+  };
+  const ringkas = (kgb: ReturnType<typeof kgbBerikutnya>) =>
+    [kgb.tmtKgbBaru.getFullYear(), kgb.tmtKgbBaru.getMonth() + 1, kgb.mkgTahunBaru, kgb.mkgBulanBaru, kgb.gajiPokokBaru];
+
+  tunda(tanggal(2025, 6));
+  assert.deepEqual([pegawai.tmtKgbBerikutnya, pegawai.mkgTahun, pegawai.gajiPokok], [tanggal(2027, 4), 10, getGajiPokok("III/b", 10, 0)], "selama penundaan MKG dan gaji terkunci");
+
+  // 1 Apr 2027: SK yang tertahan terbit; penundaan dihitung penuh sebagai masa kerja (13 th, gaji langkah 12 th).
+  assert.deepEqual(ringkas(kgbBerikutnya()), [2027, 4, 13, 0, getGajiPokok("III/b", 12, 0)]);
+  // Bukan 2029: jadwal kembali ke jalur asal, 1 April 2028, dengan MKG 14 th.
+  assert.deepEqual(pegawai.tmtKgbBerikutnya, tanggal(2028, 4));
+  assert.deepEqual(ringkas(kgbBerikutnya()), [2028, 4, 14, 0, getGajiPokok("III/b", 14, 0)]);
+  assert.deepEqual(pegawai.tmtKgbBerikutnya, tanggal(2030, 4));
+
+  // Penundaan kedua: tiap KGB sesudahnya tetap sejajar dengan masa kerja nyata, tanpa selisih yang menumpuk.
+  tunda(tanggal(2029, 6));
+  for (let i = 0; i < 4; i++) {
+    const kgb = kgbBerikutnya();
+    const nyata = bulanNyata(kgb.tmtKgbBaru);
+    assert.deepEqual([kgb.mkgTahunBaru, kgb.mkgBulanBaru], [Math.floor(nyata / 12), nyata % 12], `KGB ${kgb.tmtKgbBaru.getFullYear()}`);
+    assert.equal(kgb.gajiPokokBaru, getGajiPokok("III/b", Math.floor(nyata / 12), nyata % 12));
+  }
 });
 
 test("tanggalPalingAkhir membaca tanggal kalender", () => {

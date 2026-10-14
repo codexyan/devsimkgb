@@ -414,7 +414,9 @@ export default async function IsiPanduan({
                 <p>
                   Di SIM-KGB, hukuman disiplin yang jenisnya menunda KGB menahan proses. Selama hukuman itu masih berlaku,
                   Input KGB dan Arsip KGB pegawai tersebut ditolak, dan jadwal KGB bergeser sesuai lama penundaan. Saat
-                  KGB akhirnya dihitung, selisih waktu sejak TMT KGB terakhir dihitung penuh. Bila pegawai sedang
+                  KGB akhirnya dihitung, selisih waktu sejak TMT KGB terakhir dihitung penuh sebagai masa kerja, lalu KGB
+                  berikutnya kembali ke jalur semula (bukan dua tahun dari TMT yang baru) dan masa kerjanya bertambah
+                  sebesar bulan yang berlalu. Bila pegawai sedang
                   memiliki KGB berstatus Sedang Diproses atau Menunggu Keuangan, hukuman disiplin yang menunda KGB hanya
                   dapat dicatat bila mulai berlaku setelah TMT KGB tersebut, dan penundaannya menggeser KGB berikutnya.
                   UPT melaporkan hukuman disiplin pegawainya lewat menu <strong>Lapor Hukdis</strong>; yang

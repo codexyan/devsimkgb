@@ -1,7 +1,7 @@
 # ADR-080: Periode KGB tetap 24 bulan, dan pilihan "pernah KGB" disimpan
 
 Tanggal: 7 Oktober 2026
-Status: berlaku
+Status: berlaku; MKG pada KGB penyusul sesudah penundaan dan jalur KGB pertama CPNS yang tertunda dilengkapi ADR-115
 
 ## Konteks
 

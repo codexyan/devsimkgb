@@ -595,11 +595,18 @@ export function kalkulasiKGB(pegawai: {
   }
   const mkgSekarang = (pegawai.mkgTahun || 0) * 12 + (pegawai.mkgBulan || 0);
 
-  // Masa kerja bertambah sebesar jaraknya ke KGB ini. Bila jarak dari TMT terakhir lebih panjang, misalnya karena KGB
-  // pernah ditunda, selisih itu ikut dihitung penuh.
-  let tambah = bulanKeKgbBerikutnya(pegawai.golonganRuang, pegawai.mkgTahun, pegawai.mkgBulan);
+  // Masa kerja bertambah sebesar bulan yang berlalu sejak TMT KGB terakhir, sebab masa kerja yang tersimpan adalah
+  // keadaan pada TMT itu.
+  // - Jarak lebih panjang dari jadwal (KGB tertunda, misalnya karena hukuman disiplin): selisihnya dihitung penuh.
+  // - Jarak lebih pendek dari siklus 24 bulan: KGB penyusul sesudah penundaan, yang kembali ke jalur asalnya (ADR-080).
+  //   Hanya bulan yang benar-benar berlalu yang ditambahkan; menambah 24 bulan penuh melebihkan masa kerja setahun
+  //   untuk setiap penundaan (ADR-115).
+  // - Langkah awal tabel yang bukan siklus 24 bulan (KGB pertama sejak SK CPNS, atau golongan yang tabelnya baru
+  //   dimulai di masa kerja yang lebih tinggi) tetap menjadi batas bawah, sebab KGB memindahkan pegawai ke langkah itu.
+  const langkah = bulanKeKgbBerikutnya(pegawai.golonganRuang, pegawai.mkgTahun, pegawai.mkgBulan);
   const tmtTerakhir = tanggalKalender(pegawai.tmtKgbTerakhir);
-  if (tmtTerakhir) tambah = Math.max(tambah, selisihBulan(tmtTerakhir, tmtKgbBaru));
+  const berlalu = tmtTerakhir ? selisihBulan(tmtTerakhir, tmtKgbBaru) : 0;
+  const tambah = berlalu > langkah || (berlalu > 0 && langkah === JARAK_KGB_BULAN) ? berlalu : langkah;
 
   const mkgTahunBaru = Math.floor((mkgSekarang + tambah) / 12);
   const mkgBulanBaru = (mkgSekarang + tambah) % 12;
@@ -607,9 +614,11 @@ export function kalkulasiKGB(pegawai: {
   const gajiPokokBaru = getGajiPokok(pegawai.golonganRuang, mkgTahunBaru, mkgBulanBaru);
 
   // Periode KGB tetap (ADR-080): KGB yang tertunda, misalnya karena hukuman disiplin, kembali ke siklusnya. Tertunda
-  // 12 bulan berarti KGB berikutnya 12 bulan kemudian; masa kerjanya sudah dihitung penuh di atas. Selain itu jaraknya
-  // seperti biasa: KGB pertama sejak SK CPNS menurut tabel, sesudahnya 24 bulan, juga bila masa kerja berbulan karena PMK.
-  const tertunda = tambah - JARAK_KGB_BULAN;
+  // 12 bulan berarti KGB berikutnya 12 bulan kemudian; masa kerjanya sudah dihitung penuh di atas. Penundaan diukur dari
+  // jadwal semula: 24 bulan, atau langkah awal tabel bila KGB pertama sejak SK CPNS yang tertunda (II/a: 12 bulan), supaya
+  // KGB pertama yang tertunda juga kembali ke jalurnya, bukan mundur setahun. Selain itu jaraknya seperti biasa: KGB
+  // pertama sejak SK CPNS menurut tabel, sesudahnya 24 bulan, juga bila masa kerja berbulan karena PMK.
+  const tertunda = tambah - Math.min(langkah, JARAK_KGB_BULAN);
   const tmtKgbBerikutnya = tambahBulan(
     tmtKgbBaru,
     tertunda > 0
