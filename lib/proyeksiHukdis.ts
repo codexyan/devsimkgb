@@ -9,6 +9,7 @@
 // Murni agar dapat dipakai server maupun peramban dan diuji tanpa lapisan data.
 
 import { rencanaPenundaanHukdis } from "./jadwalKgb";
+import { isoTanggalKalender } from "./rekapKgb";
 import type { NilaiTanggal } from "./waktu";
 
 /** Bagian katalog jenis hukuman yang menentukan dampaknya pada KGB. */
@@ -33,11 +34,36 @@ export function dampakJenisHukdis(
   return { berdampakKGB, durasiTunda: berdampakKGB ? (jenis?.durasiTunda ?? DURASI_TUNDA_BAWAAN) : null };
 }
 
+/** Batas lama penundaan KGB yang diterima pencatatan hukdis, dalam bulan. */
+export const BATAS_TUNDA_BULAN = { min: 1, maks: 60 } as const;
+
+/**
+ * Dampak final satu hukuman dari isian peninjau: nilai yang diketik menang, yang kosong mengikuti katalog jenis. Satu aturan
+ * untuk pencatatan (lib/catatHukdis.ts) dan perkiraan di formulir Kanwil, supaya perkiraan tidak berbeda dari hasil catat.
+ */
+export function tentukanDampakIsian(
+  kode: string,
+  jenis: JenisDampak | null | undefined,
+  isian: { berdampakKGB?: unknown; durasiTunda?: unknown },
+): { ok: true; berdampakKGB: boolean; durasiTunda: number | null } | { ok: false; alasan: string } {
+  const berdampakKGB = typeof isian.berdampakKGB === "boolean" ? isian.berdampakKGB : dampakJenisHukdis(kode, jenis).berdampakKGB;
+  if (!berdampakKGB) return { ok: true, berdampakKGB, durasiTunda: null };
+  const diketik = Number(isian.durasiTunda);
+  const durasiTunda = Number.isFinite(diketik) && diketik > 0 ? Math.round(diketik) : (jenis?.durasiTunda ?? DURASI_TUNDA_BAWAAN);
+  if (!(Number.isInteger(durasiTunda) && durasiTunda >= BATAS_TUNDA_BULAN.min && durasiTunda <= BATAS_TUNDA_BULAN.maks))
+    return { ok: false, alasan: `Lama penundaan KGB harus ${BATAS_TUNDA_BULAN.min} sampai ${BATAS_TUNDA_BULAN.maks} bulan.` };
+  return { ok: true, berdampakKGB, durasiTunda };
+}
+
 export type ProyeksiHukdis =
   /** Hukumannya tidak menunda KGB, jadi jadwal tidak bergeser. */
   | { aksi: "tidak_menunda" }
-  /** Bila dicatat, TMT KGB berikutnya bergeser dari `tmtSebelum` ke `tmtBaru`. */
-  | { aksi: "geser"; tmtSebelum: Date; tmtBaru: Date; bulan: number }
+  /**
+   * Bila dicatat, TMT KGB berikutnya bergeser dari `tmtSebelum` ke `tmtBaru`. `sesudahKgbBerjalan` true bila pegawai punya
+   * KGB yang sedang diproses atau menunggu keuangan: KGB itu tidak berubah, yang bergeser siklus sesudahnya.
+   * `tmtKgbTerakhir` adalah TMT acuan masa kerja yang akan tersimpan pada pegawai (TMT KGB berjalan bila ada).
+   */
+  | { aksi: "geser"; tmtSebelum: Date; tmtBaru: Date; bulan: number; sesudahKgbBerjalan: boolean; tmtKgbTerakhir: Date }
   /** Kanwil akan menolak mencatatnya pada keadaan sekarang; `alasan` apa adanya dari perencana. */
   | { aksi: "tolak"; alasan: string };
 
@@ -69,5 +95,30 @@ export function proyeksiLaporanHukdis(input: {
     hariIni: input.hariIni,
   });
   if (rencana.aksi === "tolak") return { aksi: "tolak", alasan: rencana.alasan };
-  return { aksi: "geser", tmtSebelum: rencana.tmtSebelumTunda, tmtBaru: rencana.tmtKgbBerikutnya, bulan };
+  return {
+    aksi: "geser",
+    tmtSebelum: rencana.tmtSebelumTunda,
+    tmtBaru: rencana.tmtKgbBerikutnya,
+    bulan,
+    sesudahKgbBerjalan: rencana.geserKgbAktif,
+    tmtKgbTerakhir: rencana.tmtKgbTerakhir,
+  };
+}
+
+/** Bentuk JSON proyeksi untuk API (tanggal sebagai tanggal kalender WITA), dipakai UPT dan Kanwil. */
+export type ProyeksiHukdisJson =
+  | { aksi: "tidak_menunda" }
+  | { aksi: "geser"; dari: string | null; ke: string | null; bulan: number; sesudahKgbBerjalan: boolean }
+  | { aksi: "tolak"; alasan: string };
+
+export function jsonProyeksiHukdis(p: ProyeksiHukdis): ProyeksiHukdisJson {
+  if (p.aksi === "geser")
+    return {
+      aksi: "geser",
+      dari: isoTanggalKalender(p.tmtSebelum),
+      ke: isoTanggalKalender(p.tmtBaru),
+      bulan: p.bulan,
+      sesudahKgbBerjalan: p.sesudahKgbBerjalan,
+    };
+  return p.aksi === "tolak" ? { aksi: "tolak", alasan: p.alasan } : { aksi: "tidak_menunda" };
 }

@@ -2023,15 +2023,23 @@ export default async function IsiPanduan({
                 <ol>
                   <li>
                     Laporan baru memunculkan notifikasi bagi Tim SDM Hukdis dan Super Admin, dan tampil di panel{" "}
-                    <strong>Laporan dari UPT</strong> pada menu Hukuman Disiplin.
+                    <strong>Laporan dari UPT</strong> pada menu Hukuman Disiplin. Tiap laporan yang menunggu membawa{" "}
+                    <em>perkiraan</em> jadwal KGB bila dicatat: TMT KGB yang bergeser dari mana ke mana, atau alasan
+                    laporan belum dapat dicatat (misalnya KGB pegawainya sedang diproses, atau hukumannya mulai sesudah TMT
+                    KGB yang belum diinput).
                   </li>
                   <li>
                     Buka <strong>Pindaian SK</strong> dan cocokkan jenis, nomor, tanggal, dan masa berlakunya.
                   </li>
                   <li>
                     Pilih <strong>Catat</strong> untuk membuka formulir input hukuman disiplin yang sudah terisi dari
-                    laporan. Dampak pada KGB, lama penundaan, dan dasar hukum mengikuti jenisnya dan masih dapat diubah.
-                    TMT berakhir wajib diisi saat mencatat. Setelah disimpan, laporan berstatus Sudah dicatat Kanwil.
+                    laporan. Dampak pada KGB, lama penundaan, dan dasar hukum mengikuti jenisnya dan masih dapat diubah;
+                    perkiraan jadwal di bawah Berdampak pada KGB ikut berubah mengikuti jenis, TMT mulai, dan lama
+                    penundaan yang Anda isi, dengan hitungan yang sama dengan saat disimpan. Di bawahnya ada{" "}
+                    <strong>linimasa perhitungan</strong>: jalur Semula (tanpa hukuman) dan jalur Sesudah dicatat di atas
+                    satu sumbu waktu, dengan pita masa hukuman, batang penundaan, serta bulan TMT, masa kerja, dan gaji
+                    tiap KGB. Titik hijau berarti KGB berikutnya kembali ke jalur semula. TMT berakhir wajib diisi saat
+                    mencatat. Setelah disimpan, laporan berstatus Sudah dicatat Kanwil.
                   </li>
                   <li>
                     Pilih <strong>Kembalikan</strong> bila SK tidak cocok atau berkas kurang jelas. Catatan wajib diisi;

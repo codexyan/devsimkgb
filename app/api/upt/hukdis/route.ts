@@ -7,6 +7,7 @@ import { akunUpt } from "@/lib/auth/akunUpt";
 import { logAudit } from "@/lib/auditLog";
 import { pegawaiSatker } from "@/lib/aksesUpt";
 import { hukdisMasihBerlaku } from "@/lib/hukdisKedaluwarsa";
+import { jsonProyeksiHukdis } from "@/lib/proyeksiHukdis";
 import { proyeksiLaporanMenunggu } from "@/lib/proyeksiHukdisServer";
 import {
   LAPORAN_HUKDIS_DIPEGANG_UPT,
@@ -91,13 +92,7 @@ export async function GET() {
         tmtBerakhir: isoTanggalKalender(l.tmtBerakhir),
         keterangan: l.keterangan,
         berkas: l.pathBerkas ? { nama: namaAsliBerkas(l.pathBerkas) } : null,
-        proyeksi: ((): { aksi: "geser" | "tolak" | "tidak_menunda"; dari?: string | null; ke?: string | null; bulan?: number; alasan?: string } | null => {
-          const x = perkiraan.get(l.id);
-          if (!x) return null;
-          if (x.aksi === "geser")
-            return { aksi: "geser", dari: isoTanggalKalender(x.tmtSebelum), ke: isoTanggalKalender(x.tmtBaru), bulan: x.bulan };
-          return x.aksi === "tolak" ? { aksi: "tolak", alasan: x.alasan } : { aksi: "tidak_menunda" };
-        })(),
+        proyeksi: perkiraan.has(l.id) ? jsonProyeksiHukdis(perkiraan.get(l.id)!) : null,
         status: l.status,
         catatanKanwil: l.catatanKanwil,
         dilaporkanOleh: l.dilaporkanOleh,

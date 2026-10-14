@@ -3,9 +3,12 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { canManageHukdis } from "@/lib/auth";
 import { tabelBelumAda } from "@/lib/laporanHukdisServer";
+import { jsonProyeksiHukdis } from "@/lib/proyeksiHukdis";
+import { proyeksiSemuaLaporanMenunggu } from "@/lib/proyeksiHukdisServer";
 import { namaAsliBerkas } from "@/lib/usulanPegawai";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
 import { SATKER } from "@/lib/satker";
+import { hariIniWita } from "@/lib/waktu";
 import type { LaporanHukdisRow, PegawaiRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
@@ -14,7 +17,8 @@ type JenisBaris = { kode: string; label: string | null };
 
 /**
  * Laporan hukuman disiplin dari seluruh UPT untuk SDM Hukdis dan Super Admin (ADR-016). Yang menunggu
- * didahulukan; yang sudah dicatat tetap dikirim sebagai riwayat asal usul catatan hukdisnya.
+ * didahulukan; yang sudah dicatat tetap dikirim sebagai riwayat asal usul catatan hukdisnya. Laporan yang menunggu
+ * membawa `proyeksi`: perkiraan jadwal KGB bila dicatat, atau alasan Kanwil belum dapat mencatatnya (ADR-116).
  * `aktif: false` berarti tabelnya belum dibuat di basis data, dan daftarnya memang kosong.
  */
 export async function GET(req: Request) {
@@ -41,6 +45,8 @@ export async function GET(req: Request) {
   const pegawaiById = new Map(semuaPegawai.map((p) => [p.id, p]));
   const labelJenis = new Map(semuaJenis.map((j) => [j.kode, j.label ?? j.kode]));
   const urutStatus: Record<string, number> = { menunggu: 0, dikembalikan: 1, diterima: 2 };
+  // Perkiraan jadwal KGB bila laporan yang menunggu dicatat (ADR-116); hanya tampilan, data pegawai belum berubah.
+  const perkiraan = await proyeksiSemuaLaporanMenunggu(laporan, hariIniWita());
 
   const daftar = laporan
     .map((l) => {
@@ -61,6 +67,7 @@ export async function GET(req: Request) {
         tmtBerakhir: isoTanggalKalender(l.tmtBerakhir),
         keterangan: l.keterangan,
         berkas: l.pathBerkas ? { nama: namaAsliBerkas(l.pathBerkas), url: `/api/hukdis/laporan/${l.id}/berkas` } : null,
+        proyeksi: perkiraan.has(l.id) ? jsonProyeksiHukdis(perkiraan.get(l.id)!) : null,
         status: l.status,
         catatanKanwil: l.catatanKanwil,
         dilaporkanOleh: l.dilaporkanOleh,

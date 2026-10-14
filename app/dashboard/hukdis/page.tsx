@@ -8,6 +8,9 @@ import { canManageHukdis } from "@/lib/auth";
 import { formatTanggalId, hariIniWita, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 import { useDialogModal } from "@/app/dashboard/components/useDialogModal";
 import { tmtBerakhirOtomatis } from "@/lib/hukdisJenis";
+import type { ProyeksiHukdisJson } from "@/lib/proyeksiHukdis";
+import type { LinimasaHukdisJson } from "@/lib/linimasaHukdis";
+import LinimasaHukdis from "./LinimasaHukdis";
 import { SATKER } from "@/lib/satker";
 import { KODE_SATKER_LAIN, kodeSatkerPegawai } from "@/lib/rekapSatker";
 import { namaTampilSatker } from "@/app/dashboard/satker/labelSatker";
@@ -40,6 +43,8 @@ interface LaporanUpt {
   nomorSK: string | null; tanggalSK: string | null; tmtMulai: string | null; tmtBerakhir: string | null;
   keterangan: string | null;
   berkas: { nama: string | null; url: string } | null;
+  /** Perkiraan jadwal KGB bila laporan dicatat (ADR-116). */
+  proyeksi?: ProyeksiHukdisJson | null;
   status: string;
   dilaporkanOleh: string | null; dilaporkanAt: string | null;
 }
@@ -55,6 +60,33 @@ const initials = (n: string) => n.split(" ").map((x) => x[0]).slice(0, 2).join("
 const fmt = (s: string | null) => (s ? formatTanggalId(s, { day: "numeric", month: "short", year: "numeric" }) : "-");
 // Tanggal hari ini menurut kalender perangkat (bukan UTC, yang mundur sehari sebelum pukul 08.00 WITA).
 const todayIso = () => isoTanggalLokal();
+
+/** Kalimat pertama saja, untuk baris daftar; teks lengkapnya tetap ada pada atribut title. */
+const kalimatPertama = (teks: string) => teks.split(/(?<=\.)\s/)[0];
+
+/**
+ * Teks perkiraan jadwal KGB dari proyeksi hukdis (ADR-116). `ringkas` memendekkan alasan penolakan untuk baris daftar.
+ * `nada` mengikuti arti bagi peninjau: kuning bila jadwal bergeser, merah bila belum dapat dicatat, redup bila tidak ada
+ * dampak.
+ */
+function teksProyeksi(p: ProyeksiHukdisJson, ringkas: boolean): { teks: string; penuh: string; nada: "kuning" | "merah" | "redup" } {
+  if (p.aksi === "geser") {
+    const teks = p.sesudahKgbBerjalan
+      ? `Perkiraan bila dicatat: KGB yang sedang berjalan tidak berubah; siklus sesudahnya bergeser dari ${fmt(p.dari)} ke ${fmt(p.ke)} (+${p.bulan} bulan)`
+      : `Perkiraan bila dicatat: TMT KGB berikutnya bergeser dari ${fmt(p.dari)} ke ${fmt(p.ke)} (+${p.bulan} bulan)`;
+    return { teks, penuh: teks, nada: "kuning" };
+  }
+  if (p.aksi === "tidak_menunda") {
+    const teks = "Tidak menunda KGB; jadwal tidak bergeser";
+    return { teks, penuh: teks, nada: "redup" };
+  }
+  return {
+    teks: `Belum dapat dicatat: ${ringkas ? kalimatPertama(p.alasan) : p.alasan}`,
+    penuh: p.alasan,
+    nada: "merah",
+  };
+}
+const WARNA_PROYEKSI = { kuning: "var(--st-amber)", merah: "var(--st-red)", redup: "var(--dt4)" } as const;
 
 /** Saringan utama: masa berlaku dan dampak KGB. */
 type Saringan = "aktif" | "segera" | "tunda" | "berakhir" | "";
@@ -115,6 +147,9 @@ export default function HukdisPage() {
   const [sibukKembali, setSibukKembali] = useState(false);
   const [galatKembali, setGalatKembali] = useState("");
   const [pratinjauLaporan, setPratinjauLaporan] = useState<LaporanUpt | null>(null);
+  // Perkiraan jadwal KGB dari isian formulir yang sedang diketik (ADR-116). `kunci` mengikat hasilnya ke isian yang
+  // menghasilkannya, sehingga hasil usang tidak tampil sementara isian sudah berubah.
+  const [perkiraanForm, setPerkiraanForm] = useState<{ kunci: string; data: ProyeksiHukdisJson | null; linimasa: LinimasaHukdisJson | null } | null>(null);
 
   // Delete modal
   const [delTarget, setDelTarget] = useState<Hukdis | null>(null);
@@ -187,6 +222,26 @@ export default function HukdisPage() {
     const j = jenisList.find((x) => x.kode === form.jenisHukdis);
     setForm((f) => ({ ...f, tmtMulai: v, tmtBerakhir: j && j.durasiHukdis > 0 && v ? tmtBerakhirOtomatis(v, j.durasiHukdis) : f.tmtBerakhir }));
   }
+
+  const kunciPerkiraan = showInput && selPeg && form.jenisHukdis && form.tmtMulai && form.berdampakKGB
+    ? [selPeg.id, form.jenisHukdis, form.tmtMulai, form.tmtBerakhir, form.durasiTunda].join("|")
+    : null;
+  useEffect(() => {
+    if (!kunciPerkiraan || !selPeg) return;
+    const ctl = new AbortController();
+    const t = setTimeout(() => {
+      const q = new URLSearchParams({
+        pegawaiId: selPeg.id, jenis: form.jenisHukdis, tmtMulai: form.tmtMulai, tmtBerakhir: form.tmtBerakhir, berdampak: "1", tunda: String(form.durasiTunda),
+      });
+      fetch(`/api/hukdis/proyeksi?${q}`, { signal: ctl.signal })
+        .then((r) => r.json() as Promise<{ proyeksi?: ProyeksiHukdisJson | null; linimasa?: LinimasaHukdisJson | null }>)
+        .then((d) => setPerkiraanForm({ kunci: kunciPerkiraan, data: d.proyeksi ?? null, linimasa: d.linimasa ?? null }))
+        .catch(() => { if (!ctl.signal.aborted) setPerkiraanForm({ kunci: kunciPerkiraan, data: null, linimasa: null }); });
+    }, 300);
+    return () => { clearTimeout(t); ctl.abort(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kunciPerkiraan]);
+  const perkiraanSiap = kunciPerkiraan !== null && perkiraanForm?.kunci === kunciPerkiraan;
 
   const filteredPeg = useMemo(() => {
     const q = pegSearch.trim().toLowerCase();
@@ -403,6 +458,15 @@ export default function HukdisPage() {
                 <div className="min-w-0">
                   <p className="whitespace-nowrap">{fmt(l.tmtMulai)} – {l.tmtBerakhir ? fmt(l.tmtBerakhir) : "tanpa masa"}</p>
                   <p className="dsb-kecil truncate" title={l.dilaporkanOleh ?? undefined}>dilaporkan {fmt(l.dilaporkanAt)}{l.keterangan ? ` · ${l.keterangan}` : ""}</p>
+                  {/* Perkiraan jadwal bila dicatat; data pegawai belum berubah sampai Kanwil mencatatnya (ADR-116). */}
+                  {l.proyeksi && (() => {
+                    const x = teksProyeksi(l.proyeksi, true);
+                    return (
+                      <p className="dsb-kecil" title={x.penuh} style={{ marginTop: 2, color: WARNA_PROYEKSI[x.nada], display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {x.teks}
+                      </p>
+                    );
+                  })()}
                 </div>
                 <span className="hkd-aksi">
                   {l.berkas && (
@@ -664,9 +728,17 @@ export default function HukdisPage() {
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--dt5)" }}>bulan</span>
                         </div>
                         <p className="text-xs mt-1" style={{ color: "var(--st-amber2)", fontSize: "10px" }}>TMT KGB berikutnya akan digeser +{form.durasiTunda || 0} bulan. Nilai ini ditetapkan Anda, bukan otomatis.</p>
+                        {/* Perkiraan dari jadwal pegawai yang sebenarnya; mengikuti jenis, TMT mulai, dan lama penundaan di atas (ADR-116). */}
+                        {perkiraanSiap && perkiraanForm?.data && (() => {
+                          const x = teksProyeksi(perkiraanForm.data, false);
+                          return <p role="status" className="text-xs mt-1.5" style={{ color: WARNA_PROYEKSI[x.nada], fontSize: "10.5px", lineHeight: 1.5 }}>{x.teks}</p>;
+                        })()}
                       </div>
                     )}
                   </div>
+
+                  {/* Linimasa perhitungan: jalur semula dan jalur sesudah dicatat, untuk memeriksa sebelum menyimpan (ADR-116). */}
+                  {perkiraanSiap && perkiraanForm?.linimasa && <LinimasaHukdis data={perkiraanForm.linimasa} />}
 
                   <div>
                     <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--dt2)" }}>Keterangan <span style={{ color: "var(--dt5)" }}>(opsional)</span></label>

@@ -16,7 +16,7 @@ import {
   type RencanaSiklusKgb,
 } from "./jadwalKgb";
 import { formatTanggalId, hariIniWita } from "./waktu";
-import { DURASI_TUNDA_BAWAAN, dampakJenisHukdis } from "./proyeksiHukdis";
+import { tentukanDampakIsian } from "./proyeksiHukdis";
 
 type HukdisJenisRow = {
   kode: string;
@@ -64,19 +64,11 @@ export async function catatHukdis(
 
   const jenisConfig = (await db.hukdisJenis.findUnique({ kode: jenisHukdis })) as unknown as HukdisJenisRow | null;
 
-  // Dampak bawaan jenis hukuman dipakai bersama proyeksi laporan UPT (lib/proyeksiHukdis.ts), supaya perkiraan dan
-  // pencatatan tidak berbeda; peninjau tetap boleh menimpanya lewat isian.
-  const berdampakKGB: boolean =
-    typeof body.berdampakKGB === "boolean" ? body.berdampakKGB : dampakJenisHukdis(jenisHukdis, jenisConfig).berdampakKGB;
-
-  const durasiTundaInput = Number(body.durasiTunda);
-  const durasiTunda: number | null = berdampakKGB
-    ? (Number.isFinite(durasiTundaInput) && durasiTundaInput > 0
-        ? Math.round(durasiTundaInput)
-        : (jenisConfig?.durasiTunda ?? DURASI_TUNDA_BAWAAN))
-    : null;
-  if (durasiTunda !== null && !(Number.isInteger(durasiTunda) && durasiTunda >= 1 && durasiTunda <= 60))
-    return { ok: false, status: 400, error: "Lama penundaan KGB harus 1 sampai 60 bulan." };
+  // Dampak final dihitung dengan aturan yang sama dengan perkiraan di formulir Kanwil dan proyeksi laporan UPT
+  // (lib/proyeksiHukdis.ts), supaya perkiraan dan pencatatan tidak berbeda; peninjau boleh menimpa bawaan jenis lewat isian.
+  const dampak = tentukanDampakIsian(jenisHukdis, jenisConfig, body);
+  if (!dampak.ok) return { ok: false, status: 400, error: dampak.alasan };
+  const { berdampakKGB, durasiTunda } = dampak;
 
   const dasarHukum = teksAtauNull(body.dasarHukum) ?? jenisConfig?.dasarHukum ?? null;
   const hariIni = hariIniWita();
