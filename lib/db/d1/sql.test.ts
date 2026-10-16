@@ -1,5 +1,5 @@
 // Terjemahan filter ke SQL D1 (ADR-085) dijalankan di SQLite sungguhan, lalu hasilnya dibandingkan dengan pencocokan
-// lapisan Sheets (`matches`) untuk setiap contoh. Contohnya sama dengan uji filter Supabase.
+// lapisan Sheets (`matches`) untuk setiap contoh. Contohnya sama dengan uji pohon Kondisi (lib/db/kondisi.test.ts).
 //
 // Jalankan: node --import tsx --test lib/db/d1/sql.test.ts
 
@@ -8,8 +8,8 @@ import { test } from "node:test";
 import { matches, type ColumnType } from "../../sheets/table";
 import { KOLOM_CONTOH, RECORD_CONTOH, T1, WHERE_CONTOH } from "../contohFilter";
 import type { Where } from "../repo";
-import { keKondisi } from "../supabase/filter";
-import { keSnake } from "../supabase/nama";
+import { keKondisi } from "../kondisi";
+import { keSnake } from "../nama";
 import { keSql } from "./sql";
 import { keD1 } from "./table";
 import { buatD1Uji } from "./ujiD1";
@@ -69,8 +69,8 @@ test("daftar `in` yang panjang tetap satu parameter", () => {
 });
 
 test("tanggal tanpa jam dibaca seperti Postgres (tengah malam UTC), bukan sebagai teks", () => {
-  // Lapisan Sheets menganggap "2026-01-01" teks biasa sehingga gte selalu salah; Supabase (dan D1) membacanya sebagai
-  // waktu. D1 menggantikan Supabase, jadi yang diikuti adalah perilaku Postgres.
+  // Lapisan Sheets menganggap "2026-01-01" teks biasa sehingga gte selalu salah; D1 membacanya sebagai waktu, seperti
+  // Postgres dulu, supaya perilaku aplikasi tidak berubah saat basis data berpindah (ADR-085).
   const d1 = siapkan();
   assert.deepEqual(cocokSql(d1, { tmtKgbBaru: { gte: "2026-01-01" } }), [0, 1, 3, 4]);
 });

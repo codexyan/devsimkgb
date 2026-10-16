@@ -16,7 +16,6 @@ import { newId } from "./sheets/id";
 import { notifikasiUsulanRevisi } from "./generateNotifikasi";
 import { BELUM_SELESAI, BIDANG_USULAN } from "./usulanPegawai";
 import { bawaanPegawai } from "./bawaanUsulan";
-import { tulisDenganAcuan } from "./acuanUsulanServer";
 import { pegawaiSatker } from "./aksesUpt";
 import { TANPA_SK_BARU } from "./dasarBaruUsulan";
 import { SATKER } from "./satker";
@@ -130,7 +129,7 @@ export async function kembalikanUsulanDisetujui(input: {
     alasanTolak: catatan,
     ...isian,
   };
-  await tulisDenganAcuan(baris, (isi) => db.usulanPegawai.create(isi));
+  await db.usulanPegawai.create(baris);
 
   try {
     await db.notifikasi.create({

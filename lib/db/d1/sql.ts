@@ -1,9 +1,9 @@
-// Kondisi (lib/db/supabase/filter.ts) → klausa WHERE SQLite untuk D1 (ADR-085). Pohon Kondisi yang sama dipakai
-// Supabase, jadi aturan null dan operator sudah sejalan dengan pencocokan JavaScript di lib/sheets/table.ts. Yang
-// diatur di sini hanya bentuk SQL-nya dan jenis nilai yang dikirim.
+// Kondisi (lib/db/kondisi.ts) → klausa WHERE SQLite untuk D1 (ADR-085). Aturan null dan operator sudah diselesaikan
+// di pohon Kondisi, yang diuji sejalan dengan pencocokan JavaScript di lib/sheets/table.ts. Yang diatur di sini hanya
+// bentuk SQL-nya dan jenis nilai yang dikirim.
 
 import type { ColumnType } from "../../sheets/table";
-import type { Kondisi, NilaiFilter } from "../supabase/filter";
+import type { Kondisi, NilaiFilter } from "../kondisi";
 
 export interface PotonganSql {
   sql: string;

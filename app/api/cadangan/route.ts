@@ -5,7 +5,6 @@ import { penggunaLogin, PESAN_SESI_BERAKHIR } from "@/lib/auth/penggunaLogin";
 import { logAudit } from "@/lib/auditLog";
 import { LABEL_JENIS_CADANGAN, cakupanPeran, statusCadangan } from "@/lib/cadangan";
 import { daftarSkCadangan } from "@/lib/cadanganServer";
-import { GalatSupabase } from "@/lib/db/supabase/rest";
 
 export const runtime = "nodejs";
 
@@ -37,10 +36,7 @@ export async function GET(req: Request) {
   });
 }
 
-/**
- * Catat bahwa akun ini baru saja mengunduh cadangan. Bila kolomnya belum dimigrasikan, cadangan tetap
- * dianggap selesai di peramban (dicatat di sana), dan jawabannya menyebut bahwa server belum mencatat.
- */
+/** Catat bahwa akun ini baru saja mengunduh cadangan. */
 export async function POST() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -48,18 +44,12 @@ export async function POST() {
   if (!pengguna) return NextResponse.json({ error: PESAN_SESI_BERAKHIR }, { status: 401 });
 
   const sekarang = new Date();
-  let tercatat = true;
-  try {
-    await db.user.update({ id: pengguna.id }, { cadanganTerakhirAt: sekarang });
-  } catch (e) {
-    if (!(e instanceof GalatSupabase)) throw e;
-    tercatat = false;
-  }
+  await db.user.update({ id: pengguna.id }, { cadanganTerakhirAt: sekarang });
   logAudit({
     userId: pengguna.id,
     aksi: "cadangan_data",
     detail: `${pengguna.nama} mengunduh cadangan data bulanan`,
     targetNama: pengguna.nama,
   });
-  return NextResponse.json({ ok: true, tercatat, waktu: sekarang.toISOString() });
+  return NextResponse.json({ ok: true, waktu: sekarang.toISOString() });
 }

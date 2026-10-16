@@ -1,6 +1,7 @@
 // Pulihkan data SIM-KGB (ADR-084, ADR-085). Skrip ini tidak menyentuh basis data: ia meringkas isi cadangan atau menulis
-// SQL, yang lalu dibaca dan dijalankan sendiri di Supabase SQL Editor atau konsol D1 (Cloudflare → D1 → sim-kgb →
-// Console), atau dengan `npx wrangler d1 execute sim-kgb --remote --file <berkas.sql>`.
+// SQL, yang lalu dibaca dan dijalankan sendiri di konsol D1 (Cloudflare → D1 → sim-kgb → Console), atau dengan
+// `npx wrangler d1 execute sim-kgb --remote --file <berkas.sql>`. Dialek postgres tinggal untuk cadangan semasa Supabase
+// yang hendak dikembalikan ke Postgres (ADR-102).
 //
 // Dari berkas cadangan otomatis (menu Cadangkan data Super Admin, atau R2 sim-kgb-sk/cadangan/otomatis/):
 //   node --import tsx scripts/pulihkan-cadangan.ts <berkas.jsonl.gz>
@@ -101,5 +102,5 @@ const sql =
   dialek === "d1"
     ? `-- Dipulihkan dari cadangan SIM-KGB ${isi.kepala.dibuat} (${waktuWita} WITA) ke Cloudflare D1.\n${sqlPulihkanD1(tabel, dipilih, { timpa })}`
     : `-- Dipulihkan dari cadangan SIM-KGB ${isi.kepala.dibuat} (${waktuWita} WITA).\n` +
-      `-- Periksa dulu isinya, lalu jalankan di Supabase SQL Editor.\nbegin;\n${sqlPulihkan(tabel, dipilih, { timpa })}commit;\n`;
+      `-- Periksa dulu isinya, lalu jalankan di SQL Editor Postgres.\nbegin;\n${sqlPulihkan(tabel, dipilih, { timpa })}commit;\n`;
 keluarkan(sql, `${dipilih.length} baris ${tabel} (${dialek})`);

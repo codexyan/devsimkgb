@@ -7,7 +7,6 @@ import { canProcessKGB } from "@/lib/auth";
 import { PESAN_SESI_BERAKHIR, penggunaLogin } from "@/lib/auth/penggunaLogin";
 import { alasanTolakBuatSk, alasanTolakUbahSkTerakhir, bacaTanggalInput, tmtTerakhirSebelumInput } from "@/lib/prosesKgb";
 import { nomorSkBentrok } from "@/lib/nomorSkBentrok";
-import { GalatSupabase } from "@/lib/db/supabase/rest";
 import { samaTanggalKalender } from "@/lib/waktu";
 import { penundaanHukdisSelamaKgb } from "@/lib/dataPegawai";
 import type { RiwayatHukdisRow } from "@/lib/hukdisKedaluwarsa";
@@ -72,17 +71,7 @@ export async function PATCH(
       const bentrok = await nomorSkBentrok(nomor, id);
       if (bentrok) return NextResponse.json({ error: bentrok }, { status: 409 });
     }
-    try {
-      await db.riwayatKGB.update({ id }, { drafNomorSurat: nomor || null, drafTanggalSurat: nomor ? tanggal : null });
-    } catch (e) {
-      // Kolom draf baru ada setelah migrasi 20260927010000_kgb_draf_sk.sql dijalankan (ADR-011).
-      if (e instanceof GalatSupabase && e.kode === "PGRST204")
-        return NextResponse.json(
-          { error: "Penyimpanan draf SK belum aktif karena pembaruan database belum dijalankan. Catat nomornya, atau langsung Buat dan Unduh SK." },
-          { status: 503 },
-        );
-      throw e;
-    }
+    await db.riwayatKGB.update({ id }, { drafNomorSurat: nomor || null, drafTanggalSurat: nomor ? tanggal : null });
     return NextResponse.json({ ok: true });
   }
 

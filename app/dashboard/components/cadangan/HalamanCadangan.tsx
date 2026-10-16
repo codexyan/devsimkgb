@@ -7,7 +7,6 @@ import { ROLES, ROLE_LABEL } from "@/lib/auth/roles";
 import { formatTanggalId } from "@/lib/waktu";
 import { catatCadanganLokal, bacaCadanganLokal, KABAR_CADANGAN } from "./cadanganLokal";
 import PanelCadanganServer from "./PanelCadanganServer";
-import PanelPindahD1 from "./PanelPindahD1";
 
 /* Cadangan data bulanan wajib (ADR-018). Data diminta per jenis lalu disusun menjadi CSV dan ZIP di
    peramban, bukan di server: Worker Cloudflare punya batas CPU per permintaan, dan cadangan sebesar ini
@@ -124,8 +123,7 @@ export default function HalamanCadangan() {
       let tercatat = false;
       try {
         const res = await fetch("/api/cadangan", { method: "POST" });
-        const d = (await res.json().catch(() => ({}))) as { tercatat?: boolean };
-        tercatat = res.ok && d.tercatat !== false;
+        tercatat = res.ok;
       } catch {
         // Catatan peramban sudah cukup untuk pengingat di perangkat ini.
       }
@@ -236,10 +234,7 @@ export default function HalamanCadangan() {
       </section>
 
       {data?.role === ROLES.SUPER_ADMIN && (
-        <>
-          <PanelCadanganServer />
-          <PanelPindahD1 />
-        </>
+        <PanelCadanganServer />
       )}
     </div>
   );

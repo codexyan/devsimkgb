@@ -1,6 +1,6 @@
 // Skema D1 (ADR-085) harus sejalan dengan tiga hal: migrasi d1/migrations, lib/db/d1/skema.ts, dan definisi kolom
-// aplikasi (lib/sheets/tables.ts). Selama Supabase masih dipakai, setiap kolom di supabase/migrations juga wajib ada
-// di D1, supaya tidak ada kolom yang hanya ditambahkan ke salah satu basis data.
+// aplikasi (lib/sheets/tables.ts). Uji kesejalanan dengan supabase/migrations dilepas bersama adaptor Supabase (ADR-102);
+// migrasi itu tinggal arsip dan tidak lagi dijaga sejalan.
 //
 // Jalankan: node --import tsx --test lib/db/d1/skema.test.ts
 
@@ -9,7 +9,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { ALL_DEFS } from "../../sheets/tables";
-import { keSnake, namaTabel } from "../supabase/nama";
+import { keSnake, namaTabel } from "../nama";
 import { SKEMA_D1, TABEL_DIJEJAK, TABEL_JEJAK_HAPUS_SAJA, type JenisKolomD1 } from "./skema";
 import { buatD1Uji } from "./ujiD1";
 
@@ -43,25 +43,6 @@ test("setiap kolom aplikasi ada di D1 dengan jenis yang sesuai", () => {
       assert.ok(jenis, `${t}.${keSnake(c.name)} belum ada di D1`);
       assert.ok(COCOK[c.type].includes(jenis), `${t}.${keSnake(c.name)}: ${c.type} vs ${jenis}`);
     }
-  }
-});
-
-test("setiap kolom di migrasi Supabase juga ada di D1", () => {
-  const folder = path.join(process.cwd(), "supabase", "migrations");
-  const sql = readdirSync(folder)
-    .filter((f) => f.endsWith(".sql"))
-    .sort()
-    .map((f) => readFileSync(path.join(folder, f), "utf8").replace(/\r\n/g, "\n"))
-    .join("\n");
-  for (const cocok of sql.matchAll(/create table (?:if not exists )?public\.(\w+) \(\n([\s\S]*?)\n\);/g)) {
-    for (const baris of cocok[2].split("\n").map((b) => b.trim())) {
-      if (!baris || baris.startsWith("--") || /^(check|constraint|primary|unique|foreign)\b/i.test(baris)) continue;
-      const kolom = baris.split(/\s+/)[0];
-      assert.ok(SKEMA_D1[cocok[1]]?.[kolom], `${cocok[1]}.${kolom} ada di Supabase tetapi belum di D1`);
-    }
-  }
-  for (const cocok of sql.matchAll(/alter table public\.(\w+) add column (?:if not exists )?(\w+)/g)) {
-    assert.ok(SKEMA_D1[cocok[1]]?.[cocok[2]], `${cocok[1]}.${cocok[2]} ada di Supabase tetapi belum di D1`);
   }
 });
 

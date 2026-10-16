@@ -1,6 +1,6 @@
 /* ───────────────────────────────────────────────────────────────────────────
    Isi basis data LOKAL (DATA_BACKEND=lokal, berkas .data-lokal/sim-kgb.json) dengan data contoh
-   untuk `npm run dev`. Semua nama dan NIP fiktif; tidak ada koneksi ke Supabase atau Google Sheets.
+   untuk `npm run dev`. Semua nama dan NIP fiktif; tidak ada koneksi ke D1 produksi atau Google Sheets.
 
    Jalankan: npx tsx scripts/seed-lokal.ts          (menimpa berkas lokal dari awal)
 

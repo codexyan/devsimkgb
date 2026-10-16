@@ -1,7 +1,8 @@
 // Cadangan otomatis seluruh basis data ke R2 (ADR-084). Dijalankan Cron Trigger dua kali sehari dan dapat diminta
 // Super Admin kapan saja. Berbeda dengan cadangan bulanan per akun (ADR-018) yang berupa CSV untuk dibaca manusia,
-// cadangan ini berisi baris Postgres apa adanya, sehingga dapat dikembalikan ke Supabase dengan
-// scripts/pulihkan-cadangan.ts tanpa menebak jenis kolom.
+// cadangan ini berisi baris tabel apa adanya, sehingga dapat dikembalikan ke D1 dengan
+// scripts/pulihkan-cadangan.ts tanpa menebak jenis kolom. Berkas yang dibuat semasa Supabase masih menjadi basis data
+// (bentuk "postgres") tetap terbaca dan dapat dikembalikan ke D1; pembacanya ada di lib/pulihkanCadangan.ts.
 //
 // Bentuk berkas: JSON Lines yang dimampatkan gzip. Baris pertama kepala, lalu satu baris per baris tabel
 // ({"t": tabel, "r": baris}), dan baris terakhir penutup berisi jumlah per tabel. Cadangan tanpa penutup berarti
@@ -9,8 +10,7 @@
 
 import { backendData, db, type Db } from "./db";
 import { klienD1 } from "./db/d1/klien";
-import { KOLOM_URUTAN, namaTabel } from "./db/supabase/nama";
-import { rest } from "./db/supabase/rest";
+import { KOLOM_URUTAN, namaTabel } from "./db/nama";
 import { ALL_DEFS } from "./sheets/tables";
 
 export const AWALAN_CADANGAN = "cadangan/otomatis/";
@@ -33,8 +33,9 @@ type Baris = Record<string, unknown>;
 
 export interface SumberCadangan {
   /**
-   * "postgres": baris mentah Supabase (snake_case); "d1": baris mentah D1 (snake_case, boolean 0/1, ADR-085);
-   * "aplikasi": record lapisan data (camelCase), untuk uji lokal.
+   * "postgres": baris mentah Postgres (snake_case) dari berkas yang dibuat semasa Supabase, tidak lagi dibuat sejak
+   * ADR-085; "d1": baris mentah D1 (snake_case, boolean 0/1, ADR-085); "aplikasi": record lapisan data (camelCase),
+   * untuk uji lokal.
    */
   bentuk: "postgres" | "d1" | "aplikasi";
   tabel: readonly string[];
@@ -49,29 +50,13 @@ export interface HasilSusun {
   ukuranMentah: number;
 }
 
-/** Nama tabel Postgres seluruh tabel aplikasi, sesuai urutan definisinya. */
+/** Nama tabel SQL seluruh tabel aplikasi, sesuai urutan definisinya. */
 export function tabelAplikasi(): string[] {
   return ALL_DEFS.map((d) => namaTabel(d.tab));
 }
 
-/** Sumber baris dari Supabase lewat Data API, per halaman 1000 menurut urutan baris dimasukkan. */
-export function sumberSupabase(): SumberCadangan {
-  return {
-    bentuk: "postgres",
-    tabel: tabelAplikasi(),
-    async *baca(tabel: string) {
-      for (let offset = 0; ; offset += UKURAN_HALAMAN) {
-        const res = await rest(`${tabel}?select=*&order=${KOLOM_URUTAN}.asc&offset=${offset}&limit=${UKURAN_HALAMAN}`);
-        const halaman = (await res.json()) as Baris[];
-        if (halaman.length > 0) yield halaman;
-        if (halaman.length < UKURAN_HALAMAN) return;
-      }
-    },
-  };
-}
-
 /**
- * Nama tabel Postgres → kunci repository di `db`. Kunci db mengikuti nama tab (User → user, RiwayatKGB → riwayatKGB),
+ * Nama tabel SQL → kunci repository di `db`. Kunci db mengikuti nama tab (User → user, RiwayatKGB → riwayatKGB),
  * jadi dicocokkan tanpa memedulikan huruf besar.
  */
 export function kunciDbTabel(): Map<string, keyof Db> {
@@ -118,15 +103,14 @@ export function sumberD1(): SumberCadangan {
 }
 
 export function sumberBawaan(): SumberCadangan {
-  const backend = backendData();
-  return backend === "d1" ? sumberD1() : backend === "supabase" ? sumberSupabase() : sumberAplikasi();
+  return backendData() === "d1" ? sumberD1() : sumberAplikasi();
 }
 
 function tanpaRahasia(tabel: string, baris: Baris): Baris {
   const rahasia = KOLOM_RAHASIA[tabel];
   if (!rahasia) return baris;
   const salinan = { ...baris };
-  // Kolom rahasia di sini satu kata, jadi namanya sama di baris Postgres maupun record aplikasi.
+  // Kolom rahasia di sini satu kata, jadi namanya sama di baris mentah maupun record aplikasi.
   for (const k of rahasia) delete salinan[k];
   return salinan;
 }

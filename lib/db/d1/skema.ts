@@ -1,5 +1,5 @@
 // Jenis setiap kolom di D1 (ADR-085), termasuk kolom yang tidak dipakai lapisan data aplikasi (urutan_sisip,
-// created_at, dsb.). Dipakai untuk menyalin baris mentah dari Supabase, cadangan, dan pemulihan. Disusun dari skema akhir
+// created_at, dsb.). Dipakai untuk menyalin baris mentah dari cadangan dan pemulihan. Disusun dari skema akhir
 // Postgres; setiap migrasi D1 baru wajib ikut memperbaruinya (diperiksa lib/db/d1/skema.test.ts).
 
 export type JenisKolomD1 = "teks" | "waktu" | "bilangan" | "boolean" | "json";

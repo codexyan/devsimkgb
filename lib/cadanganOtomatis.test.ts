@@ -100,7 +100,7 @@ test("galat sumber membatalkan cadangan, tidak menyimpan berkas setengah jadi", 
     tabel: ["pegawai"],
     async *baca() {
       yield PEGAWAI;
-      throw new Error("Supabase API error (503)");
+      throw new Error("D1 error (503)");
     },
   };
   await assert.rejects(buatCadangan(bucket, sumber), /503/);

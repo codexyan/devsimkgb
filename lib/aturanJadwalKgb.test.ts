@@ -7,8 +7,6 @@ import { test } from "node:test";
 import { hitungMKGKenaikanPangkat, mkgAwalGolongan } from "./tabelGaji";
 import { hitungSkDilaporkan } from "./dasarSkUsulan";
 import { kekuranganUsulan, pernahKgb, pernahKgbUsulan } from "./usulanPegawai";
-import { tulisDenganAcuan } from "./acuanUsulanServer";
-import { GalatSupabase } from "./db/supabase/rest";
 
 const tgl = (y: number, m: number) => new Date(y, m - 1, 1);
 
@@ -63,20 +61,4 @@ test("berkas yang ditagih mengikuti pilihan UPT: CPNS II/c menagih SK CPNS, buka
   assert.ok(!belum.some((k) => /SK KGB terakhir/.test(k)), belum.join("; "));
   const pernah = kekuranganUsulan({ ...usulan, keadaanKgb: "pernah" }, "baru", null);
   assert.ok(pernah.some((k) => /SK KGB terakhir/.test(k)), pernah.join("; "));
-});
-
-test("simpanan sebelum migrasi keadaan_kgb diulang tanpa pilihan itu, acuan tetap tersimpan", async () => {
-  const ditulis: Record<string, unknown>[] = [];
-  const hasil = await tulisDenganAcuan(
-    { golonganAcuan: "II/b", mkgTahunAcuan: 7, mkgBulanAcuan: 0, keadaanKgb: "pernah" },
-    async (isi) => {
-      ditulis.push({ ...isi });
-      if (ditulis.length === 1)
-        throw new GalatSupabase(400, "PGRST204", "Could not find the 'keadaan_kgb' column of 'usulan_pegawai' in the schema cache");
-    },
-  );
-  assert.equal(hasil.acuanTersimpan, true);
-  assert.equal(ditulis.length, 2);
-  assert.equal(ditulis[1].keadaanKgb, null);
-  assert.equal(ditulis[1].golonganAcuan, "II/b");
 });

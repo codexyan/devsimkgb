@@ -1,5 +1,5 @@
 // Repository D1 (ADR-085) di atas skema D1 sungguhan (d1/migrations) pada SQLite di memori: perilakunya harus sama
-// dengan SupabaseTable dan Table Sheets.
+// dengan Table Sheets.
 //
 // Jalankan: node --import tsx --test lib/db/d1/table.test.ts
 

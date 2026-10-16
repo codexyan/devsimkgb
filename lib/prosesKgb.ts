@@ -223,7 +223,7 @@ export function placeholderBerlebih(rows: { id: string; createdAt: NilaiTanggal 
 /**
  * Id record KGB kembar (Input KGB atau Arsip KGB untuk pegawai dan TMT yang sama) yang dibuat oleh
  * permintaan yang berjalan bersamaan. `rows` harus dalam urutan baca penyimpanan, yaitu urutan record
- * ditambahkan (baris spreadsheet; kolom urutan di Supabase). Yang dipertahankan adalah record yang
+ * ditambahkan (baris spreadsheet; kolom urutan_sisip di D1). Yang dipertahankan adalah record yang
  * tertulis paling dulu, bukan yang createdAt-nya paling awal: createdAt diisi sebelum penulisan, jadi
  * permintaan yang menghitung waktu lebih dulu bisa menulis belakangan. Permintaan yang membaca sebelum
  * record kedua tertulis hanya melihat record-nya sendiri dan memang yang pertama, sedangkan permintaan

@@ -9,7 +9,6 @@ import { susunPegawaiBaru } from "@/lib/pegawaiBaruDariUsulan";
 import { cariDalam } from "@/lib/dataSatker";
 import { ringkasDasarBaru } from "@/lib/dasarBaruUsulan";
 import { KOSONG_ACUAN, isiHitungan } from "@/lib/usulanFormulir";
-import { tulisBanyakDenganAcuan } from "@/lib/acuanUsulanServer";
 import {
   BATAS_BARIS_IMPOR,
   dapatDisimpan,
@@ -215,7 +214,7 @@ export async function POST(req: Request) {
     }
   }
   const jumlahTerdata = rows.filter((r) => r.jenis === "baru" && r.pegawaiId).length;
-  if (rows.length > 0) await tulisBanyakDenganAcuan(rows, (isi) => db.usulanPegawai.createMany(isi));
+  if (rows.length > 0) await db.usulanPegawai.createMany(rows);
 
   const jumlahBaru = disimpan.filter((h) => h.hasil === "baru").length;
   const jumlahPerubahan = disimpan.length - jumlahBaru;

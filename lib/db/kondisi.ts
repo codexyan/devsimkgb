@@ -1,12 +1,12 @@
-// Menerjemahkan filter gaya Prisma (`Where`) ke filter PostgREST. Hasilnya harus sama dengan
-// pencocokan JavaScript di lib/sheets/table.ts, termasuk untuk nilai null: di SQL, perbandingan
-// dengan NULL tidak pernah benar, jadi beberapa operator perlu tambahan `is.null`.
+// Menerjemahkan filter gaya Prisma (`Where`) ke pohon logika `Kondisi`, yang lalu dijadikan klausa WHERE SQLite
+// oleh lib/db/d1/sql.ts. Hasilnya harus sama dengan pencocokan JavaScript di lib/sheets/table.ts, termasuk untuk
+// nilai null: di SQL, perbandingan dengan NULL tidak pernah benar, jadi beberapa operator perlu tambahan `kosong`.
 //
-// Terjemahan dibuat dua langkah: Where → Kondisi (pohon logika) → parameter query. Pohon yang
-// sama dipakai tes untuk membandingkan hasilnya dengan pencocokan lapisan Sheets.
+// Pohon yang sama dipakai tes untuk membandingkan hasilnya dengan pencocokan lapisan Sheets. Dulu pohon ini juga
+// diserialisasi ke filter PostgREST untuk Supabase; adaptor itu dilepas di ADR-102.
 
-import { matches } from "../../sheets/table";
-import type { Where } from "../repo";
+import { matches } from "../sheets/table";
+import type { Where } from "./repo";
 
 export type NilaiFilter = string | number | boolean | Date;
 
@@ -112,7 +112,7 @@ function operator(kolom: string, op: string, arg: unknown): Kondisi {
 }
 
 /**
- * Where → Kondisi. `kolom` memetakan nama kolom aplikasi ke nama kolom Postgres, atau null bila
+ * Where → Kondisi. `kolom` memetakan nama kolom aplikasi ke nama kolom SQL, atau null bila
  * kolom tidak didefinisikan.
  */
 export function keKondisi(where: Where | null | undefined, kolom: (nama: string) => string | null): Kondisi {
@@ -140,40 +140,4 @@ export function keKondisi(where: Where | null | undefined, kolom: (nama: string)
     );
   }
   return dan(bagian);
-}
-
-/** Nilai dalam tanda kutip PostgREST; kutip dan backslash di dalamnya di-escape. */
-function kutip(nilai: NilaiFilter): string {
-  const teks = nilai instanceof Date ? nilai.toISOString() : String(nilai);
-  return `"${teks.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-}
-
-function keTeks(k: Kondisi): string {
-  switch (k.jenis) {
-    case "dan":
-      return `and(${k.isi.map(keTeks).join(",")})`;
-    case "atau":
-      return `or(${k.isi.map(keTeks).join(",")})`;
-    case "banding":
-      return `${k.kolom}.${k.op}.${kutip(k.nilai)}`;
-    case "kosong":
-      return k.kosong ? `${k.kolom}.is.null` : `${k.kolom}.not.is.null`;
-    case "dalam":
-      return `${k.kolom}.${k.negasi ? "not.in" : "in"}.(${k.nilai.map(kutip).join(",")})`;
-    case "mirip":
-      return `${k.kolom}.ilike.${kutip(k.pola)}`;
-    default:
-      throw new Error(`Kondisi "${k.jenis}" tidak bisa dikirim sebagai filter`);
-  }
-}
-
-/**
- * Kondisi → satu parameter query PostgREST (`and=(...)` atau `or=(...)`), atau null bila tanpa filter.
- * Kondisi yang selalu salah harus ditangani pemanggil tanpa mengirim request.
- */
-export function keParameter(k: Kondisi): string | null {
-  if (k.jenis === "benar") return null;
-  if (k.jenis === "salah") throw new Error("Kondisi yang selalu salah tidak perlu dikirim ke Supabase");
-  const [nama, isi] = k.jenis === "atau" ? ["or", k.isi] : ["and", k.jenis === "dan" ? k.isi : [k]];
-  return `${nama}=${encodeURIComponent(`(${isi.map(keTeks).join(",")})`)}`;
 }

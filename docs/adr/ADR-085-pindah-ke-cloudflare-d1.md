@@ -2,6 +2,8 @@
 
 Tanggal: 8 Oktober 2026
 Status: diterima. Kode siap; peralihan produksi dijalankan terpisah (lihat "Peralihan").
+Pelepasan Supabase: ADR-102. Adaptor Supabase dan alat Pindah D1 sudah dilepas di sana, jadi "Peralihan" dan langkah
+"Kembali ke Supabase" di bawah tinggal riwayat.
 
 ## Konteks
 

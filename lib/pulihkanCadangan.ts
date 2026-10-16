@@ -1,7 +1,7 @@
 // Membaca berkas cadangan otomatis (lib/cadanganOtomatis.ts) dan menyusun SQL untuk mengembalikan sebagian barisnya
-// (ADR-084): ke Supabase (Postgres) atau ke Cloudflare D1 (SQLite, ADR-085). Dipakai scripts/pulihkan-cadangan.ts;
-// SQL-nya dijalankan sendiri oleh pemilik di Supabase SQL Editor atau konsol D1, jadi tidak ada yang berubah tanpa
-// dibaca lebih dulu.
+// (ADR-084): ke Cloudflare D1 (SQLite, ADR-085) atau ke Postgres (jalur untuk cadangan semasa Supabase). Dipakai
+// scripts/pulihkan-cadangan.ts; SQL-nya dijalankan sendiri oleh pemilik di konsol D1 atau SQL Editor Postgres, jadi
+// tidak ada yang berubah tanpa dibaca lebih dulu.
 
 import { barisKeD1 } from "./db/d1/barisMentah";
 import { SKEMA_D1 } from "./db/d1/skema";

@@ -10,18 +10,19 @@ Aplikasi web tunggal untuk mengelola data pegawai Kanwil dan UPT, proses KGB (In
 - **Tailwind CSS v4** (dashboard sebagian besar memakai gaya inline dan token CSS di `app/globals.css`)
 - **NextAuth v5** (masuk dengan NIP dan password, peran di `lib/auth/roles.ts`)
 - **@react-pdf/renderer** (SK KGB biasa dan versi Srikandi, disusun di peramban: `lib/generateSuratKGB.tsx`)
-- Deploy: **Cloudflare Workers** via [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare), berkas SK di **Cloudflare R2** (`SK_BUCKET`)
+- Deploy: **Cloudflare Workers** via [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare), basis data **Cloudflare D1** (`DB`), berkas SK di **Cloudflare R2** (`SK_BUCKET`)
 
 ## Penyimpanan data
 
-Semua route membaca dan menulis lewat `import { db } from "@/lib/db"`. Penyimpanan dipilih di `lib/db/index.ts`:
+Semua route membaca dan menulis lewat `import { db } from "@/lib/db"`. Penyimpanan dipilih di `lib/db/index.ts` lewat `DATA_BACKEND`:
 
-- `DATA_BACKEND=sheets` atau `DATA_BACKEND=supabase` memilih secara tegas.
-- Tanpa `DATA_BACKEND`, Supabase dipakai bila `SUPABASE_URL` diisi; selain itu **Google Sheets**.
+- `d1`: **Cloudflare D1**, basis data produksi (ADR-085).
+- `sheets`: Google Sheets. Bawaan `next dev` bila `DATA_BACKEND` kosong.
+- `lokal`: berkas JSON lokal, khusus pengembangan.
 
-Produksi memakai **Supabase**. Migrasinya diterapkan manual di SQL Editor, tidak ikut terbawa deploy, jadi commit yang menambah kolom harus disertai migrasinya dijalankan; tanpa itu setiap penyimpanan ke tabel tersebut gagal. Lihat bagian Penyimpanan data di `DEPLOY-CLOUDFLARE.md`.
+Di produksi `DATA_BACKEND` wajib terisi (`d1`); tanpa itu aplikasi menolak berjalan, supaya tulisan tidak mengalir diam-diam ke penyimpanan lain. Skema D1 ada di `d1/migrations/` dan diterapkan dengan `wrangler d1 migrations apply` **sebelum** kode yang membutuhkannya di-deploy; commit yang menambah kolom harus disertai migrasinya. Lihat bagian Penyimpanan data di `DEPLOY-CLOUDFLARE.md`.
 
-Definisi tab Sheets ada di `lib/sheets/tables.ts`; skema Supabase untuk migrasi ada di `supabase/migrations/`. Keduanya harus tetap memuat tabel dan kolom yang sama.
+Definisi tab Sheets ada di `lib/sheets/tables.ts`. Tabel dan kolomnya harus tetap sama dengan skema D1 (`lib/db/d1/skema.test.ts` menagihnya). Supabase dilepas di ADR-102; migrasinya tinggal arsip di `supabase/migrations/`.
 
 ## Menjalankan lokal
 
@@ -36,8 +37,7 @@ Variabel environment diisi di `.env` untuk `next dev` dan di secret Cloudflare u
 |----------|----------|
 | `GOOGLE_SHEET_ID` | Spreadsheet data (backend Sheets) |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `GOOGLE_PRIVATE_KEY` | Akun layanan Google untuk Sheets |
-| `DATA_BACKEND` | Opsional: `sheets` atau `supabase` |
-| `SUPABASE_URL` / `SUPABASE_SECRET_KEY` | Backend Supabase |
+| `DATA_BACKEND` | `d1` (wajib di produksi), `sheets`, atau `lokal`; kosong berarti `sheets` hanya di pengembangan |
 | `AUTH_SECRET` | Secret NextAuth v5 |
 | `CRON_SECRET` | Bearer token endpoint cron harian |
 
@@ -92,11 +92,12 @@ docs/adr/            Catatan keputusan arsitektur
 app/dashboard/       Halaman pengelola; komponen modal KGB bersama di components/kgb
 app/api/             Route API (kgb, pegawai, hukdis, keuangan, notifikasi, cron, public)
 lib/                 Logika domain murni dan teruji (tabelGaji, jadwalKgb, prosesKgb, waktu, satker, statusKgb, dsb.)
-lib/db/              Pemilih penyimpanan dan repository Supabase
+lib/db/              Pemilih penyimpanan, repository D1, dan helper bersama (kondisi, nama, nilai)
 lib/sheets/          Klien dan definisi tab Google Sheets
 lib/auth/            Peran dan helper hak akses
 lib/ui/              themeMode.ts: hook useThemeMode (mode terang/gelap dashboard, kunci kgb-theme), dipakai DashboardShell dan Sidebar
-supabase/migrations/ Skema awal Supabase
+d1/migrations/       Skema D1 (basis data produksi)
+supabase/migrations/ Arsip skema Supabase (dilepas di ADR-102, tidak dijaga sejalan)
 scripts/             Utilitas penyiapan dan migrasi data
 worker-entry.js      Wrapper worker Cloudflare (fetch + scheduled)
 wrangler.jsonc       Konfigurasi Cloudflare Workers

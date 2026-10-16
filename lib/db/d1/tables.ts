@@ -1,4 +1,4 @@
-// Repository Cloudflare D1 (ADR-085) dengan kunci dan tipe baris yang sama dengan `sheets` dan `supabase`.
+// Repository Cloudflare D1 (ADR-085) dengan kunci dan tipe baris yang sama dengan `sheets`.
 
 import {
   defs,

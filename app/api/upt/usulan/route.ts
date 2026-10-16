@@ -13,7 +13,6 @@ import { terdatakanPegawaiBaru } from "@/lib/terdatakanPegawaiBaru";
 import type { NilaiTanggal } from "@/lib/waktu";
 import { bawaanPegawai, berkasPerluDisalin, denganBerkasBawaan } from "@/lib/bawaanUsulan";
 import { bacaAcuan, bacaDasarBaru, bacaIsianUsulan, bacaKeadaanKgb, isiHitungan, nilaiFormulir, tanggalIsian } from "@/lib/usulanFormulir";
-import { tulisDenganAcuan } from "@/lib/acuanUsulanServer";
 import { bacaTanggalInput } from "@/lib/prosesKgb";
 import { BATAS_BERKAS_BYTE, PESAN_TERLALU_BESAR, salinBerkasBawaan, simpanBerkasUsulan } from "@/lib/berkasUsulan";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
@@ -403,7 +402,7 @@ export async function POST(req: Request) {
     ...isian,
   };
 
-  await tulisDenganAcuan(baris, (isi) => db.usulanPegawai.create(isi));
+  await db.usulanPegawai.create(baris);
 
   // Pegawai baru langsung terdata begitu data utama drafnya terisi, tanpa surat dan tanpa tinjauan (ADR-112). Kegagalannya tidak boleh
   // membatalkan draf yang sudah tersimpan: pegawainya dibuat lagi saat diajukan, paling lambat saat disetujui.
