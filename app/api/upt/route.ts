@@ -27,7 +27,10 @@ type HukdisBaris = { pegawaiId: string; berdampakKGB: boolean | null; tmtBerakhi
 
 export const runtime = "nodejs";
 
-/** Berapa banyak SK selesai yang dikirim ke UPT; sisanya jarang dibuka lagi. */
+/**
+ * Berapa banyak SK yang sudah direkam di Gaji Web yang dikirim ke UPT sebagai riwayat; sisanya jarang dibuka lagi.
+ * SK yang belum direkam tidak pernah dipotong: itu pekerjaan UPT, dan papan harus memuat semuanya.
+ */
 const BATAS_SK = 60;
 
 /*
@@ -240,7 +243,7 @@ export async function GET() {
   // SK yang sudah diunggah Tim SDM Kanwil. Sejak saat itu keuangan UPT yang menindaklanjutinya: menetapkan
   // rapelan dan merekamnya di Gaji Web satker (ADR-009); yang selesai tetap tampil sebagai riwayat.
   const namaPegawai = new Map(milikSatker.map((p) => [p.id, p]));
-  const sk = kgbSatker
+  const skUrut = kgbSatker
     .filter((k) => (k.status === "menunggu_keuangan" || k.status === "selesai") && !k.isArsip)
     .map((k) => {
       const p = namaPegawai.get(k.pegawaiId);
@@ -272,12 +275,14 @@ export async function GET() {
         gajiWebOleh: k.inputGajiWebBy ?? null,
       };
     })
-    // Yang belum direkam di Gaji Web didahulukan agar tidak terpotong batas jumlah oleh riwayat yang selesai.
-    .sort(
-      (a, b) =>
-        Number(!!a.gajiWebAt) - Number(!!b.gajiWebAt) || (b.tmtKgbBaru ?? "").localeCompare(a.tmtKgbBaru ?? ""),
-    )
-    .slice(0, BATAS_SK);
+    .sort((a, b) => (b.tmtKgbBaru ?? "").localeCompare(a.tmtKgbBaru ?? ""));
+  // Yang belum direkam di Gaji Web dikirim seluruhnya; batas hanya untuk riwayat yang sudah direkam. Dulu satu
+  // .slice(0, 60) memotong keduanya, sehingga satker dengan 80 SK terbit hanya memuat 60 di papan (Super Admin: 80).
+  // Batas riwayat tidak lebih kecil dari jumlah pegawai satker, supaya kolom Selesai tidak terpotong oleh satu siklus.
+  const sk = [
+    ...skUrut.filter((s) => !s.gajiWebAt),
+    ...skUrut.filter((s) => s.gajiWebAt).slice(0, Math.max(BATAS_SK, pegawai.length)),
+  ];
 
   return NextResponse.json({
     satker,

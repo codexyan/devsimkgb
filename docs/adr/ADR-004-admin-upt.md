@@ -55,4 +55,5 @@ tetap satu-satunya yang mengubah data KGB.
 - Peran ini belum berguna sampai pegawai UPT diimpor ke produksi. Per 22 September 2026 produksi baru berisi
   75 pegawai Kanwil.
 - UPT tidak menerima notifikasi apa pun; daftar notifikasi untuk peran ini kosong.
-- Batas berikutnya yang belum dikerjakan: berapa lama SK lama tetap dapat diunduh UPT (sekarang 60 SK terakhir).
+- Batas berikutnya yang belum dikerjakan: berapa lama SK lama tetap dapat diunduh UPT (sekarang 60 SK terakhir yang sudah direkam di Gaji Web, atau sebanyak pegawai satker bila lebih banyak; SK yang
+  belum direkam selalu dikirim seluruhnya).

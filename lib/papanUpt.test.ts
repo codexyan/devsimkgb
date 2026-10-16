@@ -104,6 +104,23 @@ test("kolom Selesai pada papan UPT hanya diisi SK yang sudah direkam di Gaji Web
   );
 });
 
+/**
+ * Dulu satu .slice(0, 60) memotong seluruh daftar SK di /api/upt, sehingga Lapas Banjarmasin dengan 80 SK terbit
+ * hanya memuat 60 kartu di papan Admin UPT, padahal Super Admin melihat 80. Yang belum direkam di Gaji Web adalah
+ * pekerjaan UPT dan tidak boleh dipotong; batas hanya untuk riwayat yang sudah direkam.
+ */
+test("daftar SK untuk papan UPT tidak memotong SK yang belum direkam di Gaji Web", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const sumber = readFileSync(join(__dirname, "..", "app", "api", "upt", "route.ts"), "utf8");
+
+  const batas = [...sumber.matchAll(/\.slice\(0, [^)]*\)/g)].filter((m) => /BATAS_SK/.test(m[0]));
+  assert.equal(batas.length, 1, "batas SK harus dipakai di satu tempat saja");
+  // Pemotongnya hanya boleh bekerja pada daftar yang sudah disaring ke SK yang sudah direkam.
+  const sebelum = sumber.slice(Math.max(0, batas[0].index! - 80), batas[0].index);
+  assert.match(sebelum, /\.filter\(\(s\) => s\.gajiWebAt\)\s*$/, "batas SK kembali memotong SK yang belum direkam");
+});
+
 test("draf terkunci kalah dari dokumen lain milik pegawai yang sama, sehingga SK terbit tidak ikut terlipat (ADR-059)", () => {
   const hasil = gabungKartuUpt([
     s({ kunci: "usulan:a", kolom: "kunci", pegawaiId: "p1", nip: "1", ringkas: "draf data terkunci" }),
