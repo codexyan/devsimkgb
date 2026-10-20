@@ -1174,7 +1174,10 @@ export default async function IsiPanduan({
                   Disetujui, SK dibuat, Diperiksa, TTE, dan Direkam. Kartu yang kembali ke kolom Di Kanwil sesudah Anda
                   memeriksa SK tidak mundur: ia sudah berada di tahap TTE. Setelah usulan Anda disetujui, kartu tetap di Di
                   Kanwil dengan keterangan <em>Data disetujui, menunggu Kanwil memproses KGB</em>; pegawai itu tidak perlu
-                  diusulkan lagi untuk KGB yang sama.
+                  diusulkan lagi untuk KGB yang sama. Bila TMT KGB-nya masih jauh sehingga masa usulnya belum dibuka, kartunya
+                  berbunyi <em>Data disetujui, KGB belum dibuka</em> selama dua minggu, lalu pegawai itu menunggu di jadwal
+                  sampai masa usulnya dibuka. Persetujuan usulan belum berarti KGB sedang diproses: pegawai itu baru masuk{" "}
+                  <em>Sedang diproses</em> di Kanwil setelah Tim SDM menginput KGB-nya.
                 </p>
                 <p>
                   <strong>Warna dan label kartu.</strong> Label di atas nama menyebut apa yang harus Anda kerjakan, dan

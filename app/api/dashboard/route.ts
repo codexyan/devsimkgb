@@ -19,6 +19,7 @@ import {
   tahunTmt,
 } from "@/lib/rekapKgb";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
+import { barusajaDisetujui } from "@/lib/baruDisetujui";
 import { berhakKgb, sudahBerhenti } from "@/lib/mutasiPegawai";
 import { infoReviewSk } from "@/lib/reviewSkUpt";
 import { muatSemuaReviewSk } from "@/lib/reviewSkUptServer";
@@ -90,6 +91,8 @@ export async function GET() {
       .filter((p) => {
         const tmt = tanggalKalender(p.tmtKgbBerikutnya);
         if (tmt && tmt < batasPipeline) return true;
+        // Usulan yang baru disetujui tetap terlihat di kolom Terkunci walau TMT-nya belum masuk pipeline (ADR-117).
+        if (!belumDitinjau.has(p.id) && barusajaDisetujui(p.konfirmasiUptAt, hariIni)) return true;
         return kgbsFor(p.id).some(
           (k) =>
             !k.isArsip &&
