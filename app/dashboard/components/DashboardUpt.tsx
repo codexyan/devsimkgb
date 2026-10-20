@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useDashUser } from "@/app/dashboard/components/RoleContext";
 import { PanelNavy, namaSapaan, sapaanWita, tanggalPanjangWita, type Nada } from "@/app/dashboard/components/PanelNavy";
 import { formatTanggalId, hariIniWita, tanggalKalender } from "@/lib/waktu";
+import { kartuSetelahAcc } from "@/lib/baruDisetujui";
 import { hitungDeadlineSDM } from "@/lib/tabelGaji";
 import { kunciBulanTmt, type RekapStatusKgb } from "@/lib/rekapKgb";
 import { geserBulan, namaBulan, namaTampilSatker, namaUnitKerja } from "@/app/dashboard/satker/labelSatker";
@@ -1477,39 +1478,49 @@ export default function DashboardUpt({ halaman = "dasbor" }: { halaman?: "dasbor
     }),
     // Usulan siklus ini sudah disetujui (konfirmasi berlaku) dan KGB-nya belum diinput Kanwil: kartunya tetap di Di
     // Kanwil, bukan kembali ke Perlu dikerjakan sebagai "Perlu diperiksa" (ADR-082).
-    ...pegawai
-      .filter(
-        (p) =>
-          p.konfirmasi === "berlaku" &&
-          (p.statusKGB === null || p.statusKGB === "belum_diproses") &&
-          !p.terkunci &&
-          !p.usulanBerjalan,
-      )
-      .map((p) => ({
-        kolom: "kanwil" as const,
-        kunci: `siap:${p.id}`,
-        pegawaiId: p.id,
-        nip: p.nip,
-        nama: p.nama,
-        waktu: p.konfirmasiAt,
-        ringkas: "data disetujui, menunggu Kanwil memproses KGB",
-        render: (lain: string[]) => (
-          <KartuUpt
-            lain={lain}
-            redup
-            tahap={2}
-            nama={p.nama}
-            sub={p.nip}
-            tmt={tmtSingkat(p.tmtKgb)}
-            tanda={
-              p.terlambat
-                ? { teks: "Lewat batas input Kanwil", nada: "merah" }
-                : { teks: "Data disetujui, menunggu Kanwil memproses KGB", nada: "biru" }
-            }
-            catatan={p.konfirmasiAt ? `Usulan Anda disetujui ${fmtTgl(p.konfirmasiAt)}` : null}
-          />
-        ),
-      })),
+    // Yang baru disetujui tetapi jendela input KGB-nya belum dibuka juga diberi kartu selama dua minggu, supaya
+    // persetujuannya terlihat; sesudah itu ia menunggu di jadwal sampai jendelanya terbuka (ADR-117).
+    ...pegawai.flatMap((p) => {
+      const jenisKartu = kartuSetelahAcc(p, hariIni);
+      if (!jenisKartu) return [];
+      const dibukaBulan = jenisKartu === "baru" && p.bulanTmt ? geserBulan(p.bulanTmt, -2) : null;
+      return [
+        {
+          kolom: "kanwil" as const,
+          kunci: `siap:${p.id}`,
+          pegawaiId: p.id,
+          nip: p.nip,
+          nama: p.nama,
+          waktu: p.konfirmasiAt,
+          ringkas: "data disetujui, menunggu Kanwil memproses KGB",
+          render: (lain: string[]) => (
+            <KartuUpt
+              lain={lain}
+              redup
+              tahap={2}
+              nama={p.nama}
+              sub={p.nip}
+              tmt={tmtSingkat(p.tmtKgb)}
+              tanda={
+                p.terlambat
+                  ? { teks: "Lewat batas input Kanwil", nada: "merah" }
+                  : jenisKartu === "baru"
+                    ? { teks: "Data disetujui, KGB belum dibuka", nada: "biru" }
+                    : { teks: "Data disetujui, menunggu Kanwil memproses KGB", nada: "biru" }
+              }
+              catatan={
+                [
+                  p.konfirmasiAt ? `Usulan Anda disetujui ${fmtTgl(p.konfirmasiAt)}` : "",
+                  dibukaBulan && p.bulanTmt ? `Masa usul KGB ${namaBulan(p.bulanTmt)} dibuka ${namaBulan(dibukaBulan)}; Kanwil memprosesnya sesudah itu` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || null
+              }
+            />
+          ),
+        },
+      ];
+    }),
     ...laporan
       .filter((l) => l.status === "menunggu")
       .map((l) => ({
