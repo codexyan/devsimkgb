@@ -9,6 +9,8 @@ import TabDokumenPemutakhiran from "./TabDokumenPemutakhiran";
 import {
   KakiSkRiwayat,
   ModalHapusRiwayatBebas,
+  dataUbahSkKp,
+  dataUbahSkPmk,
   ModalHapusRiwayatKembar,
   ModalUbahSkRiwayat,
   ModalUnggahSkRiwayat,
@@ -265,36 +267,8 @@ export default function RiwayatKGBPage() {
     tersisa: RingkasRiwayat;
   } | null>(null);
   // Pembuka jendela Ubah data SK, dipakai baris riwayat di tab Pangkat & PMK dan daftar SK di kartu Dasar KGB (ADR-120).
-  const bukaUbahSkKp = (p: RiwayatPangkat) =>
-    setUbahSk({
-      jenis: "kp",
-      riwayatId: p.id,
-      judul: `${p.golonganLama ? `${p.golonganLama} → ${p.golonganBaru}` : p.golonganBaru} · ${p.jenisLabel}`,
-      nomorSK: p.nomorSK ?? "",
-      tanggalSK: p.tanggalSK,
-      penetapSK: p.penetapSK,
-      jenisKp: p.jenisKp,
-      luas: bolehHapusBebas
-        ? {
-            keterangan: p.keterangan ?? "",
-            tmtPangkat: p.tmtPangkat,
-            golonganBaru: p.golonganBaru,
-            mkgTahunBaru: p.mkgTahunBaru,
-            mkgBulanBaru: p.mkgBulanBaru,
-            gajiPokokBaru: p.gajiPokokBaru,
-          }
-        : undefined,
-    });
-  const bukaUbahSkPmk = (p: RiwayatPmk) =>
-    setUbahSk({
-      jenis: "pmk",
-      riwayatId: p.id,
-      judul: "Peninjauan masa kerja",
-      nomorSK: p.nomorSK ?? "",
-      tanggalSK: p.tanggalSK,
-      penetapSK: p.penetapSK,
-      luas: bolehHapusBebas ? { keterangan: p.keterangan ?? "" } : undefined,
-    });
+  const bukaUbahSkKp = (p: RiwayatPangkat) => setUbahSk(dataUbahSkKp(p, bolehHapusBebas));
+  const bukaUbahSkPmk = (p: RiwayatPmk) => setUbahSk(dataUbahSkPmk(p, bolehHapusBebas));
   useEffect(() => {
     if (!bolehDokumen) return;
     const t = setTimeout(() => {

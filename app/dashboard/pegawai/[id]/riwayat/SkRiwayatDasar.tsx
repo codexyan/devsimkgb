@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { BidangPenetap, KerangkaModal, Catatan, PesanGalat } from "@/app/dashboard/components/kgb";
+// Impor langsung, bukan lewat indeks kgb: ModalInputKgb memakai berkas ini, dan indeks mengekspor ModalInputKgb.
+import KerangkaModal from "@/app/dashboard/components/kgb/KerangkaModal";
+import { BidangPenetap, Catatan, PesanGalat } from "@/app/dashboard/components/kgb/BidangForm";
 import { BidangTeks } from "@/app/dashboard/components/kgb/BidangForm";
 import { JENIS_DOKUMEN, periksaDokumen, type JenisDokumen } from "@/lib/dokumenPegawai";
 import { JENIS_KP } from "@/lib/kenaikanPangkat";
@@ -104,6 +106,69 @@ export interface DataUbahSkRiwayat {
     mkgTahunBaru?: number;
     mkgBulanBaru?: number;
     gajiPokokBaru?: number;
+  };
+}
+
+/** Riwayat kenaikan pangkat secukupnya untuk jendela Ubah data SK. */
+export interface RiwayatKpUntukUbah {
+  id: string;
+  jenisLabel: string;
+  jenisKp?: string;
+  golonganLama?: string;
+  golonganBaru: string;
+  nomorSK: string | null;
+  tanggalSK: string | null;
+  tmtPangkat: string | null;
+  penetapSK: string | null;
+  keterangan?: string | null;
+  mkgTahunBaru?: number;
+  mkgBulanBaru?: number;
+  gajiPokokBaru?: number | null;
+}
+
+/** Riwayat PMK secukupnya untuk jendela Ubah data SK. */
+export interface RiwayatPmkUntukUbah {
+  id: string;
+  nomorSK: string | null;
+  tanggalSK: string | null;
+  penetapSK: string | null;
+  keterangan?: string | null;
+}
+
+/** Data jendela Ubah data SK untuk satu kenaikan pangkat; `luas` (Super Admin) menambah TMT, MKG, dan keterangan (ADR-118). */
+export function dataUbahSkKp(p: RiwayatKpUntukUbah, luas: boolean): DataUbahSkRiwayat {
+  return {
+    jenis: "kp",
+    riwayatId: p.id,
+    judul: `${p.golonganLama ? `${p.golonganLama} → ${p.golonganBaru}` : p.golonganBaru} · ${p.jenisLabel}`,
+    nomorSK: p.nomorSK ?? "",
+    tanggalSK: p.tanggalSK,
+    penetapSK: p.penetapSK,
+    jenisKp: p.jenisKp,
+    luas:
+      luas && p.mkgTahunBaru !== undefined && p.mkgBulanBaru !== undefined
+        ? {
+            keterangan: p.keterangan ?? "",
+            tmtPangkat: p.tmtPangkat,
+            golonganBaru: p.golonganBaru,
+            mkgTahunBaru: p.mkgTahunBaru,
+            mkgBulanBaru: p.mkgBulanBaru,
+            gajiPokokBaru: p.gajiPokokBaru ?? undefined,
+          }
+        : undefined,
+  };
+}
+
+/** Data jendela Ubah data SK untuk satu PMK. */
+export function dataUbahSkPmk(p: RiwayatPmkUntukUbah, luas: boolean): DataUbahSkRiwayat {
+  return {
+    jenis: "pmk",
+    riwayatId: p.id,
+    judul: "Peninjauan masa kerja",
+    nomorSK: p.nomorSK ?? "",
+    tanggalSK: p.tanggalSK,
+    penetapSK: p.penetapSK,
+    luas: luas ? { keterangan: p.keterangan ?? "" } : undefined,
   };
 }
 
