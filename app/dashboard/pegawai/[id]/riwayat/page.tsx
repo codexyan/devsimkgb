@@ -18,7 +18,7 @@ import {
 } from "./SkRiwayatDasar";
 import { cariKembar } from "@/lib/riwayatKembar";
 import { kunciNomorSk } from "@/lib/nomorSurat";
-import { RingkasAtasDasar, TombolDokumenSk, dokumenAtasDasar, pesanAtasDasarBerbeda, skKgb } from "./SinkronDasarKgb";
+import { DaftarSkDasar, RingkasAtasDasar, TombolDokumenSk, dokumenAtasDasar, pesanAtasDasarBerbeda, skKgb } from "./SinkronDasarKgb";
 import { muatLinimasaDasar, type DataLinimasa } from "@/app/dashboard/components/kgb/linimasa";
 import ModalLinimasaDasar from "@/app/dashboard/components/kgb/ModalLinimasaDasar";
 import { unduhUlangSk } from "@/lib/kgbAksi";
@@ -264,6 +264,37 @@ export default function RiwayatKGBPage() {
     dihapus: RingkasRiwayat;
     tersisa: RingkasRiwayat;
   } | null>(null);
+  // Pembuka jendela Ubah data SK, dipakai baris riwayat di tab Pangkat & PMK dan daftar SK di kartu Dasar KGB (ADR-120).
+  const bukaUbahSkKp = (p: RiwayatPangkat) =>
+    setUbahSk({
+      jenis: "kp",
+      riwayatId: p.id,
+      judul: `${p.golonganLama ? `${p.golonganLama} → ${p.golonganBaru}` : p.golonganBaru} · ${p.jenisLabel}`,
+      nomorSK: p.nomorSK ?? "",
+      tanggalSK: p.tanggalSK,
+      penetapSK: p.penetapSK,
+      jenisKp: p.jenisKp,
+      luas: bolehHapusBebas
+        ? {
+            keterangan: p.keterangan ?? "",
+            tmtPangkat: p.tmtPangkat,
+            golonganBaru: p.golonganBaru,
+            mkgTahunBaru: p.mkgTahunBaru,
+            mkgBulanBaru: p.mkgBulanBaru,
+            gajiPokokBaru: p.gajiPokokBaru,
+          }
+        : undefined,
+    });
+  const bukaUbahSkPmk = (p: RiwayatPmk) =>
+    setUbahSk({
+      jenis: "pmk",
+      riwayatId: p.id,
+      judul: "Peninjauan masa kerja",
+      nomorSK: p.nomorSK ?? "",
+      tanggalSK: p.tanggalSK,
+      penetapSK: p.penetapSK,
+      luas: bolehHapusBebas ? { keterangan: p.keterangan ?? "" } : undefined,
+    });
   useEffect(() => {
     if (!bolehDokumen) return;
     const t = setTimeout(() => {
@@ -812,6 +843,27 @@ export default function RiwayatKGBPage() {
                 />
               ) : undefined
             }
+            daftarSk={
+              bolehDokumen ? (
+                <DaftarSkDasar
+                  data={linimasaHalaman}
+                  bolehUbah={bolehUbah}
+                  memuatDraf={memuatDraf}
+                  onLihat={(sk, dok) => void lihatSk(`${sk.label}${sk.nomorSK ? ` ${sk.nomorSK}` : ""}`, dok, sk.kunci)}
+                  onUbah={(sk) => {
+                    if (sk.kunci.startsWith("kp:")) {
+                      const kp = pangkatList.find((x) => x.id === sk.kunci.slice(3));
+                      if (kp) bukaUbahSkKp(kp);
+                    } else if (sk.kunci.startsWith("pmk:")) {
+                      const pmk = pmkList.find((x) => x.id === sk.kunci.slice(4));
+                      if (pmk) bukaUbahSkPmk(pmk);
+                    } else if (sk.kunci === "data-pegawai") {
+                      setTindakan("dasar");
+                    }
+                  }}
+                />
+              ) : undefined
+            }
           />
         ) : (
           <div className="dsb-kerangka" style={{ height: 280 }} role="status" aria-label="Memuat data pegawai" />
@@ -967,26 +1019,7 @@ export default function RiwayatKGBPage() {
                       tampilDokumen={bolehDokumen}
                       onUbah={
                         bolehUbah
-                          ? () =>
-                              setUbahSk({
-                                jenis: "kp",
-                                riwayatId: p.id,
-                                judul: `${p.golonganLama ? `${p.golonganLama} → ${p.golonganBaru}` : p.golonganBaru} · ${p.jenisLabel}`,
-                                nomorSK: p.nomorSK ?? "",
-                                tanggalSK: p.tanggalSK,
-                                penetapSK: p.penetapSK,
-                                jenisKp: p.jenisKp,
-                                luas: bolehHapusBebas
-                                  ? {
-                                      keterangan: p.keterangan ?? "",
-                                      tmtPangkat: p.tmtPangkat,
-                                      golonganBaru: p.golonganBaru,
-                                      mkgTahunBaru: p.mkgTahunBaru,
-                                      mkgBulanBaru: p.mkgBulanBaru,
-                                      gajiPokokBaru: p.gajiPokokBaru,
-                                    }
-                                  : undefined,
-                              })
+                          ? () => bukaUbahSkKp(p)
                           : undefined
                       }
                       sk={{
@@ -1104,16 +1137,7 @@ export default function RiwayatKGBPage() {
                       tampilDokumen={bolehDokumen}
                       onUbah={
                         bolehUbah
-                          ? () =>
-                              setUbahSk({
-                                jenis: "pmk",
-                                riwayatId: p.id,
-                                judul: "Peninjauan masa kerja",
-                                nomorSK: p.nomorSK ?? "",
-                                tanggalSK: p.tanggalSK,
-                                penetapSK: p.penetapSK,
-                                luas: bolehHapusBebas ? { keterangan: p.keterangan ?? "" } : undefined,
-                              })
+                          ? () => bukaUbahSkPmk(p)
                           : undefined
                       }
                       sk={{ jenis: "sk_pmk", nomorSK: p.nomorSK ?? "", tanggalSK: p.tanggalSK ?? null, judul: "Peninjauan masa kerja" }}

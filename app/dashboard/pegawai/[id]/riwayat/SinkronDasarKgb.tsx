@@ -89,3 +89,66 @@ export function RingkasAtasDasar({
   );
 }
 
+const LABEL_PERAN: Record<SkGaji["peran"], string> = {
+  dasar: "Atas dasar KGB berikutnya",
+  tergantikan: "Tergantikan",
+  sesudah: "Berlaku sesudah KGB berikutnya",
+};
+
+/**
+ * Seluruh SK penetap gaji pokok pegawai (SK KGB, kenaikan pangkat, PMK) menurut TMT, yang terbaru di atas, di kartu
+ * Dasar KGB (ADR-120). SK kenaikan pangkat dan PMK tidak lenyap dari kartu ketika dasarnya bergeser: tetap tercantum
+ * dengan perannya, dan dapat dibetulkan dari barisnya. `onUbah` dipanggil untuk baris yang dapat dibetulkan dari sini.
+ */
+export function DaftarSkDasar({
+  data,
+  bolehUbah,
+  memuatDraf,
+  onLihat,
+  onUbah,
+}: {
+  data: DataLinimasa | null | "gagal";
+  bolehUbah: boolean;
+  /** Kunci SK yang drafnya sedang dicetak. */
+  memuatDraf: string | null;
+  onLihat: (sk: SkGaji, dok: DokumenSk) => void;
+  onUbah: (sk: SkGaji) => void;
+}) {
+  if (data === null) return <span style={{ color: "var(--dt5)" }}>Menyusun linimasa SK…</span>;
+  if (data === "gagal") return <span style={{ color: "var(--dt5)" }}>Linimasa SK gagal dimuat.</span>;
+  const daftar = [...data.linimasa.sk].reverse();
+  if (daftar.length === 0) return <span style={{ color: "var(--dt5)" }}>Belum ada SK penetap gaji pokok yang tercatat.</span>;
+  return (
+    <ul className="pgw-mutasi" data-daftar-sk="">
+      {daftar.map((sk) => {
+        const bisaDiubah = sk.kunci.startsWith("kp:") || sk.kunci.startsWith("pmk:") || sk.kunci === "data-pegawai";
+        return (
+          <li key={sk.kunci}>
+            <strong>{teksSk(sk)}</strong>{" "}
+            <span className="dsb-tag" data-nada={sk.peran === "dasar" ? "hijau" : undefined} data-garis={sk.peran === "dasar" ? undefined : ""}>
+              {LABEL_PERAN[sk.peran]}
+            </span>
+            <span>
+              {[sk.tanggalSK ? `tanggal ${formatTanggalId(sk.tanggalSK)}` : "", sk.penetap ? `oleh ${sk.penetap}` : "", sk.rincian ?? ""]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+            <span className="flex flex-wrap items-center gap-2" style={{ fontSize: "12px", color: "var(--dt5)" }}>
+              <TombolDokumenSk
+                dok={data.dokumen ? (data.dokumen[sk.kunci] ?? null) : undefined}
+                memuat={memuatDraf === sk.kunci}
+                onLihat={(dok) => onLihat(sk, dok)}
+              />
+              {bolehUbah && bisaDiubah && (
+                <button type="button" className="dsb-tombol dsb-tombol-kecil" data-jenis="garis" onClick={() => onUbah(sk)}>
+                  {sk.kunci === "data-pegawai" ? "Ubah SK dasar" : "Ubah data SK"}
+                </button>
+              )}
+              {sk.jenis === "kgb" && sk.kunci !== "data-pegawai" && <span>SK KGB dibetulkan dari tab Riwayat KGB.</span>}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
