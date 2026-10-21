@@ -43,6 +43,7 @@ export default function TabDataPegawai({
   onTindakan,
   onSemuaDokumen,
   atasDasar,
+  daftarSk,
   mkgMenurutSk,
 }: {
   pegawai: PegawaiUbah;
@@ -54,6 +55,8 @@ export default function TabDataPegawai({
   onSemuaDokumen: () => void;
   /** Atas dasar KGB berikutnya menurut linimasa SK (ADR-070); hanya untuk peran pemegang dokumen. */
   atasDasar?: ReactNode;
+  /** Riwayat SK penetap gaji pokok pada kartu Dasar KGB (ADR-120). */
+  daftarSk?: ReactNode;
   /**
    * Masa kerja golongan pada TMT SK kenaikan pangkat atau PMK sesudah KGB terakhir, seperti tertulis pada SK itu
    * (ADR-078); null bila dasar KGB berikutnya bukan SK seperti itu.
@@ -224,6 +227,11 @@ export default function TabDataPegawai({
               {atasDasar && (
                 <Baris label="Atas dasar KGB berikutnya" lebar>
                   {atasDasar}
+                </Baris>
+              )}
+              {daftarSk && (
+                <Baris label="Riwayat SK penetap gaji pokok" lebar>
+                  {daftarSk}
                 </Baris>
               )}
             </>
