@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { canEditPegawai, canManageHukdis, canProcessKGB } from "@/lib/auth";
+import { canEditPegawai, canManageHukdis, canProcessKGB, isSuperAdmin } from "@/lib/auth";
+import { bolehHapusRiwayatKp } from "@/lib/riwayatPenopang";
 import TabDokumenPemutakhiran from "./TabDokumenPemutakhiran";
 import {
   KakiSkRiwayat,
+  ModalHapusRiwayatBebas,
   ModalHapusRiwayatKembar,
   ModalUbahSkRiwayat,
   ModalUnggahSkRiwayat,
@@ -112,6 +114,7 @@ interface RiwayatPangkat {
   gajiPokokBaru: number;
   keterangan: string | null;
   penetapSK: string | null;
+  createdAt: string | null;
 }
 
 /** Satu peninjauan masa kerja dari GET /api/pegawai/[id]/pmk. */
@@ -229,6 +232,7 @@ export default function RiwayatKGBPage() {
   // Tab Dokumen hanya untuk Super Admin dan Tim SDM KGB (ADR-023, ADR-028); ?tab=dokumen membukanya langsung.
   const bolehDokumen = canProcessKGB(role);
   const bolehUbah = canEditPegawai(role);
+  const bolehHapusBebas = isSuperAdmin(role);
   // Pindaian SK pada baris riwayat kenaikan pangkat dan PMK (ADR-067): daftar dokumen pegawai dimuat saat tab Pangkat &
   // PMK dibuka, lalu dicocokkan menurut jenis dan nomor SK, sama dengan linimasa SK penetap gaji pokok (ADR-066).
   const [dokumenSk, setDokumenSk] = useState<DokumenPegawai[] | "gagal" | null>(null);
@@ -246,6 +250,14 @@ export default function RiwayatKGBPage() {
   >(null);
   const [unggahSk, setUnggahSk] = useState<SkRiwayat | null>(null);
   const [ubahSk, setUbahSk] = useState<DataUbahSkRiwayat | null>(null);
+  const [hapusBebas, setHapusBebas] = useState<{
+    riwayatId: string;
+    judul: string;
+    nomorSK: string;
+    tmt: string | null;
+    mkg: string;
+    gaji: number;
+  } | null>(null);
   const [hapusKembar, setHapusKembar] = useState<{
     jenis: "kp" | "pmk";
     riwayatId: string;
@@ -874,6 +886,35 @@ export default function RiwayatKGBPage() {
                       </div>
                     )}
                   </dl>
+                  {bolehHapusBebas && (() => {
+                    // Super Admin: hapus riwayat mana pun yang tidak menopang data pegawai (ADR-118).
+                    const izin = bolehHapusRiwayatKp(p.id, pangkatList);
+                    return (
+                      <div className="px-4 py-2 flex flex-wrap items-center gap-2" style={{ borderTop: "0.5px solid var(--ln2)", fontSize: "12px", color: "var(--dt4)" }}>
+                        <span>{izin.boleh ? "Riwayat ini tidak menopang data pegawai saat ini." : "Menopang data pegawai saat ini; tidak dapat dihapus."}</span>
+                        {izin.boleh && (
+                          <button
+                            type="button"
+                            className="dsb-tombol dsb-tombol-kecil"
+                            data-nada="merah"
+                            style={{ marginLeft: "auto" }}
+                            onClick={() =>
+                              setHapusBebas({
+                                riwayatId: p.id,
+                                judul: `${p.golonganLama} → ${p.golonganBaru} · ${p.jenisLabel}`,
+                                nomorSK: p.nomorSK,
+                                tmt: p.tmtPangkat,
+                                mkg: `${p.mkgTahunBaru} thn ${p.mkgBulanBaru} bln`,
+                                gaji: p.gajiPokokBaru,
+                              })
+                            }
+                          >
+                            Hapus riwayat
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {(() => {
                     // SK yang sama tercatat dua kali (ADR-069): tampil dua kali pula di linimasa SK.
                     const kembar = cariKembar(
@@ -922,6 +963,16 @@ export default function RiwayatKGBPage() {
                                 tanggalSK: p.tanggalSK,
                                 penetapSK: p.penetapSK,
                                 jenisKp: p.jenisKp,
+                                luas: bolehHapusBebas
+                                  ? {
+                                      keterangan: p.keterangan ?? "",
+                                      tmtPangkat: p.tmtPangkat,
+                                      golonganBaru: p.golonganBaru,
+                                      mkgTahunBaru: p.mkgTahunBaru,
+                                      mkgBulanBaru: p.mkgBulanBaru,
+                                      gajiPokokBaru: p.gajiPokokBaru,
+                                    }
+                                  : undefined,
                               })
                           : undefined
                       }
@@ -1048,6 +1099,7 @@ export default function RiwayatKGBPage() {
                                 nomorSK: p.nomorSK ?? "",
                                 tanggalSK: p.tanggalSK,
                                 penetapSK: p.penetapSK,
+                                luas: bolehHapusBebas ? { keterangan: p.keterangan ?? "" } : undefined,
                               })
                           : undefined
                       }
@@ -1083,6 +1135,20 @@ export default function RiwayatKGBPage() {
           data={linimasaHalaman === "gagal" ? null : linimasaHalaman}
           galat={linimasaHalaman === "gagal" ? "Linimasa SK gagal dimuat." : null}
           onTutup={() => setBukaLinimasa(false)}
+        />
+      )}
+      {hapusBebas && (
+        <ModalHapusRiwayatBebas
+          pegawaiId={id}
+          riwayatId={hapusBebas.riwayatId}
+          ringkas={hapusBebas}
+          onTutup={() => setHapusBebas(null)}
+          onSelesai={(pesan) => {
+            setHapusBebas(null);
+            setPesanBerhasil(pesan);
+            fetchData();
+            setVersiDokumenSk((v) => v + 1);
+          }}
         />
       )}
       {hapusKembar && (

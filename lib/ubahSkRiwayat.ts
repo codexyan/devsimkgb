@@ -15,7 +15,10 @@
 import { db } from "./db";
 import { logAudit } from "./auditLog";
 import { newId } from "./sheets/id";
-import { isJenisKp, JENIS_KP, skKpLebihBaru } from "./kenaikanPangkat";
+import { dampakKenaikanPangkatPadaKgb, isJenisKp, JENIS_KP, skKpLebihBaru } from "./kenaikanPangkat";
+import { rencanaSiklusBerikutnya } from "./jadwalKgb";
+import { riwayatPenopang } from "./riwayatPenopang";
+import { getGajiPokok } from "./tabelGaji";
 import { kunciNomorSk } from "./nomorSurat";
 import { suratSudahDibuat, type SuratKgbTersimpan } from "./prosesKgb";
 import { daftarDokumenArsip, salinObjekKeArsip, ubahDaftarDokumenArsip } from "./dokumenPegawaiServer";
@@ -96,6 +99,12 @@ export interface IsianUbahSkRiwayat {
   penetapSK: string | null;
   /** Hanya kenaikan pangkat. */
   jenisKp?: string;
+  /**
+   * Isian lanjutan khusus Super Admin (ADR-118). Kenaikan pangkat: TMT, masa kerja golongan baru, dan keterangan;
+   * gaji pokoknya dihitung ulang dari tabel gaji. PMK: keterangan saja, sebab TMT dan masa kerjanya sudah
+   * dihitung terhadap data pegawai.
+   */
+  luas?: { tmt: Date | null; keterangan: string | null; mkgTahun: number | null; mkgBulan: number | null };
 }
 
 /** Betulkan data SK satu riwayat kenaikan pangkat (`jenis` "kp") atau PMK ("pmk"), lalu selaraskan salinannya. */
@@ -148,9 +157,42 @@ export async function ubahSkRiwayat(input: {
   if (!samaTeks(lama.penetapSK, baru.penetapSK)) beda.push(`ditetapkan oleh "${lama.penetapSK ?? "-"}" → "${baru.penetapSK ?? "-"}"`);
   if (jenisKpLama !== jenisKpBaru && jenisKpBaru)
     beda.push(`jenis ${isJenisKp(jenisKpLama ?? "") ? JENIS_KP[jenisKpLama as keyof typeof JENIS_KP] : jenisKpLama ?? "-"} → ${JENIS_KP[jenisKpBaru as keyof typeof JENIS_KP]}`);
+
+  // Isian lanjutan Super Admin (ADR-118): divalidasi seluruhnya sebelum ada yang ditulis.
+  const patchLuas: Record<string, unknown> = {};
+  let angkaBerubah = false;
+  const luas = isian.luas;
+  if (luas) {
+    const ketBaru = luas.keterangan?.trim() || null;
+    if (!samaTeks(riwayat.keterangan, ketBaru)) {
+      patchLuas.keterangan = ketBaru;
+      beda.push("keterangan diubah");
+    }
+    if (jenis === "kp") {
+      const kp = riwayat as RiwayatPangkatRow;
+      if (luas.tmt && !samaTanggal(kp.tmtPangkat, luas.tmt)) {
+        patchLuas.tmtPangkat = luas.tmt;
+        beda.push(`TMT ${kp.tmtPangkat ? formatTanggalId(kp.tmtPangkat) : "-"} → ${formatTanggalId(luas.tmt)}`);
+        angkaBerubah = true;
+      }
+      if (luas.mkgTahun !== null && luas.mkgBulan !== null && (luas.mkgTahun !== kp.mkgTahunBaru || luas.mkgBulan !== kp.mkgBulanBaru)) {
+        if (!Number.isInteger(luas.mkgTahun) || luas.mkgTahun < 0 || luas.mkgTahun > 40 || !Number.isInteger(luas.mkgBulan) || luas.mkgBulan < 0 || luas.mkgBulan > 11)
+          return { ok: false, status: 400, pesan: "Masa kerja golongan tidak valid (tahun 0 sampai 40, bulan 0 sampai 11)" };
+        const gaji = getGajiPokok(kp.golonganBaru, luas.mkgTahun, luas.mkgBulan);
+        if (gaji <= 0)
+          return { ok: false, status: 400, pesan: `Gaji pokok golongan ${kp.golonganBaru} untuk masa kerja ${luas.mkgTahun} tahun ${luas.mkgBulan} bulan tidak ditemukan di tabel gaji` };
+        Object.assign(patchLuas, { mkgTahunBaru: luas.mkgTahun, mkgBulanBaru: luas.mkgBulan, gajiPokokBaru: gaji });
+        beda.push(
+          `MKG ${kp.mkgTahunBaru} thn ${kp.mkgBulanBaru} bln → ${luas.mkgTahun} thn ${luas.mkgBulan} bln; ` +
+            `gaji pokok Rp ${kp.gajiPokokBaru.toLocaleString("id-ID")} → Rp ${gaji.toLocaleString("id-ID")}`,
+        );
+        angkaBerubah = true;
+      }
+    }
+  }
   if (beda.length === 0) return { ok: true, berubah: false, ringkas: "Tidak ada data SK yang berubah.", selaras: [] };
 
-  const patchRiwayat = { nomorSK: baru.nomorSK, tanggalSK: baru.tanggalSK, penetapSK: baru.penetapSK };
+  const patchRiwayat = { nomorSK: baru.nomorSK, tanggalSK: baru.tanggalSK, penetapSK: baru.penetapSK, ...patchLuas };
   if (jenis === "kp") await db.riwayatPangkat.update({ id: riwayat.id }, { ...patchRiwayat, jenisKp: jenisKpBaru as string });
   else await db.riwayatPmk.update({ id: riwayat.id }, patchRiwayat);
 
@@ -158,6 +200,59 @@ export async function ubahSkRiwayat(input: {
 
   // KGB yang Atas dasarnya SK ini.
   const kgb = (await db.riwayatKGB.findMany({ where: { pegawaiId: pegawai.id } })) as RiwayatKGBRow[];
+
+  // TMT dan masa kerja yang berubah ikut ke data pegawai hanya bila ini kenaikan pangkat yang menopangnya.
+  if (jenis === "kp" && angkaBerubah) {
+    const kpBaru = { ...(riwayat as RiwayatPangkatRow), ...patchLuas } as RiwayatPangkatRow;
+    const penopang = riwayatPenopang((semua as RiwayatPangkatRow[]).map((r) => (r.id === riwayat.id ? kpBaru : r)));
+    if (penopang?.id === riwayat.id && pegawai.golonganRuang === kpBaru.golonganBaru) {
+      await db.pegawai.update(
+        { id: pegawai.id },
+        { tmtGolongan: kpBaru.tmtPangkat, mkgTahun: kpBaru.mkgTahunBaru, mkgBulan: kpBaru.mkgBulanBaru, gajiPokok: kpBaru.gajiPokokBaru, updatedAt: new Date() },
+      );
+      selaras.push("TMT golongan, masa kerja, dan gaji pokok di Data Pegawai ikut dibetulkan");
+      const dampak = dampakKenaikanPangkatPadaKgb(kgb);
+      let jadwal = 0;
+      for (const k of dampak.diselaraskan) {
+        const tmtKgbBaru = tanggalKalender(k.tmtKgbBaru);
+        if (!tmtKgbBaru) continue;
+        try {
+          const rencana = rencanaSiklusBerikutnya({
+            golonganRuang: kpBaru.golonganBaru,
+            mkgTahun: kpBaru.mkgTahunBaru,
+            mkgBulan: kpBaru.mkgBulanBaru,
+            gajiPokok: kpBaru.gajiPokokBaru,
+            tmtKgbBerikutnya: tmtKgbBaru,
+            tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
+            penetapSkDasar: k.penetapSkDasar,
+          });
+          await db.riwayatKGB.update(
+            { id: k.id },
+            {
+              golonganLama: rencana.golonganLama,
+              gajiPokokLama: rencana.gajiPokokLama,
+              mkgTahunLama: rencana.mkgTahunLama,
+              mkgBulanLama: rencana.mkgBulanLama,
+              golonganBaru: rencana.golonganBaru,
+              gajiPokokBaru: rencana.gajiPokokBaru,
+              mkgTahunBaru: rencana.mkgTahunBaru,
+              mkgBulanBaru: rencana.mkgBulanBaru,
+              tmtKgbBerikutnya: rencana.tmtKgbBerikutnya,
+            },
+          );
+          jadwal++;
+        } catch {
+          // Jadwal yang tidak terbaca dibiarkan; Tim SDM memperbaikinya lewat Proses KGB.
+        }
+      }
+      if (jadwal > 0) selaras.push(`${jadwal} jadwal KGB yang belum diproses dihitung ulang dari angka baru`);
+      for (const k of dampak.perluDitinjau)
+        selaras.push(`KGB TMT ${formatTanggalId(k.tmtKgbBaru)} (${k.status.replace(/_/g, " ")}) dihitung dengan angka lama; tinjau lagi di Proses KGB`);
+    } else {
+      selaras.push("Data Pegawai tidak berubah, sebab ini bukan kenaikan pangkat terbaru");
+    }
+  }
+
   const tmtSk = jenis === "kp" ? (riwayat as RiwayatPangkatRow).tmtPangkat : (riwayat as RiwayatPmkRow).tmtPmk;
   const rencana = rencanaSelarasKgb(kgb, lama, baru, skKpLebihBaru(tmtSk, kgb, pegawai.tmtKgbTerakhir));
   const buatUlang: string[] = [];

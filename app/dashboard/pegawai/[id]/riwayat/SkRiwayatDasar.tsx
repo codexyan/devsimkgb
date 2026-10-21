@@ -5,6 +5,7 @@ import { BidangPenetap, KerangkaModal, Catatan, PesanGalat } from "@/app/dashboa
 import { BidangTeks } from "@/app/dashboard/components/kgb/BidangForm";
 import { JENIS_DOKUMEN, periksaDokumen, type JenisDokumen } from "@/lib/dokumenPegawai";
 import { JENIS_KP } from "@/lib/kenaikanPangkat";
+import { getGajiPokok } from "@/lib/tabelGaji";
 import type { DokumenSk } from "@/lib/dokumenLinimasa";
 import { formatTanggalId, isoTanggalLokal, tanggalKalender } from "@/lib/waktu";
 
@@ -92,6 +93,18 @@ export interface DataUbahSkRiwayat {
   penetapSK: string | null;
   /** Kunci jenis kenaikan pangkat; hanya "kp". */
   jenisKp?: string;
+  /**
+   * Isian lanjutan, hanya diisi untuk Super Admin (ADR-118). Kenaikan pangkat: TMT dan masa kerja golongan baru;
+   * PMK: keterangan saja.
+   */
+  luas?: {
+    keterangan: string;
+    tmtPangkat?: string | null;
+    golonganBaru?: string;
+    mkgTahunBaru?: number;
+    mkgBulanBaru?: number;
+    gajiPokokBaru?: number;
+  };
 }
 
 /**
@@ -115,19 +128,41 @@ export function ModalUbahSkRiwayat({
   const [tanggalSK, setTanggalSK] = useState(tanggalAwal ? isoTanggalLokal(tanggalAwal) : "");
   const [penetapSK, setPenetapSK] = useState(data.penetapSK ?? "");
   const [jenisKp, setJenisKp] = useState(data.jenisKp && data.jenisKp in JENIS_KP ? data.jenisKp : "reguler");
+  const luas = data.luas;
+  const tmtAwal = tanggalKalender(luas?.tmtPangkat);
+  const [tmtPangkat, setTmtPangkat] = useState(tmtAwal ? isoTanggalLokal(tmtAwal) : "");
+  const [mkgTahun, setMkgTahun] = useState(String(luas?.mkgTahunBaru ?? 0));
+  const [mkgBulan, setMkgBulan] = useState(String(luas?.mkgBulanBaru ?? 0));
+  const [keterangan, setKeterangan] = useState(luas?.keterangan ?? "");
+  const gajiBaru =
+    luas?.golonganBaru && mkgTahun !== "" && mkgBulan !== "" ? getGajiPokok(luas.golonganBaru, Number(mkgTahun), Number(mkgBulan)) : null;
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
 
   async function simpan() {
     if (!nomorSK.trim()) return setGalat(`Nomor ${label} wajib diisi.`);
     if (!tanggalSK) return setGalat(`Tanggal ${label} wajib diisi.`);
+    if (luas && data.jenis === "kp") {
+      if (!tmtPangkat) return setGalat("TMT pangkat wajib diisi.");
+      if (!gajiBaru)
+        return setGalat(`Gaji pokok golongan ${luas.golonganBaru} untuk masa kerja ${mkgTahun} tahun ${mkgBulan} bulan tidak ada di tabel gaji.`);
+    }
     setSibuk(true);
     setGalat(null);
     try {
       const res = await fetch(`/api/pegawai/${encodeURIComponent(pegawaiId)}/${data.jenis === "kp" ? "pangkat" : "pmk"}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ riwayatId: data.riwayatId, nomorSK, tanggalSK, penetapSK, ...(data.jenis === "kp" ? { jenisKp } : {}) }),
+        body: JSON.stringify({
+          riwayatId: data.riwayatId,
+          nomorSK,
+          tanggalSK,
+          penetapSK,
+          ...(data.jenis === "kp" ? { jenisKp } : {}),
+          ...(luas
+            ? { keterangan, ...(data.jenis === "kp" ? { tmtPangkat, mkgTahunBaru: Number(mkgTahun), mkgBulanBaru: Number(mkgBulan) } : {}) }
+            : {}),
+        }),
       });
       const d = (await res.json().catch(() => ({}))) as { error?: string; berubah?: boolean; selaras?: string[] };
       if (!res.ok) throw new Error(d.error ?? "Data SK gagal disimpan.");
@@ -164,9 +199,13 @@ export function ModalUbahSkRiwayat({
     >
       <PesanGalat pesan={galat} />
       <Catatan nada="navy">
-        Yang dibetulkan hanya data SK-nya; golongan, masa kerja, gaji pokok, dan TMT tidak berubah. KGB yang Atas dasarnya
-        SK ini dan belum ditandatangani, SK dasar di Data Pegawai, dan pindaian di arsip dokumen ikut memakai data baru.
-        SK KGB yang sudah ditandatangani tidak diubah.
+        {luas
+          ? data.jenis === "kp"
+            ? "Selain data SK, TMT dan masa kerja golongan dapat dibetulkan; gaji pokok dihitung ulang dari tabel gaji. Golongan tidak berubah. Bila ini kenaikan pangkat terbaru, Data Pegawai dan jadwal KGB yang belum diproses ikut dihitung ulang. "
+            : "Selain data SK, keterangan dapat dibetulkan. TMT dan masa kerja PMK tidak dapat diubah karena sudah dihitung terhadap data pegawai. "
+          : "Yang dibetulkan hanya data SK-nya; golongan, masa kerja, gaji pokok, dan TMT tidak berubah. "}
+        KGB yang Atas dasarnya SK ini dan belum ditandatangani, SK dasar di Data Pegawai, dan pindaian di arsip dokumen ikut
+        memakai data baru. SK KGB yang sudah ditandatangani tidak diubah.
       </Catatan>
       {data.jenis === "kp" && (
         <label className="kgbm-label">
@@ -186,6 +225,32 @@ export function ModalUbahSkRiwayat({
         onUbah={setPenetapSK}
         petunjuk="Pejabat yang menandatangani SK ini. Tercetak pada baris Oleh di SK KGB berikutnya bila SK ini menjadi Atas dasarnya."
       />
+      {luas && data.jenis === "kp" && (
+        <>
+          <BidangTeks label="TMT pangkat" jenis="date" wajib nilai={tmtPangkat} onUbah={setTmtPangkat} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <label className="kgbm-label">
+              <span className="kgbm-wajib">Masa kerja golongan (tahun)</span>
+              <input className="kgbm-input" type="number" min={0} max={40} value={mkgTahun} onChange={(e) => setMkgTahun(e.target.value)} />
+            </label>
+            <label className="kgbm-label">
+              <span className="kgbm-wajib">Bulan</span>
+              <input className="kgbm-input" type="number" min={0} max={11} value={mkgBulan} onChange={(e) => setMkgBulan(e.target.value)} />
+            </label>
+          </div>
+          <p className="kgbm-petunjuk">
+            Gaji pokok golongan {luas.golonganBaru}:{" "}
+            {gajiBaru ? `Rp ${gajiBaru.toLocaleString("id-ID")}` : "tidak ditemukan di tabel gaji"}
+            {gajiBaru !== null && gajiBaru !== luas.gajiPokokBaru ? ` (sebelumnya Rp ${(luas.gajiPokokBaru ?? 0).toLocaleString("id-ID")})` : ""}
+          </p>
+        </>
+      )}
+      {luas && (
+        <label className="kgbm-label">
+          <span>Keterangan</span>
+          <textarea className="kgbm-input" rows={2} value={keterangan} onChange={(e) => setKeterangan(e.target.value)} />
+        </label>
+      )}
     </KerangkaModal>
   );
 }
@@ -403,6 +468,91 @@ export function ModalHapusRiwayatKembar({
         <strong>Tetap tercatat</strong>
       </p>
       {isi(tersisa)}
+    </KerangkaModal>
+  );
+}
+
+/**
+ * Hapus riwayat kenaikan pangkat mana pun oleh Super Admin (ADR-118). Riwayatnya tidak menopang data pegawai (server
+ * memeriksanya), jadi golongan, masa kerja, dan gaji pokok pegawai tidak berubah.
+ */
+export function ModalHapusRiwayatBebas({
+  pegawaiId,
+  riwayatId,
+  ringkas,
+  onTutup,
+  onSelesai,
+}: {
+  pegawaiId: string;
+  riwayatId: string;
+  ringkas: { judul: string; nomorSK: string; tmt: string | null; mkg: string; gaji: number };
+  onTutup: () => void;
+  onSelesai: (pesan: string) => void;
+}) {
+  const [sibuk, setSibuk] = useState(false);
+  const [galat, setGalat] = useState<string | null>(null);
+
+  async function hapus() {
+    setSibuk(true);
+    setGalat(null);
+    try {
+      const res = await fetch(`/api/pegawai/${encodeURIComponent(pegawaiId)}/pangkat?riwayatId=${encodeURIComponent(riwayatId)}&mode=bebas`, {
+        method: "DELETE",
+      });
+      const d = (await res.json().catch(() => ({}))) as { error?: string; peringatan?: string[] };
+      if (!res.ok) throw new Error(d.error ?? "Riwayat gagal dihapus.");
+      onSelesai([`Riwayat kenaikan pangkat SK ${ringkas.nomorSK} dihapus.`, ...(d.peringatan ?? []).map((x) => `${x}.`)].join(" "));
+    } catch (e) {
+      setGalat(e instanceof Error ? e.message : "Riwayat gagal dihapus.");
+    } finally {
+      setSibuk(false);
+    }
+  }
+
+  return (
+    <KerangkaModal
+      judul="Hapus riwayat kenaikan pangkat"
+      subjudul={`SK ${ringkas.nomorSK}`}
+      ukuran="md"
+      nada="merah"
+      sibuk={sibuk}
+      onTutup={onTutup}
+      onKirim={() => void hapus()}
+      kaki={
+        <>
+          <button type="button" className="kgbm-tombol kgbm-kedua" onClick={onTutup} disabled={sibuk} data-autofocus>
+            Batal
+          </button>
+          <button type="submit" className="kgbm-tombol kgbm-bahaya" disabled={sibuk}>
+            {sibuk ? "Menghapus…" : "Hapus riwayat ini"}
+          </button>
+        </>
+      }
+    >
+      <PesanGalat pesan={galat} />
+      <Catatan>
+        Riwayat ini tidak menopang golongan, masa kerja, dan gaji pokok pegawai saat ini, jadi data pegawai dan KGB tidak
+        berubah. Penghapusan tidak dapat dibatalkan dan tercatat di Log Aktivitas. Bila nomor SK ini masih disebut
+        sebagai Atas dasar pada KGB, Anda akan diberi tahu.
+      </Catatan>
+      <dl className="kgbm-item-data">
+        <div>
+          <dt>Kenaikan</dt>
+          <dd>{ringkas.judul}</dd>
+        </div>
+        <div>
+          <dt>TMT</dt>
+          <dd>{ringkas.tmt ? formatTanggalId(ringkas.tmt) : "-"}</dd>
+        </div>
+        <div>
+          <dt>Masa kerja</dt>
+          <dd>{ringkas.mkg}</dd>
+        </div>
+        <div>
+          <dt>Gaji pokok</dt>
+          <dd>Rp {ringkas.gaji.toLocaleString("id-ID")}</dd>
+        </div>
+      </dl>
     </KerangkaModal>
   );
 }

@@ -10,7 +10,7 @@ import { catatKenaikanPangkat } from "@/lib/catatDasarGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
 import { tanggalKalender } from "@/lib/waktu";
-import { tanganiHapusRiwayatKembar, tanganiUbahSkRiwayat } from "@/lib/ubahSkRiwayatRute";
+import { tanganiHapusRiwayatKembar, tanganiHapusRiwayatKpBebas, tanganiUbahSkRiwayat } from "@/lib/ubahSkRiwayatRute";
 import type { RiwayatPangkatRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
@@ -24,6 +24,13 @@ export const runtime = "nodejs";
  * sedangkan KGB yang sudah dikerjakan Tim SDM atau keuangan dikembalikan sebagai daftar "perlu ditinjau" agar
  * Tim SDM memutuskan sendiri: batalkan dan input ulang, atau lanjutkan SK yang sudah dibuat.
  */
+
+/** ISO untuk dibaca layar; tanggal yang tidak terbaca menjadi null, bukan membuat daftar gagal dimuat. */
+function isoWaktuAman(nilai: Date | string | null | undefined): string | null {
+  if (!nilai) return null;
+  const d = new Date(nilai);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
 
 function keTanggal(nilai: unknown): Date | null {
   return typeof nilai === "string" && nilai.trim() ? tanggalKalender(nilai) : null;
@@ -60,6 +67,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       gajiPokokBaru: r.gajiPokokBaru,
       keterangan: r.keterangan,
       penetapSK: r.penetapSK ?? null,
+      createdAt: isoWaktuAman(r.createdAt),
     })),
   );
 }
@@ -137,7 +145,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   return tanganiUbahSkRiwayat(req, params, "kp");
 }
 
-/** DELETE ?riwayatId=, hapus satu riwayat yang tercatat dua kali; data gaji tidak berubah (ADR-069). */
+/**
+ * DELETE ?riwayatId=, hapus satu riwayat yang tercatat dua kali; data gaji tidak berubah (ADR-069). Dengan &mode=bebas
+ * (Super Admin) riwayat mana pun yang tidak menopang data pegawai (ADR-118).
+ */
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (new URL(req.url).searchParams.get("mode") === "bebas") return tanganiHapusRiwayatKpBebas(req, params);
   return tanganiHapusRiwayatKembar(req, params, "kp");
 }

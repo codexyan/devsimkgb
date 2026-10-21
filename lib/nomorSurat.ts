@@ -38,3 +38,33 @@ export function bagianNomorSk(lengkap: string | null | undefined): { berawalan: 
 export function kunciNomorSk(nomor: string | null | undefined): string {
   return (nomor ?? "").replace(/\s+/g, "").toUpperCase();
 }
+
+/**
+ * Inti nomor SK untuk mengenali satu SK yang tertulis berbeda: tanpa awalan "NOMOR" dan akhiran "TAHUN xxxx", sebab
+ * "NOMOR WP.19-79.SA.12 TAHUN 2025" dan "WP.19-79.SA.12" adalah nomor yang sama (ADR-118). Hanya untuk mendeteksi
+ * duplikat; pencocokan pindaian dan Atas dasar tetap memakai `kunciNomorSk`.
+ */
+export function kunciIntiNomorSk(nomor: string | null | undefined): string {
+  return (nomor ?? "")
+    .replace(/^\s*NOMOR\s*[:.]?\s*/i, "")
+    .replace(/\s*TAHUN\s*\d{4}\s*$/i, "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
+}
+
+/** Tahun pada akhiran "TAHUN xxxx" sebuah nomor SK, atau null bila tidak ada. */
+function tahunNomorSk(nomor: string | null | undefined): string | null {
+  return /TAHUN\s*(\d{4})\s*$/i.exec(nomor ?? "")?.[1] ?? null;
+}
+
+/**
+ * true bila dua nomor adalah satu SK yang tertulis berbeda: intinya sama, dan tahunnya sama atau salah satunya tidak
+ * menyebut tahun. "12 TAHUN 2025" dan "12 TAHUN 2026" adalah dua SK, sebab urutan nomor berulang tiap tahun.
+ */
+export function nomorSkSama(a: string | null | undefined, b: string | null | undefined): boolean {
+  const inti = kunciIntiNomorSk(a);
+  if (!inti || inti !== kunciIntiNomorSk(b)) return false;
+  const ta = tahunNomorSk(a);
+  const tb = tahunNomorSk(b);
+  return !ta || !tb || ta === tb;
+}

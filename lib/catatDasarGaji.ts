@@ -19,7 +19,7 @@ import { hitungPmk } from "./pmk";
 import { rencanaSiklusBerikutnya } from "./jadwalKgb";
 import { isoTanggalKalender } from "./rekapKgb";
 import { formatTanggalId, tanggalKalender } from "./waktu";
-import { kunciNomorSk } from "./nomorSurat";
+import { nomorSkSama } from "./nomorSurat";
 import type { PegawaiRow, RiwayatKGBRow, RiwayatPangkatRow, RiwayatPmkRow } from "./sheets/tables";
 
 export interface GagalCatat {
@@ -97,7 +97,7 @@ export async function catatKenaikanPangkat(input: {
   // Satu SK hanya menaikkan pangkat sekali; SK yang sama dicatat dua kali membuat linimasa dan pindaiannya kembar
   // (ADR-069). Data SK-nya dibetulkan lewat Ubah data SK, bukan dicatat ulang.
   const tercatat = (await db.riwayatPangkat.findMany({ where: { pegawaiId: pegawai.id } })) as RiwayatPangkatRow[];
-  if (!input.riwayatAda && tercatat.some((r) => kunciNomorSk(r.nomorSK) === kunciNomorSk(nomorSK)))
+  if (!input.riwayatAda && tercatat.some((r) => nomorSkSama(r.nomorSK, nomorSK)))
     return {
       ok: false,
       status: 409,
@@ -250,7 +250,7 @@ export async function catatPmk(input: {
   if (!nomorSK.trim()) return { ok: false, status: 400, pesan: "Nomor SK PMK wajib diisi" };
   // Satu SK PMK hanya dicatat sekali (ADR-069).
   const tercatat = (await db.riwayatPmk.findMany({ where: { pegawaiId: pegawai.id } })) as RiwayatPmkRow[];
-  if (!input.riwayatAda && tercatat.some((r) => kunciNomorSk(r.nomorSK) === kunciNomorSk(nomorSK)))
+  if (!input.riwayatAda && tercatat.some((r) => nomorSkSama(r.nomorSK, nomorSK)))
     return {
       ok: false,
       status: 409,
