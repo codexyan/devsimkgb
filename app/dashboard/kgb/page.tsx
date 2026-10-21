@@ -38,6 +38,7 @@ import { LABEL_STATUS_TTD, type StatusTtdSk } from "@/lib/tteSk";
 import { BATAS_LEWATI_REVIEW_JAM, LABEL_REVIEW_SK, formatSisaWaktu, kesempatanLewatiReview, skBolehDicetak, type InfoReviewSk } from "@/lib/reviewSkUpt";
 import { infoStatusKgb, warnaStatusKgb } from "@/lib/statusKgb";
 import { jendelaProsesKgb } from "@/lib/tabelGaji";
+import { mkgPadaSkDasar } from "@/lib/prosesKgb";
 import { formatTanggalId, hariIniWita, type NilaiTanggal } from "@/lib/waktu";
 
 interface KGB {
@@ -544,6 +545,20 @@ export default function KGBPage() {
     const nomorSkBaru = nomorSkTerisi(k.surat?.nomorSurat);
     const pathFile = k.surat?.pathFile ?? null;
     const selisih = k.gajiPokokBaru !== null ? k.gajiPokokBaru - k.gajiPokokLama : null;
+    // Masa kerja lama adalah masa kerja pada TMT KGB terakhir. Bila SK dasarnya KP atau PMK di tengah siklus, SK-nya
+    // menulis masa kerja pada TMT-nya sendiri; ditampilkan juga supaya cocok dengan angka di SK (ADR-119).
+    const mkgSkDasar =
+      k.tmtSK && k.mkgTahunBaru !== null && k.mkgBulanBaru !== null
+        ? mkgPadaSkDasar({
+            tmtSK: k.tmtSK,
+            tmtKgbBaru: k.tmtKgbBaru,
+            mkgTahunLama: k.mkgTahunLama,
+            mkgBulanLama: k.mkgBulanLama,
+            mkgTahunBaru: k.mkgTahunBaru,
+            mkgBulanBaru: k.mkgBulanBaru,
+          })
+        : null;
+    const mkgSkDasarBeda = !!mkgSkDasar && !k.isVirtual && (mkgSkDasar.tahun !== k.mkgTahunLama || mkgSkDasar.bulan !== k.mkgBulanLama);
 
     const bisaInput = k.status === "belum_diproses" && !!jendela && !jendela.isLocked;
     const bisaBuatSk = !!kgb && k.status === "sedang_diproses";
@@ -759,7 +774,13 @@ export default function KGBPage() {
               label: "Golongan",
               nilai: k.golonganBaru && k.golonganBaru !== k.golonganLama ? `${k.golonganLama} menjadi ${k.golonganBaru}` : k.golonganLama || "-",
             },
-            { label: "Masa kerja lama", nilai: formatMkg(k.mkgTahunLama, k.mkgBulanLama) },
+            {
+              label: mkgSkDasarBeda ? "Masa kerja lama (pada TMT KGB terakhir)" : "Masa kerja lama",
+              nilai: formatMkg(k.mkgTahunLama, k.mkgBulanLama),
+            },
+            ...(mkgSkDasarBeda && mkgSkDasar
+              ? [{ label: "Masa kerja pada SK dasar", nilai: `${formatMkg(mkgSkDasar.tahun, mkgSkDasar.bulan)} (TMT ${formatTanggalId(k.tmtSK)})` }]
+              : []),
             { label: "Masa kerja baru", nilai: formatMkg(k.mkgTahunBaru, k.mkgBulanBaru) },
             { label: "Gaji pokok lama", nilai: formatRupiah(k.gajiPokokLama) },
             { label: "Gaji pokok baru", nilai: formatRupiah(k.gajiPokokBaru), nada: "hijau" },

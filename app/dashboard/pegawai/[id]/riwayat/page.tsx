@@ -858,6 +858,19 @@ export default function RiwayatKGBPage() {
                             dipotong {p.mkgTahunLama - p.mkgTahunBaru} tahun (pindah jenjang golongan)
                           </span>
                         )}
+                        <span style={{ display: "block", color: "var(--dt5)" }}>pada TMT KGB terakhir pegawai</span>
+                        {(() => {
+                          // SK menulis masa kerja pada TMT pangkatnya, bukan pada TMT KGB terakhir (ADR-119).
+                          const menurutSk = mkgPadaSkTercatat(
+                            { mkgTahun: p.mkgTahunBaru, mkgBulan: p.mkgBulanBaru, tmtKgbTerakhir: lengkap?.tmtKgbTerakhir },
+                            { jenis: "kp", tmt: p.tmtPangkat },
+                          );
+                          return menurutSk ? (
+                            <span style={{ display: "block", color: "var(--dtn)" }}>
+                              menurut SK, pada TMT pangkat: {menurutSk.mkg.tahun} thn {menurutSk.mkg.bulan} bln
+                            </span>
+                          ) : null;
+                        })()}
                       </dd>
                     </div>
                     <div>
