@@ -100,7 +100,7 @@ export interface IsianUbahSkRiwayat {
   /** Hanya kenaikan pangkat. */
   jenisKp?: string;
   /**
-   * Isian lanjutan khusus Super Admin (ADR-118). Kenaikan pangkat: TMT, masa kerja golongan baru, dan keterangan;
+   * Isian lanjutan khusus Super Admin (ADR-118). Kenaikan pangkat: TMT, MKG pada TMT KGB terakhir (bukan angka di SK), dan keterangan;
    * gaji pokoknya dihitung ulang dari tabel gaji. PMK: keterangan saja, sebab TMT dan masa kerjanya sudah
    * dihitung terhadap data pegawai.
    */

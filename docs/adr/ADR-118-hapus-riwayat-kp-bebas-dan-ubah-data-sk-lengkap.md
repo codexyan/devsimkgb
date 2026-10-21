@@ -35,7 +35,7 @@ dapat dibetulkan.
    - PMK tidak dapat dihapus bebas, sebab tiap PMK sudah menambah masa kerja pegawai. PMK ganda tetap dihapus lewat
      alur kembar (ADR-069).
 3. **Ubah data SK lebih lengkap, khusus Super Admin.** Selain nomor, tanggal, penetap, dan jenis:
-   - Kenaikan pangkat: TMT pangkat, masa kerja golongan baru, dan keterangan. Gaji pokok dihitung ulang dari tabel gaji
+   - Kenaikan pangkat: TMT pangkat, MKG pada TMT KGB terakhir, dan keterangan. Gaji pokok dihitung ulang dari tabel gaji
      (PP 5/2024), tidak diketik. Golongan tetap terkunci.
    - PMK: keterangan saja, karena TMT dan masa kerjanya sudah dihitung terhadap data pegawai.
    - Bila yang diubah adalah kenaikan pangkat penopang, TMT golongan, masa kerja, dan gaji pokok pada Data Pegawai
@@ -50,3 +50,12 @@ dapat dibetulkan.
 - Kasus Naily: C tetap sebagai penopang; A dan B dapat dihapus tanpa mengubah angka. TMT yang benar (2025 atau 2026)
   diputuskan Tim SDM dari SK fisik, lalu dibetulkan lewat Ubah data SK pada C.
 - Baris KGB yang ditolak dengan MKG 18 thn 6 bln pada pegawai itu tidak disentuh; itu urusan alur KGB.
+
+## Catatan sesudah dipakai (21 Oktober 2026)
+
+Isian masa kerja pada Ubah data SK semula berlabel "Masa kerja golongan". Kolom masa kerja pada riwayat kenaikan pangkat
+dan pada Data Pegawai adalah masa kerja **pada TMT KGB terakhir**, bukan angka yang tertulis di SK (yang berlaku pada TMT
+pangkat). Pada Naily Wardani, 18 thn 6 bln dari SK terisi ke kolom itu; baris KGB turunannya menjadi 18/6 → 20/6 dan SK KGB
+mencetak masa kerja pada SK dasar 19 thn 0 bln, padahal seharusnya 18/0 → 20/0 dan 18 thn 6 bln. Label diganti menjadi
+"MKG pada TMT KGB terakhir", disertai penjelasan dan peringatan saat angkanya diubah. Pembetulan datanya lewat Ubah data
+SK (18/0) lalu KGB Sedang Diproses dibatalkan dan diinput ulang oleh Tim SDM.
