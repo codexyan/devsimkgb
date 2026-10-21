@@ -202,3 +202,16 @@ test("mkgPadaSkDasar: SK PI atau PMK di tengah siklus mencetak MKG pada TMT SK i
   assert.deepEqual(mkgPadaSkDasar({ ...kgb, tmtSK: "2023-12-01", mkgTahunBaru: 7 }), { tahun: 4, bulan: 0 });
   assert.deepEqual(mkgPadaSkDasar({ ...kgb, tmtSK: null }), { tahun: 4, bulan: 0 });
 });
+
+test("kasus Naily Wardani: MKG tersimpan 18/0, SK dasar KP 1 Jun 2025 menampilkan 18/6, KGB Des 2026 menjadi 20/0 (ADR-119)", () => {
+  const d = (s: string) => new Date(`${s}T00:00:00.000Z`);
+  const benar = mkgPadaSkDasar({
+    tmtSK: d("2025-06-01"),
+    tmtKgbBaru: d("2026-12-01"),
+    mkgTahunLama: 18,
+    mkgBulanLama: 0,
+    mkgTahunBaru: 20,
+    mkgBulanBaru: 0,
+  });
+  assert.deepEqual(benar, { tahun: 18, bulan: 6 });
+});
