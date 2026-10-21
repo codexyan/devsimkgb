@@ -43,7 +43,10 @@ import { usePegawaiKgb } from "./usePegawaiKgb";
 import { muatLinimasaDasar, type DataLinimasa } from "./linimasa";
 import PanelSkDasar from "./PanelSkDasar";
 import { useRole } from "@/app/dashboard/components/RoleContext";
-import { isSuperAdmin } from "@/lib/auth";
+import { canEditPegawai, isSuperAdmin } from "@/lib/auth";
+import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
+import ModalPmk from "@/app/dashboard/components/ModalPmk";
+import ModalUbahPegawai, { type PegawaiUbah } from "@/app/dashboard/components/pegawai/ModalUbahPegawai";
 import type { SkGaji } from "@/lib/linimasaDasarSk";
 import {
   ModalUbahSkRiwayat,
@@ -111,6 +114,9 @@ export default function ModalInputKgb({
   const [versiPanel, setVersiPanel] = useState(0);
   const [ubahSk, setUbahSk] = useState<DataUbahSkRiwayat | null>(null);
   const [catatanPanel, setCatatanPanel] = useState<string | null>(null);
+  // Jendela pencatatan dan pembetulan SK yang dibuka dari panel (ADR-122).
+  const [catat, setCatat] = useState<"kp" | "pmk" | null>(null);
+  const [dasarPegawai, setDasarPegawai] = useState<PegawaiUbah | null>(null);
 
   // Berjalan setelah SK dasar dari riwayat KGB, data pegawai, atau usulan UPT diketahui. Isian hanya diganti
   // selama belum disunting: masih kosong atau masih sama dengan SK dasar yang ditemukan.
@@ -251,9 +257,29 @@ export default function ModalInputKgb({
   }
 
   // SK kenaikan pangkat dan PMK dibetulkan dari panel dengan jendela yang sama dengan tab Pangkat & PMK (ADR-068, ADR-118).
-  const bolehBetulkan = (sk: SkGaji) => sk.kunci.startsWith("kp:") || sk.kunci.startsWith("pmk:");
+  // SK KGB terakhir yang bersumber dari SK dasar Data Pegawai dibetulkan lewat Ubah SK dasar (ADR-070).
+  const bolehBetulkan = (sk: SkGaji) => sk.kunci.startsWith("kp:") || sk.kunci.startsWith("pmk:") || sk.kunci === "data-pegawai" || sk.dataPegawai;
+  function sesudahPembetulan(pesan: string) {
+    setUbahSk(null);
+    setCatat(null);
+    setDasarPegawai(null);
+    setCatatanPanel(pesan);
+    muatUlangPanel();
+    // Golongan, masa kerja, gaji pokok, dan SK dasar pegawai dapat berubah; perhitungan KGB dimuat ulang.
+    muatUlang();
+  }
   async function betulkan(sk: SkGaji) {
     setGalat(null);
+    if (!sk.kunci.startsWith("kp:") && !sk.kunci.startsWith("pmk:")) {
+      try {
+        const res = await fetch(`/api/pegawai/${encodeURIComponent(ringkas.id)}`, { cache: "no-store" });
+        if (!res.ok) throw new Error();
+        setDasarPegawai((await res.json()) as PegawaiUbah);
+      } catch {
+        setGalat("Data pegawai gagal dimuat. Coba lagi.");
+      }
+      return;
+    }
     if (sk.kunci.startsWith("kp:")) {
       const h = await ambilRiwayatPangkat(ringkas.id);
       const r = h.ok ? h.data.find((x) => x.id === sk.kunci.slice(3)) : undefined;
@@ -518,6 +544,8 @@ export default function ModalInputKgb({
             isian={form}
             catatan={catatanPanel}
             bolehBetulkan={bolehBetulkan}
+            bolehCatat={canEditPegawai(role)}
+            onCatat={setCatat}
             onPakai={(isian) => {
               // Pilihan operator: tidak ditimpa lagi oleh pencarian otomatis.
               disunting.current = true;
@@ -537,15 +565,12 @@ export default function ModalInputKgb({
         pegawaiId={ringkas.id}
         data={ubahSk}
         onTutup={() => setUbahSk(null)}
-        onSelesai={(pesan) => {
-          setUbahSk(null);
-          setCatatanPanel(pesan);
-          muatUlangPanel();
-          // Golongan, masa kerja, dan gaji pokok pegawai dapat berubah oleh pembetulan; perhitungan KGB dimuat ulang.
-          muatUlang();
-        }}
+        onSelesai={sesudahPembetulan}
       />
     )}
+    {catat === "kp" && pegawai && <ModalKenaikanPangkat pegawai={pegawai} onTutup={() => setCatat(null)} onBerhasil={sesudahPembetulan} />}
+    {catat === "pmk" && pegawai && <ModalPmk pegawai={pegawai} onTutup={() => setCatat(null)} onBerhasil={sesudahPembetulan} />}
+    {dasarPegawai && <ModalUbahPegawai pegawai={dasarPegawai} bagian="dasar" onTutup={() => setDasarPegawai(null)} onBerhasil={sesudahPembetulan} />}
     </>
   );
 }

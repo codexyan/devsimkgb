@@ -186,6 +186,30 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
   .kgbm-split[data-buka] .kgbm-split-kanan { position: sticky; top: 0; max-height: calc(92dvh - 150px); overflow-y: auto; }
 }
 .kgbm-skp-kepala { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--dtn); }
+/* Linimasa mendatar SK penetap gaji pokok (ADR-122): satu titik per SK, KGB yang sedang dibuat bertitik belah ketupat. */
+.kgbm-gw { display: flex; align-items: flex-start; margin: 0; padding: 2px 0 6px; list-style: none; overflow-x: auto; }
+.kgbm-gw > li { position: relative; flex: 1 0 92px; min-width: 92px; }
+.kgbm-gw > li::before { content: ""; position: absolute; top: 12px; left: -50%; right: 50%; height: 2px; background: var(--ln1); }
+.kgbm-gw > li:first-child::before { display: none; }
+.kgbm-gw-node { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; padding: 0 4px 6px; border: 0; background: transparent;
+  color: inherit; font: inherit; text-align: center; cursor: pointer; border-radius: 8px; }
+.kgbm-gw-node:hover .kgbm-gw-titik { border-color: var(--navy-solid); }
+.kgbm-gw-titik { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; box-sizing: border-box;
+  border: 2px solid var(--ln0); border-radius: 50%; background: var(--card); font-size: 12px; font-weight: 800; color: var(--st-amber); }
+.kgbm-gw > li[data-peran="dasar"] .kgbm-gw-titik { border-color: var(--navy-solid); }
+.kgbm-gw > li[data-peran="tergantikan"] .kgbm-gw-node, .kgbm-gw > li[data-peran="sesudah"] .kgbm-gw-node { opacity: .85; }
+.kgbm-gw-titik[data-kurang] { border-color: var(--tint-amber-ln); background: var(--tint-amber-bg); }
+.kgbm-gw-titik[data-bentuk="belah-ketupat"] { width: 18px; height: 18px; margin: 3px 0; border-radius: 3px; border-style: dashed; border-color: var(--st-green);
+  background: var(--tint-green-bg); transform: rotate(45deg); }
+.kgbm-gw-node[aria-pressed="true"] { background: var(--tint-navy); }
+.kgbm-gw-node[aria-pressed="true"] .kgbm-gw-titik:not([data-bentuk]) { border-color: var(--navy-solid); background: var(--navy-solid); color: #fff; }
+.kgbm-gw-jenis { font-size: 12px; font-weight: 650; color: var(--dtn); }
+.kgbm-gw-tgl { font-size: 11px; color: var(--dt4); white-space: nowrap; }
+.kgbm-gw-peran { font-size: 10.5px; color: var(--dt5); line-height: 1.25; }
+.kgbm-gw > li[data-peran="dasar"] .kgbm-gw-peran { color: var(--dtn); font-weight: 600; }
+.kgbm-gw-catat { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 11.5px; color: var(--dt4); }
+.kgbm-skp-sorot { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--card); border: 1px solid var(--ln1); font-size: 11.5px; color: var(--dt4); }
+.kgbm-skp-sorot strong { font-size: 12.5px; color: var(--dtn); overflow-wrap: anywhere; }
 .kgbm-skp-daftar { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 190px; overflow-y: auto; }
 .kgbm-skp-butir { display: grid; gap: 2px; width: 100%; padding: 8px 10px; border: 1px solid var(--ln1); border-radius: 10px; background: var(--card);
   color: inherit; font: inherit; text-align: left; cursor: pointer; }
