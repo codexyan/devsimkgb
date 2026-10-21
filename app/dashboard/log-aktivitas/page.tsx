@@ -79,6 +79,7 @@ const AKSI_CONFIG: Record<string, { label: string; nada: NadaAksi; kelompok: str
   ubah_sk_pmk:              { label: "Betulkan SK PMK",        nada: "kuning", kelompok: "Pegawai" },
   hapus_riwayat_kp_kembar:  { label: "Hapus KP kembar",        nada: "merah",  kelompok: "Pegawai" },
   hapus_riwayat_pmk_kembar: { label: "Hapus PMK kembar",       nada: "merah",  kelompok: "Pegawai" },
+  hapus_riwayat_kp:         { label: "Hapus riwayat KP",       nada: "merah",  kelompok: "Pegawai" },
   input_hukdis:             { label: "Input hukuman disiplin", nada: "kuning", kelompok: "Hukuman disiplin" },
   hapus_hukdis:             { label: "Hapus hukuman disiplin", nada: "merah",  kelompok: "Hukuman disiplin" },
   tambah_jenis_hukdis:      { label: "Tambah jenis hukdis",    nada: "kuning", kelompok: "Hukuman disiplin" },

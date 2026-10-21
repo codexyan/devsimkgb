@@ -38,3 +38,16 @@ export function bagianNomorSk(lengkap: string | null | undefined): { berawalan: 
 export function kunciNomorSk(nomor: string | null | undefined): string {
   return (nomor ?? "").replace(/\s+/g, "").toUpperCase();
 }
+
+/**
+ * Inti nomor SK untuk mengenali satu SK yang tertulis berbeda: tanpa awalan "NOMOR" dan akhiran "TAHUN xxxx", sebab
+ * "NOMOR WP.19-79.SA.12 TAHUN 2025" dan "WP.19-79.SA.12" adalah nomor yang sama (ADR-118). Hanya untuk mendeteksi
+ * duplikat; pencocokan pindaian dan Atas dasar tetap memakai `kunciNomorSk`.
+ */
+export function kunciIntiNomorSk(nomor: string | null | undefined): string {
+  return (nomor ?? "")
+    .replace(/^\s*NOMOR\s*[:.]?\s*/i, "")
+    .replace(/\s*TAHUN\s*\d{4}\s*$/i, "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
+}

@@ -10,7 +10,7 @@ import { catatKenaikanPangkat } from "@/lib/catatDasarGaji";
 import { muatBatasInputSdm } from "@/lib/muatBatasInputSdm";
 import { isoTanggalKalender } from "@/lib/rekapKgb";
 import { tanggalKalender } from "@/lib/waktu";
-import { tanganiHapusRiwayatKembar, tanganiUbahSkRiwayat } from "@/lib/ubahSkRiwayatRute";
+import { tanganiHapusRiwayatKembar, tanganiHapusRiwayatKpBebas, tanganiUbahSkRiwayat } from "@/lib/ubahSkRiwayatRute";
 import type { RiwayatPangkatRow } from "@/lib/sheets/tables";
 
 export const runtime = "nodejs";
@@ -60,6 +60,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       gajiPokokBaru: r.gajiPokokBaru,
       keterangan: r.keterangan,
       penetapSK: r.penetapSK ?? null,
+      createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
     })),
   );
 }
@@ -137,7 +138,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   return tanganiUbahSkRiwayat(req, params, "kp");
 }
 
-/** DELETE ?riwayatId=, hapus satu riwayat yang tercatat dua kali; data gaji tidak berubah (ADR-069). */
+/**
+ * DELETE ?riwayatId=, hapus satu riwayat yang tercatat dua kali; data gaji tidak berubah (ADR-069). Dengan &mode=bebas
+ * (Super Admin) riwayat mana pun yang tidak menopang data pegawai (ADR-118).
+ */
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (new URL(req.url).searchParams.get("mode") === "bebas") return tanganiHapusRiwayatKpBebas(req, params);
   return tanganiHapusRiwayatKembar(req, params, "kp");
 }

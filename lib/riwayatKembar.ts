@@ -6,9 +6,11 @@
 // sama. Riwayat yang hanya bernomor sama tetapi berbeda golongan atau TMT bukan duplikat: golongan, masa kerja, dan
 // gaji pokok pegawai dihitung dari keduanya, jadi tidak dihapus dari sini.
 //
+// Nomor dibandingkan menurut intinya (`kunciIntiNomorSk`, ADR-118).
+//
 // Modul ini murni agar dipakai bersama tab Pangkat & PMK dan rutenya.
 
-import { kunciNomorSk } from "./nomorSurat";
+import { kunciIntiNomorSk } from "./nomorSurat";
 import { tanggalKalender, type NilaiTanggal } from "./waktu";
 
 export interface RiwayatUntukKembar {
@@ -23,8 +25,8 @@ export interface RiwayatUntukKembar {
 /** true bila kedua riwayat (sejenis) adalah satu SK yang tercatat dua kali. */
 export function riwayatKembar(a: RiwayatUntukKembar, b: RiwayatUntukKembar): boolean {
   if (a.id === b.id) return false;
-  const nomor = kunciNomorSk(a.nomorSK);
-  if (!nomor || nomor !== kunciNomorSk(b.nomorSK)) return false;
+  const nomor = kunciIntiNomorSk(a.nomorSK);
+  if (!nomor || nomor !== kunciIntiNomorSk(b.nomorSK)) return false;
   const ta = tanggalKalender(a.tmt)?.getTime();
   if (ta === undefined || ta !== tanggalKalender(b.tmt)?.getTime()) return false;
   return (a.golonganBaru ?? "").trim() === (b.golonganBaru ?? "").trim();
