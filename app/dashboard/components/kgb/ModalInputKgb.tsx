@@ -41,7 +41,16 @@ import {
 import { IkonTambah } from "./ikon";
 import { usePegawaiKgb } from "./usePegawaiKgb";
 import { muatLinimasaDasar, type DataLinimasa } from "./linimasa";
-import ModalLinimasaDasar from "./ModalLinimasaDasar";
+import PanelSkDasar from "./PanelSkDasar";
+import { useRole } from "@/app/dashboard/components/RoleContext";
+import { isSuperAdmin } from "@/lib/auth";
+import type { SkGaji } from "@/lib/linimasaDasarSk";
+import {
+  ModalUbahSkRiwayat,
+  dataUbahSkKp,
+  dataUbahSkPmk,
+  type DataUbahSkRiwayat,
+} from "@/app/dashboard/pegawai/[id]/riwayat/SkRiwayatDasar";
 
 interface PropsModalInputKgb {
   pegawai: RingkasPegawai & { id: string };
@@ -93,8 +102,15 @@ export default function ModalInputKgb({
   const [dariDataPegawai, setDariDataPegawai] = useState(false);
   // SK kenaikan pangkat/PI yang lebih baru dari SK dasar di atas, dan karena itu menjadi Atas dasar (ADR-020).
   const [dasarKp, setDasarKp] = useState<ReturnType<typeof dasarDariKenaikanPangkat>>(null);
-  // Jendela Linimasa SK penetap gaji (ADR-062); null selama tertutup, data null selama dimuat.
-  const [linimasa, setLinimasa] = useState<{ data: DataLinimasa | null; galat: string | null } | null>(null);
+  // Panel SK di samping formulir (ADR-121): terbuka sejak awal di layar lebar, dan dibuka dengan tombol di layar sempit.
+  // Linimasanya memuat seluruh SK penetap gaji pokok (ADR-062) beserta dokumennya (ADR-066).
+  const role = useRole();
+  const bolehLuas = isSuperAdmin(role);
+  const [panelBuka, setPanelBuka] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 900px)").matches);
+  const [panel, setPanel] = useState<{ data: DataLinimasa | null; galat: string | null }>({ data: null, galat: null });
+  const [versiPanel, setVersiPanel] = useState(0);
+  const [ubahSk, setUbahSk] = useState<DataUbahSkRiwayat | null>(null);
+  const [catatanPanel, setCatatanPanel] = useState<string | null>(null);
 
   // Berjalan setelah SK dasar dari riwayat KGB, data pegawai, atau usulan UPT diketahui. Isian hanya diganti
   // selama belum disunting: masih kosong atau masih sama dengan SK dasar yang ditemukan.
@@ -182,6 +198,22 @@ export default function ModalInputKgb({
 
   const judul = ulang ? "Input Ulang KGB" : "Input KGB";
   const hasil = perhitungan?.ok ? perhitungan.hasil : null;
+  const tmtKgbPanel = hasil?.tmtKgbBaru ?? pegawai?.tmtKgbBerikutnya ?? null;
+
+  // Memuat linimasa untuk panel setelah data pegawai diketahui (TMT KGB yang dibuat membatasi SK yang berlaku), dan
+  // setiap kali dimuat ulang sesudah pembetulan.
+  useEffect(() => {
+    if (!panelBuka || !pegawai) return;
+    let batal = false;
+    void muatLinimasaDasar(ringkas.id, { jenis: "input", tmtKgbBaru: tmtKgbPanel }).then((h) => {
+      if (!batal) setPanel(h.ok ? { data: h.data, galat: null } : { data: null, galat: h.error });
+    });
+    return () => {
+      batal = true;
+    };
+    // tmtKgbPanel mengikuti pegawai; pemuatan ulang diminta lewat versiPanel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelBuka, !!pegawai, versiPanel, ringkas.id]);
   const terkunci = hasil?.isLocked ?? false;
   const riwayatDimuat = dasarRiwayat === null;
   const dasarTercatat = !!(
@@ -213,16 +245,26 @@ export default function ModalInputKgb({
     setForm((f) => ({ ...f, [kolom]: nilai }));
   };
 
-  /**
-   * Buka Linimasa SK penetap gaji (ADR-062). Dimuat saat diminta saja: isian Atas dasar di atas sudah dicari dengan
-   * aturan yang sama, dan linimasa menunjukkan alasannya beserta SK lain milik pegawai.
-   */
-  function bukaLinimasa() {
-    setLinimasa({ data: null, galat: null });
-    void muatLinimasaDasar(ringkas.id, { jenis: "input", tmtKgbBaru: hasil?.tmtKgbBaru ?? pegawai?.tmtKgbBerikutnya ?? null }).then((h) =>
-      // Jendela yang sudah ditutup selama memuat tidak dibuka lagi.
-      setLinimasa((l) => (l ? (h.ok ? { data: h.data, galat: null } : { data: null, galat: h.error }) : l)),
-    );
+  function muatUlangPanel() {
+    setPanel({ data: null, galat: null });
+    setVersiPanel((v) => v + 1);
+  }
+
+  // SK kenaikan pangkat dan PMK dibetulkan dari panel dengan jendela yang sama dengan tab Pangkat & PMK (ADR-068, ADR-118).
+  const bolehBetulkan = (sk: SkGaji) => sk.kunci.startsWith("kp:") || sk.kunci.startsWith("pmk:");
+  async function betulkan(sk: SkGaji) {
+    setGalat(null);
+    if (sk.kunci.startsWith("kp:")) {
+      const h = await ambilRiwayatPangkat(ringkas.id);
+      const r = h.ok ? h.data.find((x) => x.id === sk.kunci.slice(3)) : undefined;
+      if (r) setUbahSk(dataUbahSkKp(r, bolehLuas));
+      else setGalat(h.ok ? "Riwayat kenaikan pangkat itu tidak ditemukan." : h.error);
+    } else {
+      const h = await ambilRiwayatPmk(ringkas.id);
+      const r = h.ok ? h.data.find((x) => x.id === sk.kunci.slice(4)) : undefined;
+      if (r) setUbahSk(dataUbahSkPmk(r, bolehLuas));
+      else setGalat(h.ok ? "Riwayat PMK itu tidak ditemukan." : h.error);
+    }
   }
 
   async function kirim() {
@@ -253,10 +295,12 @@ export default function ModalInputKgb({
   }
 
   return (
+    <>
     <KerangkaModal
       judul={judul}
       subjudul={subjudulPegawai(ringkas)}
       ikon={<IkonTambah />}
+      ukuran={panelBuka ? "lg" : "md"}
       nada={ulang ? "merah" : "amber"}
       sibuk={sibuk}
       onTutup={onTutup}
@@ -272,6 +316,8 @@ export default function ModalInputKgb({
         </>
       }
     >
+      <div className="kgbm-split" data-buka={panelBuka ? "" : undefined}>
+      <div className="kgbm-split-kiri">
       {memuat && <Memuat teks="Memuat data pegawai..." />}
       {galatMuat && (
         <Catatan nada="merah">
@@ -355,8 +401,8 @@ export default function ModalInputKgb({
               : "SK KGB yang terakhir diterima pegawai, dasar KGB ini; tercetak pada bagian Atas dasar di SK KGB."
         }
         aksi={
-          <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" onClick={bukaLinimasa} disabled={sibuk}>
-            Lihat linimasa
+          <button type="button" className="kgbm-tombol kgbm-kedua kgbm-tombol-kecil" onClick={() => setPanelBuka((b) => !b)} aria-expanded={panelBuka}>
+            {panelBuka ? "Sembunyikan panel SK" : "Periksa SK & dokumen"}
           </button>
         }
       >
@@ -463,22 +509,43 @@ export default function ModalInputKgb({
         />
       </BagianForm>
       <PesanGalat pesan={galat} />
-      {linimasa && (
-        <ModalLinimasaDasar
-          pegawai={ringkas}
-          data={linimasa.data}
-          galat={linimasa.galat}
-          isian={form}
-          onPakai={(isian) => {
-            // Pilihan operator: tidak ditimpa lagi oleh pencarian otomatis.
-            disunting.current = true;
-            setForm(isian);
-            setLinimasa(null);
-          }}
-          onMuatUlang={bukaLinimasa}
-          onTutup={() => setLinimasa(null)}
-        />
+      </div>
+      {panelBuka && (
+        <aside className="kgbm-split-kanan" aria-label="SK penetap gaji pokok dan dokumennya">
+          <PanelSkDasar
+            data={panel.data}
+            galat={panel.galat}
+            isian={form}
+            catatan={catatanPanel}
+            bolehBetulkan={bolehBetulkan}
+            onPakai={(isian) => {
+              // Pilihan operator: tidak ditimpa lagi oleh pencarian otomatis.
+              disunting.current = true;
+              setForm(isian);
+            }}
+            onBetulkan={(sk) => void betulkan(sk)}
+            onMuatUlang={muatUlangPanel}
+          />
+        </aside>
       )}
+      </div>
     </KerangkaModal>
+    {/* Saudara KerangkaModal, bukan anaknya: jendela ini berformulir sendiri, dan submit-nya akan menjalar lewat pohon React
+        ke formulir Input KGB sehingga Input KGB ikut tersimpan. */}
+    {ubahSk && (
+      <ModalUbahSkRiwayat
+        pegawaiId={ringkas.id}
+        data={ubahSk}
+        onTutup={() => setUbahSk(null)}
+        onSelesai={(pesan) => {
+          setUbahSk(null);
+          setCatatanPanel(pesan);
+          muatUlangPanel();
+          // Golongan, masa kerja, dan gaji pokok pegawai dapat berubah oleh pembetulan; perhitungan KGB dimuat ulang.
+          muatUlang();
+        }}
+      />
+    )}
+    </>
   );
 }

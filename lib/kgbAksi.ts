@@ -159,6 +159,9 @@ export interface RiwayatPangkatItem {
   golonganBaru: string;
   gajiPokokBaru?: number | null;
   penetapSK: string | null;
+  mkgTahunBaru?: number;
+  mkgBulanBaru?: number;
+  keterangan?: string | null;
 }
 
 export async function ambilRiwayatPangkat(pegawaiId: string): Promise<HasilAksi<RiwayatPangkatItem[]>> {
@@ -180,6 +183,7 @@ export interface RiwayatPmkItem {
   tambahBulan?: number | null;
   gajiPokokBaru?: number | null;
   penetapSK: string | null;
+  keterangan?: string | null;
 }
 
 /** Dokumen pegawai dari semua sumber (GET /api/pegawai/[id]/dokumen); hanya Super Admin dan Tim SDM KGB. */
