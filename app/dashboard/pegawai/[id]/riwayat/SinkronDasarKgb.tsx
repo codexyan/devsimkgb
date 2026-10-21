@@ -96,6 +96,16 @@ const LABEL_PERAN: Record<SkGaji["peran"], string> = {
 };
 
 /**
+ * Daftar hanya berguna bila ada lebih dari satu SK, atau satu SK yang bukan Atas dasar. Satu SK yang sekaligus Atas
+ * dasar sudah tampil di baris Atas dasar, dan tombol Ubah SK dasar ada di kepala kartu.
+ */
+export function perluDaftarSk(data: DataLinimasa | null | "gagal"): data is DataLinimasa {
+  if (!data || data === "gagal") return false;
+  const sk = data.linimasa.sk;
+  return sk.length > 1 || (sk.length === 1 && sk[0].peran !== "dasar");
+}
+
+/**
  * Seluruh SK penetap gaji pokok pegawai (SK KGB, kenaikan pangkat, PMK) menurut TMT, yang terbaru di atas, di kartu
  * Dasar KGB (ADR-120). SK kenaikan pangkat dan PMK tidak lenyap dari kartu ketika dasarnya bergeser: tetap tercantum
  * dengan perannya, dan dapat dibetulkan dari barisnya. `onUbah` dipanggil untuk baris yang dapat dibetulkan dari sini.
@@ -114,26 +124,36 @@ export function DaftarSkDasar({
   onLihat: (sk: SkGaji, dok: DokumenSk) => void;
   onUbah: (sk: SkGaji) => void;
 }) {
-  if (data === null) return <span style={{ color: "var(--dt5)" }}>Menyusun linimasa SK…</span>;
-  if (data === "gagal") return <span style={{ color: "var(--dt5)" }}>Linimasa SK gagal dimuat.</span>;
+  if (!perluDaftarSk(data)) return null;
   const daftar = [...data.linimasa.sk].reverse();
-  if (daftar.length === 0) return <span style={{ color: "var(--dt5)" }}>Belum ada SK penetap gaji pokok yang tercatat.</span>;
   return (
-    <ul className="pgw-mutasi" data-daftar-sk="">
+    <ol className="pgw-sk" data-daftar-sk="">
       {daftar.map((sk) => {
         const bisaDiubah = sk.kunci.startsWith("kp:") || sk.kunci.startsWith("pmk:") || sk.kunci === "data-pegawai";
         return (
-          <li key={sk.kunci}>
-            <strong>{teksSk(sk)}</strong>{" "}
-            <span className="dsb-tag" data-nada={sk.peran === "dasar" ? "hijau" : undefined} data-garis={sk.peran === "dasar" ? undefined : ""}>
-              {LABEL_PERAN[sk.peran]}
-            </span>
-            <span>
-              {[sk.tanggalSK ? `tanggal ${formatTanggalId(sk.tanggalSK)}` : "", sk.penetap ? `oleh ${sk.penetap}` : "", sk.rincian ?? ""]
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
-            <span className="flex flex-wrap items-center gap-2" style={{ fontSize: "12px", color: "var(--dt5)" }}>
+          <li key={sk.kunci} className="pgw-sk-butir" data-peran={sk.peran}>
+            <div className="pgw-sk-isi">
+              <div className="pgw-sk-judul">
+                <strong>
+                  {sk.label}
+                  {sk.nomorSK ? ` ${sk.nomorSK}` : ""}
+                </strong>
+                <span className="dsb-tag" data-nada={sk.peran === "dasar" ? "hijau" : undefined} data-garis={sk.peran === "dasar" ? undefined : ""}>
+                  {LABEL_PERAN[sk.peran]}
+                </span>
+              </div>
+              <div className="pgw-sk-meta">
+                {sk.tmt && (
+                  <span>
+                    TMT <b>{formatTanggalId(sk.tmt)}</b>
+                  </span>
+                )}
+                {sk.tanggalSK && <span>SK {formatTanggalId(sk.tanggalSK)}</span>}
+                {sk.penetap && <span>oleh {sk.penetap}</span>}
+                {sk.rincian && <span>{sk.rincian}</span>}
+              </div>
+            </div>
+            <div className="pgw-sk-aksi">
               <TombolDokumenSk
                 dok={data.dokumen ? (data.dokumen[sk.kunci] ?? null) : undefined}
                 memuat={memuatDraf === sk.kunci}
@@ -144,11 +164,11 @@ export function DaftarSkDasar({
                   {sk.kunci === "data-pegawai" ? "Ubah SK dasar" : "Ubah data SK"}
                 </button>
               )}
-              {sk.jenis === "kgb" && sk.kunci !== "data-pegawai" && <span>SK KGB dibetulkan dari tab Riwayat KGB.</span>}
-            </span>
+              {sk.jenis === "kgb" && sk.kunci !== "data-pegawai" && <span>Dibetulkan dari tab Riwayat KGB</span>}
+            </div>
           </li>
         );
       })}
-    </ul>
+    </ol>
   );
 }

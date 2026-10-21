@@ -25,3 +25,12 @@ test("sesudah KGB Des 2026 selesai, dasar berpindah ke SK KGB itu dan KP tetap t
   assert.equal(kp?.peran, "tergantikan");
   assert.equal(sk.length, 3);
 });
+
+test("daftar SK di kartu hanya bila lebih dari satu SK atau satu SK yang bukan Atas dasar (ADR-120)", () => {
+  const { sk } = susunLinimasaDasar({ kgb: [kgb2024], pangkat: [kp2025], tmtKgbSebelumnya: d("2024-12-01"), tmtKgbBaru: d("2026-12-01") });
+  const perlu = (daftar: typeof sk) => daftar.length > 1 || (daftar.length === 1 && daftar[0].peran !== "dasar");
+  assert.equal(perlu(sk), true, "dua SK: tampil");
+  assert.equal(perlu([sk[1]]), false, "satu SK yang sekaligus Atas dasar: sudah tampil di baris Atas dasar");
+  assert.equal(perlu([sk[0]]), true, "satu SK yang tergantikan: tampil");
+  assert.equal(perlu([]), false);
+});

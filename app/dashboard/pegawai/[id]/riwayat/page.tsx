@@ -18,7 +18,7 @@ import {
 } from "./SkRiwayatDasar";
 import { cariKembar } from "@/lib/riwayatKembar";
 import { kunciNomorSk } from "@/lib/nomorSurat";
-import { DaftarSkDasar, RingkasAtasDasar, TombolDokumenSk, dokumenAtasDasar, pesanAtasDasarBerbeda, skKgb } from "./SinkronDasarKgb";
+import { DaftarSkDasar, perluDaftarSk, RingkasAtasDasar, TombolDokumenSk, dokumenAtasDasar, pesanAtasDasarBerbeda, skKgb } from "./SinkronDasarKgb";
 import { muatLinimasaDasar, type DataLinimasa } from "@/app/dashboard/components/kgb/linimasa";
 import ModalLinimasaDasar from "@/app/dashboard/components/kgb/ModalLinimasaDasar";
 import { unduhUlangSk } from "@/lib/kgbAksi";
@@ -844,7 +844,7 @@ export default function RiwayatKGBPage() {
               ) : undefined
             }
             daftarSk={
-              bolehDokumen ? (
+              bolehDokumen && perluDaftarSk(linimasaHalaman) ? (
                 <DaftarSkDasar
                   data={linimasaHalaman}
                   bolehUbah={bolehUbah}
