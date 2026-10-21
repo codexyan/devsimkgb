@@ -25,6 +25,13 @@ export const runtime = "nodejs";
  * Tim SDM memutuskan sendiri: batalkan dan input ulang, atau lanjutkan SK yang sudah dibuat.
  */
 
+/** ISO untuk dibaca layar; tanggal yang tidak terbaca menjadi null, bukan membuat daftar gagal dimuat. */
+function isoWaktuAman(nilai: Date | string | null | undefined): string | null {
+  if (!nilai) return null;
+  const d = new Date(nilai);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 function keTanggal(nilai: unknown): Date | null {
   return typeof nilai === "string" && nilai.trim() ? tanggalKalender(nilai) : null;
 }
@@ -60,7 +67,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       gajiPokokBaru: r.gajiPokokBaru,
       keterangan: r.keterangan,
       penetapSK: r.penetapSK ?? null,
-      createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
+      createdAt: isoWaktuAman(r.createdAt),
     })),
   );
 }

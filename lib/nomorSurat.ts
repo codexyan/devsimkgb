@@ -51,3 +51,20 @@ export function kunciIntiNomorSk(nomor: string | null | undefined): string {
     .replace(/\s+/g, "")
     .toUpperCase();
 }
+
+/** Tahun pada akhiran "TAHUN xxxx" sebuah nomor SK, atau null bila tidak ada. */
+function tahunNomorSk(nomor: string | null | undefined): string | null {
+  return /TAHUN\s*(\d{4})\s*$/i.exec(nomor ?? "")?.[1] ?? null;
+}
+
+/**
+ * true bila dua nomor adalah satu SK yang tertulis berbeda: intinya sama, dan tahunnya sama atau salah satunya tidak
+ * menyebut tahun. "12 TAHUN 2025" dan "12 TAHUN 2026" adalah dua SK, sebab urutan nomor berulang tiap tahun.
+ */
+export function nomorSkSama(a: string | null | undefined, b: string | null | undefined): boolean {
+  const inti = kunciIntiNomorSk(a);
+  if (!inti || inti !== kunciIntiNomorSk(b)) return false;
+  const ta = tahunNomorSk(a);
+  const tb = tahunNomorSk(b);
+  return !ta || !tb || ta === tb;
+}
