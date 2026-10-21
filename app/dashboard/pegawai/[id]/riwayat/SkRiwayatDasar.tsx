@@ -136,6 +136,7 @@ export function ModalUbahSkRiwayat({
   const [keterangan, setKeterangan] = useState(luas?.keterangan ?? "");
   const gajiBaru =
     luas?.golonganBaru && mkgTahun !== "" && mkgBulan !== "" ? getGajiPokok(luas.golonganBaru, Number(mkgTahun), Number(mkgBulan)) : null;
+  const mkgDiubah = luas?.mkgTahunBaru !== undefined && (Number(mkgTahun) !== luas.mkgTahunBaru || Number(mkgBulan) !== luas.mkgBulanBaru);
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState<string | null>(null);
 
@@ -201,7 +202,7 @@ export function ModalUbahSkRiwayat({
       <Catatan nada="navy">
         {luas
           ? data.jenis === "kp"
-            ? "Selain data SK, TMT dan masa kerja golongan dapat dibetulkan; gaji pokok dihitung ulang dari tabel gaji. Golongan tidak berubah. Bila ini kenaikan pangkat terbaru, Data Pegawai dan jadwal KGB yang belum diproses ikut dihitung ulang. "
+            ? "Selain data SK, TMT dan MKG pada TMT KGB terakhir dapat dibetulkan; gaji pokok dihitung ulang dari tabel gaji. Golongan tidak berubah. Bila ini kenaikan pangkat terbaru, Data Pegawai dan jadwal KGB yang belum diproses ikut dihitung ulang. "
             : "Selain data SK, keterangan dapat dibetulkan. TMT dan masa kerja PMK tidak dapat diubah karena sudah dihitung terhadap data pegawai. "
           : "Yang dibetulkan hanya data SK-nya; golongan, masa kerja, gaji pokok, dan TMT tidak berubah. "}
         KGB yang Atas dasarnya SK ini dan belum ditandatangani, SK dasar di Data Pegawai, dan pindaian di arsip dokumen ikut
@@ -230,7 +231,7 @@ export function ModalUbahSkRiwayat({
           <BidangTeks label="TMT pangkat" jenis="date" wajib nilai={tmtPangkat} onUbah={setTmtPangkat} />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <label className="kgbm-label">
-              <span className="kgbm-wajib">Masa kerja golongan (tahun)</span>
+              <span className="kgbm-wajib">MKG pada TMT KGB terakhir (tahun)</span>
               <input className="kgbm-input" type="number" min={0} max={40} value={mkgTahun} onChange={(e) => setMkgTahun(e.target.value)} />
             </label>
             <label className="kgbm-label">
@@ -238,6 +239,13 @@ export function ModalUbahSkRiwayat({
               <input className="kgbm-input" type="number" min={0} max={11} value={mkgBulan} onChange={(e) => setMkgBulan(e.target.value)} />
             </label>
           </div>
+          <Catatan nada={mkgDiubah ? "amber" : "navy"}>
+            Ini <strong>bukan</strong> masa kerja yang tertulis di SK. SK menulis masa kerja pada TMT pangkat, sedangkan
+            sistem menyimpan masa kerja pada TMT KGB terakhir pegawai, yang menjadi dasar KGB berikutnya. Angka di SK
+            bisa berbeda: masa kerja pada TMT pangkat sama dengan angka ini ditambah selang TMT KGB terakhir sampai TMT
+            pangkat. Ubah hanya bila angka tersimpan memang keliru; bila ragu, biarkan.
+            {mkgDiubah ? " Angka ini sedang Anda ubah dan akan ditulis ke Data Pegawai bila ini kenaikan pangkat terbaru." : ""}
+          </Catatan>
           <p className="kgbm-petunjuk">
             Gaji pokok golongan {luas.golonganBaru}:{" "}
             {gajiBaru ? `Rp ${gajiBaru.toLocaleString("id-ID")}` : "tidak ditemukan di tabel gaji"}
