@@ -1049,7 +1049,7 @@ export default async function IsiPanduan({
                     tetap Anda periksa lewat <em>Review SK KGB</em> sebelum dicetak.
                   </li>
                   <li>
-                    <strong>Unggah pindaian SK-nya</strong>, masing-masing PDF paling besar 500 KB. Pindai sebagai
+                    <strong>Unggah pindaian SK-nya</strong>, masing-masing PDF paling besar 600 KB. Pindai sebagai
                     dokumen, bukan foto kamera, agar ukurannya muat. Tiap berkas dapat dipratinjau sebelum diunggah,
                     lalu diganti atau dihapus, supaya dapat dipastikan tidak tertukar.
                   </li>
@@ -2004,7 +2004,7 @@ export default async function IsiPanduan({
                     terisi dari masa hukuman jenisnya; sesuaikan bila SK berkata lain.
                   </li>
                   <li>
-                    Unggah pindaian SK hukuman disiplin (PDF, paling besar 500 KB, wajib), tambahkan keterangan bila perlu,
+                    Unggah pindaian SK hukuman disiplin (PDF, paling besar 600 KB, wajib), tambahkan keterangan bila perlu,
                     lalu <strong>Kirim laporan</strong>.
                   </li>
                 </ol>

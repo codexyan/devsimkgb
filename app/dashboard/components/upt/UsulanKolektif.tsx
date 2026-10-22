@@ -1126,7 +1126,7 @@ export default function UsulanKolektif() {
                 <input className="kol-isi" type="date" value={surat.tanggalSurat} onChange={(e) => setSurat((s) => ({ ...s, tanggalSurat: e.target.value }))} />
               </label>
               <KotakBerkas
-                label="Berkas surat (PDF, paling besar 500 KB)"
+                label="Berkas surat (PDF, paling besar 600 KB)"
                 berkas={berkasSurat}
                 keterangan="Surat yang sudah dikirim lewat Srikandi; berlaku untuk semua pegawai di surat ini."
                 onPilih={(f) => {
@@ -1681,7 +1681,7 @@ function DetailBaris({
     return (
       <div className="kol-bagian">
         <p className="kol-subjudul">
-          {judul} <span>PDF, paling besar 500 KB</span>
+          {judul} <span>PDF, paling besar 600 KB</span>
         </p>
         <div className="kol-berkas-daftar">
           {daftar.map((jenis) => {

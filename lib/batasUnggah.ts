@@ -8,10 +8,10 @@
 // kali (sekali saat req.formData(), sekali lagi saat file.arrayBuffer() sebelum ditulis ke R2). Batas 10 MB
 // yang lama berarti satu permintaan saja dapat memegang belasan megabyte, dan itulah yang paling mungkin
 // memicu "Worker exceeded resource limits" di produksi. Satu lembar SK yang dipindai sebagai dokumen hitam
-// putih berukuran ratusan kilobyte, jadi 500 KB masih lapang untuk pemakaian yang benar.
+// putih berukuran ratusan kilobyte, jadi 600 KB masih lapang untuk pemakaian yang benar (dari 500 KB sejak 22 Oktober 2026, ADR-124).
 
 /** Batas ukuran satu berkas unggahan. */
-export const BATAS_UNGGAH_BYTE = 500 * 1024;
+export const BATAS_UNGGAH_BYTE = 600 * 1024;
 
 /**
  * Batas khusus SK bertanda tangan (ADR-096): 5 MB. SK TTE asli dari Srikandi berukuran 185 KB sampai 1 MB karena BSrE
@@ -24,7 +24,7 @@ export const BATAS_UNGGAH_SK_BYTE = 5 * 1024 * 1024;
 export const BATAS_UNGGAH_SK_LABEL = "5 MB";
 
 /** Label yang dipakai pada pesan dan petunjuk layar, supaya angkanya tidak ditulis ulang di mana-mana. */
-export const BATAS_UNGGAH_LABEL = "500 KB";
+export const BATAS_UNGGAH_LABEL = "600 KB";
 
 /**
  * Pesan tolak yang seragam. Menyebut cara memperkecilnya, bukan hanya angkanya: berkas yang terlalu besar

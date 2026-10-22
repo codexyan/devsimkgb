@@ -510,7 +510,7 @@ export function LayarKolektif2() {
         "Salin golongan dan masa kerja golongan dari SK, jangan dihitung sendiri. Isian yang Anda ubah ditandai kuning.",
         "Gaji pokok dan TMT KGB berikutnya dihitung sistem dari tabel PP 5/2024. Keduanya tidak diketik, sebab salah ketik di sini langsung menggeser uang.",
         "Jawab untuk tiap pegawai: sesudah SK KGB terakhir, adakah SK kenaikan pangkat, penyesuaian ijazah, atau PMK yang belum tercatat? Bila ada, isi SK-nya. Baris di bawahnya menunjukkan SK yang akan menjadi Atas dasar SK KGB berikutnya.",
-        "Unggah pindaian SK, masing-masing PDF paling besar 500 KB. Pindai sebagai dokumen, bukan foto kamera.",
+        "Unggah pindaian SK, masing-masing PDF paling besar 600 KB. Pindai sebagai dokumen, bukan foto kamera.",
       ]}
       catatan="Semua isian di sini tersimpan sebagai draf usulan milik satker Anda: belum terlihat Kanwil dan belum mengubah data pegawai di SIM-KGB, boleh ditinggal dan dilanjutkan kapan saja. Data Pegawai berubah setelah usulannya disetujui Kanwil."
       anak={
@@ -716,7 +716,7 @@ export function LayarKolektif3() {
               <span className="lyr-berkas-kotak">
                 <span className="lyr-berkas-ikon">+</span>
                 <span className="min-w-0">
-                  <strong>Berkas surat (PDF, paling besar 500 KB)</strong>
+                  <strong>Berkas surat (PDF, paling besar 600 KB)</strong>
                   <small>Surat yang sudah dikirim lewat Srikandi; berlaku untuk semua pegawai.</small>
                 </span>
                 <span className="lyr-tautan">Pilih</span>

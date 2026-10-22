@@ -43,7 +43,7 @@ export default function KolomBerkas({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [galat, setGalat] = useState<string | null>(null);
-  const judul = `${label} (PDF, paling besar 500 KB)`;
+  const judul = `${label} (PDF, paling besar 600 KB)`;
   const tersimpan = !!urlTersimpan && !ditandaiHapus;
 
   function pilih(e: React.ChangeEvent<HTMLInputElement>) {

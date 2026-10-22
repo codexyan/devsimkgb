@@ -858,7 +858,7 @@ export default function FormulirUsulan({
       <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
         <div className="kgbm-bagian-kepala">
           <p className="kgbm-bagian-judul">Berkas {skAcuan}</p>
-          <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 500 KB</p>
+          <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: tiap berkas paling besar 600 KB</p>
         </div>
         <div className="kgbm-bagian-isi">{daftarBerkas(berkasUntukKeadaan(pernahKgb))}</div>
       </div>
@@ -1075,7 +1075,7 @@ export default function FormulirUsulan({
         <div className="kgbm-bagian" style={{ flexShrink: 0 }}>
           <div className="kgbm-bagian-kepala">
             <p className="kgbm-bagian-judul">Berkas SK yang dilaporkan</p>
-            <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: paling besar 500 KB</p>
+            <p className="kgbm-bagian-ket">Pindai sebagai dokumen, bukan foto: paling besar 600 KB</p>
           </div>
           <div className="kgbm-bagian-isi">{daftarBerkas(berkasDasarBaru(dasar.jenis))}</div>
         </div>
