@@ -399,7 +399,7 @@ export default function TemplateSuratManager({ bolehUbah }: { bolehUbah: boolean
                       }}
                     />
                   </label>
-                  <span className="tpl-bantu">Paling besar 500 KB. Latar transparan paling rapi.</span>
+                  <span className="tpl-bantu">Paling besar 600 KB. Latar transparan paling rapi.</span>
                 </div>
               )}
             </div>

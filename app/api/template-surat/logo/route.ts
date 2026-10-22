@@ -26,7 +26,7 @@ export async function GET(req: Request) {
   });
 }
 
-/** Unggah logo kop (PNG atau JPEG, paling besar 500 KB). Logo baru dipakai setelah disimpan dalam versi template. */
+/** Unggah logo kop (PNG atau JPEG, paling besar 600 KB). Logo baru dipakai setelah disimpan dalam versi template. */
 export async function POST(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
   const berkas = form?.get("logo");
   if (!(berkas instanceof File) || berkas.size === 0) return NextResponse.json({ error: "Pilih berkas logo" }, { status: 400 });
-  if (berkas.size > BATAS_LOGO_BYTE) return NextResponse.json({ error: "Logo paling besar 500 KB" }, { status: 413 });
+  if (berkas.size > BATAS_LOGO_BYTE) return NextResponse.json({ error: "Logo paling besar 600 KB" }, { status: 413 });
   const isi = await berkas.arrayBuffer();
   const jenis = jenisGambar(new Uint8Array(isi.slice(0, 8)));
   if (!jenis) return NextResponse.json({ error: "Logo harus berupa gambar PNG atau JPEG" }, { status: 400 });
