@@ -154,7 +154,7 @@ export async function POST(
 
     // Satu nomor dari arsiparis untuk satu SK, termasuk yang dipesan sebagai draf KGB lain. Diperiksa juga
     // saat pratinjau, agar nomor yang bentrok ketahuan sebelum operator menekan Buat dan Unduh SK.
-    const bentrok = await nomorSkBentrok(nomorSurat, id);
+    const bentrok = await nomorSkBentrok(nomorSurat, id, tanggalSurat);
     if (bentrok) return NextResponse.json({ error: bentrok }, { status: 409 });
   }
 

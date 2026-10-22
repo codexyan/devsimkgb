@@ -69,7 +69,7 @@ export async function PATCH(
     const alasan = alasanTolakBuatSk(kgb.status);
     if (alasan) return NextResponse.json({ error: alasan }, { status: 409 });
     if (nomor) {
-      const bentrok = await nomorSkBentrok(nomor, id);
+      const bentrok = await nomorSkBentrok(nomor, id, tanggal);
       if (bentrok) return NextResponse.json({ error: bentrok }, { status: 409 });
     }
     try {
