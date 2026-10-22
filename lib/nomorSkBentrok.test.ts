@@ -83,5 +83,10 @@ test("nomor SK hanya dipegang SK lain yang berlaku: KGB batal dan KGB lain milik
     await surat("s-lain", "lain", "WP.19-SA.04.04-901", null);
     assert.match((await nomorSkBentrok("WP.19-SA.04.04-900", "ulang")) ?? "", /sudah disimpan sebagai draf SK KGB PEGAWAI P2/);
     assert.match((await nomorSkBentrok("WP.19-SA.04.04-901", "ulang")) ?? "", /sudah dipakai SK KGB PEGAWAI P2/);
+
+    // Nomor arsiparis dimulai lagi tiap tahun: nomor yang sama pada tahun SK yang berbeda bukan bentrok (ADR-127).
+    assert.equal(await nomorSkBentrok("WP.19-SA.04.04-500", "ulang", tgl(2027, 1, 5)), null, "SK tahun lain");
+    assert.match((await nomorSkBentrok("WP.19-SA.04.04-500", "ulang", tgl(2026, 12, 31))) ?? "", /sudah dipakai/, "SK tahun sama");
+    assert.match((await nomorSkBentrok("WP.19-SA.04.04-500", "ulang", null)) ?? "", /sudah dipakai/, "tahun baru tidak diketahui");
   });
 });

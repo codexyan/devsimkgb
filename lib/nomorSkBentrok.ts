@@ -7,13 +7,22 @@
 //   (Input Ulang KGB), dan nomor arsiparisnya memang dipakai lagi.
 // SK yang sudah diunggah bertanda tangan tetap memegang nomornya, siapa pun pemiliknya: nomor itu sudah tercetak
 // pada surat yang sah.
+//
+// Nomor arsiparis dimulai lagi dari awal setiap tahun (ADR-127): nomor yang sama pada tahun yang berbeda bukan bentrok.
+// Tahun dibandingkan dari tanggal SK baru dengan tanggal SK yang memegang nomor itu; bila salah satunya tidak diketahui,
+// nomor tetap dianggap bentrok.
 
 import { db } from "./db";
 import { kunciNomorSk } from "./nomorSurat";
+import { tanggalKalender, type NilaiTanggal } from "./waktu";
 import type { SuratKgbTersimpan } from "./prosesKgb";
 
-/** Pesan penolakan bila nomor bentrok dengan KGB lain; null bila bebas. */
-export async function nomorSkBentrok(nomor: string, kgbId: string): Promise<string | null> {
+function tahunKalender(nilai: NilaiTanggal): number | null {
+  return tanggalKalender(nilai)?.getFullYear() ?? null;
+}
+
+/** Pesan penolakan bila nomor bentrok dengan KGB lain pada tahun SK yang sama; null bila bebas. */
+export async function nomorSkBentrok(nomor: string, kgbId: string, tanggalBaru?: NilaiTanggal): Promise<string | null> {
   const kunci = kunciNomorSk(nomor);
   if (!kunci) return null;
   const [surat, semuaKgb] = await Promise.all([
@@ -28,10 +37,22 @@ export async function nomorSkBentrok(nomor: string, kgbId: string): Promise<stri
     return !(pegawaiIni && k.pegawaiId === pegawaiIni);
   };
 
+  const tahunBaru = tahunKalender(tanggalBaru);
+  const tahunBeda = (tanggalLama: NilaiTanggal): boolean => {
+    const lama = tahunKalender(tanggalLama);
+    return tahunBaru !== null && lama !== null && lama !== tahunBaru;
+  };
+
   const dariSurat = surat.find(
-    (s) => s.kgbId !== kgbId && kunciNomorSk(s.nomorSurat) === kunci && memegang(kgbById.get(s.kgbId), !!s.pathFile),
+    (s) =>
+      s.kgbId !== kgbId &&
+      kunciNomorSk(s.nomorSurat) === kunci &&
+      !tahunBeda(s.tanggalSurat) &&
+      memegang(kgbById.get(s.kgbId), !!s.pathFile),
   )?.kgbId;
-  const dariDraf = semuaKgb.find((k) => k.id !== kgbId && kunciNomorSk(k.drafNomorSurat) === kunci && memegang(k, false))?.id;
+  const dariDraf = semuaKgb.find(
+    (k) => k.id !== kgbId && kunciNomorSk(k.drafNomorSurat) === kunci && !tahunBeda(k.drafTanggalSurat) && memegang(k, false),
+  )?.id;
   const kgbLainId = dariSurat ?? dariDraf;
   if (!kgbLainId) return null;
 
