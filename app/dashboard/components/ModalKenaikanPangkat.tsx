@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { BidangPenetap, Catatan, DaftarData, KerangkaModal, PesanGalat } from "@/app/dashboard/components/kgb";
-import { JENIS_KP, URUTAN_GOLONGAN, hitungKenaikanPangkat, peringkatGolongan, type JenisKp } from "@/lib/kenaikanPangkat";
+import { JENIS_KP, URUTAN_GOLONGAN, hitungKenaikanPangkat, mkgMenurutSkPadaTmt, peringkatGolongan, type JenisKp } from "@/lib/kenaikanPangkat";
 import { GOLONGAN_PANGKAT } from "@/lib/tabelGaji";
 import { formatTanggalId, isoTanggalLokal } from "@/lib/waktu";
 import PanelDokumenRujukan, { unggahKeArsip, type LampiranSk } from "@/app/dashboard/components/pegawai/PanelDokumenRujukan";
@@ -22,6 +22,8 @@ export interface PegawaiPangkat {
   mkgTahun: number;
   mkgBulan: number;
   gajiPokok: number;
+  /** Bila diketahui, pratinjau menampilkan masa kerja menurut SK pada TMT pangkat (ADR-125). */
+  tmtKgbTerakhir?: string | null;
 }
 
 interface KgbDitinjau {
@@ -79,6 +81,22 @@ export default function ModalKenaikanPangkat({
     });
     return h.ok ? h.hasil : null;
   }, [golonganBaru, pegawai]);
+
+  // Masa kerja pada TMT pangkat seperti tertulis di SK; angka tersimpan (pada TMT KGB terakhir) tetap dasar hitungan.
+  const menurutSk = useMemo(
+    () =>
+      golonganBaru && tmtPangkat && pegawai.tmtKgbTerakhir
+        ? mkgMenurutSkPadaTmt({
+            golonganLama: pegawai.golonganRuang,
+            mkgTahunLama: pegawai.mkgTahun,
+            mkgBulanLama: pegawai.mkgBulan,
+            golonganBaru,
+            tmtKgbTerakhir: pegawai.tmtKgbTerakhir,
+            tmtPangkat,
+          })
+        : null,
+    [golonganBaru, tmtPangkat, pegawai],
+  );
 
   async function simpan() {
     setGalat("");
@@ -223,7 +241,17 @@ export default function ModalKenaikanPangkat({
                   { label: "Pangkat", nilai: `${pegawai.golonganRuang} → ${pratinjau.golonganBaru} (${pratinjau.pangkatBaru})` },
                   {
                     label: "Masa kerja golongan",
-                    nilai: `${pegawai.mkgTahun} thn ${pegawai.mkgBulan} bln → ${pratinjau.mkgTahunBaru} thn ${pratinjau.mkgBulanBaru} bln`,
+                    nilai: menurutSk ? (
+                      <>
+                        {`${menurutSk.sebelum.tahun} thn ${menurutSk.sebelum.bulan} bln → ${menurutSk.sesudah.tahun} thn ${menurutSk.sesudah.bulan} bln`}
+                        <span className="kgbm-mkg-ket">menurut SK, pada TMT pangkat {formatTanggalId(tmtPangkat)}</span>
+                        <span className="kgbm-mkg-ket">
+                          {`tersimpan ${pegawai.mkgTahun} thn ${pegawai.mkgBulan} bln → ${pratinjau.mkgTahunBaru} thn ${pratinjau.mkgBulanBaru} bln pada TMT KGB terakhir (dasar hitungan)`}
+                        </span>
+                      </>
+                    ) : (
+                      `${pegawai.mkgTahun} thn ${pegawai.mkgBulan} bln → ${pratinjau.mkgTahunBaru} thn ${pratinjau.mkgBulanBaru} bln`
+                    ),
                   },
                   { label: "Gaji pokok", nilai: `${fmtRp(pegawai.gajiPokok)} → ${fmtRp(pratinjau.gajiPokokBaru)}` },
                 ]}
