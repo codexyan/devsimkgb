@@ -186,6 +186,7 @@ textarea.kgbm-input { resize: vertical; min-height: 72px; }
   .kgbm-split[data-buka] .kgbm-split-kanan { position: sticky; top: 0; max-height: calc(92dvh - 150px); overflow-y: auto; }
 }
 .kgbm-skp-kepala { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--dtn); }
+.kgbm-mkg-ket { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; line-height: 1.35; color: var(--dt5); }
 /* Linimasa mendatar SK penetap gaji pokok (ADR-122): satu titik per SK, KGB yang sedang dibuat bertitik belah ketupat. */
 .kgbm-gw { display: flex; align-items: flex-start; margin: 0; padding: 2px 0 6px; list-style: none; overflow-x: auto; }
 .kgbm-gw > li { position: relative; flex: 1 0 92px; min-width: 92px; }

@@ -1685,6 +1685,9 @@ export default function RiwayatKGBPage() {
             mkgBulanBaru: modal.kgb.mkgBulanBaru,
             tmtKgbBaru: modal.kgb.tmtKgbBaru,
             flagRapelan: modal.kgb.flagRapelan,
+            mkgTahunLama: modal.kgb.mkgTahunLama,
+            mkgBulanLama: modal.kgb.mkgBulanLama,
+            tmtSK: modal.kgb.tmtSK,
           }}
           dasarAwal={{
             nomorSK: modal.kgb.nomorSK,
