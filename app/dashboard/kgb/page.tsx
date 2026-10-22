@@ -151,6 +151,9 @@ function ringkasanSk(k: KGB): RingkasanSk {
     mkgBulanBaru: k.mkgBulanBaru,
     tmtKgbBaru: k.tmtKgbBaru,
     flagRapelan: k.flagRapelan,
+    mkgTahunLama: k.mkgTahunLama,
+    mkgBulanLama: k.mkgBulanLama,
+    tmtSK: k.tmtSK,
   };
 }
 
@@ -779,7 +782,7 @@ export default function KGBPage() {
               nilai: formatMkg(k.mkgTahunLama, k.mkgBulanLama),
             },
             ...(mkgSkDasarBeda && mkgSkDasar
-              ? [{ label: "Masa kerja pada SK dasar", nilai: `${formatMkg(mkgSkDasar.tahun, mkgSkDasar.bulan)} (TMT ${formatTanggalId(k.tmtSK)})` }]
+              ? [{ label: "Masa kerja menurut SK dasar", nilai: `${formatMkg(mkgSkDasar.tahun, mkgSkDasar.bulan)} (TMT ${formatTanggalId(k.tmtSK)})` }]
               : []),
             { label: "Masa kerja baru", nilai: formatMkg(k.mkgTahunBaru, k.mkgBulanBaru) },
             { label: "Gaji pokok lama", nilai: formatRupiah(k.gajiPokokLama) },

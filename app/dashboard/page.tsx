@@ -105,6 +105,8 @@ interface PegawaiJatuhTempo {
   gajiPokokBaru: number | null;
   mkgTahunBaru: number | null;
   mkgBulanBaru: number | null;
+  mkgTahunLama?: number | null;
+  mkgBulanLama?: number | null;
   prevNomorSK: string | null;
   prevTanggalSK: string | null;
   prevTmtSK: string | null;
@@ -699,6 +701,9 @@ function DashboardMain() {
         mkgBulanBaru: p.mkgBulanBaru,
         tmtKgbBaru: p.tmtKgbBerikutnya,
         flagRapelan: p.flagRapelan,
+        mkgTahunLama: p.mkgTahunLama,
+        mkgBulanLama: p.mkgBulanLama,
+        tmtSK: p.tmtSK,
       },
       dasarAwal: { nomorSK: p.nomorSK, tanggalSK: p.tanggalSK, tmtSK: p.tmtSK, penetapSkDasar: p.penetapSkDasar },
       nomorSkBaru: p.suratNomorSurat,

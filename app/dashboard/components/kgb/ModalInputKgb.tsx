@@ -42,6 +42,8 @@ import { IkonTambah } from "./ikon";
 import { usePegawaiKgb } from "./usePegawaiKgb";
 import { muatLinimasaDasar, type DataLinimasa } from "./linimasa";
 import PanelSkDasar from "./PanelSkDasar";
+import { NilaiMasaKerja } from "./MasaKerjaSk";
+import { mkgPadaSkTercatat } from "@/lib/dasarSkUsulan";
 import { useRole } from "@/app/dashboard/components/RoleContext";
 import { canEditPegawai, isSuperAdmin } from "@/lib/auth";
 import ModalKenaikanPangkat from "@/app/dashboard/components/ModalKenaikanPangkat";
@@ -205,6 +207,10 @@ export default function ModalInputKgb({
   const judul = ulang ? "Input Ulang KGB" : "Input KGB";
   const hasil = perhitungan?.ok ? perhitungan.hasil : null;
   const tmtKgbPanel = hasil?.tmtKgbBaru ?? pegawai?.tmtKgbBerikutnya ?? null;
+  // Masa kerja menurut SK kenaikan pangkat atau PMK yang menjadi dasar, bila terbit sesudah KGB terakhir (ADR-123). Dasarnya
+  // diambil dari linimasa panel (segar sesudah SK dicatat atau dibetulkan), dan dari pencarian awal selama panel belum dimuat.
+  const dasarMkg = panel.data?.linimasa.dasar ?? (dasarKp ? { jenis: dasarKp.kp.jenis ?? "kp", tmt: dasarKp.kp.tmtPangkat } : null);
+  const mkgMenurutSk = pegawai && dasarMkg ? mkgPadaSkTercatat(pegawai, dasarMkg) : null;
 
   // Memuat linimasa untuk panel setelah data pegawai diketahui (TMT KGB yang dibuat membatasi SK yang berlaku), dan
   // setiap kali dimuat ulang sesudah pembetulan.
@@ -364,7 +370,7 @@ export default function ModalInputKgb({
           baris={[
             { label: "Jabatan", nilai: pegawai.jabatan || "-" },
             { label: "Golongan", nilai: pegawai.golonganRuang || "-" },
-            { label: "Masa kerja golongan", nilai: formatMkg(pegawai.mkgTahun, pegawai.mkgBulan) },
+            { label: "Masa kerja golongan", nilai: <NilaiMasaKerja tahun={pegawai.mkgTahun} bulan={pegawai.mkgBulan} menurutSk={mkgMenurutSk} /> },
             { label: "Gaji pokok", nilai: formatRupiah(pegawai.gajiPokok) },
             { label: "TMT KGB", nilai: formatTanggalId(pegawai.tmtKgbBerikutnya) },
           ]}

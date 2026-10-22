@@ -173,6 +173,8 @@ export async function GET() {
         tmtSK: isoTanggalKalender(k?.tmtSK),
         gajiPokokLama: k?.gajiPokokLama ?? null,
         gajiPokokBaru: k?.gajiPokokBaru ?? null,
+        mkgTahunLama: k?.mkgTahunLama ?? null,
+        mkgBulanLama: k?.mkgBulanLama ?? null,
         mkgTahunBaru: k?.mkgTahunBaru ?? null,
         mkgBulanBaru: k?.mkgBulanBaru ?? null,
         prevNomorSK: adaNomorPrev ? nomorPrev : arsipPrev ? prev!.nomorSK!.trim() : null,

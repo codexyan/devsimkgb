@@ -33,6 +33,7 @@ import {
 } from "./format";
 import { IkonDokumen } from "./ikon";
 import { muatLinimasaDasar, type DataLinimasa } from "./linimasa";
+import { mkgPadaSkDasar } from "@/lib/prosesKgb";
 import ModalLinimasaDasar from "./ModalLinimasaDasar";
 
 type Versi = "biasa" | "srikandi";
@@ -48,6 +49,10 @@ export interface RingkasanSk {
   mkgBulanBaru?: number | null;
   tmtKgbBaru?: NilaiTanggal;
   flagRapelan?: boolean;
+  /** Masa kerja pada TMT KGB terakhir dan TMT SK dasar, untuk masa kerja yang tercetak pada baris SK dasar (ADR-123). */
+  mkgTahunLama?: number | null;
+  mkgBulanLama?: number | null;
+  tmtSK?: NilaiTanggal;
 }
 
 interface PropsModalBuatSk {
@@ -472,6 +477,22 @@ export default function ModalBuatSk({
   const kurangIsian = alasanTolak ? null : periksaIsian();
   // Isian sekarang dibandingkan dengan SK terbaru menurut linimasa (ADR-062).
   const banding = linimasa && !ditahan ? bandingkanDasarSk(dasar, linimasa.linimasa) : null;
+  // Masa kerja pada TMT SK dasar menurut hitungan yang sama dengan baris SK dasar yang tercetak; hanya bila berbeda dari
+  // masa kerja pada TMT KGB terakhir, yaitu bila SK dasarnya KP atau PMK di tengah siklus (ADR-123).
+  const mkgSkDasar =
+    ringkasan?.tmtSK && ringkasan.mkgTahunLama != null && ringkasan.mkgBulanLama != null && ringkasan.mkgTahunBaru != null && ringkasan.mkgBulanBaru != null
+      ? (() => {
+          const m = mkgPadaSkDasar({
+            tmtSK: ringkasan.tmtSK,
+            tmtKgbBaru: ringkasan.tmtKgbBaru,
+            mkgTahunLama: ringkasan.mkgTahunLama,
+            mkgBulanLama: ringkasan.mkgBulanLama,
+            mkgTahunBaru: ringkasan.mkgTahunBaru,
+            mkgBulanBaru: ringkasan.mkgBulanBaru,
+          });
+          return m.tahun !== ringkasan.mkgTahunLama || m.bulan !== ringkasan.mkgBulanLama ? m : null;
+        })()
+      : null;
   const dasarLinimasa = linimasa?.linimasa.dasar ?? null;
 
   return (
@@ -534,6 +555,9 @@ export default function ModalBuatSk({
                   { label: "Golongan", nilai: ringkasan.golongan || "-" },
                   { label: "Gaji pokok lama", nilai: formatRupiah(ringkasan.gajiPokokLama) },
                   { label: "Gaji pokok baru", nilai: formatRupiah(ringkasan.gajiPokokBaru), nada: "hijau" },
+                  ...(mkgSkDasar
+                    ? [{ label: "Masa kerja pada SK dasar", nilai: `${formatMkg(mkgSkDasar.tahun, mkgSkDasar.bulan)} (tercetak di SK)` }]
+                    : []),
                   { label: "Masa kerja baru", nilai: formatMkg(ringkasan.mkgTahunBaru, ringkasan.mkgBulanBaru) },
                   { label: "TMT KGB", nilai: formatTanggalId(ringkasan.tmtKgbBaru) },
                 ]}
