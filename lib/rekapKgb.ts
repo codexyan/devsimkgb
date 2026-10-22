@@ -326,7 +326,7 @@ export function rekapPerBulanTmt(daftar: readonly KgbUntukRekap[], hariIni?: Dat
 }
 
 export interface HasilPilihKgbSiklus<T> {
-  /** Record KGB siklus berjalan (bukan arsip, bukan placeholder), atau null bila belum diinput. */
+  /** Record KGB siklus berjalan (bukan arsip, bukan placeholder), atau null bila belum diinput atau sudah usang. */
   kgbBerjalan: T | null;
   /** SK KGB selesai terakhir sebelum siklus berjalan (arsip ikut), untuk data SK terakhir. */
   selesaiSebelumnya: T | null;
@@ -339,7 +339,8 @@ export interface HasilPilihKgbSiklus<T> {
  *   itu (misalnya yang dibatalkan); bila tidak ada, KGB belum diinput (null), walaupun pegawai
  *   punya KGB selesai dari siklus sebelumnya.
  * - Bila masa input belum dibuka, record terbaru dengan TMT di tahun berjalan tetap ditampilkan
- *   (misalnya KGB yang selesai tahun ini); selain itu null.
+ *   (misalnya KGB yang selesai tahun ini); selain itu null. KGB dibatalkan yang TMT-nya bukan TMT berikutnya pegawai
+ *   tidak ditampilkan, karena jadwalnya sudah maju.
  */
 export function pilihKgbSiklus<T extends KgbUntukRekap>(input: {
   tmtKgbBerikutnya: NilaiTanggal;
@@ -360,7 +361,10 @@ export function pilihKgbSiklus<T extends KgbUntukRekap>(input: {
     if (jendela && !jendela.isLocked) {
       kgbBerjalan = bukanPlaceholder.find((k) => kunciTanggal(k.tmtKgbBaru) === tmtBerikutnya) ?? null;
     } else {
-      kgbBerjalan = bukanPlaceholder.find((k) => tahunTmt(k) === input.tahun) ?? null;
+      // KGB dibatalkan yang TMT-nya bukan lagi jadwal pegawai sudah usang: jadwal sudah maju (arsip, hukdis, atau pembetulan),
+      // jadi ia tidak boleh membuat pegawai tampil sebagai Perlu diinput padahal jendelanya belum dibuka.
+      kgbBerjalan =
+        bukanPlaceholder.find((k) => tahunTmt(k) === input.tahun && (k.status !== "ditolak" || kunciTanggal(k.tmtKgbBaru) === tmtBerikutnya)) ?? null;
     }
   }
 

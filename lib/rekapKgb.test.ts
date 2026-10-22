@@ -267,3 +267,16 @@ test("pipeline: KGB dibatalkan dengan TMT yang dibuka menjadi siklus berjalan", 
   assert.equal(hasil.kgbBerjalan?.id, "batal");
   assert.equal(hasil.selesaiSebelumnya?.id, "arsip");
 });
+
+test("pipeline: KGB dibatalkan yang jadwalnya sudah maju tidak menjadi siklus berjalan", () => {
+  const daftar = [
+    kgb({ id: "arsip", pegawaiId: "p", status: "selesai", isArsip: true, tmtKgbBaru: tanggal(2025, 12), createdAt: tanggal(2026, 9) }),
+    kgb({ id: "batal", pegawaiId: "p", status: "ditolak", tmtKgbBaru: tanggal(2026, 12), createdAt: tanggal(2026, 9) }),
+  ];
+  // TMT pegawai sudah 1 Desember 2027; masa inputnya belum dibuka, jadi pegawai tidak boleh tampil sebagai Perlu diinput.
+  const hasil = pilihKgbSiklus({ tmtKgbBerikutnya: tanggal(2027, 12), kgb: daftar, hariIni: HARI_INI, tahun: 2026 });
+  assert.equal(hasil.kgbBerjalan, null);
+  // Yang masih jadwal pegawai tetap tampil, walau jendelanya belum dibuka.
+  const sama = pilihKgbSiklus({ tmtKgbBerikutnya: tanggal(2026, 12), kgb: daftar, hariIni: tanggal(2026, 8), tahun: 2026 });
+  assert.equal(sama.kgbBerjalan?.id, "batal");
+});
