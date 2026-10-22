@@ -14,6 +14,7 @@ import {
   getPangkat,
   hitungMKGKenaikanPangkat,
   isGolonganDikenal,
+  selisihBulan,
 } from "@/lib/tabelGaji";
 import { tanggalKalender, type NilaiTanggal } from "@/lib/waktu";
 
@@ -81,6 +82,33 @@ export function hitungKenaikanPangkat(input: {
       gajiPokokBaru: getGajiPokok(golonganBaru, mkgTahunBaru, mkgBulanBaru),
       potonganMkgTahun: potongan ? mkgTahunLama - potongan.mkgTahun : 0,
     },
+  };
+}
+
+/**
+ * Masa kerja golongan pada TMT kenaikan pangkat, sebelum dan sesudahnya, seperti yang tertulis di SK (ADR-125). Data pegawai
+ * menyimpan masa kerja pada TMT KGB terakhir; SK menulis masa kerja pada TMT-nya sendiri, yaitu angka tersimpan ditambah
+ * selang kedua TMT, dipotong bila pindah jenjang golongan. Hanya untuk tampilan: hitungan KGB tetap memakai angka tersimpan.
+ * null bila TMT kenaikan pangkat tidak sesudah TMT KGB terakhir, atau hitungannya tidak mungkin.
+ */
+export function mkgMenurutSkPadaTmt(input: {
+  golonganLama: string;
+  mkgTahunLama: number;
+  mkgBulanLama: number;
+  golonganBaru: string;
+  tmtKgbTerakhir: NilaiTanggal;
+  tmtPangkat: NilaiTanggal;
+}): { sebelum: { tahun: number; bulan: number }; sesudah: { tahun: number; bulan: number } } | null {
+  const terakhir = tanggalKalender(input.tmtKgbTerakhir);
+  const tmt = tanggalKalender(input.tmtPangkat);
+  if (!terakhir || !tmt || tmt <= terakhir) return null;
+  const h = hitungKenaikanPangkat(input);
+  if (!h.ok) return null;
+  const jarak = selisihBulan(terakhir, tmt);
+  const pecah = (bulan: number) => ({ tahun: Math.floor(bulan / 12), bulan: bulan % 12 });
+  return {
+    sebelum: pecah(input.mkgTahunLama * 12 + input.mkgBulanLama + jarak),
+    sesudah: pecah(h.hasil.mkgTahunBaru * 12 + h.hasil.mkgBulanBaru + jarak),
   };
 }
 

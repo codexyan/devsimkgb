@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkgPadaSkTercatat } from "./dasarSkUsulan";
 import { mkgPadaSkDasar } from "./prosesKgb";
+import { mkgMenurutSkPadaTmt } from "./kenaikanPangkat";
 
 const d = (s: string) => new Date(`${s}T00:00:00.000Z`);
 
@@ -27,4 +28,26 @@ test("angka tampilan sejalan dengan hitungan KGB: 8/4 + 8 bulan = 7/0 + 24 bulan
     { tahun: 8, bulan: 4 },
     "SK KGB mencetak 8 thn 4 bln pada baris SK dasar, sama dengan angka yang tampil di Data Kepegawaian",
   );
+});
+
+test("Catat KP: II/b → II/c, tersimpan 7/0, KGB terakhir 1 Des 2024, TMT pangkat 1 Apr 2026 → SK menulis 8/4 sebelum dan sesudahnya (ADR-125)", () => {
+  const h = mkgMenurutSkPadaTmt({
+    golonganLama: "II/b", mkgTahunLama: 7, mkgBulanLama: 0, golonganBaru: "II/c", tmtKgbTerakhir: d("2024-12-01"), tmtPangkat: d("2026-04-01"),
+  });
+  assert.deepEqual(h, { sebelum: { tahun: 8, bulan: 4 }, sesudah: { tahun: 8, bulan: 4 } });
+});
+
+test("Catat KP pindah jenjang: potongan 5 tahun berlaku pada angka sesudahnya saja", () => {
+  const h = mkgMenurutSkPadaTmt({
+    golonganLama: "II/d", mkgTahunLama: 7, mkgBulanLama: 0, golonganBaru: "III/a", tmtKgbTerakhir: d("2024-12-01"), tmtPangkat: d("2026-04-01"),
+  });
+  assert.deepEqual(h, { sebelum: { tahun: 8, bulan: 4 }, sesudah: { tahun: 3, bulan: 4 } });
+});
+
+test("Catat KP: TMT pangkat tidak sesudah KGB terakhir, atau golongan tidak naik, tidak menampilkan angka lain", () => {
+  const dasar = { golonganLama: "II/b", mkgTahunLama: 7, mkgBulanLama: 0, golonganBaru: "II/c", tmtKgbTerakhir: d("2024-12-01") };
+  assert.equal(mkgMenurutSkPadaTmt({ ...dasar, tmtPangkat: d("2024-12-01") }), null);
+  assert.equal(mkgMenurutSkPadaTmt({ ...dasar, tmtPangkat: d("2024-06-01") }), null);
+  assert.equal(mkgMenurutSkPadaTmt({ ...dasar, golonganBaru: "II/a", tmtPangkat: d("2026-04-01") }), null);
+  assert.equal(mkgMenurutSkPadaTmt({ ...dasar, tmtKgbTerakhir: null, tmtPangkat: d("2026-04-01") }), null);
 });
